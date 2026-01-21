@@ -117,13 +117,34 @@ impl App {
         egui.begin_frame(window);
 
         // Build UI
-        egui::SidePanel::left("main_panel")
-            .default_width(305.0)
-            .show(&egui.context, |ui| {
-                ui.heading("polyscope-rs");
-                ui.separator();
-                ui.label("Structures will appear here");
+        let mut bg_color = [
+            self.background_color.x,
+            self.background_color.y,
+            self.background_color.z,
+        ];
+
+        polyscope_ui::build_left_panel(&egui.context, |ui| {
+            polyscope_ui::build_controls_section(ui, &mut bg_color);
+
+            // Collect structure info
+            let structures: Vec<(String, String, bool)> = crate::with_context(|ctx| {
+                ctx.registry
+                    .iter()
+                    .map(|s| (s.type_name().to_string(), s.name().to_string(), s.is_enabled()))
+                    .collect()
             });
+
+            polyscope_ui::build_structure_tree(ui, &structures, |type_name, name, enabled| {
+                crate::with_context_mut(|ctx| {
+                    if let Some(s) = ctx.registry.get_mut(type_name, name) {
+                        s.set_enabled(enabled);
+                    }
+                });
+            });
+        });
+
+        // Update background color if changed
+        self.background_color = Vec3::new(bg_color[0], bg_color[1], bg_color[2]);
 
         // End egui frame
         let egui_output = egui.end_frame(window);
