@@ -22,14 +22,8 @@ impl PointCloudScalarQuantity {
         structure_name: impl Into<String>,
         values: Vec<f32>,
     ) -> Self {
-        let min = values
-            .iter()
-            .cloned()
-            .fold(f32::INFINITY, f32::min);
-        let max = values
-            .iter()
-            .cloned()
-            .fold(f32::NEG_INFINITY, f32::max);
+        let min = values.iter().cloned().fold(f32::INFINITY, f32::min);
+        let max = values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
 
         Self {
             name: name.into(),
@@ -85,6 +79,20 @@ impl PointCloudScalarQuantity {
     pub fn set_range(&mut self, min: f32, max: f32) {
         self.range_min = min;
         self.range_max = max;
+    }
+
+    /// Builds the egui UI for this scalar quantity.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        let colormaps = ["viridis", "blues", "reds", "coolwarm", "rainbow"];
+        polyscope_ui::build_scalar_quantity_ui(
+            ui,
+            &self.name,
+            &mut self.enabled,
+            &mut self.colormap_name,
+            &mut self.range_min,
+            &mut self.range_max,
+            &colormaps,
+        )
     }
 }
 
@@ -217,6 +225,38 @@ impl PointCloudVectorQuantity {
     pub fn set_color(&mut self, color: Vec3) {
         self.color = color;
     }
+
+    /// Gets the length scale.
+    pub fn length_scale(&self) -> f32 {
+        self.length_scale
+    }
+
+    /// Gets the radius.
+    pub fn radius(&self) -> f32 {
+        self.radius
+    }
+
+    /// Gets the color.
+    pub fn color(&self) -> Vec3 {
+        self.color
+    }
+
+    /// Builds the egui UI for this vector quantity.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        let mut color = [self.color.x, self.color.y, self.color.z];
+        let changed = polyscope_ui::build_vector_quantity_ui(
+            ui,
+            &self.name,
+            &mut self.enabled,
+            &mut self.length_scale,
+            &mut self.radius,
+            &mut color,
+        );
+        if changed {
+            self.color = Vec3::new(color[0], color[1], color[2]);
+        }
+        changed
+    }
 }
 
 impl Quantity for PointCloudVectorQuantity {
@@ -294,6 +334,11 @@ impl PointCloudColorQuantity {
     /// Applies this color quantity to the point cloud render data.
     pub fn apply_to_render_data(&self, queue: &wgpu::Queue, render_data: &PointCloudRenderData) {
         render_data.update_colors(queue, &self.colors);
+    }
+
+    /// Builds the egui UI for this color quantity.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        polyscope_ui::build_color_quantity_ui(ui, &self.name, &mut self.enabled, self.colors.len())
     }
 }
 

@@ -184,6 +184,31 @@ impl PointCloud {
             self.base_color = Vec3::new(color[0], color[1], color[2]);
             self.point_radius = radius;
         }
+
+        // Show quantities
+        if !self.quantities.is_empty() {
+            ui.separator();
+            ui.label("Quantities:");
+            for quantity in &mut self.quantities {
+                // Cast to concrete type and call build_egui_ui
+                if let Some(sq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<PointCloudScalarQuantity>()
+                {
+                    sq.build_egui_ui(ui);
+                } else if let Some(cq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<PointCloudColorQuantity>()
+                {
+                    cq.build_egui_ui(ui);
+                } else if let Some(vq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<PointCloudVectorQuantity>()
+                {
+                    vq.build_egui_ui(ui);
+                }
+            }
+        }
     }
 
     /// Updates GPU buffers based on current state.
