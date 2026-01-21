@@ -6,7 +6,7 @@ use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{PointCloudRenderData, PointUniforms};
+use polyscope_render::{ColorMapRegistry, PointCloudRenderData, PointUniforms};
 
 pub use quantities::*;
 
@@ -141,8 +141,22 @@ impl PointCloud {
         None
     }
 
+    /// Returns the currently active scalar quantity, if any.
+    pub fn active_scalar_quantity(&self) -> Option<&PointCloudScalarQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
+                if let Some(sq) = q.as_any().downcast_ref::<PointCloudScalarQuantity>() {
+                    return Some(sq);
+                }
+            }
+        }
+        None
+    }
+
     /// Updates GPU buffers based on current state.
-    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
+    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue, color_maps: &ColorMapRegistry) {
         let Some(render_data) = &self.render_data else {
             return;
         };
@@ -154,10 +168,16 @@ impl PointCloud {
             base_color: [self.base_color.x, self.base_color.y, self.base_color.z, 1.0],
         };
 
-        // Check for active color quantity
+        // Priority: color quantity > scalar quantity > base color
         if let Some(color_q) = self.active_color_quantity() {
             uniforms.use_per_point_color = 1;
             color_q.apply_to_render_data(queue, render_data);
+        } else if let Some(scalar_q) = self.active_scalar_quantity() {
+            if let Some(colormap) = color_maps.get(scalar_q.colormap_name()) {
+                uniforms.use_per_point_color = 1;
+                let colors = scalar_q.compute_colors(colormap);
+                render_data.update_colors(queue, &colors);
+            }
         }
 
         render_data.update_uniforms(queue, &uniforms);

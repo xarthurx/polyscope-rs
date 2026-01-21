@@ -23,7 +23,7 @@ fn main() -> Result<()> {
 
     let handle = register_point_cloud("my points", points);
 
-    // Add color based on position (creates a rainbow gradient)
+    // Add color quantity based on position (creates a rainbow gradient)
     let colors: Vec<Vec3> = (0..1000)
         .map(|i| {
             let x = (i % 10) as f32 / 9.0;
@@ -34,11 +34,21 @@ fn main() -> Result<()> {
         .collect();
     handle.add_color_quantity("position colors", colors);
 
-    // Enable the color quantity
+    // Add scalar quantity (height = x + y position)
+    let scalars: Vec<f32> = (0..1000)
+        .map(|i| {
+            let x = (i % 10) as f32 / 9.0;
+            let y = ((i / 10) % 10) as f32 / 9.0;
+            x + y // Scalar = x + y position
+        })
+        .collect();
+    handle.add_scalar_quantity("height", scalars);
+
+    // Enable the scalar quantity (will use viridis colormap)
     with_context_mut(|ctx| {
         if let Some(structure) = ctx.registry.get_mut("PointCloud", "my points") {
             if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>() {
-                if let Some(q) = pc.get_quantity_mut("position colors") {
+                if let Some(q) = pc.get_quantity_mut("height") {
                     q.set_enabled(true);
                 }
             }

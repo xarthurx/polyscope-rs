@@ -2,7 +2,7 @@
 
 use glam::Vec3;
 use polyscope_core::quantity::{Quantity, QuantityKind, VertexQuantity};
-use polyscope_render::PointCloudRenderData;
+use polyscope_render::{ColorMap, PointCloudRenderData};
 
 /// A scalar quantity on a point cloud.
 pub struct PointCloudScalarQuantity {
@@ -10,7 +10,9 @@ pub struct PointCloudScalarQuantity {
     structure_name: String,
     values: Vec<f32>,
     enabled: bool,
-    // TODO: Add color map, range, GPU resources
+    colormap_name: String,
+    range_min: f32,
+    range_max: f32,
 }
 
 impl PointCloudScalarQuantity {
@@ -20,17 +22,69 @@ impl PointCloudScalarQuantity {
         structure_name: impl Into<String>,
         values: Vec<f32>,
     ) -> Self {
+        let min = values
+            .iter()
+            .cloned()
+            .fold(f32::INFINITY, f32::min);
+        let max = values
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
+
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
             values,
             enabled: false,
+            colormap_name: "viridis".to_string(),
+            range_min: min,
+            range_max: max,
         }
     }
 
     /// Returns the scalar values.
     pub fn values(&self) -> &[f32] {
         &self.values
+    }
+
+    /// Maps scalar values to colors using the colormap.
+    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
+        let range = self.range_max - self.range_min;
+        let range = if range.abs() < 1e-10 { 1.0 } else { range };
+
+        self.values
+            .iter()
+            .map(|&v| {
+                let t = (v - self.range_min) / range;
+                colormap.sample(t)
+            })
+            .collect()
+    }
+
+    /// Gets the colormap name.
+    pub fn colormap_name(&self) -> &str {
+        &self.colormap_name
+    }
+
+    /// Sets the colormap name.
+    pub fn set_colormap(&mut self, name: impl Into<String>) {
+        self.colormap_name = name.into();
+    }
+
+    /// Gets the range minimum.
+    pub fn range_min(&self) -> f32 {
+        self.range_min
+    }
+
+    /// Gets the range maximum.
+    pub fn range_max(&self) -> f32 {
+        self.range_max
+    }
+
+    /// Sets the range.
+    pub fn set_range(&mut self, min: f32, max: f32) {
+        self.range_min = min;
+        self.range_max = max;
     }
 }
 

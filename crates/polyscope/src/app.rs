@@ -82,7 +82,7 @@ impl App {
             for structure in ctx.registry.iter() {
                 if structure.type_name() == "PointCloud" {
                     if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
-                        pc.update_gpu_buffers(&engine.queue);
+                        pc.update_gpu_buffers(&engine.queue, &engine.color_maps);
                     }
                 }
             }
