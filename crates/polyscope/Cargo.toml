@@ -1,0 +1,25 @@
+[package]
+name = "polyscope"
+description = "A Rust-native 3D visualization library for geometric data"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+polyscope-core.workspace = true
+polyscope-render.workspace = true
+polyscope-ui.workspace = true
+polyscope-structures.workspace = true
+glam.workspace = true
+log.workspace = true
+env_logger.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

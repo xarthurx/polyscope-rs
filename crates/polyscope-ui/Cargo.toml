@@ -1,0 +1,29 @@
+[package]
+name = "polyscope-ui"
+description = "UI layer for polyscope-rs: dear-imgui integration and widgets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+polyscope-core.workspace = true
+polyscope-render.workspace = true
+glam.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+dear-imgui-rs.workspace = true
+dear-imgui-wgpu.workspace = true
+dear-imgui-winit.workspace = true
+dear-imguizmo.workspace = true
+dear-implot.workspace = true
+log.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
