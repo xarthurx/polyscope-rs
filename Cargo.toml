@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "crates/polyscope-core",
     "crates/polyscope-render",
-    # "crates/polyscope-ui",  # TODO: Re-enable in Phase 4 (requires libclang)
+    "crates/polyscope-ui",
     "crates/polyscope-structures",
     "crates/polyscope",
 ]
@@ -30,12 +30,10 @@ glam = { version = "0.29", features = ["serde"] }
 wgpu = "24"
 winit = "0.30"
 
-# UI (dear-imgui-rs ecosystem) - using 0.7.x for wgpu 24 compatibility
-dear-imgui-rs = "0.7"
-dear-imgui-wgpu = "0.7"
-dear-imgui-winit = "0.7"
-dear-imguizmo = "0.7"
-dear-implot = "0.7"
+# UI (egui - pure Rust, no native dependencies)
+egui = "0.31"
+egui-wgpu = "0.31"
+egui-winit = "0.31"
 
 # Utilities
 serde = { version = "1.0", features = ["derive"] }
