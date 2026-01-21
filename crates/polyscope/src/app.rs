@@ -12,7 +12,7 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use polyscope_render::RenderEngine;
+use polyscope_render::{PickResult, RenderEngine};
 use polyscope_structures::PointCloud;
 use polyscope_ui::EguiIntegration;
 
@@ -29,6 +29,9 @@ pub struct App {
     mouse_pos: (f64, f64),
     mouse_down: bool,
     right_mouse_down: bool,
+    // Selection state
+    selection: Option<PickResult>,
+    last_click_pos: Option<(f64, f64)>,
 }
 
 impl App {
@@ -43,6 +46,8 @@ impl App {
             mouse_pos: (0.0, 0.0),
             mouse_down: false,
             right_mouse_down: false,
+            selection: None,
+            last_click_pos: None,
         }
     }
 
@@ -164,6 +169,16 @@ impl App {
                 },
             );
         });
+
+        // Show selection panel if we have a selection
+        if let Some(ref selection) = self.selection {
+            if selection.hit {
+                polyscope_ui::build_selection_panel(&egui.context, selection, |ui| {
+                    // Structure-specific pick UI (placeholder for now)
+                    ui.label("Quantity values would appear here");
+                });
+            }
+        }
 
         // Update background color if changed
         self.background_color = Vec3::new(bg_color[0], bg_color[1], bg_color[2]);
@@ -373,10 +388,45 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                let pressed = state == ElementState::Pressed;
-                match button {
-                    MouseButton::Left => self.mouse_down = pressed,
-                    MouseButton::Right => self.right_mouse_down = pressed,
+                match (button, state) {
+                    (MouseButton::Left, ElementState::Pressed) => {
+                        self.mouse_down = true;
+                        self.last_click_pos = Some(self.mouse_pos);
+                    }
+                    (MouseButton::Left, ElementState::Released) => {
+                        // Check if this was a click (not a drag)
+                        if let Some(click_pos) = self.last_click_pos {
+                            let dx = self.mouse_pos.0 - click_pos.0;
+                            let dy = self.mouse_pos.1 - click_pos.1;
+                            let drag_distance = (dx * dx + dy * dy).sqrt();
+
+                            // If we didn't drag much, it's a click - do picking
+                            if drag_distance < 5.0 {
+                                // Placeholder selection - actual GPU picking can be added later
+                                self.selection = Some(PickResult {
+                                    hit: true,
+                                    structure_type: "PointCloud".to_string(),
+                                    structure_name: "test".to_string(),
+                                    element_index: 42,
+                                    screen_pos: glam::Vec2::new(
+                                        self.mouse_pos.0 as f32,
+                                        self.mouse_pos.1 as f32,
+                                    ),
+                                    depth: 0.5,
+                                });
+                            }
+                        }
+                        self.mouse_down = false;
+                        self.last_click_pos = None;
+                    }
+                    (MouseButton::Right, ElementState::Pressed) => {
+                        self.right_mouse_down = true;
+                    }
+                    (MouseButton::Right, ElementState::Released) => {
+                        // Clear selection on right click
+                        self.selection = None;
+                        self.right_mouse_down = false;
+                    }
                     _ => {}
                 }
             }
