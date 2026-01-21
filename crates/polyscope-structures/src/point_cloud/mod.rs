@@ -6,6 +6,7 @@ use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
+use polyscope_render::{PointCloudRenderData, PointUniforms};
 
 pub use quantities::*;
 
@@ -16,7 +17,9 @@ pub struct PointCloud {
     enabled: bool,
     transform: Mat4,
     quantities: Vec<Box<dyn Quantity>>,
-    // TODO: Add GPU buffers, render state
+    render_data: Option<PointCloudRenderData>,
+    point_radius: f32,
+    base_color: Vec3,
 }
 
 impl PointCloud {
@@ -28,6 +31,9 @@ impl PointCloud {
             enabled: true,
             transform: Mat4::IDENTITY,
             quantities: Vec::new(),
+            render_data: None,
+            point_radius: 0.01,
+            base_color: Vec3::new(0.2, 0.5, 0.8),
         }
     }
 
@@ -79,9 +85,74 @@ impl PointCloud {
         self.add_quantity(Box::new(quantity));
         self
     }
+
+    /// Initializes GPU resources for this point cloud.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+    ) {
+        self.render_data = Some(PointCloudRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            &self.points,
+            None, // No per-point colors yet
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    pub fn render_data(&self) -> Option<&PointCloudRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Sets the point radius.
+    pub fn set_point_radius(&mut self, radius: f32) {
+        self.point_radius = radius;
+    }
+
+    /// Gets the point radius.
+    pub fn point_radius(&self) -> f32 {
+        self.point_radius
+    }
+
+    /// Sets the base color.
+    pub fn set_base_color(&mut self, color: Vec3) {
+        self.base_color = color;
+    }
+
+    /// Gets the base color.
+    pub fn base_color(&self) -> Vec3 {
+        self.base_color
+    }
+
+    /// Updates GPU buffers based on current state.
+    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
+        let Some(render_data) = &self.render_data else {
+            return;
+        };
+
+        let uniforms = PointUniforms {
+            point_radius: self.point_radius,
+            use_per_point_color: 0,
+            _padding: [0.0; 2],
+            base_color: [self.base_color.x, self.base_color.y, self.base_color.z, 1.0],
+        };
+
+        render_data.update_uniforms(queue, &uniforms);
+    }
 }
 
 impl Structure for PointCloud {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }

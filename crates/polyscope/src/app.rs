@@ -12,6 +12,7 @@ use winit::{
 };
 
 use polyscope_render::RenderEngine;
+use polyscope_structures::PointCloud;
 
 use crate::Vec3;
 
@@ -56,6 +57,37 @@ impl App {
             return;
         };
 
+        // Update camera uniforms
+        engine.update_camera_uniforms();
+
+        // Initialize GPU resources for any uninitialized point clouds
+        crate::with_context_mut(|ctx| {
+            for structure in ctx.registry.iter_mut() {
+                if structure.type_name() == "PointCloud" {
+                    if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>() {
+                        if pc.render_data().is_none() {
+                            pc.init_gpu_resources(
+                                &engine.device,
+                                engine.point_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                    }
+                }
+            }
+        });
+
+        // Update GPU buffers for point clouds
+        crate::with_context(|ctx| {
+            for structure in ctx.registry.iter() {
+                if structure.type_name() == "PointCloud" {
+                    if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                        pc.update_gpu_buffers(&engine.queue);
+                    }
+                }
+            }
+        });
+
         let output = match surface.get_current_texture() {
             Ok(output) => output,
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
@@ -77,14 +109,18 @@ impl App {
             }
         };
 
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder = engine.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("render encoder"),
-        });
+        let mut encoder = engine
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("render encoder"),
+            });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("main render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -110,7 +146,27 @@ impl App {
                 ..Default::default()
             });
 
-            // TODO: Draw structures here
+            // Draw point clouds
+            if let Some(pipeline) = &engine.point_pipeline {
+                render_pass.set_pipeline(pipeline);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "PointCloud" {
+                            if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                                if let Some(render_data) = pc.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    // 6 vertices per quad, num_points instances
+                                    render_pass.draw(0..6, 0..render_data.num_points);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
         }
 
         engine.queue.submit(std::iter::once(encoder.finish()));

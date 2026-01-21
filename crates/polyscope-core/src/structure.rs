@@ -3,6 +3,8 @@
 //! A [`Structure`] represents a geometric object in the scene, such as a point cloud,
 //! surface mesh, or curve network.
 
+use std::any::Any;
+
 use glam::{Mat4, Vec3};
 
 use crate::pick::PickResult;
@@ -15,7 +17,12 @@ use crate::quantity::Quantity;
 /// - A transform matrix for positioning in the scene
 /// - Visibility state
 /// - Methods for rendering and UI building
-pub trait Structure: Send + Sync {
+pub trait Structure: Any + Send + Sync {
+    /// Returns a reference to self as `Any` for downcasting.
+    fn as_any(&self) -> &dyn Any;
+
+    /// Returns a mutable reference to self as `Any` for downcasting.
+    fn as_any_mut(&mut self) -> &mut dyn Any;
     /// Returns the unique name of this structure.
     fn name(&self) -> &str;
 
