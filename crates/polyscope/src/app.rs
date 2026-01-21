@@ -130,17 +130,39 @@ impl App {
             let structures: Vec<(String, String, bool)> = crate::with_context(|ctx| {
                 ctx.registry
                     .iter()
-                    .map(|s| (s.type_name().to_string(), s.name().to_string(), s.is_enabled()))
+                    .map(|s| {
+                        (
+                            s.type_name().to_string(),
+                            s.name().to_string(),
+                            s.is_enabled(),
+                        )
+                    })
                     .collect()
             });
 
-            polyscope_ui::build_structure_tree(ui, &structures, |type_name, name, enabled| {
-                crate::with_context_mut(|ctx| {
-                    if let Some(s) = ctx.registry.get_mut(type_name, name) {
-                        s.set_enabled(enabled);
-                    }
-                });
-            });
+            polyscope_ui::build_structure_tree_with_ui(
+                ui,
+                &structures,
+                |type_name, name, enabled| {
+                    crate::with_context_mut(|ctx| {
+                        if let Some(s) = ctx.registry.get_mut(type_name, name) {
+                            s.set_enabled(enabled);
+                        }
+                    });
+                },
+                |ui, type_name, name| {
+                    // Build structure-specific UI
+                    crate::with_context_mut(|ctx| {
+                        if let Some(s) = ctx.registry.get_mut(type_name, name) {
+                            if type_name == "PointCloud" {
+                                if let Some(pc) = s.as_any_mut().downcast_mut::<PointCloud>() {
+                                    pc.build_egui_ui(ui);
+                                }
+                            }
+                        }
+                    });
+                },
+            );
         });
 
         // Update background color if changed
@@ -295,18 +317,19 @@ impl ApplicationHandler for App {
             .expect("failed to create render engine");
 
         // Create egui integration
-        let egui = EguiIntegration::new(
-            &engine.device,
-            engine.surface_config.format,
-            &window,
-        );
+        let egui = EguiIntegration::new(&engine.device, engine.surface_config.format, &window);
 
         self.window = Some(window);
         self.engine = Some(engine);
         self.egui = Some(egui);
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
         // Let egui handle events first
         if let (Some(egui), Some(window)) = (&mut self.egui, &self.window) {
             if egui.handle_event(window, &event) {
@@ -337,11 +360,15 @@ impl ApplicationHandler for App {
                 if let Some(engine) = &mut self.engine {
                     if self.mouse_down {
                         // Orbit camera
-                        engine.camera.orbit(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
+                        engine
+                            .camera
+                            .orbit(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
                     } else if self.right_mouse_down {
                         // Pan camera
                         let scale = engine.camera.position.distance(engine.camera.target) * 0.002;
-                        engine.camera.pan(-delta_x as f32 * scale, delta_y as f32 * scale);
+                        engine
+                            .camera
+                            .pan(-delta_x as f32 * scale, delta_y as f32 * scale);
                     }
                 }
             }

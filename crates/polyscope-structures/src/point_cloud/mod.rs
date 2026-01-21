@@ -54,11 +54,7 @@ impl PointCloud {
     }
 
     /// Adds a scalar quantity to this point cloud.
-    pub fn add_scalar_quantity(
-        &mut self,
-        name: impl Into<String>,
-        values: Vec<f32>,
-    ) -> &mut Self {
+    pub fn add_scalar_quantity(&mut self, name: impl Into<String>, values: Vec<f32>) -> &mut Self {
         let quantity = PointCloudScalarQuantity::new(name, self.name.clone(), values);
         self.add_quantity(Box::new(quantity));
         self
@@ -76,11 +72,7 @@ impl PointCloud {
     }
 
     /// Adds a color quantity to this point cloud.
-    pub fn add_color_quantity(
-        &mut self,
-        name: impl Into<String>,
-        colors: Vec<Vec3>,
-    ) -> &mut Self {
+    pub fn add_color_quantity(&mut self, name: impl Into<String>, colors: Vec<Vec3>) -> &mut Self {
         let quantity = PointCloudColorQuantity::new(name, self.name.clone(), colors);
         self.add_quantity(Box::new(quantity));
         self
@@ -181,6 +173,17 @@ impl PointCloud {
             }
         }
         None
+    }
+
+    /// Builds the egui UI for this point cloud.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+        let mut color = [self.base_color.x, self.base_color.y, self.base_color.z];
+        let mut radius = self.point_radius;
+
+        if polyscope_ui::build_point_cloud_ui(ui, self.points.len(), &mut radius, &mut color) {
+            self.base_color = Vec3::new(color[0], color[1], color[2]);
+            self.point_radius = radius;
+        }
     }
 
     /// Updates GPU buffers based on current state.
@@ -330,9 +333,7 @@ impl HasQuantities for PointCloud {
     }
 
     fn get_quantity_mut(&mut self, name: &str) -> Option<&mut Box<dyn Quantity>> {
-        self.quantities
-            .iter_mut()
-            .find(|q| q.name() == name)
+        self.quantities.iter_mut().find(|q| q.name() == name)
     }
 
     fn remove_quantity(&mut self, name: &str) -> Option<Box<dyn Quantity>> {

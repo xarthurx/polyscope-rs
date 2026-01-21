@@ -11,8 +11,10 @@ authors.workspace = true
 [dependencies]
 polyscope-core.workspace = true
 polyscope-render.workspace = true
+polyscope-ui.workspace = true
 glam.workspace = true
 wgpu.workspace = true
+egui.workspace = true
 ply-rs.workspace = true
 log.workspace = true
 thiserror.workspace = true
