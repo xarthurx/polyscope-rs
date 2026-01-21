@@ -127,18 +127,38 @@ impl PointCloud {
         self.base_color
     }
 
+    /// Returns the currently active color quantity, if any.
+    pub fn active_color_quantity(&self) -> Option<&PointCloudColorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Color {
+                if let Some(cq) = q.as_any().downcast_ref::<PointCloudColorQuantity>() {
+                    return Some(cq);
+                }
+            }
+        }
+        None
+    }
+
     /// Updates GPU buffers based on current state.
     pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
         let Some(render_data) = &self.render_data else {
             return;
         };
 
-        let uniforms = PointUniforms {
+        let mut uniforms = PointUniforms {
             point_radius: self.point_radius,
             use_per_point_color: 0,
             _padding: [0.0; 2],
             base_color: [self.base_color.x, self.base_color.y, self.base_color.z, 1.0],
         };
+
+        // Check for active color quantity
+        if let Some(color_q) = self.active_color_quantity() {
+            uniforms.use_per_point_color = 1;
+            color_q.apply_to_render_data(queue, render_data);
+        }
 
         render_data.update_uniforms(queue, &uniforms);
     }

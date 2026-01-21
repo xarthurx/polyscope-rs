@@ -3,6 +3,8 @@
 //! A [`Quantity`] represents data associated with a structure, such as scalar values,
 //! vector fields, or colors.
 
+use std::any::Any;
+
 /// The kind of quantity (for categorization and UI).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum QuantityKind {
@@ -25,7 +27,13 @@ pub enum QuantityKind {
 /// - Vector fields (velocity, normals, etc.)
 /// - Colors
 /// - UV parameterizations
-pub trait Quantity: Send + Sync {
+pub trait Quantity: Any + Send + Sync {
+    /// Returns a reference to self as `Any` for downcasting.
+    fn as_any(&self) -> &dyn Any;
+
+    /// Returns a mutable reference to self as `Any` for downcasting.
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+
     /// Returns the name of this quantity.
     fn name(&self) -> &str;
 

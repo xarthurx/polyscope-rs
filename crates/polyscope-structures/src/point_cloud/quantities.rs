@@ -2,6 +2,7 @@
 
 use glam::Vec3;
 use polyscope_core::quantity::{Quantity, QuantityKind, VertexQuantity};
+use polyscope_render::PointCloudRenderData;
 
 /// A scalar quantity on a point cloud.
 pub struct PointCloudScalarQuantity {
@@ -34,6 +35,14 @@ impl PointCloudScalarQuantity {
 }
 
 impl Quantity for PointCloudScalarQuantity {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -100,6 +109,14 @@ impl PointCloudVectorQuantity {
 }
 
 impl Quantity for PointCloudVectorQuantity {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -162,9 +179,22 @@ impl PointCloudColorQuantity {
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
+
+    /// Applies this color quantity to the point cloud render data.
+    pub fn apply_to_render_data(&self, queue: &wgpu::Queue, render_data: &PointCloudRenderData) {
+        render_data.update_colors(queue, &self.colors);
+    }
 }
 
 impl Quantity for PointCloudColorQuantity {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }

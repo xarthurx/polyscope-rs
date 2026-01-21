@@ -1,6 +1,7 @@
 //! Demo application showing basic polyscope-rs usage.
 
 use polyscope::*;
+use polyscope_structures::PointCloud;
 
 fn main() -> Result<()> {
     // Initialize polyscope
@@ -20,7 +21,29 @@ fn main() -> Result<()> {
         }
     }
 
-    register_point_cloud("my points", points);
+    let handle = register_point_cloud("my points", points);
+
+    // Add color based on position (creates a rainbow gradient)
+    let colors: Vec<Vec3> = (0..1000)
+        .map(|i| {
+            let x = (i % 10) as f32 / 9.0;
+            let y = ((i / 10) % 10) as f32 / 9.0;
+            let z = (i / 100) as f32 / 9.0;
+            Vec3::new(x, y, z)
+        })
+        .collect();
+    handle.add_color_quantity("position colors", colors);
+
+    // Enable the color quantity
+    with_context_mut(|ctx| {
+        if let Some(structure) = ctx.registry.get_mut("PointCloud", "my points") {
+            if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>() {
+                if let Some(q) = pc.get_quantity_mut("position colors") {
+                    q.set_enabled(true);
+                }
+            }
+        }
+    });
 
     // Show the viewer (blocks until closed)
     show();
