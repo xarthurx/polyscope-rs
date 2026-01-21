@@ -65,10 +65,36 @@ Both implementations use 1D texture lookups for color mapping. The colormap data
 
 | Aspect | C++ Polyscope | polyscope-rs |
 |--------|---------------|--------------|
-| **Library** | Dear ImGui (C++) | dear-imgui-rs |
-| **Backend** | OpenGL | wgpu (via imgui-wgpu) |
+| **Library** | Dear ImGui (C++) | egui (pure Rust) |
+| **Backend** | OpenGL | wgpu (via egui-wgpu) |
+| **Build Dependencies** | None (bundled) | None (pure Rust) |
 
-The UI structure and layout aims to match the original as closely as possible.
+### Why egui Instead of dear-imgui-rs?
+
+The original C++ Polyscope uses Dear ImGui, and there is a Rust binding (`dear-imgui-rs`). However, we chose **egui** for polyscope-rs:
+
+**dear-imgui-rs drawbacks:**
+- Requires `libclang` system dependency for building (bindgen generates FFI bindings)
+- Users must install platform-specific packages before `cargo build` works:
+  - Linux: `apt install libclang-dev`
+  - macOS: `brew install llvm` or Xcode
+  - Windows: LLVM from llvm.org
+- Adds friction for contributors and end users
+
+**egui advantages:**
+- Pure Rust - no native dependencies, no FFI
+- `cargo build` just works on any platform
+- WebAssembly ready out of the box (future web deployment)
+- Modern Rust API with native types
+- Actively maintained with good wgpu integration
+- Built-in dark theme that matches Polyscope's aesthetic
+
+**Trade-offs:**
+- UI will not look pixel-identical to C++ Polyscope
+- Different API patterns (though both are immediate-mode)
+- Some ImGui-specific widgets may need custom implementation
+
+**Functional parity:** The UI provides the same *functionality* as C++ Polyscope (structure tree, quantity controls, picking panel) even though the exact appearance differs slightly. Users familiar with C++ Polyscope will find the same controls in the same logical locations.
 
 ## Memory Management
 
