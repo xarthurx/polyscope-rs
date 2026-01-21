@@ -13,6 +13,10 @@ polyscope-core.workspace = true
 polyscope-render.workspace = true
 glam.workspace = true
 egui.workspace = true
+egui-wgpu.workspace = true
+egui-winit.workspace = true
+wgpu.workspace = true
+winit.workspace = true
 log.workspace = true
 
 [dev-dependencies]

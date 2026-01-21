@@ -1,9 +1,5 @@
-//! UI layer for polyscope-rs.
-//!
-//! This crate provides the egui integration and UI widgets:
-//! - egui context and renderer setup
-//! - Structure tree panel
-//! - Quantity controls
-//! - Color bar widget
+//! UI layer for polyscope-rs using egui.
 
-// TODO: Implement egui-based UI in subsequent tasks
+pub mod integration;
+
+pub use integration::EguiIntegration;
