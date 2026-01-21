@@ -11,7 +11,7 @@ authors.workspace = true
 [dependencies]
 polyscope-core.workspace = true
 polyscope-render.workspace = true
-polyscope-ui.workspace = true
+# polyscope-ui.workspace = true  # TODO: Re-enable in Phase 4 (requires libclang)
 polyscope-structures.workspace = true
 glam.workspace = true
 log.workspace = true

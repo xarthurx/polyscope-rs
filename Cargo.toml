@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "crates/polyscope-core",
     "crates/polyscope-render",
-    "crates/polyscope-ui",
+    # "crates/polyscope-ui",  # TODO: Re-enable in Phase 4 (requires libclang)
     "crates/polyscope-structures",
     "crates/polyscope",
 ]
