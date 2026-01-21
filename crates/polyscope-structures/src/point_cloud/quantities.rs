@@ -2,6 +2,7 @@
 
 use glam::Vec3;
 use polyscope_core::quantity::{Quantity, QuantityKind, VertexQuantity};
+use polyscope_render::{ColorMap, PointCloudRenderData, VectorRenderData, VectorUniforms};
 
 /// A scalar quantity on a point cloud.
 pub struct PointCloudScalarQuantity {
@@ -9,7 +10,9 @@ pub struct PointCloudScalarQuantity {
     structure_name: String,
     values: Vec<f32>,
     enabled: bool,
-    // TODO: Add color map, range, GPU resources
+    colormap_name: String,
+    range_min: f32,
+    range_max: f32,
 }
 
 impl PointCloudScalarQuantity {
@@ -19,11 +22,23 @@ impl PointCloudScalarQuantity {
         structure_name: impl Into<String>,
         values: Vec<f32>,
     ) -> Self {
+        let min = values
+            .iter()
+            .cloned()
+            .fold(f32::INFINITY, f32::min);
+        let max = values
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
+
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
             values,
             enabled: false,
+            colormap_name: "viridis".to_string(),
+            range_min: min,
+            range_max: max,
         }
     }
 
@@ -31,9 +46,57 @@ impl PointCloudScalarQuantity {
     pub fn values(&self) -> &[f32] {
         &self.values
     }
+
+    /// Maps scalar values to colors using the colormap.
+    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
+        let range = self.range_max - self.range_min;
+        let range = if range.abs() < 1e-10 { 1.0 } else { range };
+
+        self.values
+            .iter()
+            .map(|&v| {
+                let t = (v - self.range_min) / range;
+                colormap.sample(t)
+            })
+            .collect()
+    }
+
+    /// Gets the colormap name.
+    pub fn colormap_name(&self) -> &str {
+        &self.colormap_name
+    }
+
+    /// Sets the colormap name.
+    pub fn set_colormap(&mut self, name: impl Into<String>) {
+        self.colormap_name = name.into();
+    }
+
+    /// Gets the range minimum.
+    pub fn range_min(&self) -> f32 {
+        self.range_min
+    }
+
+    /// Gets the range maximum.
+    pub fn range_max(&self) -> f32 {
+        self.range_max
+    }
+
+    /// Sets the range.
+    pub fn set_range(&mut self, min: f32, max: f32) {
+        self.range_min = min;
+        self.range_max = max;
+    }
 }
 
 impl Quantity for PointCloudScalarQuantity {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -75,7 +138,10 @@ pub struct PointCloudVectorQuantity {
     structure_name: String,
     vectors: Vec<Vec3>,
     enabled: bool,
-    // TODO: Add scale, color, style, GPU resources
+    length_scale: f32,
+    radius: f32,
+    color: Vec3,
+    render_data: Option<VectorRenderData>,
 }
 
 impl PointCloudVectorQuantity {
@@ -90,6 +156,10 @@ impl PointCloudVectorQuantity {
             structure_name: structure_name.into(),
             vectors,
             enabled: false,
+            length_scale: 1.0,
+            radius: 0.005,
+            color: Vec3::new(0.8, 0.2, 0.2), // Red
+            render_data: None,
         }
     }
 
@@ -97,9 +167,67 @@ impl PointCloudVectorQuantity {
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
     }
+
+    /// Initializes GPU resources for this vector quantity.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        base_positions: &[Vec3],
+    ) {
+        self.render_data = Some(VectorRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            base_positions,
+            &self.vectors,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    pub fn render_data(&self) -> Option<&VectorRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU uniforms.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue) {
+        if let Some(render_data) = &self.render_data {
+            let uniforms = VectorUniforms {
+                length_scale: self.length_scale,
+                radius: self.radius,
+                _padding: [0.0; 2],
+                color: [self.color.x, self.color.y, self.color.z, 1.0],
+            };
+            render_data.update_uniforms(queue, &uniforms);
+        }
+    }
+
+    /// Sets the length scale.
+    pub fn set_length_scale(&mut self, scale: f32) {
+        self.length_scale = scale;
+    }
+
+    /// Sets the radius.
+    pub fn set_radius(&mut self, radius: f32) {
+        self.radius = radius;
+    }
+
+    /// Sets the color.
+    pub fn set_color(&mut self, color: Vec3) {
+        self.color = color;
+    }
 }
 
 impl Quantity for PointCloudVectorQuantity {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -162,9 +290,22 @@ impl PointCloudColorQuantity {
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
+
+    /// Applies this color quantity to the point cloud render data.
+    pub fn apply_to_render_data(&self, queue: &wgpu::Queue, render_data: &PointCloudRenderData) {
+        render_data.update_colors(queue, &self.colors);
+    }
 }
 
 impl Quantity for PointCloudColorQuantity {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
