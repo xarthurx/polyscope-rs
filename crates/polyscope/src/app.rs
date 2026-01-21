@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use egui_wgpu::ScreenDescriptor;
 use pollster::FutureExt;
 use winit::{
     application::ApplicationHandler,
@@ -13,6 +14,7 @@ use winit::{
 
 use polyscope_render::RenderEngine;
 use polyscope_structures::PointCloud;
+use polyscope_ui::EguiIntegration;
 
 use crate::Vec3;
 
@@ -20,6 +22,7 @@ use crate::Vec3;
 pub struct App {
     window: Option<Arc<Window>>,
     engine: Option<RenderEngine>,
+    egui: Option<EguiIntegration>,
     close_requested: bool,
     background_color: Vec3,
     // Mouse state for camera control
@@ -34,6 +37,7 @@ impl App {
         Self {
             window: None,
             engine: None,
+            egui: None,
             close_requested: false,
             background_color: Vec3::new(0.1, 0.1, 0.1),
             mouse_pos: (0.0, 0.0),
@@ -49,7 +53,9 @@ impl App {
 
     /// Renders a single frame.
     fn render(&mut self) {
-        let Some(engine) = &mut self.engine else {
+        let (Some(engine), Some(egui), Some(window)) =
+            (&mut self.engine, &mut self.egui, &self.window)
+        else {
             return;
         };
 
@@ -106,6 +112,21 @@ impl App {
                 }
             }
         });
+
+        // Begin egui frame
+        egui.begin_frame(window);
+
+        // Build UI
+        egui::SidePanel::left("main_panel")
+            .default_width(305.0)
+            .show(&egui.context, |ui| {
+                ui.heading("polyscope-rs");
+                ui.separator();
+                ui.label("Structures will appear here");
+            });
+
+        // End egui frame
+        let egui_output = egui.end_frame(window);
 
         let output = match surface.get_current_texture() {
             Ok(output) => output,
@@ -212,6 +233,20 @@ impl App {
             }
         }
 
+        // Render egui on top
+        let screen_descriptor = ScreenDescriptor {
+            size_in_pixels: [engine.width, engine.height],
+            pixels_per_point: window.scale_factor() as f32,
+        };
+        egui.render(
+            &engine.device,
+            &engine.queue,
+            &mut encoder,
+            &view,
+            &screen_descriptor,
+            egui_output,
+        );
+
         engine.queue.submit(std::iter::once(encoder.finish()));
         output.present();
     }
@@ -238,11 +273,26 @@ impl ApplicationHandler for App {
             .block_on()
             .expect("failed to create render engine");
 
+        // Create egui integration
+        let egui = EguiIntegration::new(
+            &engine.device,
+            engine.surface_config.format,
+            &window,
+        );
+
         self.window = Some(window);
         self.engine = Some(engine);
+        self.egui = Some(egui);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
+        // Let egui handle events first
+        if let (Some(egui), Some(window)) = (&mut self.egui, &self.window) {
+            if egui.handle_event(window, &event) {
+                return; // egui consumed the event
+            }
+        }
+
         match event {
             WindowEvent::CloseRequested => {
                 self.close_requested = true;
