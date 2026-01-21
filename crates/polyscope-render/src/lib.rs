@@ -13,6 +13,7 @@ pub mod engine;
 pub mod error;
 pub mod ground_plane;
 pub mod materials;
+pub mod point_cloud_render;
 pub mod shader;
 
 pub use camera::Camera;
@@ -20,6 +21,7 @@ pub use color_maps::{ColorMap, ColorMapRegistry};
 pub use engine::RenderEngine;
 pub use error::{RenderError, RenderResult};
 pub use materials::{Material, MaterialRegistry};
+pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use shader::{ShaderBuilder, ShaderProgram};
 
 /// Render context passed to structures during drawing.
