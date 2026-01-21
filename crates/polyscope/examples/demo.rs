@@ -6,44 +6,21 @@ fn main() -> Result<()> {
     // Initialize polyscope
     init()?;
 
-    // Create a simple point cloud (cube corners)
-    let points = vec![
-        Vec3::new(-1.0, -1.0, -1.0),
-        Vec3::new(1.0, -1.0, -1.0),
-        Vec3::new(-1.0, 1.0, -1.0),
-        Vec3::new(1.0, 1.0, -1.0),
-        Vec3::new(-1.0, -1.0, 1.0),
-        Vec3::new(1.0, -1.0, 1.0),
-        Vec3::new(-1.0, 1.0, 1.0),
-        Vec3::new(1.0, 1.0, 1.0),
-    ];
+    // Create a grid of points (10x10x10 = 1000 points)
+    let mut points = Vec::new();
+    for i in 0..10 {
+        for j in 0..10 {
+            for k in 0..10 {
+                points.push(Vec3::new(
+                    i as f32 * 0.1 - 0.45,
+                    j as f32 * 0.1 - 0.45,
+                    k as f32 * 0.1 - 0.45,
+                ));
+            }
+        }
+    }
 
-    let pc = register_point_cloud("cube corners", points);
-
-    // Add scalar quantity (height)
-    pc.add_scalar_quantity("height", vec![-1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0]);
-
-    // Add color quantity
-    pc.add_color_quantity("colors", vec![
-        Vec3::new(1.0, 0.0, 0.0),
-        Vec3::new(0.0, 1.0, 0.0),
-        Vec3::new(0.0, 0.0, 1.0),
-        Vec3::new(1.0, 1.0, 0.0),
-        Vec3::new(1.0, 0.0, 1.0),
-        Vec3::new(0.0, 1.0, 1.0),
-        Vec3::new(0.5, 0.5, 0.5),
-        Vec3::new(1.0, 1.0, 1.0),
-    ]);
-
-    // Create a simple triangle mesh
-    let verts = vec![
-        Vec3::new(0.0, 0.0, 0.0),
-        Vec3::new(2.0, 0.0, 0.0),
-        Vec3::new(1.0, 2.0, 0.0),
-    ];
-    let faces = vec![glam::UVec3::new(0, 1, 2)];
-
-    register_surface_mesh("triangle", verts, faces);
+    register_point_cloud("my points", points);
 
     // Show the viewer (blocks until closed)
     show();
