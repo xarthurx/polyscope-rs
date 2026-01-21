@@ -43,6 +43,8 @@
 //! - [`VolumeGrid`] - A regular grid of values (for implicit surfaces)
 //! - [`CameraView`] - A camera frustum visualization
 
+mod app;
+
 // Re-export core types
 pub use polyscope_core::{
     error::{PolyscopeError, Result},
@@ -91,8 +93,8 @@ pub fn shutdown() {
 ///
 /// This function blocks until the window is closed.
 pub fn show() {
-    // TODO: Implement windowed show loop
-    log::warn!("show() not yet implemented");
+    let _ = env_logger::try_init();
+    app::run_app();
 }
 
 /// Performs one iteration of the main loop.
