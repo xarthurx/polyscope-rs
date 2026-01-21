@@ -24,3 +24,6 @@ Thumbs.db
 # Local configuration
 .env
 .env.local
+
+# Git worktrees
+.worktrees/
