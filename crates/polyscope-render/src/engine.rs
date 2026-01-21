@@ -68,6 +68,10 @@ pub struct RenderEngine {
     pub point_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Camera uniform buffer.
     pub camera_buffer: wgpu::Buffer,
+    /// Vector arrow render pipeline.
+    pub vector_pipeline: Option<wgpu::RenderPipeline>,
+    /// Vector bind group layout.
+    pub vector_bind_group_layout: Option<wgpu::BindGroupLayout>,
 }
 
 impl RenderEngine {
@@ -154,9 +158,12 @@ impl RenderEngine {
             point_pipeline: None,
             point_bind_group_layout: None,
             camera_buffer,
+            vector_pipeline: None,
+            vector_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
+        engine.init_vector_pipeline();
 
         Ok(engine)
     }
@@ -227,9 +234,12 @@ impl RenderEngine {
             point_pipeline: None,
             point_bind_group_layout: None,
             camera_buffer,
+            vector_pipeline: None,
+            vector_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
+        engine.init_vector_pipeline();
 
         Ok(engine)
     }
@@ -427,5 +437,128 @@ impl RenderEngine {
     /// Gets the camera buffer.
     pub fn camera_buffer(&self) -> &wgpu::Buffer {
         &self.camera_buffer
+    }
+
+    /// Initializes the vector arrow render pipeline.
+    pub fn init_vector_pipeline(&mut self) {
+        let shader_source = include_str!("shaders/vector_arrow.wgsl");
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("vector arrow shader"),
+                source: wgpu::ShaderSource::Wgsl(shader_source.into()),
+            });
+
+        let bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("vector bind group layout"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Vector uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Base positions storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Vectors storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("vector pipeline layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("vector arrow pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: self.surface_config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.vector_pipeline = Some(pipeline);
+        self.vector_bind_group_layout = Some(bind_group_layout);
+    }
+
+    /// Gets the vector bind group layout.
+    pub fn vector_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.vector_bind_group_layout
+            .as_ref()
+            .expect("vector pipeline not initialized")
     }
 }

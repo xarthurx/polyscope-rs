@@ -155,6 +155,34 @@ impl PointCloud {
         None
     }
 
+    /// Returns the currently active vector quantity, if any.
+    pub fn active_vector_quantity(&self) -> Option<&PointCloudVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any().downcast_ref::<PointCloudVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns a mutable reference to the active vector quantity.
+    pub fn active_vector_quantity_mut(&mut self) -> Option<&mut PointCloudVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &mut self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any_mut().downcast_mut::<PointCloudVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
     /// Updates GPU buffers based on current state.
     pub fn update_gpu_buffers(&self, queue: &wgpu::Queue, color_maps: &ColorMapRegistry) {
         let Some(render_data) = &self.render_data else {

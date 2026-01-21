@@ -2,7 +2,7 @@
 
 use glam::Vec3;
 use polyscope_core::quantity::{Quantity, QuantityKind, VertexQuantity};
-use polyscope_render::{ColorMap, PointCloudRenderData};
+use polyscope_render::{ColorMap, PointCloudRenderData, VectorRenderData, VectorUniforms};
 
 /// A scalar quantity on a point cloud.
 pub struct PointCloudScalarQuantity {
@@ -138,7 +138,10 @@ pub struct PointCloudVectorQuantity {
     structure_name: String,
     vectors: Vec<Vec3>,
     enabled: bool,
-    // TODO: Add scale, color, style, GPU resources
+    length_scale: f32,
+    radius: f32,
+    color: Vec3,
+    render_data: Option<VectorRenderData>,
 }
 
 impl PointCloudVectorQuantity {
@@ -153,12 +156,66 @@ impl PointCloudVectorQuantity {
             structure_name: structure_name.into(),
             vectors,
             enabled: false,
+            length_scale: 1.0,
+            radius: 0.005,
+            color: Vec3::new(0.8, 0.2, 0.2), // Red
+            render_data: None,
         }
     }
 
     /// Returns the vectors.
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
+    }
+
+    /// Initializes GPU resources for this vector quantity.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        base_positions: &[Vec3],
+    ) {
+        self.render_data = Some(VectorRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            base_positions,
+            &self.vectors,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    pub fn render_data(&self) -> Option<&VectorRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU uniforms.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue) {
+        if let Some(render_data) = &self.render_data {
+            let uniforms = VectorUniforms {
+                length_scale: self.length_scale,
+                radius: self.radius,
+                _padding: [0.0; 2],
+                color: [self.color.x, self.color.y, self.color.z, 1.0],
+            };
+            render_data.update_uniforms(queue, &uniforms);
+        }
+    }
+
+    /// Sets the length scale.
+    pub fn set_length_scale(&mut self, scale: f32) {
+        self.length_scale = scale;
+    }
+
+    /// Sets the radius.
+    pub fn set_radius(&mut self, radius: f32) {
+        self.radius = radius;
+    }
+
+    /// Sets the color.
+    pub fn set_color(&mut self, color: Vec3) {
+        self.color = color;
     }
 }
 
