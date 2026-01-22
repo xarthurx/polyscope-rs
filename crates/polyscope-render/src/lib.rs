@@ -24,7 +24,7 @@ pub use color_maps::{ColorMap, ColorMapRegistry};
 pub use engine::RenderEngine;
 pub use error::{RenderError, RenderResult};
 pub use materials::{Material, MaterialRegistry};
-pub use pick::{color_to_index, index_to_color, PickResult};
+pub use pick::{color_to_index, index_to_color, PickElementType, PickResult};
 pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use shader::{ShaderBuilder, ShaderProgram};
 pub use surface_mesh_render::{MeshUniforms, SurfaceMeshRenderData};

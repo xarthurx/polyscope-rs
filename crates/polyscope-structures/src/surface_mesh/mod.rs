@@ -471,11 +471,32 @@ impl SurfaceMesh {
             ui.separator();
             ui.label("Quantities:");
             for quantity in &mut self.quantities {
+                // Try downcasting to each known quantity type
                 if let Some(sq) = quantity
                     .as_any_mut()
                     .downcast_mut::<MeshVertexScalarQuantity>()
                 {
                     sq.build_egui_ui(ui);
+                } else if let Some(sq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshFaceScalarQuantity>()
+                {
+                    sq.build_egui_ui(ui);
+                } else if let Some(cq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshVertexColorQuantity>()
+                {
+                    cq.build_egui_ui(ui);
+                } else if let Some(cq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshFaceColorQuantity>()
+                {
+                    cq.build_egui_ui(ui);
+                } else if let Some(vq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshVertexVectorQuantity>()
+                {
+                    vq.build_egui_ui(ui);
                 }
             }
         }
@@ -506,6 +527,50 @@ impl SurfaceMesh {
             }
         }
         None
+    }
+
+    /// Adds a face scalar quantity to this mesh.
+    pub fn add_face_scalar_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+    ) -> &mut Self {
+        let quantity = MeshFaceScalarQuantity::new(name, self.name.clone(), values);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex color quantity to this mesh.
+    pub fn add_vertex_color_quantity(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = MeshVertexColorQuantity::new(name, self.name.clone(), colors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a face color quantity to this mesh.
+    pub fn add_face_color_quantity(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = MeshFaceColorQuantity::new(name, self.name.clone(), colors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex vector quantity to this mesh.
+    pub fn add_vertex_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = MeshVertexVectorQuantity::new(name, self.name.clone(), vectors);
+        self.add_quantity(Box::new(quantity));
+        self
     }
 
     // === GPU resource methods ===
@@ -973,5 +1038,145 @@ mod tests {
         let q = mesh.get_quantity("height").expect("quantity not found");
         assert_eq!(q.data_size(), 3);
         assert_eq!(q.kind(), QuantityKind::Scalar);
+    }
+
+    /// Test face scalar quantity.
+    #[test]
+    fn test_face_scalar_quantity() {
+        use polyscope_core::quantity::QuantityKind;
+
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        ];
+        let faces = vec![vec![0, 1, 2]];
+        let mut mesh = SurfaceMesh::new("test", vertices, faces);
+
+        mesh.add_face_scalar_quantity("area", vec![1.0]);
+
+        let q = mesh.get_quantity("area").expect("quantity not found");
+        assert_eq!(q.data_size(), 1);
+        assert_eq!(q.kind(), QuantityKind::Scalar);
+    }
+
+    /// Test vertex color quantity.
+    #[test]
+    fn test_vertex_color_quantity() {
+        use polyscope_core::quantity::QuantityKind;
+
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        ];
+        let faces = vec![vec![0, 1, 2]];
+        let mut mesh = SurfaceMesh::new("test", vertices, faces);
+
+        mesh.add_vertex_color_quantity("colors", vec![Vec3::X, Vec3::Y, Vec3::Z]);
+
+        let q = mesh.get_quantity("colors").expect("quantity not found");
+        assert_eq!(q.data_size(), 3);
+        assert_eq!(q.kind(), QuantityKind::Color);
+    }
+
+    /// Test face color quantity.
+    #[test]
+    fn test_face_color_quantity() {
+        use polyscope_core::quantity::QuantityKind;
+
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        ];
+        let faces = vec![vec![0, 1, 2]];
+        let mut mesh = SurfaceMesh::new("test", vertices, faces);
+
+        mesh.add_face_color_quantity("face_colors", vec![Vec3::new(1.0, 0.0, 0.0)]);
+
+        let q = mesh
+            .get_quantity("face_colors")
+            .expect("quantity not found");
+        assert_eq!(q.data_size(), 1);
+        assert_eq!(q.kind(), QuantityKind::Color);
+    }
+
+    /// Test vertex vector quantity.
+    #[test]
+    fn test_vertex_vector_quantity() {
+        use polyscope_core::quantity::QuantityKind;
+
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        ];
+        let faces = vec![vec![0, 1, 2]];
+        let mut mesh = SurfaceMesh::new("test", vertices, faces);
+
+        mesh.add_vertex_vector_quantity("normals", vec![Vec3::Z, Vec3::Z, Vec3::Z]);
+
+        let q = mesh.get_quantity("normals").expect("quantity not found");
+        assert_eq!(q.data_size(), 3);
+        assert_eq!(q.kind(), QuantityKind::Vector);
+    }
+
+    /// Test vector quantity properties.
+    #[test]
+    fn test_vector_quantity_properties() {
+        let mut vq =
+            MeshVertexVectorQuantity::new("test_vectors", "mesh", vec![Vec3::X, Vec3::Y, Vec3::Z]);
+
+        // Test default values
+        assert_eq!(vq.length_scale(), 1.0);
+        assert_eq!(vq.radius(), 0.005);
+        assert_eq!(vq.color(), Vec3::new(0.8, 0.2, 0.2));
+
+        // Test setters
+        vq.set_length_scale(2.0);
+        assert_eq!(vq.length_scale(), 2.0);
+
+        vq.set_radius(0.01);
+        assert_eq!(vq.radius(), 0.01);
+
+        vq.set_color(Vec3::new(0.0, 1.0, 0.0));
+        assert_eq!(vq.color(), Vec3::new(0.0, 1.0, 0.0));
+    }
+
+    /// Test face scalar quantity compute_vertex_colors.
+    #[test]
+    fn test_face_scalar_compute_vertex_colors() {
+        let fsq = MeshFaceScalarQuantity::new("test", "mesh", vec![0.0, 1.0]);
+        let faces = vec![vec![0, 1, 2], vec![2, 1, 3]];
+        let colormap = polyscope_render::ColorMap::new("test", vec![Vec3::ZERO, Vec3::ONE]);
+
+        let colors = fsq.compute_vertex_colors(&faces, 4, &colormap);
+
+        // Each vertex gets color from the last face it belongs to
+        assert_eq!(colors.len(), 4);
+        // Vertex 0 is only in face 0 (value 0.0) -> should be Vec3::ZERO
+        assert!((colors[0] - Vec3::ZERO).length() < 1e-5);
+        // Vertex 3 is only in face 1 (value 1.0) -> should be Vec3::ONE
+        assert!((colors[3] - Vec3::ONE).length() < 1e-5);
+    }
+
+    /// Test face color quantity compute_vertex_colors.
+    #[test]
+    fn test_face_color_compute_vertex_colors() {
+        let fcq = MeshFaceColorQuantity::new(
+            "test",
+            "mesh",
+            vec![Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0)],
+        );
+        let faces = vec![vec![0, 1, 2], vec![2, 1, 3]];
+
+        let colors = fcq.compute_vertex_colors(&faces, 4);
+
+        assert_eq!(colors.len(), 4);
+        // Vertex 0 is only in face 0 -> red
+        assert_eq!(colors[0], Vec3::new(1.0, 0.0, 0.0));
+        // Vertex 3 is only in face 1 -> green
+        assert_eq!(colors[3], Vec3::new(0.0, 1.0, 0.0));
     }
 }

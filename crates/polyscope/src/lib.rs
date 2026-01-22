@@ -59,7 +59,8 @@ pub use polyscope_core::{
 
 // Re-export render types
 pub use polyscope_render::{
-    Camera, ColorMap, ColorMapRegistry, Material, MaterialRegistry, RenderContext, RenderEngine,
+    Camera, ColorMap, ColorMapRegistry, Material, MaterialRegistry, PickElementType, RenderContext,
+    RenderEngine,
 };
 
 // Re-export structures
@@ -255,4 +256,34 @@ impl SurfaceMeshHandle {
     }
 
     // TODO: Add quantity methods
+}
+
+/// Executes a closure with mutable access to a registered surface mesh.
+///
+/// Returns `None` if the mesh does not exist.
+pub fn with_surface_mesh<F, R>(name: &str, f: F) -> Option<R>
+where
+    F: FnOnce(&mut SurfaceMesh) -> R,
+{
+    with_context_mut(|ctx| {
+        ctx.registry
+            .get_mut("SurfaceMesh", name)
+            .and_then(|s| s.as_any_mut().downcast_mut::<SurfaceMesh>())
+            .map(f)
+    })
+}
+
+/// Executes a closure with immutable access to a registered surface mesh.
+///
+/// Returns `None` if the mesh does not exist.
+pub fn with_surface_mesh_ref<F, R>(name: &str, f: F) -> Option<R>
+where
+    F: FnOnce(&SurfaceMesh) -> R,
+{
+    with_context(|ctx| {
+        ctx.registry
+            .get("SurfaceMesh", name)
+            .and_then(|s| s.as_any().downcast_ref::<SurfaceMesh>())
+            .map(f)
+    })
 }

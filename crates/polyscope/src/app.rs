@@ -456,6 +456,7 @@ impl ApplicationHandler for App {
                                     structure_type: "PointCloud".to_string(),
                                     structure_name: "test".to_string(),
                                     element_index: 42,
+                                    element_type: polyscope_render::PickElementType::Point,
                                     screen_pos: glam::Vec2::new(
                                         self.mouse_pos.0 as f32,
                                         self.mouse_pos.1 as f32,

@@ -6,6 +6,22 @@
 
 use glam::Vec2;
 
+/// Element type for pick results.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PickElementType {
+    /// No element type (background or unknown).
+    #[default]
+    None,
+    /// A point in a point cloud.
+    Point,
+    /// A vertex of a mesh.
+    Vertex,
+    /// A face of a mesh.
+    Face,
+    /// An edge of a mesh or curve network.
+    Edge,
+}
+
 /// Result of a pick operation.
 #[derive(Debug, Clone, Default)]
 pub struct PickResult {
@@ -17,6 +33,8 @@ pub struct PickResult {
     pub structure_name: String,
     /// The index of the element within the structure.
     pub element_index: u64,
+    /// The type of element that was hit.
+    pub element_type: PickElementType,
     /// The screen position where the pick occurred.
     pub screen_pos: Vec2,
     /// The depth value at the pick location.
@@ -85,7 +103,25 @@ mod tests {
         assert!(result.structure_type.is_empty());
         assert!(result.structure_name.is_empty());
         assert_eq!(result.element_index, 0);
+        assert_eq!(result.element_type, PickElementType::None);
         assert_eq!(result.screen_pos, Vec2::ZERO);
         assert_eq!(result.depth, 0.0);
+    }
+
+    #[test]
+    fn test_pick_element_type() {
+        // Test that all variants exist and are distinct
+        assert_ne!(PickElementType::None, PickElementType::Point);
+        assert_ne!(PickElementType::Point, PickElementType::Vertex);
+        assert_ne!(PickElementType::Vertex, PickElementType::Face);
+        assert_ne!(PickElementType::Face, PickElementType::Edge);
+
+        // Test default
+        assert_eq!(PickElementType::default(), PickElementType::None);
+
+        // Test copy
+        let element = PickElementType::Face;
+        let copied = element;
+        assert_eq!(element, copied);
     }
 }

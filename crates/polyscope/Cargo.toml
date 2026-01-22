@@ -27,5 +27,9 @@ egui-winit.workspace = true
 [dev-dependencies]
 proptest.workspace = true
 
+[[example]]
+name = "surface_mesh_demo"
+path = "../../examples/surface_mesh_demo.rs"
+
 [lints]
 workspace = true
