@@ -1,10 +1,14 @@
 //! Curve network structure.
 
+mod quantities;
+
 use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{CurveNetworkRenderData, CurveNetworkUniforms};
+use polyscope_render::{ColorMapRegistry, CurveNetworkRenderData, CurveNetworkUniforms};
+
+pub use quantities::*;
 
 /// A curve network structure (nodes connected by edges).
 pub struct CurveNetwork {
@@ -181,6 +185,106 @@ impl CurveNetwork {
         self.refresh();
     }
 
+    /// Adds a node scalar quantity to this curve network.
+    pub fn add_node_scalar_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+    ) -> &mut Self {
+        let quantity = CurveNodeScalarQuantity::new(name, self.name.clone(), values);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds an edge scalar quantity to this curve network.
+    pub fn add_edge_scalar_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+    ) -> &mut Self {
+        let quantity = CurveEdgeScalarQuantity::new(name, self.name.clone(), values);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a node color quantity to this curve network.
+    pub fn add_node_color_quantity(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = CurveNodeColorQuantity::new(name, self.name.clone(), colors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds an edge color quantity to this curve network.
+    pub fn add_edge_color_quantity(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = CurveEdgeColorQuantity::new(name, self.name.clone(), colors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Returns the currently active node scalar quantity, if any.
+    pub fn active_node_scalar_quantity(&self) -> Option<&CurveNodeScalarQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
+                if let Some(sq) = q.as_any().downcast_ref::<CurveNodeScalarQuantity>() {
+                    return Some(sq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active edge scalar quantity, if any.
+    pub fn active_edge_scalar_quantity(&self) -> Option<&CurveEdgeScalarQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
+                if let Some(sq) = q.as_any().downcast_ref::<CurveEdgeScalarQuantity>() {
+                    return Some(sq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active node color quantity, if any.
+    pub fn active_node_color_quantity(&self) -> Option<&CurveNodeColorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Color {
+                if let Some(cq) = q.as_any().downcast_ref::<CurveNodeColorQuantity>() {
+                    return Some(cq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active edge color quantity, if any.
+    pub fn active_edge_color_quantity(&self) -> Option<&CurveEdgeColorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Color {
+                if let Some(cq) = q.as_any().downcast_ref::<CurveEdgeColorQuantity>() {
+                    return Some(cq);
+                }
+            }
+        }
+        None
+    }
+
     /// Initializes GPU resources for this curve network.
     pub fn init_gpu_resources(
         &mut self,
@@ -204,7 +308,7 @@ impl CurveNetwork {
     }
 
     /// Updates GPU buffers based on current state.
-    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
+    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue, color_maps: &ColorMapRegistry) {
         let Some(render_data) = &self.render_data else {
             return;
         };
@@ -218,6 +322,26 @@ impl CurveNetwork {
         };
 
         render_data.update_uniforms(queue, &uniforms);
+
+        // Apply node color quantities
+        if let Some(color_q) = self.active_node_color_quantity() {
+            color_q.apply_to_render_data(queue, render_data);
+        } else if let Some(scalar_q) = self.active_node_scalar_quantity() {
+            if let Some(colormap) = color_maps.get(scalar_q.colormap_name()) {
+                let colors = scalar_q.compute_colors(colormap);
+                render_data.update_node_colors(queue, &colors);
+            }
+        }
+
+        // Apply edge color quantities
+        if let Some(color_q) = self.active_edge_color_quantity() {
+            color_q.apply_to_render_data(queue, render_data);
+        } else if let Some(scalar_q) = self.active_edge_scalar_quantity() {
+            if let Some(colormap) = color_maps.get(scalar_q.colormap_name()) {
+                let colors = scalar_q.compute_colors(colormap);
+                render_data.update_edge_colors(queue, &colors);
+            }
+        }
     }
 
     /// Recomputes edge centers and node degrees.

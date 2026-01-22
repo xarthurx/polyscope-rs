@@ -149,7 +149,7 @@ impl App {
 
                 if structure.type_name() == "CurveNetwork" {
                     if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
-                        cn.update_gpu_buffers(&engine.queue);
+                        cn.update_gpu_buffers(&engine.queue, &engine.color_maps);
                     }
                 }
             }
