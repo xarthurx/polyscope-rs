@@ -471,7 +471,10 @@ impl SurfaceMesh {
             ui.separator();
             ui.label("Quantities:");
             for quantity in &mut self.quantities {
-                if let Some(sq) = quantity.as_any_mut().downcast_mut::<MeshVertexScalarQuantity>() {
+                if let Some(sq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshVertexScalarQuantity>()
+                {
                     sq.build_egui_ui(ui);
                 }
             }
