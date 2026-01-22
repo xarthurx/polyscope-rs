@@ -418,6 +418,52 @@ impl SurfaceMesh {
         self.edges.sort(); // Sort for deterministic ordering
     }
 
+    /// Builds the egui UI for this surface mesh.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+        let mut shade_style = self.shade_style as u32;
+        let mut color = [
+            self.surface_color.x,
+            self.surface_color.y,
+            self.surface_color.z,
+        ];
+        let mut transparency = self.transparency;
+        let mut show_edges = self.show_edges;
+        let mut edge_width = self.edge_width;
+        let mut edge_color = [self.edge_color.x, self.edge_color.y, self.edge_color.z];
+        let mut backface_policy = self.backface_policy as u32;
+
+        if polyscope_ui::build_surface_mesh_ui(
+            ui,
+            self.num_vertices(),
+            self.num_faces(),
+            self.num_edges(),
+            &mut shade_style,
+            &mut color,
+            &mut transparency,
+            &mut show_edges,
+            &mut edge_width,
+            &mut edge_color,
+            &mut backface_policy,
+        ) {
+            self.shade_style = match shade_style {
+                0 => ShadeStyle::Smooth,
+                1 => ShadeStyle::Flat,
+                _ => ShadeStyle::TriFlat,
+            };
+            self.surface_color = Vec3::new(color[0], color[1], color[2]);
+            self.transparency = transparency;
+            self.show_edges = show_edges;
+            self.edge_width = edge_width;
+            self.edge_color = Vec3::new(edge_color[0], edge_color[1], edge_color[2]);
+            self.backface_policy = match backface_policy {
+                0 => BackfacePolicy::Identical,
+                1 => BackfacePolicy::Different,
+                2 => BackfacePolicy::Custom,
+                _ => BackfacePolicy::Cull,
+            };
+        }
+    }
+
     // TODO: Add quantity methods (vertex scalar, face scalar, vertex vector, etc.)
 
     // === GPU resource methods ===

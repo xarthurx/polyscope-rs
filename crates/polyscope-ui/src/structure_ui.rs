@@ -36,3 +36,121 @@ pub fn build_point_cloud_ui(
 
     changed
 }
+
+/// Builds UI for a surface mesh.
+pub fn build_surface_mesh_ui(
+    ui: &mut Ui,
+    num_vertices: usize,
+    num_faces: usize,
+    num_edges: usize,
+    shade_style: &mut u32,
+    surface_color: &mut [f32; 3],
+    transparency: &mut f32,
+    show_edges: &mut bool,
+    edge_width: &mut f32,
+    edge_color: &mut [f32; 3],
+    backface_policy: &mut u32,
+) -> bool {
+    let mut changed = false;
+
+    ui.label(format!("Vertices: {num_vertices}"));
+    ui.label(format!("Faces: {num_faces}"));
+    ui.label(format!("Edges: {num_edges}"));
+
+    ui.separator();
+
+    // Shade style
+    egui::ComboBox::from_label("Shading")
+        .selected_text(match *shade_style {
+            0 => "Smooth",
+            1 => "Flat",
+            _ => "Tri-Flat",
+        })
+        .show_ui(ui, |ui| {
+            if ui.selectable_value(shade_style, 0, "Smooth").changed() {
+                changed = true;
+            }
+            if ui.selectable_value(shade_style, 1, "Flat").changed() {
+                changed = true;
+            }
+            if ui.selectable_value(shade_style, 2, "Tri-Flat").changed() {
+                changed = true;
+            }
+        });
+
+    // Surface color
+    ui.horizontal(|ui| {
+        ui.label("Color:");
+        if ui.color_edit_button_rgb(surface_color).changed() {
+            changed = true;
+        }
+    });
+
+    // Transparency
+    ui.horizontal(|ui| {
+        ui.label("Opacity:");
+        if ui.add(egui::Slider::new(transparency, 0.0..=1.0)).changed() {
+            changed = true;
+        }
+    });
+
+    ui.separator();
+
+    // Wireframe
+    if ui.checkbox(show_edges, "Show edges").changed() {
+        changed = true;
+    }
+
+    if *show_edges {
+        ui.indent("edges", |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Width:");
+                if ui
+                    .add(egui::DragValue::new(edge_width).speed(0.1).range(0.1..=5.0))
+                    .changed()
+                {
+                    changed = true;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Color:");
+                if ui.color_edit_button_rgb(edge_color).changed() {
+                    changed = true;
+                }
+            });
+        });
+    }
+
+    ui.separator();
+
+    // Backface policy
+    egui::ComboBox::from_label("Backface")
+        .selected_text(match *backface_policy {
+            0 => "Identical",
+            1 => "Different",
+            2 => "Custom",
+            _ => "Cull",
+        })
+        .show_ui(ui, |ui| {
+            if ui
+                .selectable_value(backface_policy, 0, "Identical")
+                .changed()
+            {
+                changed = true;
+            }
+            if ui
+                .selectable_value(backface_policy, 1, "Different")
+                .changed()
+            {
+                changed = true;
+            }
+            if ui.selectable_value(backface_policy, 2, "Custom").changed() {
+                changed = true;
+            }
+            if ui.selectable_value(backface_policy, 3, "Cull").changed() {
+                changed = true;
+            }
+        });
+
+    changed
+}

@@ -182,6 +182,11 @@ impl App {
                                     pc.build_egui_ui(ui);
                                 }
                             }
+                            if type_name == "SurfaceMesh" {
+                                if let Some(mesh) = s.as_any_mut().downcast_mut::<SurfaceMesh>() {
+                                    mesh.build_egui_ui(ui);
+                                }
+                            }
                         }
                     });
                 },
