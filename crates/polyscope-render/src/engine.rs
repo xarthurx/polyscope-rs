@@ -72,6 +72,10 @@ pub struct RenderEngine {
     pub vector_pipeline: Option<wgpu::RenderPipeline>,
     /// Vector bind group layout.
     pub vector_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Surface mesh render pipeline.
+    pub mesh_pipeline: Option<wgpu::RenderPipeline>,
+    /// Mesh bind group layout.
+    mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
 }
 
 impl RenderEngine {
@@ -158,10 +162,13 @@ impl RenderEngine {
             camera_buffer,
             vector_pipeline: None,
             vector_bind_group_layout: None,
+            mesh_pipeline: None,
+            mesh_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
         engine.init_vector_pipeline();
+        engine.create_mesh_pipeline();
 
         Ok(engine)
     }
@@ -234,10 +241,13 @@ impl RenderEngine {
             camera_buffer,
             vector_pipeline: None,
             vector_bind_group_layout: None,
+            mesh_pipeline: None,
+            mesh_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
         engine.init_vector_pipeline();
+        engine.create_mesh_pipeline();
 
         Ok(engine)
     }
@@ -558,5 +568,150 @@ impl RenderEngine {
         self.vector_bind_group_layout
             .as_ref()
             .expect("vector pipeline not initialized")
+    }
+
+    /// Gets the mesh bind group layout.
+    pub fn mesh_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.mesh_bind_group_layout
+            .as_ref()
+            .expect("mesh pipeline not initialized")
+    }
+
+    /// Creates the surface mesh render pipeline.
+    fn create_mesh_pipeline(&mut self) {
+        let shader_source = include_str!("shaders/surface_mesh.wgsl");
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("surface mesh shader"),
+                source: wgpu::ShaderSource::Wgsl(shader_source.into()),
+            });
+
+        let bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("mesh bind group layout"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Mesh uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Positions storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Normals storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Barycentrics storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 4,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Colors storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 5,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("mesh pipeline layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("surface mesh pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: self.surface_config.format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None, // Culling handled in shader
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.mesh_pipeline = Some(pipeline);
+        self.mesh_bind_group_layout = Some(bind_group_layout);
     }
 }
