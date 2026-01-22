@@ -31,5 +31,9 @@ proptest.workspace = true
 name = "surface_mesh_demo"
 path = "../../examples/surface_mesh_demo.rs"
 
+[[example]]
+name = "curve_network_demo"
+path = "../../examples/curve_network_demo.rs"
+
 [lints]
 workspace = true
