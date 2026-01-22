@@ -69,6 +69,31 @@ impl CurveNetwork {
         cn
     }
 
+    /// Creates a curve network as a connected line (0-1-2-3-...).
+    pub fn new_line(name: impl Into<String>, nodes: Vec<Vec3>) -> Self {
+        let n = nodes.len();
+        let edges: Vec<[u32; 2]> = (0..n.saturating_sub(1))
+            .map(|i| [i as u32, (i + 1) as u32])
+            .collect();
+        Self::new(name, nodes, edges)
+    }
+
+    /// Creates a curve network as a closed loop (0-1-2-...-n-0).
+    pub fn new_loop(name: impl Into<String>, nodes: Vec<Vec3>) -> Self {
+        let n = nodes.len();
+        let edges: Vec<[u32; 2]> = (0..n).map(|i| [i as u32, ((i + 1) % n) as u32]).collect();
+        Self::new(name, nodes, edges)
+    }
+
+    /// Creates a curve network as separate segments (0-1, 2-3, 4-5, ...).
+    pub fn new_segments(name: impl Into<String>, nodes: Vec<Vec3>) -> Self {
+        let n = nodes.len();
+        let edges: Vec<[u32; 2]> = (0..n / 2)
+            .map(|i| [(i * 2) as u32, (i * 2 + 1) as u32])
+            .collect();
+        Self::new(name, nodes, edges)
+    }
+
     /// Returns the structure name.
     pub fn name(&self) -> &str {
         &self.name
@@ -281,5 +306,52 @@ mod tests {
         assert_eq!(cn.num_nodes(), 3);
         assert_eq!(cn.num_edges(), 2);
         assert_eq!(cn.nodes(), &nodes);
+    }
+
+    #[test]
+    fn test_curve_network_line_connectivity() {
+        let nodes = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 0.0),
+            Vec3::new(3.0, 0.0, 0.0),
+        ];
+
+        let cn = CurveNetwork::new_line("line", nodes);
+
+        assert_eq!(cn.num_edges(), 3); // 0-1, 1-2, 2-3
+        assert_eq!(cn.edge_tail_inds(), &[0, 1, 2]);
+        assert_eq!(cn.edge_tip_inds(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn test_curve_network_loop_connectivity() {
+        let nodes = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+        ];
+
+        let cn = CurveNetwork::new_loop("loop", nodes);
+
+        assert_eq!(cn.num_edges(), 3); // 0-1, 1-2, 2-0
+        assert_eq!(cn.edge_tail_inds(), &[0, 1, 2]);
+        assert_eq!(cn.edge_tip_inds(), &[1, 2, 0]);
+    }
+
+    #[test]
+    fn test_curve_network_segments_connectivity() {
+        let nodes = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 0.0),
+            Vec3::new(3.0, 0.0, 0.0),
+        ];
+
+        let cn = CurveNetwork::new_segments("segments", nodes);
+
+        assert_eq!(cn.num_edges(), 2); // 0-1, 2-3
+        assert_eq!(cn.edge_tail_inds(), &[0, 2]);
+        assert_eq!(cn.edge_tip_inds(), &[1, 3]);
     }
 }
