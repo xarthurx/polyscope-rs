@@ -1,5 +1,8 @@
 //! Surface mesh structure.
 
+mod quantities;
+pub use quantities::*;
+
 use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
@@ -462,9 +465,45 @@ impl SurfaceMesh {
                 _ => BackfacePolicy::Cull,
             };
         }
+
+        // Show quantities
+        if !self.quantities.is_empty() {
+            ui.separator();
+            ui.label("Quantities:");
+            for quantity in &mut self.quantities {
+                if let Some(sq) = quantity.as_any_mut().downcast_mut::<MeshVertexScalarQuantity>() {
+                    sq.build_egui_ui(ui);
+                }
+            }
+        }
     }
 
-    // TODO: Add quantity methods (vertex scalar, face scalar, vertex vector, etc.)
+    // === Quantity methods ===
+
+    /// Adds a vertex scalar quantity to this mesh.
+    pub fn add_vertex_scalar_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+    ) -> &mut Self {
+        let quantity = MeshVertexScalarQuantity::new(name, self.name.clone(), values);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Returns the currently active vertex scalar quantity, if any.
+    pub fn active_vertex_scalar_quantity(&self) -> Option<&MeshVertexScalarQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
+                if let Some(sq) = q.as_any().downcast_ref::<MeshVertexScalarQuantity>() {
+                    return Some(sq);
+                }
+            }
+        }
+        None
+    }
 
     // === GPU resource methods ===
 
@@ -518,6 +557,15 @@ impl SurfaceMesh {
             ],
         };
         render_data.update_uniforms(queue, &uniforms);
+
+        // Apply vertex scalar quantity colors if enabled
+        // TODO: Need ColorMapRegistry to compute colors - this will be passed in from app.rs
+        // if let Some(sq) = self.active_vertex_scalar_quantity() {
+        //     if let Some(colormap) = color_maps.get(sq.colormap_name()) {
+        //         let colors = sq.compute_colors(colormap);
+        //         render_data.update_vertex_colors(queue, &colors);
+        //     }
+        // }
     }
 }
 
@@ -902,5 +950,25 @@ mod tests {
         assert_eq!(mesh.transparency(), 1.0);
         mesh.set_transparency(-0.5);
         assert_eq!(mesh.transparency(), 0.0);
+    }
+
+    /// Test vertex scalar quantity.
+    #[test]
+    fn test_vertex_scalar_quantity() {
+        use polyscope_core::quantity::QuantityKind;
+
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        ];
+        let faces = vec![vec![0, 1, 2]];
+        let mut mesh = SurfaceMesh::new("test", vertices, faces);
+
+        mesh.add_vertex_scalar_quantity("height", vec![0.0, 0.5, 1.0]);
+
+        let q = mesh.get_quantity("height").expect("quantity not found");
+        assert_eq!(q.data_size(), 3);
+        assert_eq!(q.kind(), QuantityKind::Scalar);
     }
 }
