@@ -9,6 +9,7 @@
 pub mod buffer;
 pub mod camera;
 pub mod color_maps;
+pub mod curve_network_render;
 pub mod engine;
 pub mod error;
 pub mod ground_plane;
@@ -21,6 +22,7 @@ pub mod vector_render;
 
 pub use camera::Camera;
 pub use color_maps::{ColorMap, ColorMapRegistry};
+pub use curve_network_render::{CurveNetworkRenderData, CurveNetworkUniforms};
 pub use engine::RenderEngine;
 pub use error::{RenderError, RenderResult};
 pub use materials::{Material, MaterialRegistry};
