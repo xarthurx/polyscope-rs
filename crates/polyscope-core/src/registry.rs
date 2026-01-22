@@ -47,9 +47,7 @@ impl Registry {
 
     /// Gets a mutable reference to a structure by type and name.
     pub fn get_mut(&mut self, type_name: &str, name: &str) -> Option<&mut Box<dyn Structure>> {
-        self.structures
-            .get_mut(type_name)?
-            .get_mut(name)
+        self.structures.get_mut(type_name)?.get_mut(name)
     }
 
     /// Checks if a structure with the given type and name exists.
@@ -61,7 +59,9 @@ impl Registry {
 
     /// Removes a structure by type and name.
     pub fn remove(&mut self, type_name: &str, name: &str) -> Option<Box<dyn Structure>> {
-        self.structures.get_mut(type_name).and_then(|m| m.remove(name))
+        self.structures
+            .get_mut(type_name)
+            .and_then(|m| m.remove(name))
     }
 
     /// Removes all structures of a given type.
@@ -84,9 +84,7 @@ impl Registry {
 
     /// Returns a mutable iterator over all structures.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Box<dyn Structure>> + '_ {
-        self.structures
-            .values_mut()
-            .flat_map(|m| m.values_mut())
+        self.structures.values_mut().flat_map(|m| m.values_mut())
     }
 
     /// Returns the total number of registered structures.

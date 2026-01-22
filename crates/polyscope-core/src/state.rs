@@ -27,7 +27,6 @@ pub struct Context {
 
     /// Axis-aligned bounding box for all registered structures.
     pub bounding_box: (Vec3, Vec3),
-
     // User callback will be added later with proper thread-safety handling
 }
 
