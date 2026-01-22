@@ -30,15 +30,15 @@ pub struct MeshUniforms {
 impl Default for MeshUniforms {
     fn default() -> Self {
         Self {
-            shade_style: 0,                          // smooth shading
-            show_edges: 0,                           // edges off
-            edge_width: 1.0,                         // 1 pixel edge
-            transparency: 0.0,                       // fully opaque
-            surface_color: [0.5, 0.5, 0.5, 1.0],     // gray
-            edge_color: [0.0, 0.0, 0.0, 1.0],        // black edges
-            backface_policy: 0,                      // identical to front
+            shade_style: 0,                      // smooth shading
+            show_edges: 0,                       // edges off
+            edge_width: 1.0,                     // 1 pixel edge
+            transparency: 0.0,                   // fully opaque
+            surface_color: [0.5, 0.5, 0.5, 1.0], // gray
+            edge_color: [0.0, 0.0, 0.0, 1.0],    // black edges
+            backface_policy: 0,                  // identical to front
             _padding: [0.0; 3],
-            backface_color: [0.3, 0.3, 0.3, 1.0],    // darker gray
+            backface_color: [0.3, 0.3, 0.3, 1.0], // darker gray
         }
     }
 }
@@ -88,10 +88,7 @@ impl SurfaceMeshRenderData {
         let num_indices = num_triangles * 3;
 
         // Create vertex position buffer (vec4 for alignment)
-        let vertex_data: Vec<f32> = vertices
-            .iter()
-            .flat_map(|v| [v.x, v.y, v.z, 1.0])
-            .collect();
+        let vertex_data: Vec<f32> = vertices.iter().flat_map(|v| [v.x, v.y, v.z, 1.0]).collect();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh vertices"),
             contents: bytemuck::cast_slice(&vertex_data),
@@ -223,10 +220,19 @@ mod tests {
         let uniforms = MeshUniforms::default();
 
         // Verify default values
-        assert_eq!(uniforms.shade_style, 0, "default shade_style should be smooth (0)");
-        assert_eq!(uniforms.show_edges, 0, "default show_edges should be off (0)");
+        assert_eq!(
+            uniforms.shade_style, 0,
+            "default shade_style should be smooth (0)"
+        );
+        assert_eq!(
+            uniforms.show_edges, 0,
+            "default show_edges should be off (0)"
+        );
         assert_eq!(uniforms.edge_width, 1.0, "default edge_width should be 1.0");
-        assert_eq!(uniforms.transparency, 0.0, "default transparency should be 0.0 (opaque)");
+        assert_eq!(
+            uniforms.transparency, 0.0,
+            "default transparency should be 0.0 (opaque)"
+        );
         assert_eq!(
             uniforms.surface_color,
             [0.5, 0.5, 0.5, 1.0],

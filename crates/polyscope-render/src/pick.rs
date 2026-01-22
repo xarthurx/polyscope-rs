@@ -57,7 +57,12 @@ mod tests {
         for index in [0, 1, 255, 256, 65535, 65536, 0xFFFFFF, 12345678 & 0xFFFFFF] {
             let color = index_to_color(index);
             let decoded = color_to_index(color[0], color[1], color[2]);
-            assert_eq!(decoded, index & 0xFFFFFF, "Roundtrip failed for index {}", index);
+            assert_eq!(
+                decoded,
+                index & 0xFFFFFF,
+                "Roundtrip failed for index {}",
+                index
+            );
         }
     }
 

@@ -15,8 +15,6 @@ pub struct VolumeGrid {
 impl VolumeGrid {
     /// Creates a new volume grid (placeholder).
     pub fn new(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-        }
+        Self { name: name.into() }
     }
 }

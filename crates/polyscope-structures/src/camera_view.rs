@@ -15,8 +15,6 @@ pub struct CameraView {
 impl CameraView {
     /// Creates a new camera view (placeholder).
     pub fn new(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-        }
+        Self { name: name.into() }
     }
 }

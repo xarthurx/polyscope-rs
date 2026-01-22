@@ -76,9 +76,7 @@ pub struct RenderEngine {
 
 impl RenderEngine {
     /// Creates a new windowed render engine.
-    pub async fn new_windowed(
-        window: Arc<winit::window::Window>,
-    ) -> RenderResult<Self> {
+    pub async fn new_windowed(window: Arc<winit::window::Window>) -> RenderResult<Self> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..Default::default()
