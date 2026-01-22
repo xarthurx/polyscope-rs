@@ -109,7 +109,5 @@ impl Registry {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // TODO: Add tests once we have concrete structure implementations
 }

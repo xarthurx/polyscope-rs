@@ -95,16 +95,41 @@ impl SurfaceMeshRenderData {
         let num_triangles = triangles.len() as u32;
         let num_indices = num_triangles * 3;
 
+        // Expand vertex data to be per-triangle-vertex (not per-original-vertex)
+        // This is needed because the shader accesses data by vertex_index (0, 1, 2, ...)
+        // and we use non-indexed drawing with storage buffers
+        let mut expanded_positions: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
+        let mut expanded_normals: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
+        let mut expanded_colors: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
+        let mut barycentric_data: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
+
+        for tri in triangles {
+            // Barycentric coordinates for wireframe
+            let bary_coords = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
+            for (i, &vi) in tri.iter().enumerate() {
+                let v = vertices[vi as usize];
+                expanded_positions.extend_from_slice(&[v.x, v.y, v.z, 1.0]);
+
+                let n = vertex_normals[vi as usize];
+                expanded_normals.extend_from_slice(&[n.x, n.y, n.z, 0.0]);
+
+                // Default color (will be overwritten by surface_color in shader)
+                expanded_colors.extend_from_slice(&[0.0, 0.0, 0.0, 0.0]);
+
+                barycentric_data.extend_from_slice(&[bary_coords[i][0], bary_coords[i][1], bary_coords[i][2], 0.0]);
+            }
+        }
+
         // Create vertex position buffer (vec4 for alignment)
-        let vertex_data: Vec<f32> = vertices.iter().flat_map(|v| [v.x, v.y, v.z, 1.0]).collect();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh vertices"),
-            contents: bytemuck::cast_slice(&vertex_data),
+            contents: bytemuck::cast_slice(&expanded_positions),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
-        // Create index buffer
-        let index_data: Vec<u32> = triangles.iter().flat_map(|t| [t[0], t[1], t[2]]).collect();
+        // Create index buffer (sequential indices since data is expanded)
+        let index_data: Vec<u32> = (0..num_indices).collect();
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh indices"),
             contents: bytemuck::cast_slice(&index_data),
@@ -112,38 +137,23 @@ impl SurfaceMeshRenderData {
         });
 
         // Create normal buffer (vec4 for alignment)
-        let normal_data: Vec<f32> = vertex_normals
-            .iter()
-            .flat_map(|n| [n.x, n.y, n.z, 0.0])
-            .collect();
         let normal_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh normals"),
-            contents: bytemuck::cast_slice(&normal_data),
+            contents: bytemuck::cast_slice(&expanded_normals),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
         // Create barycentric coordinate buffer
-        // Each triangle vertex gets [1,0,0], [0,1,0], [0,0,1] for wireframe rendering
-        let barycentric_data: Vec<f32> = (0..triangles.len())
-            .flat_map(|_| {
-                [
-                    1.0, 0.0, 0.0, 0.0, // vertex 0: [1,0,0] + padding
-                    0.0, 1.0, 0.0, 0.0, // vertex 1: [0,1,0] + padding
-                    0.0, 0.0, 1.0, 0.0, // vertex 2: [0,0,1] + padding
-                ]
-            })
-            .collect();
         let barycentric_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh barycentrics"),
             contents: bytemuck::cast_slice(&barycentric_data),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
-        // Create color buffer (default white)
-        let color_data: Vec<f32> = vec![1.0; vertices.len() * 4];
+        // Create color buffer (expanded, default to zero - shader uses surface_color when zero)
         let color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh colors"),
-            contents: bytemuck::cast_slice(&color_data),
+            contents: bytemuck::cast_slice(&expanded_colors),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 

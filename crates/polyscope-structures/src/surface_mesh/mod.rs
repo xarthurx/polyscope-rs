@@ -100,7 +100,7 @@ impl SurfaceMesh {
             backface_policy: BackfacePolicy::default(),
             backface_color: Vec3::new(0.3, 0.3, 0.3),
             surface_color: Vec3::new(0.5, 0.5, 0.8),
-            transparency: 1.0,
+            transparency: 0.0, // 0.0 = fully opaque, 1.0 = fully transparent
 
             render_data: None,
         };
@@ -988,7 +988,7 @@ mod tests {
         assert_eq!(mesh.shade_style(), ShadeStyle::Smooth);
         assert_eq!(mesh.backface_policy(), BackfacePolicy::Identical);
         assert!(!mesh.show_edges());
-        assert_eq!(mesh.transparency(), 1.0);
+        assert_eq!(mesh.transparency(), 0.0); // 0.0 = fully opaque
 
         // Test setters
         mesh.set_shade_style(ShadeStyle::Flat);
