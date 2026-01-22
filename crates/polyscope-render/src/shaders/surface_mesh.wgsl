@@ -18,7 +18,13 @@ struct MeshUniforms {
     surface_color: vec4<f32>,
     edge_color: vec4<f32>,
     backface_policy: u32,  // 0 = identical, 1 = different, 2 = custom, 3 = cull
-    _padding: vec3<f32>,
+    _pad1_0: f32,
+    _pad1_1: f32,
+    _pad1_2: f32,
+    _pad2_0: f32,
+    _pad2_1: f32,
+    _pad2_2: f32,
+    _pad3: f32,
     backface_color: vec4<f32>,
 }
 

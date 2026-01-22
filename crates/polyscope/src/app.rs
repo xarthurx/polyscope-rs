@@ -52,6 +52,7 @@ impl App {
     }
 
     /// Sets the background color.
+    #[allow(dead_code)]
     pub fn set_background_color(&mut self, color: Vec3) {
         self.background_color = color;
     }

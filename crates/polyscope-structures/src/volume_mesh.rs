@@ -7,6 +7,7 @@
 // - Slice plane integration
 
 /// A volume mesh structure (tetrahedral or hexahedral).
+#[allow(dead_code)]
 pub struct VolumeMesh {
     name: String,
     // TODO: Add vertices, cells, quantities, GPU resources

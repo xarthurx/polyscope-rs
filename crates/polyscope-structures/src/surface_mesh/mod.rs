@@ -616,7 +616,9 @@ impl SurfaceMesh {
             ],
             edge_color: [self.edge_color.x, self.edge_color.y, self.edge_color.z, 1.0],
             backface_policy: self.backface_policy as u32,
-            _padding: [0.0; 3],
+            _pad1: [0.0; 3],
+            _pad2: [0.0; 3],
+            _pad3: 0.0,
             backface_color: [
                 self.backface_color.x,
                 self.backface_color.y,

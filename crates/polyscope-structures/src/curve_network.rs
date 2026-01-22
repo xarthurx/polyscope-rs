@@ -7,6 +7,7 @@
 // - Node and edge quantities
 
 /// A curve network structure (nodes connected by edges).
+#[allow(dead_code)]
 pub struct CurveNetwork {
     name: String,
     // TODO: Add nodes, edges, quantities, GPU resources

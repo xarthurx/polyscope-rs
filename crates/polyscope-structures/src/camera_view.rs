@@ -7,6 +7,7 @@
 // - Image plane display
 
 /// A camera view structure for visualizing camera poses.
+#[allow(dead_code)]
 pub struct CameraView {
     name: String,
     // TODO: Add camera parameters, GPU resources

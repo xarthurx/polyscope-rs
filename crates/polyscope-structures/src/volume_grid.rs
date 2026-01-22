@@ -7,6 +7,7 @@
 // - Scalar quantities on the grid
 
 /// A volume grid structure (regular grid of values).
+#[allow(dead_code)]
 pub struct VolumeGrid {
     name: String,
     // TODO: Add grid dimensions, values, quantities, GPU resources

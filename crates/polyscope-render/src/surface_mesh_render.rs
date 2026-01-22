@@ -4,6 +4,8 @@ use glam::Vec3;
 use wgpu::util::DeviceExt;
 
 /// Uniforms for surface mesh rendering.
+/// Note: Layout must match WGSL MeshUniforms exactly (96 bytes).
+/// WGSL vec3<f32> has 16-byte alignment, requiring extra padding.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct MeshUniforms {
@@ -21,8 +23,12 @@ pub struct MeshUniforms {
     pub edge_color: [f32; 4],
     /// Backface policy: 0 = identical, 1 = different, 2 = custom, 3 = cull
     pub backface_policy: u32,
-    /// Padding for 16-byte alignment
-    pub _padding: [f32; 3],
+    /// Padding to align next vec3 to 16 bytes (WGSL vec3 alignment)
+    pub _pad1: [f32; 3],
+    /// Padding matching WGSL vec3 (12 bytes)
+    pub _pad2: [f32; 3],
+    /// Padding to align vec4 to 16 bytes
+    pub _pad3: f32,
     /// Backface color (RGBA), used when backface_policy is custom
     pub backface_color: [f32; 4],
 }
@@ -37,7 +43,9 @@ impl Default for MeshUniforms {
             surface_color: [0.5, 0.5, 0.5, 1.0], // gray
             edge_color: [0.0, 0.0, 0.0, 1.0],    // black edges
             backface_policy: 0,                  // identical to front
-            _padding: [0.0; 3],
+            _pad1: [0.0; 3],
+            _pad2: [0.0; 3],
+            _pad3: 0.0,
             backface_color: [0.3, 0.3, 0.3, 1.0], // darker gray
         }
     }
@@ -274,12 +282,14 @@ mod tests {
         // surface_color: 16 bytes ([f32; 4])
         // edge_color: 16 bytes ([f32; 4])
         // backface_policy: 4 bytes (u32)
-        // _padding: 12 bytes ([f32; 3])
+        // _pad1: 12 bytes ([f32; 3])
+        // _pad2: 12 bytes ([f32; 3])
+        // _pad3: 4 bytes (f32)
         // backface_color: 16 bytes ([f32; 4])
-        // Total: 80 bytes
+        // Total: 96 bytes (matches WGSL layout with vec3 alignment)
         assert_eq!(
-            size, 80,
-            "MeshUniforms should be 80 bytes, got {} bytes",
+            size, 96,
+            "MeshUniforms should be 96 bytes, got {} bytes",
             size
         );
     }
