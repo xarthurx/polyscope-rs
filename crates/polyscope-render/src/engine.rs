@@ -76,6 +76,10 @@ pub struct RenderEngine {
     pub mesh_pipeline: Option<wgpu::RenderPipeline>,
     /// Mesh bind group layout.
     mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Curve network edge render pipeline (line rendering).
+    pub curve_network_edge_pipeline: Option<wgpu::RenderPipeline>,
+    /// Curve network edge bind group layout.
+    curve_network_edge_bind_group_layout: Option<wgpu::BindGroupLayout>,
 }
 
 impl RenderEngine {
@@ -164,11 +168,14 @@ impl RenderEngine {
             vector_bind_group_layout: None,
             mesh_pipeline: None,
             mesh_bind_group_layout: None,
+            curve_network_edge_pipeline: None,
+            curve_network_edge_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
         engine.init_vector_pipeline();
         engine.create_mesh_pipeline();
+        engine.create_curve_network_edge_pipeline();
 
         Ok(engine)
     }
@@ -243,11 +250,14 @@ impl RenderEngine {
             vector_bind_group_layout: None,
             mesh_pipeline: None,
             mesh_bind_group_layout: None,
+            curve_network_edge_pipeline: None,
+            curve_network_edge_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
         engine.init_vector_pipeline();
         engine.create_mesh_pipeline();
+        engine.create_curve_network_edge_pipeline();
 
         Ok(engine)
     }
@@ -713,5 +723,150 @@ impl RenderEngine {
 
         self.mesh_pipeline = Some(pipeline);
         self.mesh_bind_group_layout = Some(bind_group_layout);
+    }
+
+    /// Gets the curve network edge bind group layout.
+    pub fn curve_network_edge_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.curve_network_edge_bind_group_layout
+            .as_ref()
+            .expect("curve network edge pipeline not initialized")
+    }
+
+    /// Creates the curve network edge render pipeline (line rendering).
+    fn create_curve_network_edge_pipeline(&mut self) {
+        let shader_source = include_str!("shaders/curve_network_edge.wgsl");
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("curve network edge shader"),
+                source: wgpu::ShaderSource::Wgsl(shader_source.into()),
+            });
+
+        let bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("curve network edge bind group layout"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Curve network uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Node positions storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Node colors storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Edge vertices storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 4,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Edge colors storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 5,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("curve network edge pipeline layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("curve network edge pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: self.surface_config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::LineList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None, // Lines have no front/back
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.curve_network_edge_pipeline = Some(pipeline);
+        self.curve_network_edge_bind_group_layout = Some(bind_group_layout);
     }
 }
