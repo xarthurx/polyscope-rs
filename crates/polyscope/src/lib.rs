@@ -126,6 +126,11 @@ pub fn register_surface_mesh(
     faces: Vec<UVec3>,
 ) -> SurfaceMeshHandle {
     let name = name.into();
+    // Convert UVec3 faces to Vec<Vec<u32>> for the SurfaceMesh constructor
+    let faces: Vec<Vec<u32>> = faces
+        .into_iter()
+        .map(|f| vec![f.x, f.y, f.z])
+        .collect();
     let mesh = SurfaceMesh::new(name.clone(), vertices, faces);
 
     with_context_mut(|ctx| {

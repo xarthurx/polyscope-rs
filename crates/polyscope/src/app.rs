@@ -13,7 +13,7 @@ use winit::{
 };
 
 use polyscope_render::{PickResult, RenderEngine};
-use polyscope_structures::PointCloud;
+use polyscope_structures::{PointCloud, SurfaceMesh};
 use polyscope_ui::EguiIntegration;
 
 use crate::Vec3;
@@ -99,6 +99,18 @@ impl App {
                         }
                     }
                 }
+
+                if structure.type_name() == "SurfaceMesh" {
+                    if let Some(mesh) = structure.as_any_mut().downcast_mut::<SurfaceMesh>() {
+                        if mesh.render_data().is_none() {
+                            mesh.init_gpu_resources(
+                                &engine.device,
+                                engine.mesh_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                    }
+                }
             }
         });
 
@@ -113,6 +125,12 @@ impl App {
                         if let Some(vq) = pc.active_vector_quantity() {
                             vq.update_uniforms(&engine.queue);
                         }
+                    }
+                }
+
+                if structure.type_name() == "SurfaceMesh" {
+                    if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                        mesh.update_gpu_buffers(&engine.queue);
                     }
                 }
             }
@@ -283,6 +301,31 @@ impl App {
                                         // 8 segments * 6 vertices = 48 vertices per arrow
                                         render_pass.draw(0..48, 0..render_data.num_vectors);
                                     }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Draw surface meshes
+            if let Some(pipeline) = &engine.mesh_pipeline {
+                render_pass.set_pipeline(pipeline);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                if let Some(render_data) = mesh.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.set_index_buffer(
+                                        render_data.index_buffer.slice(..),
+                                        wgpu::IndexFormat::Uint32,
+                                    );
+                                    render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
                                 }
                             }
                         }

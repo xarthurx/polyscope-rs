@@ -4,6 +4,7 @@ use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
+use polyscope_render::{MeshUniforms, SurfaceMeshRenderData};
 use std::ops::Range;
 
 /// Shading style for surface mesh rendering.
@@ -61,8 +62,8 @@ pub struct SurfaceMesh {
     surface_color: Vec3,
     transparency: f32,
 
-    // GPU resources (will be added in Task 5)
-    render_data: Option<()>,
+    // GPU resources
+    render_data: Option<SurfaceMeshRenderData>,
 }
 
 impl SurfaceMesh {
@@ -418,6 +419,60 @@ impl SurfaceMesh {
     }
 
     // TODO: Add quantity methods (vertex scalar, face scalar, vertex vector, etc.)
+
+    // === GPU resource methods ===
+
+    /// Initializes GPU resources for rendering.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+    ) {
+        self.render_data = Some(SurfaceMeshRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            &self.vertices,
+            &self.triangulation,
+            &self.vertex_normals,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    pub fn render_data(&self) -> Option<&SurfaceMeshRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU buffers with current mesh settings.
+    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
+        let Some(render_data) = &self.render_data else {
+            return;
+        };
+
+        let uniforms = MeshUniforms {
+            shade_style: self.shade_style as u32,
+            show_edges: u32::from(self.show_edges),
+            edge_width: self.edge_width,
+            transparency: self.transparency,
+            surface_color: [
+                self.surface_color.x,
+                self.surface_color.y,
+                self.surface_color.z,
+                1.0,
+            ],
+            edge_color: [self.edge_color.x, self.edge_color.y, self.edge_color.z, 1.0],
+            backface_policy: self.backface_policy as u32,
+            _padding: [0.0; 3],
+            backface_color: [
+                self.backface_color.x,
+                self.backface_color.y,
+                self.backface_color.z,
+                1.0,
+            ],
+        };
+        render_data.update_uniforms(queue, &uniforms);
+    }
 }
 
 impl Structure for SurfaceMesh {
