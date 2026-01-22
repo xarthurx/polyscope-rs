@@ -13,7 +13,7 @@ use winit::{
 };
 
 use polyscope_render::{PickResult, RenderEngine};
-use polyscope_structures::{PointCloud, SurfaceMesh};
+use polyscope_structures::{CurveNetwork, PointCloud, SurfaceMesh};
 use polyscope_ui::EguiIntegration;
 
 use crate::Vec3;
@@ -112,6 +112,18 @@ impl App {
                         }
                     }
                 }
+
+                if structure.type_name() == "CurveNetwork" {
+                    if let Some(cn) = structure.as_any_mut().downcast_mut::<CurveNetwork>() {
+                        if cn.render_data().is_none() {
+                            cn.init_gpu_resources(
+                                &engine.device,
+                                engine.curve_network_edge_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                    }
+                }
             }
         });
 
@@ -132,6 +144,12 @@ impl App {
                 if structure.type_name() == "SurfaceMesh" {
                     if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
                         mesh.update_gpu_buffers(&engine.queue);
+                    }
+                }
+
+                if structure.type_name() == "CurveNetwork" {
+                    if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                        cn.update_gpu_buffers(&engine.queue);
                     }
                 }
             }
@@ -332,6 +350,28 @@ impl App {
                                         wgpu::IndexFormat::Uint32,
                                     );
                                     render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Draw curve network edges
+            if let Some(pipeline) = &engine.curve_network_edge_pipeline {
+                render_pass.set_pipeline(pipeline);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "CurveNetwork" {
+                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                                if let Some(render_data) = cn.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    // 2 vertices per edge (LineList topology)
+                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
                                 }
                             }
                         }

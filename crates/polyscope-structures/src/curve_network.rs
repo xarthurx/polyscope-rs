@@ -4,6 +4,7 @@ use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
+use polyscope_render::{CurveNetworkRenderData, CurveNetworkUniforms};
 
 /// A curve network structure (nodes connected by edges).
 pub struct CurveNetwork {
@@ -35,8 +36,8 @@ pub struct CurveNetwork {
     node_radius_autoscale: bool,
     edge_radius_autoscale: bool,
 
-    // GPU resources (placeholder for now)
-    render_data: Option<()>,
+    // GPU resources
+    render_data: Option<CurveNetworkRenderData>,
 }
 
 impl CurveNetwork {
@@ -178,6 +179,45 @@ impl CurveNetwork {
         self.node_positions = nodes;
         self.recompute_geometry();
         self.refresh();
+    }
+
+    /// Initializes GPU resources for this curve network.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+    ) {
+        self.render_data = Some(CurveNetworkRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            &self.node_positions,
+            &self.edge_tail_inds,
+            &self.edge_tip_inds,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    pub fn render_data(&self) -> Option<&CurveNetworkRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU buffers based on current state.
+    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
+        let Some(render_data) = &self.render_data else {
+            return;
+        };
+
+        let uniforms = CurveNetworkUniforms {
+            color: [self.color.x, self.color.y, self.color.z, 1.0],
+            radius: self.radius,
+            radius_is_relative: if self.radius_is_relative { 1 } else { 0 },
+            render_mode: 0, // Line mode
+            _padding: 0.0,
+        };
+
+        render_data.update_uniforms(queue, &uniforms);
     }
 
     /// Recomputes edge centers and node degrees.
