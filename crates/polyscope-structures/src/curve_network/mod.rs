@@ -285,6 +285,56 @@ impl CurveNetwork {
         None
     }
 
+    /// Builds the egui UI for this curve network.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+        let mut color = [self.color.x, self.color.y, self.color.z];
+        let mut radius = self.radius;
+        let mut radius_is_relative = self.radius_is_relative;
+
+        if polyscope_ui::build_curve_network_ui(
+            ui,
+            self.node_positions.len(),
+            self.edge_tail_inds.len(),
+            &mut radius,
+            &mut radius_is_relative,
+            &mut color,
+        ) {
+            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.radius = radius;
+            self.radius_is_relative = radius_is_relative;
+        }
+
+        // Show quantities
+        if !self.quantities.is_empty() {
+            ui.separator();
+            ui.label("Quantities:");
+            for quantity in &mut self.quantities {
+                // Cast to concrete types and call build_egui_ui
+                if let Some(sq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<CurveNodeScalarQuantity>()
+                {
+                    sq.build_egui_ui(ui);
+                } else if let Some(sq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<CurveEdgeScalarQuantity>()
+                {
+                    sq.build_egui_ui(ui);
+                } else if let Some(cq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<CurveNodeColorQuantity>()
+                {
+                    cq.build_egui_ui(ui);
+                } else if let Some(cq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<CurveEdgeColorQuantity>()
+                {
+                    cq.build_egui_ui(ui);
+                }
+            }
+        }
+    }
+
     /// Initializes GPU resources for this curve network.
     pub fn init_gpu_resources(
         &mut self,

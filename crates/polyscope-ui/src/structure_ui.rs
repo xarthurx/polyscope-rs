@@ -154,3 +154,50 @@ pub fn build_surface_mesh_ui(
 
     changed
 }
+
+/// Builds UI for a curve network.
+pub fn build_curve_network_ui(
+    ui: &mut Ui,
+    num_nodes: usize,
+    num_edges: usize,
+    radius: &mut f32,
+    radius_is_relative: &mut bool,
+    color: &mut [f32; 3],
+) -> bool {
+    let mut changed = false;
+
+    ui.label(format!("Nodes: {num_nodes}"));
+    ui.label(format!("Edges: {num_edges}"));
+
+    ui.separator();
+
+    // Color
+    ui.horizontal(|ui| {
+        ui.label("Color:");
+        if ui.color_edit_button_rgb(color).changed() {
+            changed = true;
+        }
+    });
+
+    // Radius
+    ui.horizontal(|ui| {
+        ui.label("Radius:");
+        if ui
+            .add(
+                egui::DragValue::new(radius)
+                    .speed(0.001)
+                    .range(0.001..=0.5),
+            )
+            .changed()
+        {
+            changed = true;
+        }
+    });
+
+    // Radius is relative checkbox
+    if ui.checkbox(radius_is_relative, "Relative radius").changed() {
+        changed = true;
+    }
+
+    changed
+}

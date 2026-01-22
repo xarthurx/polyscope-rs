@@ -206,6 +206,11 @@ impl App {
                                     mesh.build_egui_ui(ui);
                                 }
                             }
+                            if type_name == "CurveNetwork" {
+                                if let Some(cn) = s.as_any_mut().downcast_mut::<CurveNetwork>() {
+                                    cn.build_egui_ui(ui);
+                                }
+                            }
                         }
                     });
                 },
