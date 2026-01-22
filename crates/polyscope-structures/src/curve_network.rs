@@ -134,6 +134,52 @@ impl CurveNetwork {
         &self.node_degrees
     }
 
+    /// Gets the base color.
+    pub fn color(&self) -> Vec3 {
+        self.color
+    }
+
+    /// Sets the base color.
+    pub fn set_color(&mut self, color: Vec3) -> &mut Self {
+        self.color = color;
+        self
+    }
+
+    /// Gets the radius.
+    pub fn radius(&self) -> f32 {
+        self.radius
+    }
+
+    /// Returns whether the radius is relative to scene scale.
+    pub fn radius_is_relative(&self) -> bool {
+        self.radius_is_relative
+    }
+
+    /// Sets the radius.
+    pub fn set_radius(&mut self, radius: f32, is_relative: bool) -> &mut Self {
+        self.radius = radius;
+        self.radius_is_relative = is_relative;
+        self
+    }
+
+    /// Gets the material name.
+    pub fn material(&self) -> &str {
+        &self.material
+    }
+
+    /// Sets the material name.
+    pub fn set_material(&mut self, material: impl Into<String>) -> &mut Self {
+        self.material = material.into();
+        self
+    }
+
+    /// Updates the node positions.
+    pub fn update_node_positions(&mut self, nodes: Vec<Vec3>) {
+        self.node_positions = nodes;
+        self.recompute_geometry();
+        self.refresh();
+    }
+
     /// Recomputes edge centers and node degrees.
     fn recompute_geometry(&mut self) {
         // Compute edge centers
@@ -353,5 +399,30 @@ mod tests {
         assert_eq!(cn.num_edges(), 2); // 0-1, 2-3
         assert_eq!(cn.edge_tail_inds(), &[0, 2]);
         assert_eq!(cn.edge_tip_inds(), &[1, 3]);
+    }
+
+    #[test]
+    fn test_curve_network_visualization_params() {
+        let nodes = vec![Vec3::ZERO, Vec3::X];
+        let edges = vec![[0, 1]];
+        let mut cn = CurveNetwork::new("test", nodes, edges);
+
+        // Test defaults
+        assert_eq!(cn.color(), Vec3::new(0.2, 0.5, 0.8));
+        assert_eq!(cn.radius(), 0.005);
+        assert!(cn.radius_is_relative());
+
+        // Test setters
+        cn.set_color(Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(cn.color(), Vec3::new(1.0, 0.0, 0.0));
+
+        cn.set_radius(0.1, false);
+        assert_eq!(cn.radius(), 0.1);
+        assert!(!cn.radius_is_relative());
+
+        // Test material getter/setter
+        assert_eq!(cn.material(), "default");
+        cn.set_material("clay");
+        assert_eq!(cn.material(), "clay");
     }
 }
