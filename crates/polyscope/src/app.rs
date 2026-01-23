@@ -46,6 +46,9 @@ pub struct App {
     scene_extents: polyscope_ui::SceneExtents,
     // Appearance settings UI state
     appearance_settings: polyscope_ui::AppearanceSettings,
+    // Slice plane UI state
+    slice_plane_settings: Vec<polyscope_ui::SlicePlaneSettings>,
+    new_slice_plane_name: String,
 }
 
 impl App {
@@ -68,6 +71,8 @@ impl App {
             camera_settings: polyscope_ui::CameraSettings::default(),
             scene_extents: polyscope_ui::SceneExtents::default(),
             appearance_settings: polyscope_ui::AppearanceSettings::default(),
+            slice_plane_settings: crate::get_slice_plane_settings(),
+            new_slice_plane_name: String::new(),
         }
     }
 
@@ -274,6 +279,19 @@ impl App {
 
             // Appearance settings panel
             polyscope_ui::build_appearance_section(ui, &mut self.appearance_settings);
+
+            // Slice Planes section
+            let slice_action = polyscope_ui::panels::build_slice_planes_section(
+                ui,
+                &mut self.slice_plane_settings,
+                &mut self.new_slice_plane_name,
+            );
+            if slice_action != polyscope_ui::SlicePlanesAction::None {
+                crate::handle_slice_plane_action(slice_action.clone(), &mut self.slice_plane_settings);
+                if matches!(slice_action, polyscope_ui::SlicePlanesAction::Add(_)) {
+                    self.new_slice_plane_name.clear();
+                }
+            }
 
             polyscope_ui::build_ground_plane_section(
                 ui,
