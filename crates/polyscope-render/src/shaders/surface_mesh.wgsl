@@ -34,6 +34,7 @@ struct MeshUniforms {
 @group(0) @binding(3) var<storage, read> normals: array<vec4<f32>>;
 @group(0) @binding(4) var<storage, read> barycentrics: array<vec4<f32>>;
 @group(0) @binding(5) var<storage, read> colors: array<vec4<f32>>;
+@group(0) @binding(6) var<storage, read> edge_is_real: array<vec4<f32>>;
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
@@ -41,6 +42,7 @@ struct VertexOutput {
     @location(1) world_normal: vec3<f32>,
     @location(2) barycentric: vec3<f32>,
     @location(3) vertex_color: vec4<f32>,
+    @location(4) edge_real: vec3<f32>,
 }
 
 @vertex
@@ -61,6 +63,7 @@ fn vs_main(
     out.world_normal = normal;
     out.barycentric = bary;
     out.vertex_color = color;
+    out.edge_real = edge_is_real[vertex_index].xyz;
 
     return out;
 }
@@ -124,9 +127,26 @@ fn fs_main(
     var color = base_color * lighting;
 
     // Wireframe: if show_edges, mix edge_color based on barycentric distance
+    // Only draw edges marked as real (not internal triangulation edges)
     if (mesh_uniforms.show_edges == 1u) {
         let bary = in.barycentric;
-        let d = min(bary.x, min(bary.y, bary.z));
+        let edge_real = in.edge_real;
+
+        // Compute distance to each edge, but only consider real edges
+        // Edge 0: opposite to vertex 0 (barycentric.x), between vertices 1-2
+        // Edge 1: opposite to vertex 1 (barycentric.y), between vertices 2-0
+        // Edge 2: opposite to vertex 2 (barycentric.z), between vertices 0-1
+        var d = 1.0; // start with max distance
+        if (edge_real.z > 0.5) { // edge from v0 to v1 (opposite to v2)
+            d = min(d, bary.z);
+        }
+        if (edge_real.x > 0.5) { // edge from v1 to v2 (opposite to v0)
+            d = min(d, bary.x);
+        }
+        if (edge_real.y > 0.5) { // edge from v2 to v0 (opposite to v1)
+            d = min(d, bary.y);
+        }
+
         let edge_factor = smoothstep(0.0, mesh_uniforms.edge_width * fwidth(d), d);
         color = mix(mesh_uniforms.edge_color.rgb, color, edge_factor);
     }
