@@ -2,6 +2,76 @@
 
 use glam::{Mat4, Vec3};
 
+/// Camera navigation/interaction style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NavigationStyle {
+    /// Turntable - orbits around target, constrained to up direction.
+    #[default]
+    Turntable,
+    /// Free - unconstrained rotation.
+    Free,
+    /// Planar - 2D panning only.
+    Planar,
+    /// First person - WASD-style movement.
+    FirstPerson,
+    /// None - camera controls disabled.
+    None,
+}
+
+/// Camera projection mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ProjectionMode {
+    /// Perspective projection.
+    #[default]
+    Perspective,
+    /// Orthographic projection.
+    Orthographic,
+}
+
+/// Axis direction for up/front vectors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AxisDirection {
+    /// Positive X axis.
+    PosX,
+    /// Negative X axis.
+    NegX,
+    /// Positive Y axis (default up).
+    #[default]
+    PosY,
+    /// Negative Y axis.
+    NegY,
+    /// Positive Z axis.
+    PosZ,
+    /// Negative Z axis (default front).
+    NegZ,
+}
+
+impl AxisDirection {
+    /// Returns the unit vector for this direction.
+    pub fn to_vec3(self) -> Vec3 {
+        match self {
+            AxisDirection::PosX => Vec3::X,
+            AxisDirection::NegX => Vec3::NEG_X,
+            AxisDirection::PosY => Vec3::Y,
+            AxisDirection::NegY => Vec3::NEG_Y,
+            AxisDirection::PosZ => Vec3::Z,
+            AxisDirection::NegZ => Vec3::NEG_Z,
+        }
+    }
+
+    /// Returns display name.
+    pub fn name(self) -> &'static str {
+        match self {
+            AxisDirection::PosX => "+X",
+            AxisDirection::NegX => "-X",
+            AxisDirection::PosY => "+Y",
+            AxisDirection::NegY => "-Y",
+            AxisDirection::PosZ => "+Z",
+            AxisDirection::NegZ => "-Z",
+        }
+    }
+}
+
 /// A 3D camera for viewing the scene.
 #[derive(Debug, Clone)]
 pub struct Camera {
@@ -19,6 +89,18 @@ pub struct Camera {
     pub near: f32,
     /// Far clipping plane.
     pub far: f32,
+    /// Navigation style.
+    pub navigation_style: NavigationStyle,
+    /// Projection mode.
+    pub projection_mode: ProjectionMode,
+    /// Up direction.
+    pub up_direction: AxisDirection,
+    /// Front direction.
+    pub front_direction: AxisDirection,
+    /// Movement speed multiplier.
+    pub move_speed: f32,
+    /// Orthographic scale (used when projection_mode is Orthographic).
+    pub ortho_scale: f32,
 }
 
 impl Camera {
@@ -32,6 +114,12 @@ impl Camera {
             aspect_ratio,
             near: 0.01,
             far: 1000.0,
+            navigation_style: NavigationStyle::Turntable,
+            projection_mode: ProjectionMode::Perspective,
+            up_direction: AxisDirection::PosY,
+            front_direction: AxisDirection::NegZ,
+            move_speed: 1.0,
+            ortho_scale: 1.0,
         }
     }
 
@@ -47,7 +135,16 @@ impl Camera {
 
     /// Returns the projection matrix.
     pub fn projection_matrix(&self) -> Mat4 {
-        Mat4::perspective_rh(self.fov, self.aspect_ratio, self.near, self.far)
+        match self.projection_mode {
+            ProjectionMode::Perspective => {
+                Mat4::perspective_rh(self.fov, self.aspect_ratio, self.near, self.far)
+            }
+            ProjectionMode::Orthographic => {
+                let half_height = self.ortho_scale;
+                let half_width = half_height * self.aspect_ratio;
+                Mat4::orthographic_rh(-half_width, half_width, -half_height, half_height, self.near, self.far)
+            }
+        }
     }
 
     /// Returns the combined view-projection matrix.
@@ -108,6 +205,57 @@ impl Camera {
         self.position = center + Vec3::new(0.0, 0.0, size * 1.5);
         self.near = size * 0.001;
         self.far = size * 100.0;
+    }
+
+    /// Sets the navigation style.
+    pub fn set_navigation_style(&mut self, style: NavigationStyle) {
+        self.navigation_style = style;
+    }
+
+    /// Sets the projection mode.
+    pub fn set_projection_mode(&mut self, mode: ProjectionMode) {
+        self.projection_mode = mode;
+    }
+
+    /// Sets the up direction and updates the up vector.
+    pub fn set_up_direction(&mut self, direction: AxisDirection) {
+        self.up_direction = direction;
+        self.up = direction.to_vec3();
+    }
+
+    /// Sets the movement speed.
+    pub fn set_move_speed(&mut self, speed: f32) {
+        self.move_speed = speed.max(0.01);
+    }
+
+    /// Sets the orthographic scale.
+    pub fn set_ortho_scale(&mut self, scale: f32) {
+        self.ortho_scale = scale.max(0.01);
+    }
+
+    /// Sets the field of view in radians.
+    pub fn set_fov(&mut self, fov: f32) {
+        self.fov = fov.clamp(0.1, std::f32::consts::PI - 0.1);
+    }
+
+    /// Sets the near clipping plane.
+    pub fn set_near(&mut self, near: f32) {
+        self.near = near.max(0.001);
+    }
+
+    /// Sets the far clipping plane.
+    pub fn set_far(&mut self, far: f32) {
+        self.far = far.max(self.near + 0.1);
+    }
+
+    /// Returns FOV in degrees.
+    pub fn fov_degrees(&self) -> f32 {
+        self.fov.to_degrees()
+    }
+
+    /// Sets FOV from degrees.
+    pub fn set_fov_degrees(&mut self, degrees: f32) {
+        self.set_fov(degrees.to_radians());
     }
 }
 

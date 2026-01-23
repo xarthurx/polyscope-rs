@@ -21,7 +21,7 @@ pub mod shader;
 pub mod surface_mesh_render;
 pub mod vector_render;
 
-pub use camera::Camera;
+pub use camera::{AxisDirection, Camera, NavigationStyle, ProjectionMode};
 pub use color_maps::{ColorMap, ColorMapRegistry};
 pub use curve_network_render::{CurveNetworkRenderData, CurveNetworkUniforms};
 pub use engine::RenderEngine;
