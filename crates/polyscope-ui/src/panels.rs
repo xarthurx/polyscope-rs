@@ -452,6 +452,113 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
     changed
 }
 
+/// Builds UI for a single slice plane.
+/// Returns true if any setting changed.
+fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> bool {
+    let mut changed = false;
+
+    // Enabled checkbox
+    ui.horizontal(|ui| {
+        if ui.checkbox(&mut settings.enabled, "Enabled").changed() {
+            changed = true;
+        }
+    });
+
+    ui.separator();
+
+    // Origin
+    ui.label("Origin:");
+    ui.horizontal(|ui| {
+        ui.label("X:");
+        if ui.add(DragValue::new(&mut settings.origin[0]).speed(0.1)).changed() {
+            changed = true;
+        }
+        ui.label("Y:");
+        if ui.add(DragValue::new(&mut settings.origin[1]).speed(0.1)).changed() {
+            changed = true;
+        }
+        ui.label("Z:");
+        if ui.add(DragValue::new(&mut settings.origin[2]).speed(0.1)).changed() {
+            changed = true;
+        }
+    });
+
+    // Normal direction with preset buttons
+    ui.label("Normal:");
+    ui.horizontal(|ui| {
+        if ui.button("+X").clicked() {
+            settings.normal = [1.0, 0.0, 0.0];
+            changed = true;
+        }
+        if ui.button("-X").clicked() {
+            settings.normal = [-1.0, 0.0, 0.0];
+            changed = true;
+        }
+        if ui.button("+Y").clicked() {
+            settings.normal = [0.0, 1.0, 0.0];
+            changed = true;
+        }
+        if ui.button("-Y").clicked() {
+            settings.normal = [0.0, -1.0, 0.0];
+            changed = true;
+        }
+        if ui.button("+Z").clicked() {
+            settings.normal = [0.0, 0.0, 1.0];
+            changed = true;
+        }
+        if ui.button("-Z").clicked() {
+            settings.normal = [0.0, 0.0, -1.0];
+            changed = true;
+        }
+    });
+
+    // Custom normal input
+    ui.horizontal(|ui| {
+        ui.label("X:");
+        if ui.add(DragValue::new(&mut settings.normal[0]).speed(0.01).range(-1.0..=1.0)).changed() {
+            changed = true;
+        }
+        ui.label("Y:");
+        if ui.add(DragValue::new(&mut settings.normal[1]).speed(0.01).range(-1.0..=1.0)).changed() {
+            changed = true;
+        }
+        ui.label("Z:");
+        if ui.add(DragValue::new(&mut settings.normal[2]).speed(0.01).range(-1.0..=1.0)).changed() {
+            changed = true;
+        }
+    });
+
+    ui.separator();
+
+    // Visualization options
+    ui.horizontal(|ui| {
+        if ui.checkbox(&mut settings.draw_plane, "Draw plane").changed() {
+            changed = true;
+        }
+        if ui.checkbox(&mut settings.draw_widget, "Draw widget").changed() {
+            changed = true;
+        }
+    });
+
+    // Color
+    ui.horizontal(|ui| {
+        ui.label("Color:");
+        if ui.color_edit_button_rgb(&mut settings.color).changed() {
+            changed = true;
+        }
+    });
+
+    // Transparency
+    ui.horizontal(|ui| {
+        ui.label("Opacity:");
+        if ui.add(Slider::new(&mut settings.transparency, 0.0..=1.0)).changed() {
+            changed = true;
+        }
+    });
+
+    changed
+}
+
 /// Builds the ground plane settings section.
 pub fn build_ground_plane_section(
     ui: &mut Ui,
