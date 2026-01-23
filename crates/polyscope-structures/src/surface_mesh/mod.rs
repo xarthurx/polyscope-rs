@@ -52,6 +52,7 @@ pub struct SurfaceMesh {
     vertex_normals: Vec<Vec3>,
     face_normals: Vec<Vec3>,
     corner_normals: Vec<Vec3>,
+    edge_is_real: Vec<Vec3>,
     edges: Vec<(u32, u32)>,
     needs_recompute: bool,
 
@@ -89,6 +90,7 @@ impl SurfaceMesh {
             vertex_normals: Vec::new(),
             face_normals: Vec::new(),
             corner_normals: Vec::new(),
+            edge_is_real: Vec::new(),
             edges: Vec::new(),
             needs_recompute: true,
 
@@ -173,6 +175,15 @@ impl SurfaceMesh {
     /// Returns the corner normals (per triangle vertex).
     pub fn corner_normals(&self) -> &[Vec3] {
         &self.corner_normals
+    }
+
+    /// Returns the `edge_is_real` flags for each triangle corner.
+    /// For each triangle vertex, this is a Vec3 where:
+    /// - x = 1.0 if edge from this vertex to next is real, 0.0 if internal
+    /// - y = 1.0 if edge from next to prev is real (always real for middle edge)
+    /// - z = 1.0 if edge from prev to this is real, 0.0 if internal
+    pub fn edge_is_real(&self) -> &[Vec3] {
+        &self.edge_is_real
     }
 
     /// Returns the unique edges as sorted pairs.
@@ -289,6 +300,7 @@ impl SurfaceMesh {
         self.compute_vertex_normals();
         self.compute_corner_normals();
         self.compute_edges();
+        self.compute_edge_is_real();
 
         self.needs_recompute = false;
     }
@@ -396,6 +408,36 @@ impl SurfaceMesh {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// Computes `edge_is_real` flags for wireframe rendering.
+    /// Marks which edges in the triangulation are real polygon edges vs internal.
+    fn compute_edge_is_real(&mut self) {
+        self.edge_is_real.clear();
+        self.edge_is_real.reserve(self.triangulation.len() * 3);
+
+        for (_face_idx, range) in self.face_to_tri_range.iter().enumerate() {
+            let num_tris = range.end - range.start;
+
+            for (j, _tri_idx) in range.clone().enumerate() {
+                // For fan triangulation from v0:
+                // Triangle j has vertices [v0, v_{j+1}, v_{j+2}]
+                // Edge 0 (v0 -> v_{j+1}): real only if j == 0
+                // Edge 1 (v_{j+1} -> v_{j+2}): always real (it's a polygon edge)
+                // Edge 2 (v_{j+2} -> v0): real only if j == num_tris - 1
+
+                let edge0_real = if j == 0 { 1.0 } else { 0.0 };
+                let edge1_real = 1.0; // middle edge always real
+                let edge2_real = if j == num_tris - 1 { 1.0 } else { 0.0 };
+
+                // Each triangle corner gets the edge_is_real for all three edges
+                // This matches C++ Polyscope's approach
+                let edge_real = Vec3::new(edge0_real, edge1_real, edge2_real);
+                self.edge_is_real.push(edge_real);
+                self.edge_is_real.push(edge_real);
+                self.edge_is_real.push(edge_real);
             }
         }
     }
@@ -1180,5 +1222,110 @@ mod tests {
         assert_eq!(colors[0], Vec3::new(1.0, 0.0, 0.0));
         // Vertex 3 is only in face 1 -> green
         assert_eq!(colors[3], Vec3::new(0.0, 1.0, 0.0));
+    }
+
+    /// Test edge_is_real for triangle (all edges should be real).
+    #[test]
+    fn test_edge_is_real_triangle() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+        ];
+        let faces = vec![vec![0, 1, 2]];
+
+        let mesh = SurfaceMesh::new("test_tri", vertices, faces);
+
+        // Triangle has 1 triangle, so 3 edge_is_real entries (one per corner)
+        assert_eq!(mesh.edge_is_real().len(), 3);
+
+        // For a single triangle (1 tri from fan), all edges are real
+        // j=0, num_tris=1: edge0_real=1.0, edge1_real=1.0, edge2_real=1.0
+        let expected = Vec3::new(1.0, 1.0, 1.0);
+        for edge_real in mesh.edge_is_real() {
+            assert_eq!(*edge_real, expected);
+        }
+    }
+
+    /// Test edge_is_real for quad (internal edge should not be real).
+    #[test]
+    fn test_edge_is_real_quad() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        ];
+        let faces = vec![vec![0, 1, 2, 3]];
+
+        let mesh = SurfaceMesh::new("test_quad", vertices, faces);
+
+        // Quad has 2 triangles, so 6 edge_is_real entries
+        assert_eq!(mesh.edge_is_real().len(), 6);
+
+        // Fan triangulation: [0,1,2], [0,2,3]
+        // Triangle 0 (j=0, num_tris=2):
+        //   edge0 (0->1): real (j==0)
+        //   edge1 (1->2): always real
+        //   edge2 (2->0): NOT real (j != num_tris-1)
+        let tri0_expected = Vec3::new(1.0, 1.0, 0.0);
+
+        // Triangle 1 (j=1, num_tris=2):
+        //   edge0 (0->2): NOT real (j!=0)
+        //   edge1 (2->3): always real
+        //   edge2 (3->0): real (j == num_tris-1)
+        let tri1_expected = Vec3::new(0.0, 1.0, 1.0);
+
+        // First 3 entries are for triangle 0
+        assert_eq!(mesh.edge_is_real()[0], tri0_expected);
+        assert_eq!(mesh.edge_is_real()[1], tri0_expected);
+        assert_eq!(mesh.edge_is_real()[2], tri0_expected);
+
+        // Next 3 entries are for triangle 1
+        assert_eq!(mesh.edge_is_real()[3], tri1_expected);
+        assert_eq!(mesh.edge_is_real()[4], tri1_expected);
+        assert_eq!(mesh.edge_is_real()[5], tri1_expected);
+    }
+
+    /// Test edge_is_real for pentagon (multiple internal edges).
+    #[test]
+    fn test_edge_is_real_pentagon() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.5, 0.5, 0.0),
+            Vec3::new(0.75, 1.0, 0.0),
+            Vec3::new(-0.25, 0.5, 0.0),
+        ];
+        let faces = vec![vec![0, 1, 2, 3, 4]];
+
+        let mesh = SurfaceMesh::new("test_pentagon", vertices, faces);
+
+        // Pentagon has 3 triangles, so 9 edge_is_real entries
+        assert_eq!(mesh.edge_is_real().len(), 9);
+
+        // Fan triangulation: [0,1,2], [0,2,3], [0,3,4]
+        // Triangle 0 (j=0, num_tris=3): (1.0, 1.0, 0.0)
+        // Triangle 1 (j=1, num_tris=3): (0.0, 1.0, 0.0) - middle triangle, only edge1 real
+        // Triangle 2 (j=2, num_tris=3): (0.0, 1.0, 1.0)
+
+        let tri0_expected = Vec3::new(1.0, 1.0, 0.0);
+        let tri1_expected = Vec3::new(0.0, 1.0, 0.0);
+        let tri2_expected = Vec3::new(0.0, 1.0, 1.0);
+
+        // Check triangle 0 corners
+        assert_eq!(mesh.edge_is_real()[0], tri0_expected);
+        assert_eq!(mesh.edge_is_real()[1], tri0_expected);
+        assert_eq!(mesh.edge_is_real()[2], tri0_expected);
+
+        // Check triangle 1 corners
+        assert_eq!(mesh.edge_is_real()[3], tri1_expected);
+        assert_eq!(mesh.edge_is_real()[4], tri1_expected);
+        assert_eq!(mesh.edge_is_real()[5], tri1_expected);
+
+        // Check triangle 2 corners
+        assert_eq!(mesh.edge_is_real()[6], tri2_expected);
+        assert_eq!(mesh.edge_is_real()[7], tri2_expected);
+        assert_eq!(mesh.edge_is_real()[8], tri2_expected);
     }
 }
