@@ -12,6 +12,7 @@ use winit::{
     window::{Window, WindowId},
 };
 
+use polyscope_core::{GroundPlaneConfig, GroundPlaneMode};
 use polyscope_render::{PickResult, RenderEngine};
 use polyscope_structures::{CurveNetwork, PointCloud, SurfaceMesh};
 use polyscope_ui::EguiIntegration;
@@ -32,6 +33,8 @@ pub struct App {
     // Selection state
     selection: Option<PickResult>,
     last_click_pos: Option<(f64, f64)>,
+    // Ground plane settings
+    ground_plane: GroundPlaneConfig,
 }
 
 impl App {
@@ -48,6 +51,7 @@ impl App {
             right_mouse_down: false,
             selection: None,
             last_click_pos: None,
+            ground_plane: GroundPlaneConfig::default(),
         }
     }
 
@@ -165,8 +169,31 @@ impl App {
             self.background_color.z,
         ];
 
+        // Extract ground plane settings for UI
+        let mut gp_mode = match self.ground_plane.mode {
+            GroundPlaneMode::None => 0u32,
+            GroundPlaneMode::Tile => 1u32,
+        };
+        let mut gp_height = self.ground_plane.height;
+        let mut gp_height_is_relative = self.ground_plane.height_is_relative;
+        let mut gp_color1 = self.ground_plane.color1;
+        let mut gp_color2 = self.ground_plane.color2;
+        let mut gp_tile_size = self.ground_plane.tile_size;
+        let mut gp_transparency = self.ground_plane.transparency;
+
         polyscope_ui::build_left_panel(&egui.context, |ui| {
             polyscope_ui::build_controls_section(ui, &mut bg_color);
+
+            polyscope_ui::build_ground_plane_section(
+                ui,
+                &mut gp_mode,
+                &mut gp_height,
+                &mut gp_height_is_relative,
+                &mut gp_color1,
+                &mut gp_color2,
+                &mut gp_tile_size,
+                &mut gp_transparency,
+            );
 
             // Collect structure info
             let structures: Vec<(String, String, bool)> = crate::with_context(|ctx| {
@@ -229,6 +256,18 @@ impl App {
 
         // Update background color if changed
         self.background_color = Vec3::new(bg_color[0], bg_color[1], bg_color[2]);
+
+        // Update ground plane settings from UI
+        self.ground_plane.mode = match gp_mode {
+            0 => GroundPlaneMode::None,
+            _ => GroundPlaneMode::Tile,
+        };
+        self.ground_plane.height = gp_height;
+        self.ground_plane.height_is_relative = gp_height_is_relative;
+        self.ground_plane.color1 = gp_color1;
+        self.ground_plane.color2 = gp_color2;
+        self.ground_plane.tile_size = gp_tile_size;
+        self.ground_plane.transparency = gp_transparency;
 
         // End egui frame
         let egui_output = egui.end_frame(window);
@@ -384,6 +423,15 @@ impl App {
                 });
             }
         }
+
+        // Render ground plane (after scene, before UI)
+        let scene_min_y = crate::with_context(|ctx| ctx.bounding_box.0.y);
+        engine.render_ground_plane(
+            &mut encoder,
+            &view,
+            &self.ground_plane,
+            scene_min_y,
+        );
 
         // Render egui on top
         let screen_descriptor = ScreenDescriptor {
