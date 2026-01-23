@@ -452,6 +452,19 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
     changed
 }
 
+/// Actions that can be triggered from the slice planes UI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SlicePlanesAction {
+    /// No action.
+    None,
+    /// Add a new slice plane with the given name.
+    Add(String),
+    /// Remove slice plane at the given index.
+    Remove(usize),
+    /// Settings for a plane were modified.
+    Modified(usize),
+}
+
 /// Builds UI for a single slice plane.
 /// Returns true if any setting changed.
 fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> bool {
@@ -557,6 +570,68 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
     });
 
     changed
+}
+
+/// Builds the slice planes section.
+/// Returns an action if one was triggered (add, remove, or modify).
+pub fn build_slice_planes_section(
+    ui: &mut Ui,
+    planes: &mut Vec<SlicePlaneSettings>,
+    new_plane_name: &mut String,
+) -> SlicePlanesAction {
+    let mut action = SlicePlanesAction::None;
+
+    CollapsingHeader::new("Slice Planes")
+        .default_open(false)
+        .show(ui, |ui| {
+            // Add new plane controls
+            ui.horizontal(|ui| {
+                ui.label("New plane:");
+                ui.text_edit_singleline(new_plane_name);
+                if ui.button("Add").clicked() && !new_plane_name.is_empty() {
+                    action = SlicePlanesAction::Add(new_plane_name.clone());
+                }
+            });
+
+            if planes.is_empty() {
+                ui.label("No slice planes");
+                return;
+            }
+
+            ui.separator();
+
+            // List existing planes
+            let mut remove_idx = None;
+            for (idx, plane) in planes.iter_mut().enumerate() {
+                let header_text = format!(
+                    "{} {}",
+                    if plane.enabled { "●" } else { "○" },
+                    plane.name
+                );
+
+                CollapsingHeader::new(header_text)
+                    .id_salt(format!("slice_plane_{}", idx))
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        if build_slice_plane_item(ui, plane) {
+                            if action == SlicePlanesAction::None {
+                                action = SlicePlanesAction::Modified(idx);
+                            }
+                        }
+
+                        ui.separator();
+                        if ui.button("Remove").clicked() {
+                            remove_idx = Some(idx);
+                        }
+                    });
+            }
+
+            if let Some(idx) = remove_idx {
+                action = SlicePlanesAction::Remove(idx);
+            }
+        });
+
+    action
 }
 
 /// Builds the ground plane settings section.
