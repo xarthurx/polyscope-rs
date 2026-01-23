@@ -1994,4 +1994,92 @@ mod tests {
         let translation = transform.w_axis.truncate();
         assert!((translation - Vec3::new(1.0, 2.0, 3.0)).length() < 0.001);
     }
+
+    #[test]
+    fn test_get_slice_plane_settings() {
+        setup();
+        let name = unique_name("ui_slice_plane");
+
+        // Add a slice plane
+        add_slice_plane_with_pose(&name, Vec3::new(1.0, 2.0, 3.0), Vec3::X);
+
+        // Get settings
+        let settings = get_slice_plane_settings();
+        let found = settings.iter().find(|s| s.name == name);
+        assert!(found.is_some());
+
+        let s = found.unwrap();
+        assert_eq!(s.origin, [1.0, 2.0, 3.0]);
+        assert_eq!(s.normal, [1.0, 0.0, 0.0]);
+        assert!(s.enabled);
+    }
+
+    #[test]
+    fn test_apply_slice_plane_settings() {
+        setup();
+        let name = unique_name("apply_slice_plane");
+
+        // Add a slice plane
+        add_slice_plane(&name);
+
+        // Create modified settings
+        let settings = polyscope_ui::SlicePlaneSettings {
+            name: name.clone(),
+            enabled: false,
+            origin: [5.0, 6.0, 7.0],
+            normal: [0.0, 0.0, 1.0],
+            draw_plane: false,
+            draw_widget: true,
+            color: [1.0, 0.0, 0.0],
+            transparency: 0.8,
+        };
+
+        // Apply settings
+        apply_slice_plane_settings(&settings);
+
+        // Verify
+        let handle = get_slice_plane(&name).unwrap();
+        assert!(!handle.is_enabled());
+        assert_eq!(handle.origin(), Vec3::new(5.0, 6.0, 7.0));
+        assert_eq!(handle.normal(), Vec3::Z);
+        assert!(!handle.draw_plane());
+        assert!(handle.draw_widget());
+        assert_eq!(handle.color(), Vec3::new(1.0, 0.0, 0.0));
+        assert!((handle.transparency() - 0.8).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_handle_slice_plane_action_add() {
+        setup();
+        let name = unique_name("action_add_plane");
+        let mut settings = Vec::new();
+
+        handle_slice_plane_action(
+            polyscope_ui::SlicePlanesAction::Add(name.clone()),
+            &mut settings,
+        );
+
+        assert_eq!(settings.len(), 1);
+        assert_eq!(settings[0].name, name);
+        assert!(get_slice_plane(&name).is_some());
+    }
+
+    #[test]
+    fn test_handle_slice_plane_action_remove() {
+        setup();
+        let name = unique_name("action_remove_plane");
+
+        // Add plane
+        add_slice_plane(&name);
+        let mut settings = vec![polyscope_ui::SlicePlaneSettings::with_name(&name)];
+
+        // Remove via action
+        handle_slice_plane_action(
+            polyscope_ui::SlicePlanesAction::Remove(0),
+            &mut settings,
+        );
+
+        assert!(settings.is_empty());
+        assert!(get_slice_plane(&name).is_none());
+    }
 }
