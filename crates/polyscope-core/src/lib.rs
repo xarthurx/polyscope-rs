@@ -7,6 +7,7 @@
 //! - Configuration options and persistent values
 
 pub mod error;
+pub mod ground_plane;
 pub mod options;
 pub mod pick;
 pub mod quantity;
@@ -15,6 +16,7 @@ pub mod state;
 pub mod structure;
 
 pub use error::{PolyscopeError, Result};
+pub use ground_plane::{GroundPlaneConfig, GroundPlaneMode};
 pub use options::Options;
 pub use pick::{PickResult, Pickable};
 pub use quantity::{Quantity, QuantityKind};
