@@ -54,6 +54,27 @@ pub struct SceneExtents {
     pub bbox_max: [f32; 3],
 }
 
+/// Appearance settings for UI.
+#[derive(Debug, Clone)]
+pub struct AppearanceSettings {
+    /// Transparency mode (0=None, 1=Simple, 2=WeightedBlended)
+    pub transparency_mode: u32,
+    /// SSAA factor (1, 2, or 4)
+    pub ssaa_factor: u32,
+    /// Max FPS (0 = unlimited)
+    pub max_fps: u32,
+}
+
+impl Default for AppearanceSettings {
+    fn default() -> Self {
+        Self {
+            transparency_mode: 1, // Simple
+            ssaa_factor: 1,
+            max_fps: 60,
+        }
+    }
+}
+
 /// Builds the main left panel.
 pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
     SidePanel::left("polyscope_main_panel")
@@ -239,6 +260,69 @@ pub fn build_scene_extents_section(ui: &mut Ui, extents: &mut SceneExtents) -> b
             ui.horizontal(|ui| {
                 ui.label("Center:");
                 ui.label(format!("({:.2}, {:.2}, {:.2})", center[0], center[1], center[2]));
+            });
+        });
+
+    changed
+}
+
+/// Builds the appearance settings section.
+/// Returns true if any setting changed.
+pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) -> bool {
+    let mut changed = false;
+
+    CollapsingHeader::new("Appearance")
+        .default_open(false)
+        .show(ui, |ui| {
+            // Transparency mode
+            egui::ComboBox::from_label("Transparency")
+                .selected_text(match settings.transparency_mode {
+                    0 => "None",
+                    1 => "Simple",
+                    _ => "Weighted Blended",
+                })
+                .show_ui(ui, |ui| {
+                    if ui.selectable_value(&mut settings.transparency_mode, 0, "None").changed() {
+                        changed = true;
+                    }
+                    if ui.selectable_value(&mut settings.transparency_mode, 1, "Simple").changed() {
+                        changed = true;
+                    }
+                    if ui.selectable_value(&mut settings.transparency_mode, 2, "Weighted Blended").changed() {
+                        changed = true;
+                    }
+                });
+
+            ui.separator();
+
+            // SSAA factor
+            egui::ComboBox::from_label("Anti-aliasing")
+                .selected_text(format!("{}x SSAA", settings.ssaa_factor))
+                .show_ui(ui, |ui| {
+                    if ui.selectable_value(&mut settings.ssaa_factor, 1, "1x (Off)").changed() {
+                        changed = true;
+                    }
+                    if ui.selectable_value(&mut settings.ssaa_factor, 2, "2x SSAA").changed() {
+                        changed = true;
+                    }
+                    if ui.selectable_value(&mut settings.ssaa_factor, 4, "4x SSAA").changed() {
+                        changed = true;
+                    }
+                });
+
+            ui.separator();
+
+            // Max FPS
+            ui.horizontal(|ui| {
+                ui.label("Max FPS:");
+                let mut fps = settings.max_fps as i32;
+                if ui.add(DragValue::new(&mut fps).range(0..=240)).changed() {
+                    settings.max_fps = fps.max(0) as u32;
+                    changed = true;
+                }
+                if settings.max_fps == 0 {
+                    ui.label("(unlimited)");
+                }
             });
         });
 
