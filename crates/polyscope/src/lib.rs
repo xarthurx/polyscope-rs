@@ -68,7 +68,9 @@ pub use polyscope_render::{
 };
 
 // Re-export UI types
-pub use polyscope_ui::{AppearanceSettings, CameraSettings, SceneExtents};
+pub use polyscope_ui::{
+    AppearanceSettings, CameraSettings, SceneExtents, SlicePlaneSettings, SlicePlanesAction,
+};
 
 // Re-export structures
 pub use polyscope_structures::{
@@ -1587,6 +1589,71 @@ pub fn set_auto_compute_extents(auto: bool) {
     polyscope_core::state::with_context_mut(|ctx| {
         ctx.options.auto_compute_scene_extents = auto;
     });
+}
+
+// ============================================================================
+// Slice Plane UI Sync Functions
+// ============================================================================
+
+/// Gets all slice planes as UI settings.
+pub fn get_slice_plane_settings() -> Vec<polyscope_ui::SlicePlaneSettings> {
+    with_context(|ctx| {
+        ctx.slice_planes
+            .values()
+            .map(|plane| polyscope_ui::SlicePlaneSettings {
+                name: plane.name().to_string(),
+                enabled: plane.is_enabled(),
+                origin: plane.origin().to_array(),
+                normal: plane.normal().to_array(),
+                draw_plane: plane.draw_plane(),
+                draw_widget: plane.draw_widget(),
+                color: plane.color().to_array(),
+                transparency: plane.transparency(),
+            })
+            .collect()
+    })
+}
+
+/// Applies UI settings to a slice plane.
+pub fn apply_slice_plane_settings(settings: &polyscope_ui::SlicePlaneSettings) {
+    with_context_mut(|ctx| {
+        if let Some(plane) = ctx.get_slice_plane_mut(&settings.name) {
+            plane.set_enabled(settings.enabled);
+            plane.set_origin(Vec3::from_array(settings.origin));
+            plane.set_normal(Vec3::from_array(settings.normal));
+            plane.set_draw_plane(settings.draw_plane);
+            plane.set_draw_widget(settings.draw_widget);
+            plane.set_color(Vec3::from_array(settings.color));
+            plane.set_transparency(settings.transparency);
+        }
+    });
+}
+
+/// Handles a slice plane UI action.
+/// Returns the new list of settings after the action.
+pub fn handle_slice_plane_action(
+    action: polyscope_ui::SlicePlanesAction,
+    current_settings: &mut Vec<polyscope_ui::SlicePlaneSettings>,
+) {
+    match action {
+        polyscope_ui::SlicePlanesAction::None => {}
+        polyscope_ui::SlicePlanesAction::Add(name) => {
+            add_slice_plane(&name);
+            current_settings.push(polyscope_ui::SlicePlaneSettings::with_name(&name));
+        }
+        polyscope_ui::SlicePlanesAction::Remove(idx) => {
+            if idx < current_settings.len() {
+                let name = &current_settings[idx].name;
+                remove_slice_plane(name);
+                current_settings.remove(idx);
+            }
+        }
+        polyscope_ui::SlicePlanesAction::Modified(idx) => {
+            if idx < current_settings.len() {
+                apply_slice_plane_settings(&current_settings[idx]);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
