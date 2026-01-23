@@ -30,6 +30,97 @@ pub fn build_controls_section(ui: &mut Ui, background_color: &mut [f32; 3]) {
         });
 }
 
+/// Builds the ground plane settings section.
+pub fn build_ground_plane_section(
+    ui: &mut Ui,
+    mode: &mut u32, // 0=None, 1=Tile
+    height: &mut f32,
+    height_is_relative: &mut bool,
+    color1: &mut [f32; 3],
+    color2: &mut [f32; 3],
+    tile_size: &mut f32,
+    transparency: &mut f32,
+) -> bool {
+    let mut changed = false;
+
+    CollapsingHeader::new("Ground Plane")
+        .default_open(false)
+        .show(ui, |ui| {
+            // Mode selector
+            egui::ComboBox::from_label("Mode")
+                .selected_text(match *mode {
+                    0 => "None",
+                    _ => "Tile",
+                })
+                .show_ui(ui, |ui| {
+                    if ui.selectable_value(mode, 0, "None").changed() {
+                        changed = true;
+                    }
+                    if ui.selectable_value(mode, 1, "Tile").changed() {
+                        changed = true;
+                    }
+                });
+
+            if *mode > 0 {
+                ui.separator();
+
+                // Height settings
+                if ui.checkbox(height_is_relative, "Auto height").changed() {
+                    changed = true;
+                }
+
+                if !*height_is_relative {
+                    ui.horizontal(|ui| {
+                        ui.label("Height:");
+                        if ui.add(egui::DragValue::new(height).speed(0.1)).changed() {
+                            changed = true;
+                        }
+                    });
+                }
+
+                ui.separator();
+
+                // Colors
+                ui.horizontal(|ui| {
+                    ui.label("Color 1:");
+                    if ui.color_edit_button_rgb(color1).changed() {
+                        changed = true;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Color 2:");
+                    if ui.color_edit_button_rgb(color2).changed() {
+                        changed = true;
+                    }
+                });
+
+                // Tile size
+                ui.horizontal(|ui| {
+                    ui.label("Tile size:");
+                    if ui
+                        .add(egui::DragValue::new(tile_size).speed(0.1).range(0.1..=100.0))
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+
+                // Transparency (displayed as opacity)
+                ui.horizontal(|ui| {
+                    ui.label("Opacity:");
+                    let mut opacity = 1.0 - *transparency;
+                    if ui.add(egui::Slider::new(&mut opacity, 0.0..=1.0)).changed() {
+                        *transparency = 1.0 - opacity;
+                        changed = true;
+                    }
+                });
+            }
+        });
+
+    changed
+}
+
 /// Builds the structure tree section.
 pub fn build_structure_tree<F>(
     ui: &mut Ui,
