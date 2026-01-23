@@ -41,6 +41,19 @@ impl Default for CameraSettings {
     }
 }
 
+/// Scene extents information for UI display.
+#[derive(Debug, Clone, Default)]
+pub struct SceneExtents {
+    /// Whether to auto-compute extents.
+    pub auto_compute: bool,
+    /// Length scale of the scene.
+    pub length_scale: f32,
+    /// Bounding box minimum.
+    pub bbox_min: [f32; 3],
+    /// Bounding box maximum.
+    pub bbox_max: [f32; 3],
+}
+
 /// Builds the main left panel.
 pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
     SidePanel::left("polyscope_main_panel")
@@ -172,6 +185,60 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                 if ui.add(DragValue::new(&mut settings.move_speed).speed(0.1).range(0.1..=10.0)).changed() {
                     changed = true;
                 }
+            });
+        });
+
+    changed
+}
+
+/// Builds the scene extents section.
+/// Returns true if auto_compute changed.
+pub fn build_scene_extents_section(ui: &mut Ui, extents: &mut SceneExtents) -> bool {
+    let mut changed = false;
+
+    CollapsingHeader::new("Scene Extents")
+        .default_open(false)
+        .show(ui, |ui| {
+            if ui.checkbox(&mut extents.auto_compute, "Auto-compute").changed() {
+                changed = true;
+            }
+
+            ui.separator();
+
+            // Display length scale (read-only)
+            ui.horizontal(|ui| {
+                ui.label("Length scale:");
+                ui.label(format!("{:.4}", extents.length_scale));
+            });
+
+            // Display bounding box (read-only)
+            ui.label("Bounding box:");
+            ui.indent("bbox", |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Min:");
+                    ui.label(format!(
+                        "({:.2}, {:.2}, {:.2})",
+                        extents.bbox_min[0], extents.bbox_min[1], extents.bbox_min[2]
+                    ));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Max:");
+                    ui.label(format!(
+                        "({:.2}, {:.2}, {:.2})",
+                        extents.bbox_max[0], extents.bbox_max[1], extents.bbox_max[2]
+                    ));
+                });
+            });
+
+            // Compute center and size
+            let center = [
+                (extents.bbox_min[0] + extents.bbox_max[0]) / 2.0,
+                (extents.bbox_min[1] + extents.bbox_max[1]) / 2.0,
+                (extents.bbox_min[2] + extents.bbox_max[2]) / 2.0,
+            ];
+            ui.horizontal(|ui| {
+                ui.label("Center:");
+                ui.label(format!("({:.2}, {:.2}, {:.2})", center[0], center[1], center[2]));
             });
         });
 
