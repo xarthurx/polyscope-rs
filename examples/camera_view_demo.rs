@@ -1,6 +1,6 @@
 //! Demo showing camera view visualization in polyscope-rs.
 
-use polyscope::{self, Vec3, CameraParameters, CameraExtrinsics, CameraIntrinsics};
+use polyscope::{self, CameraExtrinsics, CameraIntrinsics, CameraParameters, Vec3};
 
 fn main() {
     // Initialize polyscope
@@ -38,11 +38,11 @@ fn main() {
     // Camera 1: Looking at the cube from the front
     let cam1 = polyscope::register_camera_view_look_at(
         "front camera",
-        Vec3::new(0.0, 0.0, 3.0),  // position
-        Vec3::ZERO,                // target
-        Vec3::Y,                   // up
-        60.0,                      // vertical FoV degrees
-        1.5,                       // aspect ratio
+        Vec3::new(0.0, 0.0, 3.0), // position
+        Vec3::ZERO,               // target
+        Vec3::Y,                  // up
+        60.0,                     // vertical FoV degrees
+        1.5,                      // aspect ratio
     );
     cam1.set_color(Vec3::new(1.0, 0.0, 0.0)); // Red
 

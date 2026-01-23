@@ -93,7 +93,9 @@ impl Context {
 
     /// Creates a new group.
     pub fn create_group(&mut self, name: &str) -> &mut Group {
-        self.groups.entry(name.to_string()).or_insert_with(|| Group::new(name))
+        self.groups
+            .entry(name.to_string())
+            .or_insert_with(|| Group::new(name))
     }
 
     /// Gets a group by name.

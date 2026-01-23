@@ -21,9 +21,9 @@ pub struct VolumeGrid {
     name: String,
 
     // Grid parameters
-    node_dim: UVec3,      // Number of nodes in each dimension
-    bound_min: Vec3,      // Minimum corner of the grid
-    bound_max: Vec3,      // Maximum corner of the grid
+    node_dim: UVec3, // Number of nodes in each dimension
+    bound_min: Vec3, // Minimum corner of the grid
+    bound_max: Vec3, // Maximum corner of the grid
 
     // Common structure fields
     enabled: bool,
@@ -48,12 +48,7 @@ impl VolumeGrid {
     /// * `node_dim` - Number of nodes in each dimension (X, Y, Z)
     /// * `bound_min` - Minimum corner of the grid bounding box
     /// * `bound_max` - Maximum corner of the grid bounding box
-    pub fn new(
-        name: impl Into<String>,
-        node_dim: UVec3,
-        bound_min: Vec3,
-        bound_max: Vec3,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, node_dim: UVec3, bound_min: Vec3, bound_max: Vec3) -> Self {
         Self {
             name: name.into(),
             node_dim,
@@ -119,7 +114,9 @@ impl VolumeGrid {
 
     /// Flattens a 3D node index to a linear index.
     pub fn flatten_node_index(&self, i: u32, j: u32, k: u32) -> u64 {
-        i as u64 + (j as u64 * self.node_dim.x as u64) + (k as u64 * self.node_dim.x as u64 * self.node_dim.y as u64)
+        i as u64
+            + (j as u64 * self.node_dim.x as u64)
+            + (k as u64 * self.node_dim.x as u64 * self.node_dim.y as u64)
     }
 
     /// Unflattens a linear node index to a 3D index.
@@ -190,11 +187,20 @@ impl VolumeGrid {
         // 12 edges of the bounding box
         let edges = vec![
             // Bottom face
-            [0, 1], [1, 2], [2, 3], [3, 0],
+            [0, 1],
+            [1, 2],
+            [2, 3],
+            [3, 0],
             // Top face
-            [4, 5], [5, 6], [6, 7], [7, 4],
+            [4, 5],
+            [5, 6],
+            [6, 7],
+            [7, 4],
             // Vertical edges
-            [0, 4], [1, 5], [2, 6], [3, 7],
+            [0, 4],
+            [1, 5],
+            [2, 6],
+            [3, 7],
         ];
 
         (nodes, edges)
@@ -246,12 +252,8 @@ impl VolumeGrid {
         name: impl Into<String>,
         values: Vec<f32>,
     ) -> &mut Self {
-        let quantity = VolumeGridNodeScalarQuantity::new(
-            name,
-            self.name.clone(),
-            values,
-            self.node_dim,
-        );
+        let quantity =
+            VolumeGridNodeScalarQuantity::new(name, self.name.clone(), values, self.node_dim);
         self.add_quantity(Box::new(quantity));
         self
     }
@@ -262,12 +264,8 @@ impl VolumeGrid {
         name: impl Into<String>,
         values: Vec<f32>,
     ) -> &mut Self {
-        let quantity = VolumeGridCellScalarQuantity::new(
-            name,
-            self.name.clone(),
-            values,
-            self.cell_dim(),
-        );
+        let quantity =
+            VolumeGridCellScalarQuantity::new(name, self.name.clone(), values, self.cell_dim());
         self.add_quantity(Box::new(quantity));
         self
     }
@@ -296,7 +294,14 @@ impl VolumeGrid {
         ui.horizontal(|ui| {
             ui.label("Edge Width:");
             let mut width = self.edge_width;
-            if ui.add(egui::DragValue::new(&mut width).speed(0.01).range(0.0..=5.0)).changed() {
+            if ui
+                .add(
+                    egui::DragValue::new(&mut width)
+                        .speed(0.01)
+                        .range(0.0..=5.0),
+                )
+                .changed()
+            {
                 self.set_edge_width(width);
             }
         });
@@ -306,9 +311,15 @@ impl VolumeGrid {
             ui.separator();
             ui.label("Quantities:");
             for quantity in &mut self.quantities {
-                if let Some(sq) = quantity.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                if let Some(sq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                {
                     sq.build_egui_ui(ui);
-                } else if let Some(sq) = quantity.as_any_mut().downcast_mut::<VolumeGridCellScalarQuantity>() {
+                } else if let Some(sq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridCellScalarQuantity>()
+                {
                     sq.build_egui_ui(ui);
                 }
             }
@@ -387,7 +398,10 @@ impl HasQuantities for VolumeGrid {
     }
 
     fn get_quantity(&self, name: &str) -> Option<&dyn Quantity> {
-        self.quantities.iter().find(|q| q.name() == name).map(|q| q.as_ref())
+        self.quantities
+            .iter()
+            .find(|q| q.name() == name)
+            .map(|q| q.as_ref())
     }
 
     fn get_quantity_mut(&mut self, name: &str) -> Option<&mut Box<dyn Quantity>> {
@@ -410,12 +424,7 @@ mod tests {
 
     #[test]
     fn test_volume_grid_creation() {
-        let grid = VolumeGrid::new(
-            "test",
-            UVec3::new(10, 20, 30),
-            Vec3::ZERO,
-            Vec3::ONE,
-        );
+        let grid = VolumeGrid::new("test", UVec3::new(10, 20, 30), Vec3::ZERO, Vec3::ONE);
         assert_eq!(grid.node_dim(), UVec3::new(10, 20, 30));
         assert_eq!(grid.cell_dim(), UVec3::new(9, 19, 29));
         assert_eq!(grid.num_nodes(), 10 * 20 * 30);
@@ -424,12 +433,7 @@ mod tests {
 
     #[test]
     fn test_index_conversion() {
-        let grid = VolumeGrid::new(
-            "test",
-            UVec3::new(5, 6, 7),
-            Vec3::ZERO,
-            Vec3::ONE,
-        );
+        let grid = VolumeGrid::new("test", UVec3::new(5, 6, 7), Vec3::ZERO, Vec3::ONE);
 
         let idx = grid.flatten_node_index(2, 3, 4);
         let uvec = grid.unflatten_node_index(idx);

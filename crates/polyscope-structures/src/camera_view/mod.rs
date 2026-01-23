@@ -59,7 +59,13 @@ impl CameraView {
         aspect_ratio: f32,
     ) -> Self {
         let look_dir = (look_at - position).normalize();
-        let params = CameraParameters::from_vectors(position, look_dir, up, fov_vertical_degrees, aspect_ratio);
+        let params = CameraParameters::from_vectors(
+            position,
+            look_dir,
+            up,
+            fov_vertical_degrees,
+            aspect_ratio,
+        );
         Self::new(name, params)
     }
 
@@ -170,11 +176,19 @@ impl CameraView {
         // Edges
         let edges = vec![
             // From root to corners
-            [0, 1], [0, 2], [0, 3], [0, 4],
+            [0, 1],
+            [0, 2],
+            [0, 3],
+            [0, 4],
             // Frame rectangle
-            [1, 2], [2, 4], [4, 3], [3, 1],
+            [1, 2],
+            [2, 4],
+            [4, 3],
+            [3, 1],
             // Orientation triangle
-            [5, 6], [6, 7], [7, 5],
+            [5, 6],
+            [6, 7],
+            [7, 5],
         ];
 
         (nodes, edges)
@@ -209,7 +223,7 @@ impl CameraView {
             color: [self.color.x, self.color.y, self.color.z, 1.0],
             radius: self.compute_radius(length_scale),
             radius_is_relative: 0, // Absolute radius since we already computed it
-            render_mode: 0, // Lines
+            render_mode: 0,        // Lines
             _padding: 0.0,
         };
         render_data.update_uniforms(queue, &uniforms);
@@ -237,15 +251,26 @@ impl CameraView {
         ui.horizontal(|ui| {
             ui.label("Thickness:");
             let mut thickness = self.widget_thickness;
-            if ui.add(egui::DragValue::new(&mut thickness).speed(0.001).range(0.001..=0.5)).changed() {
+            if ui
+                .add(
+                    egui::DragValue::new(&mut thickness)
+                        .speed(0.001)
+                        .range(0.001..=0.5),
+                )
+                .changed()
+            {
                 self.set_widget_thickness(thickness);
             }
         });
 
         // Camera info
         ui.separator();
-        ui.label(format!("Position: ({:.2}, {:.2}, {:.2})",
-            self.params.position().x, self.params.position().y, self.params.position().z));
+        ui.label(format!(
+            "Position: ({:.2}, {:.2}, {:.2})",
+            self.params.position().x,
+            self.params.position().y,
+            self.params.position().z
+        ));
         ui.label(format!("FoV: {:.1}°", self.params.fov_vertical_degrees()));
         ui.label(format!("Aspect: {:.2}", self.params.aspect_ratio()));
     }
@@ -327,7 +352,10 @@ impl HasQuantities for CameraView {
     }
 
     fn get_quantity(&self, name: &str) -> Option<&dyn Quantity> {
-        self.quantities.iter().find(|q| q.name() == name).map(|q| q.as_ref())
+        self.quantities
+            .iter()
+            .find(|q| q.name() == name)
+            .map(|q| q.as_ref())
     }
 
     fn get_quantity_mut(&mut self, name: &str) -> Option<&mut Box<dyn Quantity>> {

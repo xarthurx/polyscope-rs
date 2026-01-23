@@ -142,7 +142,14 @@ impl Camera {
             ProjectionMode::Orthographic => {
                 let half_height = self.ortho_scale;
                 let half_width = half_height * self.aspect_ratio;
-                Mat4::orthographic_rh(-half_width, half_width, -half_height, half_height, self.near, self.far)
+                Mat4::orthographic_rh(
+                    -half_width,
+                    half_width,
+                    -half_height,
+                    half_height,
+                    self.near,
+                    self.far,
+                )
             }
         }
     }

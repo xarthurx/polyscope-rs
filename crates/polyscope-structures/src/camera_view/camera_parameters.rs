@@ -128,7 +128,10 @@ pub struct CameraParameters {
 impl CameraParameters {
     /// Creates new camera parameters.
     pub fn new(intrinsics: CameraIntrinsics, extrinsics: CameraExtrinsics) -> Self {
-        Self { intrinsics, extrinsics }
+        Self {
+            intrinsics,
+            extrinsics,
+        }
     }
 
     /// Creates camera parameters from vectors.
@@ -238,13 +241,8 @@ mod tests {
 
     #[test]
     fn test_look_at() {
-        let params = CameraParameters::look_at(
-            Vec3::new(0.0, 0.0, 5.0),
-            Vec3::ZERO,
-            Vec3::Y,
-            60.0,
-            1.5,
-        );
+        let params =
+            CameraParameters::look_at(Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO, Vec3::Y, 60.0, 1.5);
         assert!((params.look_dir() - Vec3::new(0.0, 0.0, -1.0)).length() < 1e-6);
         assert_eq!(params.fov_vertical_degrees(), 60.0);
         assert_eq!(params.aspect_ratio(), 1.5);

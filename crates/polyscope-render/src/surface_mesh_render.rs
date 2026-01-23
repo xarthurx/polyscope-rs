@@ -123,7 +123,12 @@ impl SurfaceMeshRenderData {
                 // Default color (will be overwritten by surface_color in shader)
                 expanded_colors.extend_from_slice(&[0.0, 0.0, 0.0, 0.0]);
 
-                barycentric_data.extend_from_slice(&[bary_coords[i][0], bary_coords[i][1], bary_coords[i][2], 0.0]);
+                barycentric_data.extend_from_slice(&[
+                    bary_coords[i][0],
+                    bary_coords[i][1],
+                    bary_coords[i][2],
+                    0.0,
+                ]);
 
                 // Edge is real flags (same for all vertices of triangle)
                 let eir = edge_is_real[tri_vertex_idx];

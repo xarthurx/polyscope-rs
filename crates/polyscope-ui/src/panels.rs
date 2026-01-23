@@ -121,8 +121,14 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                     _ => "None",
                 })
                 .show_ui(ui, |ui| {
-                    for (i, name) in ["Turntable", "Free", "Planar", "First Person", "None"].iter().enumerate() {
-                        if ui.selectable_value(&mut settings.navigation_style, i as u32, *name).changed() {
+                    for (i, name) in ["Turntable", "Free", "Planar", "First Person", "None"]
+                        .iter()
+                        .enumerate()
+                    {
+                        if ui
+                            .selectable_value(&mut settings.navigation_style, i as u32, *name)
+                            .changed()
+                        {
                             changed = true;
                         }
                     }
@@ -130,12 +136,22 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
 
             // Projection mode
             egui::ComboBox::from_label("Projection")
-                .selected_text(if settings.projection_mode == 0 { "Perspective" } else { "Orthographic" })
+                .selected_text(if settings.projection_mode == 0 {
+                    "Perspective"
+                } else {
+                    "Orthographic"
+                })
                 .show_ui(ui, |ui| {
-                    if ui.selectable_value(&mut settings.projection_mode, 0, "Perspective").changed() {
+                    if ui
+                        .selectable_value(&mut settings.projection_mode, 0, "Perspective")
+                        .changed()
+                    {
                         changed = true;
                     }
-                    if ui.selectable_value(&mut settings.projection_mode, 1, "Orthographic").changed() {
+                    if ui
+                        .selectable_value(&mut settings.projection_mode, 1, "Orthographic")
+                        .changed()
+                    {
                         changed = true;
                     }
                 });
@@ -148,7 +164,10 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                 .selected_text(directions[settings.up_direction as usize])
                 .show_ui(ui, |ui| {
                     for (i, name) in directions.iter().enumerate() {
-                        if ui.selectable_value(&mut settings.up_direction, i as u32, *name).changed() {
+                        if ui
+                            .selectable_value(&mut settings.up_direction, i as u32, *name)
+                            .changed()
+                        {
                             changed = true;
                         }
                     }
@@ -159,7 +178,10 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                 .selected_text(directions[settings.front_direction as usize])
                 .show_ui(ui, |ui| {
                     for (i, name) in directions.iter().enumerate() {
-                        if ui.selectable_value(&mut settings.front_direction, i as u32, *name).changed() {
+                        if ui
+                            .selectable_value(&mut settings.front_direction, i as u32, *name)
+                            .changed()
+                        {
                             changed = true;
                         }
                     }
@@ -171,7 +193,10 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
             if settings.projection_mode == 0 {
                 ui.horizontal(|ui| {
                     ui.label("FOV:");
-                    if ui.add(Slider::new(&mut settings.fov_degrees, 10.0..=170.0).suffix("°")).changed() {
+                    if ui
+                        .add(Slider::new(&mut settings.fov_degrees, 10.0..=170.0).suffix("°"))
+                        .changed()
+                    {
                         changed = true;
                     }
                 });
@@ -179,7 +204,14 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                 // Ortho scale
                 ui.horizontal(|ui| {
                     ui.label("Scale:");
-                    if ui.add(DragValue::new(&mut settings.ortho_scale).speed(0.1).range(0.1..=100.0)).changed() {
+                    if ui
+                        .add(
+                            DragValue::new(&mut settings.ortho_scale)
+                                .speed(0.1)
+                                .range(0.1..=100.0),
+                        )
+                        .changed()
+                    {
                         changed = true;
                     }
                 });
@@ -188,14 +220,28 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
             // Clip planes
             ui.horizontal(|ui| {
                 ui.label("Near:");
-                if ui.add(DragValue::new(&mut settings.near).speed(0.001).range(0.001..=10.0)).changed() {
+                if ui
+                    .add(
+                        DragValue::new(&mut settings.near)
+                            .speed(0.001)
+                            .range(0.001..=10.0),
+                    )
+                    .changed()
+                {
                     changed = true;
                 }
             });
 
             ui.horizontal(|ui| {
                 ui.label("Far:");
-                if ui.add(DragValue::new(&mut settings.far).speed(1.0).range(10.0..=10000.0)).changed() {
+                if ui
+                    .add(
+                        DragValue::new(&mut settings.far)
+                            .speed(1.0)
+                            .range(10.0..=10000.0),
+                    )
+                    .changed()
+                {
                     changed = true;
                 }
             });
@@ -203,7 +249,14 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
             // Move speed
             ui.horizontal(|ui| {
                 ui.label("Move Speed:");
-                if ui.add(DragValue::new(&mut settings.move_speed).speed(0.1).range(0.1..=10.0)).changed() {
+                if ui
+                    .add(
+                        DragValue::new(&mut settings.move_speed)
+                            .speed(0.1)
+                            .range(0.1..=10.0),
+                    )
+                    .changed()
+                {
                     changed = true;
                 }
             });
@@ -220,7 +273,10 @@ pub fn build_scene_extents_section(ui: &mut Ui, extents: &mut SceneExtents) -> b
     CollapsingHeader::new("Scene Extents")
         .default_open(false)
         .show(ui, |ui| {
-            if ui.checkbox(&mut extents.auto_compute, "Auto-compute").changed() {
+            if ui
+                .checkbox(&mut extents.auto_compute, "Auto-compute")
+                .changed()
+            {
                 changed = true;
             }
 
@@ -259,7 +315,10 @@ pub fn build_scene_extents_section(ui: &mut Ui, extents: &mut SceneExtents) -> b
             ];
             ui.horizontal(|ui| {
                 ui.label("Center:");
-                ui.label(format!("({:.2}, {:.2}, {:.2})", center[0], center[1], center[2]));
+                ui.label(format!(
+                    "({:.2}, {:.2}, {:.2})",
+                    center[0], center[1], center[2]
+                ));
             });
         });
 
@@ -282,13 +341,22 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
                     _ => "Weighted Blended",
                 })
                 .show_ui(ui, |ui| {
-                    if ui.selectable_value(&mut settings.transparency_mode, 0, "None").changed() {
+                    if ui
+                        .selectable_value(&mut settings.transparency_mode, 0, "None")
+                        .changed()
+                    {
                         changed = true;
                     }
-                    if ui.selectable_value(&mut settings.transparency_mode, 1, "Simple").changed() {
+                    if ui
+                        .selectable_value(&mut settings.transparency_mode, 1, "Simple")
+                        .changed()
+                    {
                         changed = true;
                     }
-                    if ui.selectable_value(&mut settings.transparency_mode, 2, "Weighted Blended").changed() {
+                    if ui
+                        .selectable_value(&mut settings.transparency_mode, 2, "Weighted Blended")
+                        .changed()
+                    {
                         changed = true;
                     }
                 });
@@ -299,13 +367,22 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
             egui::ComboBox::from_label("Anti-aliasing")
                 .selected_text(format!("{}x SSAA", settings.ssaa_factor))
                 .show_ui(ui, |ui| {
-                    if ui.selectable_value(&mut settings.ssaa_factor, 1, "1x (Off)").changed() {
+                    if ui
+                        .selectable_value(&mut settings.ssaa_factor, 1, "1x (Off)")
+                        .changed()
+                    {
                         changed = true;
                     }
-                    if ui.selectable_value(&mut settings.ssaa_factor, 2, "2x SSAA").changed() {
+                    if ui
+                        .selectable_value(&mut settings.ssaa_factor, 2, "2x SSAA")
+                        .changed()
+                    {
                         changed = true;
                     }
-                    if ui.selectable_value(&mut settings.ssaa_factor, 4, "4x SSAA").changed() {
+                    if ui
+                        .selectable_value(&mut settings.ssaa_factor, 4, "4x SSAA")
+                        .changed()
+                    {
                         changed = true;
                     }
                 });

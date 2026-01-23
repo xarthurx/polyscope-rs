@@ -6,7 +6,11 @@ use glam::Vec3;
 use std::f32::consts::PI;
 
 /// Generate a UV sphere mesh.
-fn generate_sphere(radius: f32, lat_segments: u32, lon_segments: u32) -> (Vec<Vec3>, Vec<glam::UVec3>) {
+fn generate_sphere(
+    radius: f32,
+    lat_segments: u32,
+    lon_segments: u32,
+) -> (Vec<Vec3>, Vec<glam::UVec3>) {
     let mut vertices = Vec::new();
     let mut faces = Vec::new();
 

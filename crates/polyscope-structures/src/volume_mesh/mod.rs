@@ -24,7 +24,7 @@ pub struct VolumeMesh {
 
     // Geometry
     vertices: Vec<Vec3>,
-    cells: Vec<[u32; 8]>,  // 8 indices per cell, unused slots hold u32::MAX
+    cells: Vec<[u32; 8]>, // 8 indices per cell, unused slots hold u32::MAX
 
     // Common structure fields
     enabled: bool,
@@ -73,13 +73,28 @@ impl VolumeMesh {
         // Convert tets to 8-index cells
         let cells: Vec<[u32; 8]> = tets
             .into_iter()
-            .map(|t| [t[0], t[1], t[2], t[3], u32::MAX, u32::MAX, u32::MAX, u32::MAX])
+            .map(|t| {
+                [
+                    t[0],
+                    t[1],
+                    t[2],
+                    t[3],
+                    u32::MAX,
+                    u32::MAX,
+                    u32::MAX,
+                    u32::MAX,
+                ]
+            })
             .collect();
         Self::new(name, vertices, cells)
     }
 
     /// Creates a hexahedral mesh.
-    pub fn new_hex_mesh(name: impl Into<String>, vertices: Vec<Vec3>, hexes: Vec<[u32; 8]>) -> Self {
+    pub fn new_hex_mesh(
+        name: impl Into<String>,
+        vertices: Vec<Vec3>,
+        hexes: Vec<[u32; 8]>,
+    ) -> Self {
         Self::new(name, vertices, hexes)
     }
 
@@ -304,7 +319,14 @@ impl VolumeMesh {
             }
             if show_edges {
                 let mut width = self.edge_width;
-                if ui.add(egui::DragValue::new(&mut width).speed(0.01).range(0.01..=5.0)).changed() {
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut width)
+                            .speed(0.01)
+                            .range(0.01..=5.0),
+                    )
+                    .changed()
+                {
                     self.set_edge_width(width);
                 }
             }
@@ -397,7 +419,10 @@ impl HasQuantities for VolumeMesh {
     }
 
     fn get_quantity(&self, name: &str) -> Option<&dyn Quantity> {
-        self.quantities.iter().find(|q| q.name() == name).map(|q| q.as_ref())
+        self.quantities
+            .iter()
+            .find(|q| q.name() == name)
+            .map(|q| q.as_ref())
     }
 
     fn get_quantity_mut(&mut self, name: &str) -> Option<&mut Box<dyn Quantity>> {

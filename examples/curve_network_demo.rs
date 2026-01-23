@@ -46,11 +46,7 @@ fn main() {
     // Create a 5x5 grid
     for i in 0..5 {
         for j in 0..5 {
-            grid_nodes.push(Vec3::new(
-                -2.0 + i as f32 * 0.3,
-                1.5,
-                -0.6 + j as f32 * 0.3,
-            ));
+            grid_nodes.push(Vec3::new(-2.0 + i as f32 * 0.3, 1.5, -0.6 + j as f32 * 0.3));
         }
     }
 

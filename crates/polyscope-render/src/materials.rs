@@ -190,7 +190,12 @@ impl MaterialRegistry {
     pub fn default_material(&self) -> &Material {
         self.materials
             .get(&self.default_material)
-            .unwrap_or_else(|| self.materials.values().next().expect("no materials registered"))
+            .unwrap_or_else(|| {
+                self.materials
+                    .values()
+                    .next()
+                    .expect("no materials registered")
+            })
     }
 
     /// Sets the default material name.

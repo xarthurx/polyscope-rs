@@ -42,9 +42,8 @@ pub fn save_image(
         .unwrap_or_default();
 
     // Create image buffer from raw data
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(width, height, data.to_vec())
-            .ok_or(ScreenshotError::InvalidImageData)?;
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, data.to_vec())
+        .ok_or(ScreenshotError::InvalidImageData)?;
 
     // Flip vertically (GPU buffers are typically bottom-up)
     let img = image::imageops::flip_vertical(&img);
@@ -76,9 +75,8 @@ pub fn save_image(
 /// # Returns
 /// PNG-encoded image data as a byte vector.
 pub fn save_to_buffer(data: &[u8], width: u32, height: u32) -> Result<Vec<u8>, ScreenshotError> {
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(width, height, data.to_vec())
-            .ok_or(ScreenshotError::InvalidImageData)?;
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, data.to_vec())
+        .ok_or(ScreenshotError::InvalidImageData)?;
 
     // Flip vertically
     let img = image::imageops::flip_vertical(&img);

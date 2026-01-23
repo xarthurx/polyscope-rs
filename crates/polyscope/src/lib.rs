@@ -63,7 +63,8 @@ pub use polyscope_core::{
 // Re-export render types
 pub use polyscope_render::{
     AxisDirection, Camera, ColorMap, ColorMapRegistry, Material, MaterialRegistry, NavigationStyle,
-    PickElementType, ProjectionMode, RenderContext, RenderEngine, ScreenshotError, ScreenshotOptions,
+    PickElementType, ProjectionMode, RenderContext, RenderEngine, ScreenshotError,
+    ScreenshotOptions,
 };
 
 // Re-export UI types
@@ -319,7 +320,10 @@ pub fn register_curve_network(
 }
 
 /// Registers a curve network as a connected line (0-1-2-3-...).
-pub fn register_curve_network_line(name: impl Into<String>, nodes: Vec<Vec3>) -> CurveNetworkHandle {
+pub fn register_curve_network_line(
+    name: impl Into<String>,
+    nodes: Vec<Vec3>,
+) -> CurveNetworkHandle {
     let name = name.into();
     let cn = CurveNetwork::new_line(name.clone(), nodes);
 
@@ -334,7 +338,10 @@ pub fn register_curve_network_line(name: impl Into<String>, nodes: Vec<Vec3>) ->
 }
 
 /// Registers a curve network as a closed loop (0-1-2-...-n-0).
-pub fn register_curve_network_loop(name: impl Into<String>, nodes: Vec<Vec3>) -> CurveNetworkHandle {
+pub fn register_curve_network_loop(
+    name: impl Into<String>,
+    nodes: Vec<Vec3>,
+) -> CurveNetworkHandle {
     let name = name.into();
     let cn = CurveNetwork::new_loop(name.clone(), nodes);
 
@@ -474,7 +481,8 @@ pub fn register_camera_view_look_at(
     fov_vertical_degrees: f32,
     aspect_ratio: f32,
 ) -> CameraViewHandle {
-    let params = CameraParameters::look_at(position, target, up, fov_vertical_degrees, aspect_ratio);
+    let params =
+        CameraParameters::look_at(position, target, up, fov_vertical_degrees, aspect_ratio);
     register_camera_view(name, params)
 }
 
@@ -879,7 +887,12 @@ pub fn remove_group(name: &str) {
 
 /// Returns all group names.
 pub fn get_all_groups() -> Vec<String> {
-    with_context(|ctx| ctx.group_names().into_iter().map(|s| s.to_string()).collect())
+    with_context(|ctx| {
+        ctx.group_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    })
 }
 
 /// Handle for a group.
@@ -1413,7 +1426,11 @@ pub fn set_point_cloud_transform(name: &str, transform: Mat4) {
 
 /// Gets the transform of a point cloud by name.
 pub fn get_point_cloud_transform(name: &str) -> Option<Mat4> {
-    with_context(|ctx| ctx.registry.get("PointCloud", name).map(|pc| pc.transform()))
+    with_context(|ctx| {
+        ctx.registry
+            .get("PointCloud", name)
+            .map(|pc| pc.transform())
+    })
 }
 
 /// Sets the transform of a surface mesh by name.
@@ -1441,7 +1458,11 @@ pub fn set_curve_network_transform(name: &str, transform: Mat4) {
 
 /// Gets the transform of a curve network by name.
 pub fn get_curve_network_transform(name: &str) -> Option<Mat4> {
-    with_context(|ctx| ctx.registry.get("CurveNetwork", name).map(|cn| cn.transform()))
+    with_context(|ctx| {
+        ctx.registry
+            .get("CurveNetwork", name)
+            .map(|cn| cn.transform())
+    })
 }
 
 /// Sets the transform of a volume mesh by name.
@@ -1455,7 +1476,11 @@ pub fn set_volume_mesh_transform(name: &str, transform: Mat4) {
 
 /// Gets the transform of a volume mesh by name.
 pub fn get_volume_mesh_transform(name: &str) -> Option<Mat4> {
-    with_context(|ctx| ctx.registry.get("VolumeMesh", name).map(|vm| vm.transform()))
+    with_context(|ctx| {
+        ctx.registry
+            .get("VolumeMesh", name)
+            .map(|vm| vm.transform())
+    })
 }
 
 // ============================================================================
@@ -1463,7 +1488,10 @@ pub fn get_volume_mesh_transform(name: &str) -> Option<Mat4> {
 // ============================================================================
 
 /// Syncs CameraSettings from UI to the actual Camera.
-pub fn apply_camera_settings(camera: &mut polyscope_render::Camera, settings: &polyscope_ui::CameraSettings) {
+pub fn apply_camera_settings(
+    camera: &mut polyscope_render::Camera,
+    settings: &polyscope_ui::CameraSettings,
+) {
     use polyscope_render::{AxisDirection, NavigationStyle, ProjectionMode};
 
     camera.navigation_style = match settings.navigation_style {
@@ -1546,13 +1574,11 @@ pub fn camera_to_settings(camera: &polyscope_render::Camera) -> polyscope_ui::Ca
 
 /// Gets scene extents from the global context.
 pub fn get_scene_extents() -> polyscope_ui::SceneExtents {
-    polyscope_core::state::with_context(|ctx| {
-        polyscope_ui::SceneExtents {
-            auto_compute: ctx.options.auto_compute_scene_extents,
-            length_scale: ctx.length_scale,
-            bbox_min: ctx.bounding_box.0.to_array(),
-            bbox_max: ctx.bounding_box.1.to_array(),
-        }
+    polyscope_core::state::with_context(|ctx| polyscope_ui::SceneExtents {
+        auto_compute: ctx.options.auto_compute_scene_extents,
+        length_scale: ctx.length_scale,
+        bbox_min: ctx.bounding_box.0.to_array(),
+        bbox_max: ctx.bounding_box.1.to_array(),
     })
 }
 

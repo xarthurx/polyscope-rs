@@ -185,13 +185,21 @@ impl CurveNetworkRenderData {
     /// Updates node colors.
     pub fn update_node_colors(&self, queue: &wgpu::Queue, colors: &[Vec3]) {
         let color_data: Vec<f32> = colors.iter().flat_map(|c| [c.x, c.y, c.z, 1.0]).collect();
-        queue.write_buffer(&self.node_color_buffer, 0, bytemuck::cast_slice(&color_data));
+        queue.write_buffer(
+            &self.node_color_buffer,
+            0,
+            bytemuck::cast_slice(&color_data),
+        );
     }
 
     /// Updates edge colors.
     pub fn update_edge_colors(&self, queue: &wgpu::Queue, colors: &[Vec3]) {
         let color_data: Vec<f32> = colors.iter().flat_map(|c| [c.x, c.y, c.z, 1.0]).collect();
-        queue.write_buffer(&self.edge_color_buffer, 0, bytemuck::cast_slice(&color_data));
+        queue.write_buffer(
+            &self.edge_color_buffer,
+            0,
+            bytemuck::cast_slice(&color_data),
+        );
     }
 
     /// Updates node positions.

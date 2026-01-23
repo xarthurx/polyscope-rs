@@ -14,7 +14,9 @@ use winit::{
 
 use polyscope_core::{GroundPlaneConfig, GroundPlaneMode};
 use polyscope_render::{PickResult, RenderEngine};
-use polyscope_structures::{CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh};
+use polyscope_structures::{
+    CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh,
+};
 use polyscope_ui::EguiIntegration;
 
 use crate::Vec3;
