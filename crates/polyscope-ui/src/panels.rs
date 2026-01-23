@@ -1,6 +1,45 @@
 //! UI panel builders.
 
-use egui::{CollapsingHeader, Context, SidePanel, Ui};
+use egui::{CollapsingHeader, Context, DragValue, SidePanel, Slider, Ui};
+
+/// Camera settings exposed in UI.
+#[derive(Debug, Clone)]
+pub struct CameraSettings {
+    /// Navigation style (0=Turntable, 1=Free, 2=Planar, 3=FirstPerson, 4=None)
+    pub navigation_style: u32,
+    /// Projection mode (0=Perspective, 1=Orthographic)
+    pub projection_mode: u32,
+    /// Up direction (0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z)
+    pub up_direction: u32,
+    /// Front direction
+    pub front_direction: u32,
+    /// Field of view in degrees
+    pub fov_degrees: f32,
+    /// Near clip plane
+    pub near: f32,
+    /// Far clip plane
+    pub far: f32,
+    /// Movement speed
+    pub move_speed: f32,
+    /// Orthographic scale
+    pub ortho_scale: f32,
+}
+
+impl Default for CameraSettings {
+    fn default() -> Self {
+        Self {
+            navigation_style: 0, // Turntable
+            projection_mode: 0,  // Perspective
+            up_direction: 2,     // +Y
+            front_direction: 5,  // -Z
+            fov_degrees: 45.0,
+            near: 0.01,
+            far: 1000.0,
+            move_speed: 1.0,
+            ortho_scale: 1.0,
+        }
+    }
+}
 
 /// Builds the main left panel.
 pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
@@ -28,6 +67,115 @@ pub fn build_controls_section(ui: &mut Ui, background_color: &mut [f32; 3]) {
                 // TODO: Reset camera
             }
         });
+}
+
+/// Builds the camera settings section.
+/// Returns true if any setting changed.
+pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings) -> bool {
+    let mut changed = false;
+
+    CollapsingHeader::new("Camera")
+        .default_open(false)
+        .show(ui, |ui| {
+            // Navigation style
+            egui::ComboBox::from_label("Navigation")
+                .selected_text(match settings.navigation_style {
+                    0 => "Turntable",
+                    1 => "Free",
+                    2 => "Planar",
+                    3 => "First Person",
+                    _ => "None",
+                })
+                .show_ui(ui, |ui| {
+                    for (i, name) in ["Turntable", "Free", "Planar", "First Person", "None"].iter().enumerate() {
+                        if ui.selectable_value(&mut settings.navigation_style, i as u32, *name).changed() {
+                            changed = true;
+                        }
+                    }
+                });
+
+            // Projection mode
+            egui::ComboBox::from_label("Projection")
+                .selected_text(if settings.projection_mode == 0 { "Perspective" } else { "Orthographic" })
+                .show_ui(ui, |ui| {
+                    if ui.selectable_value(&mut settings.projection_mode, 0, "Perspective").changed() {
+                        changed = true;
+                    }
+                    if ui.selectable_value(&mut settings.projection_mode, 1, "Orthographic").changed() {
+                        changed = true;
+                    }
+                });
+
+            ui.separator();
+
+            // Up direction
+            let directions = ["+X", "-X", "+Y", "-Y", "+Z", "-Z"];
+            egui::ComboBox::from_label("Up")
+                .selected_text(directions[settings.up_direction as usize])
+                .show_ui(ui, |ui| {
+                    for (i, name) in directions.iter().enumerate() {
+                        if ui.selectable_value(&mut settings.up_direction, i as u32, *name).changed() {
+                            changed = true;
+                        }
+                    }
+                });
+
+            // Front direction
+            egui::ComboBox::from_label("Front")
+                .selected_text(directions[settings.front_direction as usize])
+                .show_ui(ui, |ui| {
+                    for (i, name) in directions.iter().enumerate() {
+                        if ui.selectable_value(&mut settings.front_direction, i as u32, *name).changed() {
+                            changed = true;
+                        }
+                    }
+                });
+
+            ui.separator();
+
+            // FOV (only for perspective)
+            if settings.projection_mode == 0 {
+                ui.horizontal(|ui| {
+                    ui.label("FOV:");
+                    if ui.add(Slider::new(&mut settings.fov_degrees, 10.0..=170.0).suffix("°")).changed() {
+                        changed = true;
+                    }
+                });
+            } else {
+                // Ortho scale
+                ui.horizontal(|ui| {
+                    ui.label("Scale:");
+                    if ui.add(DragValue::new(&mut settings.ortho_scale).speed(0.1).range(0.1..=100.0)).changed() {
+                        changed = true;
+                    }
+                });
+            }
+
+            // Clip planes
+            ui.horizontal(|ui| {
+                ui.label("Near:");
+                if ui.add(DragValue::new(&mut settings.near).speed(0.001).range(0.001..=10.0)).changed() {
+                    changed = true;
+                }
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Far:");
+                if ui.add(DragValue::new(&mut settings.far).speed(1.0).range(10.0..=10000.0)).changed() {
+                    changed = true;
+                }
+            });
+
+            // Move speed
+            ui.horizontal(|ui| {
+                ui.label("Move Speed:");
+                if ui.add(DragValue::new(&mut settings.move_speed).speed(0.1).range(0.1..=10.0)).changed() {
+                    changed = true;
+                }
+            });
+        });
+
+    changed
 }
 
 /// Builds the ground plane settings section.
