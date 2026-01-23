@@ -31,6 +31,7 @@ pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use shader::{ShaderBuilder, ShaderProgram};
 pub use surface_mesh_render::{MeshUniforms, SurfaceMeshRenderData};
 pub use vector_render::{VectorRenderData, VectorUniforms};
+pub use ground_plane::{GroundPlaneRenderData, GroundPlaneUniforms};
 
 /// Render context passed to structures during drawing.
 pub struct RenderContext<'a> {
