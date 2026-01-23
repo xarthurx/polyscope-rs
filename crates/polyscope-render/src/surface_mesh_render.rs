@@ -64,6 +64,8 @@ pub struct SurfaceMeshRenderData {
     pub barycentric_buffer: wgpu::Buffer,
     /// Color buffer (per-vertex colors for quantities, vec4).
     pub color_buffer: wgpu::Buffer,
+    /// Edge is real buffer - marks which edges are real polygon edges vs triangulation internal.
+    pub edge_is_real_buffer: wgpu::Buffer,
     /// Uniform buffer for mesh-specific settings.
     pub uniform_buffer: wgpu::Buffer,
     /// Bind group for this surface mesh.
@@ -84,6 +86,7 @@ impl SurfaceMeshRenderData {
     /// * `vertices` - Vertex positions
     /// * `triangles` - Triangle indices (each [u32; 3] is one triangle)
     /// * `vertex_normals` - Per-vertex normals
+    /// * `edge_is_real` - Per-triangle-vertex flags marking real polygon edges vs internal triangulation edges
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -91,6 +94,7 @@ impl SurfaceMeshRenderData {
         vertices: &[Vec3],
         triangles: &[[u32; 3]],
         vertex_normals: &[Vec3],
+        edge_is_real: &[Vec3],
     ) -> Self {
         let num_triangles = triangles.len() as u32;
         let num_indices = num_triangles * 3;
@@ -102,7 +106,9 @@ impl SurfaceMeshRenderData {
         let mut expanded_normals: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
         let mut expanded_colors: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
         let mut barycentric_data: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
+        let mut edge_is_real_data: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
 
+        let mut tri_vertex_idx = 0;
         for tri in triangles {
             // Barycentric coordinates for wireframe
             let bary_coords = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
@@ -118,6 +124,12 @@ impl SurfaceMeshRenderData {
                 expanded_colors.extend_from_slice(&[0.0, 0.0, 0.0, 0.0]);
 
                 barycentric_data.extend_from_slice(&[bary_coords[i][0], bary_coords[i][1], bary_coords[i][2], 0.0]);
+
+                // Edge is real flags (same for all vertices of triangle)
+                let eir = edge_is_real[tri_vertex_idx];
+                edge_is_real_data.extend_from_slice(&[eir.x, eir.y, eir.z, 0.0]);
+
+                tri_vertex_idx += 1;
             }
         }
 
@@ -157,6 +169,13 @@ impl SurfaceMeshRenderData {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
+        // Create edge_is_real buffer
+        let edge_is_real_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("mesh edge_is_real"),
+            contents: bytemuck::cast_slice(&edge_is_real_data),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        });
+
         // Create uniform buffer
         let uniforms = MeshUniforms::default();
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -173,6 +192,7 @@ impl SurfaceMeshRenderData {
         // 3: normals (storage)
         // 4: barycentrics (storage)
         // 5: colors (storage)
+        // 6: edge_is_real (storage)
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("surface mesh bind group"),
             layout: bind_group_layout,
@@ -201,6 +221,10 @@ impl SurfaceMeshRenderData {
                     binding: 5,
                     resource: color_buffer.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: edge_is_real_buffer.as_entire_binding(),
+                },
             ],
         });
 
@@ -210,6 +234,7 @@ impl SurfaceMeshRenderData {
             normal_buffer,
             barycentric_buffer,
             color_buffer,
+            edge_is_real_buffer,
             uniform_buffer,
             bind_group,
             num_triangles,

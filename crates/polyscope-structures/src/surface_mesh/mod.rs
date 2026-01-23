@@ -631,6 +631,7 @@ impl SurfaceMesh {
             &self.vertices,
             &self.triangulation,
             &self.vertex_normals,
+            &self.edge_is_real,
         ));
     }
 
