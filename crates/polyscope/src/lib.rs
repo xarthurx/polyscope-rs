@@ -62,9 +62,12 @@ pub use polyscope_core::{
 
 // Re-export render types
 pub use polyscope_render::{
-    Camera, ColorMap, ColorMapRegistry, Material, MaterialRegistry, PickElementType, RenderContext,
-    RenderEngine, ScreenshotError, ScreenshotOptions,
+    AxisDirection, Camera, ColorMap, ColorMapRegistry, Material, MaterialRegistry, NavigationStyle,
+    PickElementType, ProjectionMode, RenderContext, RenderEngine, ScreenshotError, ScreenshotOptions,
 };
+
+// Re-export UI types
+pub use polyscope_ui::{AppearanceSettings, CameraSettings, SceneExtents};
 
 // Re-export structures
 pub use polyscope_structures::{
@@ -1453,6 +1456,111 @@ pub fn set_volume_mesh_transform(name: &str, transform: Mat4) {
 /// Gets the transform of a volume mesh by name.
 pub fn get_volume_mesh_transform(name: &str) -> Option<Mat4> {
     with_context(|ctx| ctx.registry.get("VolumeMesh", name).map(|vm| vm.transform()))
+}
+
+// ============================================================================
+// Camera and UI Sync Functions
+// ============================================================================
+
+/// Syncs CameraSettings from UI to the actual Camera.
+pub fn apply_camera_settings(camera: &mut polyscope_render::Camera, settings: &polyscope_ui::CameraSettings) {
+    use polyscope_render::{AxisDirection, NavigationStyle, ProjectionMode};
+
+    camera.navigation_style = match settings.navigation_style {
+        0 => NavigationStyle::Turntable,
+        1 => NavigationStyle::Free,
+        2 => NavigationStyle::Planar,
+        3 => NavigationStyle::FirstPerson,
+        _ => NavigationStyle::None,
+    };
+
+    camera.projection_mode = match settings.projection_mode {
+        0 => ProjectionMode::Perspective,
+        _ => ProjectionMode::Orthographic,
+    };
+
+    camera.set_up_direction(match settings.up_direction {
+        0 => AxisDirection::PosX,
+        1 => AxisDirection::NegX,
+        2 => AxisDirection::PosY,
+        3 => AxisDirection::NegY,
+        4 => AxisDirection::PosZ,
+        _ => AxisDirection::NegZ,
+    });
+
+    camera.front_direction = match settings.front_direction {
+        0 => AxisDirection::PosX,
+        1 => AxisDirection::NegX,
+        2 => AxisDirection::PosY,
+        3 => AxisDirection::NegY,
+        4 => AxisDirection::PosZ,
+        _ => AxisDirection::NegZ,
+    };
+
+    camera.set_fov_degrees(settings.fov_degrees);
+    camera.set_near(settings.near);
+    camera.set_far(settings.far);
+    camera.set_move_speed(settings.move_speed);
+    camera.set_ortho_scale(settings.ortho_scale);
+}
+
+/// Creates CameraSettings from the current Camera state.
+pub fn camera_to_settings(camera: &polyscope_render::Camera) -> polyscope_ui::CameraSettings {
+    use polyscope_render::{AxisDirection, NavigationStyle, ProjectionMode};
+
+    polyscope_ui::CameraSettings {
+        navigation_style: match camera.navigation_style {
+            NavigationStyle::Turntable => 0,
+            NavigationStyle::Free => 1,
+            NavigationStyle::Planar => 2,
+            NavigationStyle::FirstPerson => 3,
+            NavigationStyle::None => 4,
+        },
+        projection_mode: match camera.projection_mode {
+            ProjectionMode::Perspective => 0,
+            ProjectionMode::Orthographic => 1,
+        },
+        up_direction: match camera.up_direction {
+            AxisDirection::PosX => 0,
+            AxisDirection::NegX => 1,
+            AxisDirection::PosY => 2,
+            AxisDirection::NegY => 3,
+            AxisDirection::PosZ => 4,
+            AxisDirection::NegZ => 5,
+        },
+        front_direction: match camera.front_direction {
+            AxisDirection::PosX => 0,
+            AxisDirection::NegX => 1,
+            AxisDirection::PosY => 2,
+            AxisDirection::NegY => 3,
+            AxisDirection::PosZ => 4,
+            AxisDirection::NegZ => 5,
+        },
+        fov_degrees: camera.fov_degrees(),
+        near: camera.near,
+        far: camera.far,
+        move_speed: camera.move_speed,
+        ortho_scale: camera.ortho_scale,
+    }
+}
+
+/// Gets scene extents from the global context.
+pub fn get_scene_extents() -> polyscope_ui::SceneExtents {
+    polyscope_core::state::with_context(|ctx| {
+        polyscope_ui::SceneExtents {
+            auto_compute: ctx.options.auto_compute_scene_extents,
+            length_scale: ctx.length_scale,
+            bbox_min: ctx.bounding_box.0.to_array(),
+            bbox_max: ctx.bounding_box.1.to_array(),
+        }
+    })
+}
+
+/// Sets auto-compute scene extents option.
+pub fn set_auto_compute_extents(auto: bool) {
+    polyscope_core::state::with_context_mut(|ctx| {
+        ctx.options.auto_compute_scene_extents = auto;
+    });
 }
 
 #[cfg(test)]
