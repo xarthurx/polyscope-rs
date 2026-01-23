@@ -287,7 +287,10 @@ impl App {
                 &mut self.new_slice_plane_name,
             );
             if slice_action != polyscope_ui::SlicePlanesAction::None {
-                crate::handle_slice_plane_action(slice_action.clone(), &mut self.slice_plane_settings);
+                crate::handle_slice_plane_action(
+                    slice_action.clone(),
+                    &mut self.slice_plane_settings,
+                );
                 if matches!(slice_action, polyscope_ui::SlicePlanesAction::Add(_)) {
                     self.new_slice_plane_name.clear();
                 }

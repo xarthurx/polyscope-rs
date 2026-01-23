@@ -483,15 +483,24 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
     ui.label("Origin:");
     ui.horizontal(|ui| {
         ui.label("X:");
-        if ui.add(DragValue::new(&mut settings.origin[0]).speed(0.1)).changed() {
+        if ui
+            .add(DragValue::new(&mut settings.origin[0]).speed(0.1))
+            .changed()
+        {
             changed = true;
         }
         ui.label("Y:");
-        if ui.add(DragValue::new(&mut settings.origin[1]).speed(0.1)).changed() {
+        if ui
+            .add(DragValue::new(&mut settings.origin[1]).speed(0.1))
+            .changed()
+        {
             changed = true;
         }
         ui.label("Z:");
-        if ui.add(DragValue::new(&mut settings.origin[2]).speed(0.1)).changed() {
+        if ui
+            .add(DragValue::new(&mut settings.origin[2]).speed(0.1))
+            .changed()
+        {
             changed = true;
         }
     });
@@ -528,15 +537,36 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
     // Custom normal input
     ui.horizontal(|ui| {
         ui.label("X:");
-        if ui.add(DragValue::new(&mut settings.normal[0]).speed(0.01).range(-1.0..=1.0)).changed() {
+        if ui
+            .add(
+                DragValue::new(&mut settings.normal[0])
+                    .speed(0.01)
+                    .range(-1.0..=1.0),
+            )
+            .changed()
+        {
             changed = true;
         }
         ui.label("Y:");
-        if ui.add(DragValue::new(&mut settings.normal[1]).speed(0.01).range(-1.0..=1.0)).changed() {
+        if ui
+            .add(
+                DragValue::new(&mut settings.normal[1])
+                    .speed(0.01)
+                    .range(-1.0..=1.0),
+            )
+            .changed()
+        {
             changed = true;
         }
         ui.label("Z:");
-        if ui.add(DragValue::new(&mut settings.normal[2]).speed(0.01).range(-1.0..=1.0)).changed() {
+        if ui
+            .add(
+                DragValue::new(&mut settings.normal[2])
+                    .speed(0.01)
+                    .range(-1.0..=1.0),
+            )
+            .changed()
+        {
             changed = true;
         }
     });
@@ -545,10 +575,16 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
 
     // Visualization options
     ui.horizontal(|ui| {
-        if ui.checkbox(&mut settings.draw_plane, "Draw plane").changed() {
+        if ui
+            .checkbox(&mut settings.draw_plane, "Draw plane")
+            .changed()
+        {
             changed = true;
         }
-        if ui.checkbox(&mut settings.draw_widget, "Draw widget").changed() {
+        if ui
+            .checkbox(&mut settings.draw_widget, "Draw widget")
+            .changed()
+        {
             changed = true;
         }
     });
@@ -564,7 +600,10 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
     // Transparency
     ui.horizontal(|ui| {
         ui.label("Opacity:");
-        if ui.add(Slider::new(&mut settings.transparency, 0.0..=1.0)).changed() {
+        if ui
+            .add(Slider::new(&mut settings.transparency, 0.0..=1.0))
+            .changed()
+        {
             changed = true;
         }
     });
@@ -603,11 +642,8 @@ pub fn build_slice_planes_section(
             // List existing planes
             let mut remove_idx = None;
             for (idx, plane) in planes.iter_mut().enumerate() {
-                let header_text = format!(
-                    "{} {}",
-                    if plane.enabled { "●" } else { "○" },
-                    plane.name
-                );
+                let header_text =
+                    format!("{} {}", if plane.enabled { "●" } else { "○" }, plane.name);
 
                 CollapsingHeader::new(header_text)
                     .id_salt(format!("slice_plane_{}", idx))

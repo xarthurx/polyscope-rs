@@ -2074,10 +2074,7 @@ mod tests {
         let mut settings = vec![polyscope_ui::SlicePlaneSettings::with_name(&name)];
 
         // Remove via action
-        handle_slice_plane_action(
-            polyscope_ui::SlicePlanesAction::Remove(0),
-            &mut settings,
-        );
+        handle_slice_plane_action(polyscope_ui::SlicePlanesAction::Remove(0), &mut settings);
 
         assert!(settings.is_empty());
         assert!(get_slice_plane(&name).is_none());
