@@ -7,20 +7,26 @@
 //! - Configuration options and persistent values
 
 pub mod error;
+pub mod gizmo;
 pub mod ground_plane;
+pub mod group;
 pub mod options;
 pub mod pick;
 pub mod quantity;
 pub mod registry;
+pub mod slice_plane;
 pub mod state;
 pub mod structure;
 
 pub use error::{PolyscopeError, Result};
+pub use gizmo::{GizmoAxis, GizmoConfig, GizmoMode, GizmoSpace, GizmoUniforms, Transform};
 pub use ground_plane::{GroundPlaneConfig, GroundPlaneMode};
+pub use group::Group;
 pub use options::Options;
 pub use pick::{PickResult, Pickable};
 pub use quantity::{Quantity, QuantityKind};
 pub use registry::Registry;
+pub use slice_plane::{SlicePlane, SlicePlaneUniforms, MAX_SLICE_PLANES};
 pub use state::{with_context, with_context_mut, Context};
 pub use structure::{HasQuantities, Structure};
 

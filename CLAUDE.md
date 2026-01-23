@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Response Style
+
+Every response to the user must start with "Master,"
+
 ## Project Overview
 
 polyscope-rs is a Rust-native 3D visualization library for geometric data. It's a port/reimagining of the C++ [Polyscope](https://polyscope.run) library, targeting the Rust ecosystem.
@@ -71,11 +75,11 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 ### Structures (polyscope-structures)
 
 - `PointCloud` - Point set with scalar/vector/color quantities
-- `SurfaceMesh` - Triangle mesh (polygons TODO)
-- `CurveNetwork` - Edge network (TODO)
-- `VolumeMesh` - Tet/hex mesh (TODO)
-- `VolumeGrid` - Implicit surface grid (TODO)
-- `CameraView` - Camera frustum visualization (TODO)
+- `SurfaceMesh` - Triangle mesh with vertex/face quantities
+- `CurveNetwork` - Edge network with node/edge quantities
+- `VolumeMesh` - Tet/hex mesh
+- `VolumeGrid` - Regular 3D grid with node/cell quantities
+- `CameraView` - Camera frustum visualization
 
 ## Technology Stack
 
@@ -115,5 +119,6 @@ Shaders are written in WGSL (WebGPU Shading Language). Key shaders needed:
 ## Reference
 
 - Original C++ Polyscope: https://github.com/nmwsharp/polyscope
+- **Local C++ Polyscope source**: `~/repo/polyscope` - Always check this for implementation details
 - Polyscope documentation: https://polyscope.run
 - Design document: `docs/plans/2026-01-21-polyscope-rs-design.md`

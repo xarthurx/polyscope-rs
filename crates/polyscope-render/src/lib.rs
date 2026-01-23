@@ -16,6 +16,7 @@ pub mod ground_plane;
 pub mod materials;
 pub mod pick;
 pub mod point_cloud_render;
+pub mod screenshot;
 pub mod shader;
 pub mod surface_mesh_render;
 pub mod vector_render;
@@ -25,13 +26,14 @@ pub use color_maps::{ColorMap, ColorMapRegistry};
 pub use curve_network_render::{CurveNetworkRenderData, CurveNetworkUniforms};
 pub use engine::RenderEngine;
 pub use error::{RenderError, RenderResult};
-pub use materials::{Material, MaterialRegistry};
+pub use materials::{Material, MaterialRegistry, MaterialUniforms};
 pub use pick::{color_to_index, index_to_color, PickElementType, PickResult};
 pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use shader::{ShaderBuilder, ShaderProgram};
 pub use surface_mesh_render::{MeshUniforms, SurfaceMeshRenderData};
 pub use vector_render::{VectorRenderData, VectorUniforms};
 pub use ground_plane::{GroundPlaneRenderData, GroundPlaneUniforms};
+pub use screenshot::{save_image, save_to_buffer, ScreenshotError, ScreenshotOptions};
 
 /// Render context passed to structures during drawing.
 pub struct RenderContext<'a> {

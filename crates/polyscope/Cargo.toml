@@ -35,5 +35,17 @@ path = "../../examples/surface_mesh_demo.rs"
 name = "curve_network_demo"
 path = "../../examples/curve_network_demo.rs"
 
+[[example]]
+name = "camera_view_demo"
+path = "../../examples/camera_view_demo.rs"
+
+[[example]]
+name = "volume_grid_demo"
+path = "../../examples/volume_grid_demo.rs"
+
+[[example]]
+name = "volume_mesh_demo"
+path = "../../examples/volume_mesh_demo.rs"
+
 [lints]
 workspace = true

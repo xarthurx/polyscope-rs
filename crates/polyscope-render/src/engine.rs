@@ -87,6 +87,10 @@ pub struct RenderEngine {
     ground_plane_bind_group_layout: wgpu::BindGroupLayout,
     /// Ground plane render data (lazily initialized).
     ground_plane_render_data: Option<GroundPlaneRenderData>,
+    /// Screenshot capture texture (lazily initialized).
+    screenshot_texture: Option<wgpu::Texture>,
+    /// Screenshot capture buffer (lazily initialized).
+    screenshot_buffer: Option<wgpu::Buffer>,
 }
 
 impl RenderEngine {
@@ -225,8 +229,8 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: false, // Don't write depth for ground plane
-                    depth_compare: wgpu::CompareFunction::Always, // Always draw (handled by shader)
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::LessEqual,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -261,6 +265,8 @@ impl RenderEngine {
             ground_plane_pipeline,
             ground_plane_bind_group_layout,
             ground_plane_render_data: None,
+            screenshot_texture: None,
+            screenshot_buffer: None,
         };
 
         engine.init_point_pipeline();
@@ -391,8 +397,8 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: false, // Don't write depth for ground plane
-                    depth_compare: wgpu::CompareFunction::Always, // Always draw (handled by shader)
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::LessEqual,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -427,6 +433,8 @@ impl RenderEngine {
             ground_plane_pipeline,
             ground_plane_bind_group_layout,
             ground_plane_render_data: None,
+            screenshot_texture: None,
+            screenshot_buffer: None,
         };
 
         engine.init_point_pipeline();
@@ -1128,5 +1136,145 @@ impl RenderEngine {
             // 4 triangles * 3 vertices = 12 vertices for infinite plane
             render_pass.draw(0..12, 0..1);
         }
+    }
+
+    /// Creates a screenshot texture for capturing frames.
+    ///
+    /// Returns a texture view that can be used as a render target.
+    /// After rendering to this view, call `capture_screenshot()` to get the pixel data.
+    pub fn create_screenshot_target(&mut self) -> wgpu::TextureView {
+        // Calculate buffer size with proper alignment
+        let bytes_per_row = Self::aligned_bytes_per_row(self.width);
+        let buffer_size = (bytes_per_row * self.height) as u64;
+
+        // Create capture texture
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("screenshot texture"),
+            size: wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: self.surface_config.format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+
+        // Create staging buffer for readback
+        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("screenshot buffer"),
+            size: buffer_size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.screenshot_texture = Some(texture);
+        self.screenshot_buffer = Some(buffer);
+
+        view
+    }
+
+    /// Returns the screenshot depth view for rendering.
+    pub fn screenshot_depth_view(&self) -> &wgpu::TextureView {
+        &self.depth_view
+    }
+
+    /// Calculates bytes per row with proper alignment for wgpu buffer copies.
+    fn aligned_bytes_per_row(width: u32) -> u32 {
+        let bytes_per_pixel = 4u32; // RGBA8
+        let unaligned = width * bytes_per_pixel;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+        (unaligned + align - 1) / align * align
+    }
+
+    /// Captures the screenshot after rendering to the screenshot target.
+    ///
+    /// This method copies the screenshot texture to a buffer and reads it back.
+    /// Call this after rendering to the view returned by `create_screenshot_target()`.
+    ///
+    /// Returns the raw RGBA pixel data.
+    pub fn capture_screenshot(&mut self) -> Result<Vec<u8>, crate::screenshot::ScreenshotError> {
+        let texture = self
+            .screenshot_texture
+            .as_ref()
+            .ok_or(crate::screenshot::ScreenshotError::InvalidImageData)?;
+        let buffer = self
+            .screenshot_buffer
+            .as_ref()
+            .ok_or(crate::screenshot::ScreenshotError::InvalidImageData)?;
+
+        let bytes_per_row = Self::aligned_bytes_per_row(self.width);
+
+        // Create encoder and copy texture to buffer
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("screenshot copy encoder"),
+            });
+
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(self.height),
+                },
+            },
+            wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        // Map buffer and read data
+        let buffer_slice = buffer.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send(result).unwrap();
+        });
+        self.device.poll(wgpu::Maintain::Wait);
+        rx.recv()
+            .map_err(|_| crate::screenshot::ScreenshotError::BufferMapFailed)?
+            .map_err(|_| crate::screenshot::ScreenshotError::BufferMapFailed)?;
+
+        // Copy data, removing row padding
+        let data = buffer_slice.get_mapped_range();
+        let mut result = Vec::with_capacity((self.width * self.height * 4) as usize);
+        let row_bytes = (self.width * 4) as usize;
+
+        for row in 0..self.height {
+            let start = (row * bytes_per_row) as usize;
+            let end = start + row_bytes;
+            result.extend_from_slice(&data[start..end]);
+        }
+
+        drop(data);
+        buffer.unmap();
+
+        // Clean up screenshot resources
+        self.screenshot_texture = None;
+        self.screenshot_buffer = None;
+
+        Ok(result)
+    }
+
+    /// Returns the current viewport dimensions.
+    pub fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
     }
 }

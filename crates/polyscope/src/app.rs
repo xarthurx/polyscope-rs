@@ -14,7 +14,7 @@ use winit::{
 
 use polyscope_core::{GroundPlaneConfig, GroundPlaneMode};
 use polyscope_render::{PickResult, RenderEngine};
-use polyscope_structures::{CurveNetwork, PointCloud, SurfaceMesh};
+use polyscope_structures::{CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh};
 use polyscope_ui::EguiIntegration;
 
 use crate::Vec3;
@@ -35,6 +35,9 @@ pub struct App {
     last_click_pos: Option<(f64, f64)>,
     // Ground plane settings
     ground_plane: GroundPlaneConfig,
+    // Screenshot state
+    screenshot_pending: Option<String>,
+    screenshot_counter: u32,
 }
 
 impl App {
@@ -52,7 +55,21 @@ impl App {
             selection: None,
             last_click_pos: None,
             ground_plane: GroundPlaneConfig::default(),
+            screenshot_pending: None,
+            screenshot_counter: 0,
         }
+    }
+
+    /// Requests a screenshot to be saved to the specified file.
+    pub fn request_screenshot(&mut self, filename: String) {
+        self.screenshot_pending = Some(filename);
+    }
+
+    /// Requests a screenshot with an auto-generated filename.
+    pub fn request_auto_screenshot(&mut self) {
+        let filename = format!("screenshot_{:04}.png", self.screenshot_counter);
+        self.screenshot_counter += 1;
+        self.screenshot_pending = Some(filename);
     }
 
     /// Sets the background color.
@@ -128,6 +145,45 @@ impl App {
                         }
                     }
                 }
+
+                if structure.type_name() == "CameraView" {
+                    if let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>() {
+                        if cv.render_data().is_none() {
+                            cv.init_render_data(
+                                &engine.device,
+                                engine.curve_network_edge_bind_group_layout(),
+                                engine.camera_buffer(),
+                                &engine.queue,
+                                ctx.length_scale,
+                            );
+                        }
+                    }
+                }
+
+                if structure.type_name() == "VolumeGrid" {
+                    if let Some(vg) = structure.as_any_mut().downcast_mut::<VolumeGrid>() {
+                        if vg.render_data().is_none() {
+                            vg.init_render_data(
+                                &engine.device,
+                                engine.curve_network_edge_bind_group_layout(),
+                                engine.camera_buffer(),
+                                &engine.queue,
+                            );
+                        }
+                    }
+                }
+
+                if structure.type_name() == "VolumeMesh" {
+                    if let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>() {
+                        if vm.render_data().is_none() {
+                            vm.init_render_data(
+                                &engine.device,
+                                engine.mesh_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                    }
+                }
             }
         });
 
@@ -154,6 +210,12 @@ impl App {
                 if structure.type_name() == "CurveNetwork" {
                     if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
                         cn.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                    }
+                }
+
+                if structure.type_name() == "VolumeMesh" {
+                    if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                        vm.update_gpu_buffers(&engine.queue);
                     }
                 }
             }
@@ -228,6 +290,21 @@ impl App {
                             if type_name == "CurveNetwork" {
                                 if let Some(cn) = s.as_any_mut().downcast_mut::<CurveNetwork>() {
                                     cn.build_egui_ui(ui);
+                                }
+                            }
+                            if type_name == "CameraView" {
+                                if let Some(cv) = s.as_any_mut().downcast_mut::<CameraView>() {
+                                    cv.build_egui_ui(ui);
+                                }
+                            }
+                            if type_name == "VolumeGrid" {
+                                if let Some(vg) = s.as_any_mut().downcast_mut::<VolumeGrid>() {
+                                    vg.build_egui_ui(ui);
+                                }
+                            }
+                            if type_name == "VolumeMesh" {
+                                if let Some(vm) = s.as_any_mut().downcast_mut::<VolumeMesh>() {
+                                    vm.build_egui_ui(ui);
                                 }
                             }
                         }
@@ -364,7 +441,7 @@ impl App {
                 });
             }
 
-            // Draw surface meshes
+            // Draw surface meshes and volume meshes
             if let Some(pipeline) = &engine.mesh_pipeline {
                 render_pass.set_pipeline(pipeline);
 
@@ -385,11 +462,23 @@ impl App {
                                 }
                             }
                         }
+                        if structure.type_name() == "VolumeMesh" {
+                            if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                                if let Some(render_data) = vm.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.set_index_buffer(
+                                        render_data.index_buffer.slice(..),
+                                        wgpu::IndexFormat::Uint32,
+                                    );
+                                    render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
+                                }
+                            }
+                        }
                     }
                 });
             }
 
-            // Draw curve network edges
+            // Draw curve network edges and camera views
             if let Some(pipeline) = &engine.curve_network_edge_pipeline {
                 render_pass.set_pipeline(pipeline);
 
@@ -401,6 +490,24 @@ impl App {
                         if structure.type_name() == "CurveNetwork" {
                             if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
                                 if let Some(render_data) = cn.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    // 2 vertices per edge (LineList topology)
+                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                }
+                            }
+                        }
+                        if structure.type_name() == "CameraView" {
+                            if let Some(cv) = structure.as_any().downcast_ref::<CameraView>() {
+                                if let Some(render_data) = cv.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    // 2 vertices per edge (LineList topology)
+                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                }
+                            }
+                        }
+                        if structure.type_name() == "VolumeGrid" {
+                            if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
+                                if let Some(render_data) = vg.render_data() {
                                     render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                     // 2 vertices per edge (LineList topology)
                                     render_pass.draw(0..render_data.num_edges * 2, 0..1);
@@ -452,6 +559,219 @@ impl App {
 
         engine.queue.submit(std::iter::once(encoder.finish()));
         output.present();
+
+        // Handle screenshot if pending
+        if let Some(filename) = self.screenshot_pending.take() {
+            self.capture_screenshot(filename);
+        }
+    }
+
+    /// Captures a screenshot by re-rendering to a dedicated texture.
+    fn capture_screenshot(&mut self, filename: String) {
+        let Some(engine) = &mut self.engine else {
+            log::error!("Cannot capture screenshot: engine not initialized");
+            return;
+        };
+
+        // Create screenshot target
+        let screenshot_view = engine.create_screenshot_target();
+
+        // Re-render to screenshot texture
+        let mut encoder = engine
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("screenshot encoder"),
+            });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("screenshot render pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &screenshot_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: self.background_color.x as f64,
+                            g: self.background_color.y as f64,
+                            b: self.background_color.z as f64,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: engine.screenshot_depth_view(),
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+
+            // Draw point clouds
+            if let Some(pipeline) = &engine.point_pipeline {
+                render_pass.set_pipeline(pipeline);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "PointCloud" {
+                            if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                                if let Some(render_data) = pc.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.draw(0..6, 0..render_data.num_points);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Draw vector quantities
+            if let Some(pipeline) = &engine.vector_pipeline {
+                render_pass.set_pipeline(pipeline);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "PointCloud" {
+                            if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                                if let Some(vq) = pc.active_vector_quantity() {
+                                    if let Some(render_data) = vq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..48, 0..render_data.num_vectors);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Draw surface meshes and volume meshes
+            if let Some(pipeline) = &engine.mesh_pipeline {
+                render_pass.set_pipeline(pipeline);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                if let Some(render_data) = mesh.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.set_index_buffer(
+                                        render_data.index_buffer.slice(..),
+                                        wgpu::IndexFormat::Uint32,
+                                    );
+                                    render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
+                                }
+                            }
+                        }
+                        if structure.type_name() == "VolumeMesh" {
+                            if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                                if let Some(render_data) = vm.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.set_index_buffer(
+                                        render_data.index_buffer.slice(..),
+                                        wgpu::IndexFormat::Uint32,
+                                    );
+                                    render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Draw curve networks, camera views, and volume grids
+            if let Some(pipeline) = &engine.curve_network_edge_pipeline {
+                render_pass.set_pipeline(pipeline);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "CurveNetwork" {
+                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                                if let Some(render_data) = cn.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                }
+                            }
+                        }
+                        if structure.type_name() == "CameraView" {
+                            if let Some(cv) = structure.as_any().downcast_ref::<CameraView>() {
+                                if let Some(render_data) = cv.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                }
+                            }
+                        }
+                        if structure.type_name() == "VolumeGrid" {
+                            if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
+                                if let Some(render_data) = vg.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Render ground plane for screenshot
+        let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
+            let center = ctx.center();
+            (
+                [center.x, center.y, center.z],
+                ctx.bounding_box.0.y,
+                ctx.length_scale,
+            )
+        });
+        let height_override = if self.ground_plane.height_is_relative {
+            None
+        } else {
+            Some(self.ground_plane.height)
+        };
+        engine.render_ground_plane(
+            &mut encoder,
+            &screenshot_view,
+            self.ground_plane.mode == GroundPlaneMode::Tile,
+            scene_center,
+            scene_min_y,
+            length_scale,
+            height_override,
+        );
+
+        engine.queue.submit(std::iter::once(encoder.finish()));
+
+        // Capture the screenshot
+        match engine.capture_screenshot() {
+            Ok(data) => {
+                let (width, height) = engine.dimensions();
+                match polyscope_render::save_image(&filename, &data, width, height) {
+                    Ok(()) => {
+                        log::info!("Screenshot saved to {}", filename);
+                    }
+                    Err(e) => {
+                        log::error!("Failed to save screenshot: {}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to capture screenshot: {}", e);
+            }
+        }
     }
 }
 
@@ -587,11 +907,18 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                if event.physical_key
-                    == winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::Escape)
-                    && event.state == ElementState::Pressed
-                {
-                    self.close_requested = true;
+                if event.state == ElementState::Pressed {
+                    match event.physical_key {
+                        winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::Escape) => {
+                            self.close_requested = true;
+                        }
+                        winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::F12) => {
+                            // Take screenshot with auto-generated filename
+                            self.request_auto_screenshot();
+                            log::info!("Screenshot requested (F12)");
+                        }
+                        _ => {}
+                    }
                 }
             }
             _ => {}
