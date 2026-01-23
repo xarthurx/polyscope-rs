@@ -40,6 +40,12 @@ pub struct App {
     // Screenshot state
     screenshot_pending: Option<String>,
     screenshot_counter: u32,
+    // Camera settings UI state
+    camera_settings: polyscope_ui::CameraSettings,
+    // Scene extents UI state
+    scene_extents: polyscope_ui::SceneExtents,
+    // Appearance settings UI state
+    appearance_settings: polyscope_ui::AppearanceSettings,
 }
 
 impl App {
@@ -59,6 +65,9 @@ impl App {
             ground_plane: GroundPlaneConfig::default(),
             screenshot_pending: None,
             screenshot_counter: 0,
+            camera_settings: polyscope_ui::CameraSettings::default(),
+            scene_extents: polyscope_ui::SceneExtents::default(),
+            appearance_settings: polyscope_ui::AppearanceSettings::default(),
         }
     }
 
@@ -241,8 +250,30 @@ impl App {
         let mut gp_height = self.ground_plane.height;
         let mut gp_height_is_relative = self.ground_plane.height_is_relative;
 
+        // Sync camera settings from engine
+        self.camera_settings = crate::camera_to_settings(&engine.camera);
+
+        // Sync scene extents from context
+        self.scene_extents = crate::get_scene_extents();
+
+        let mut camera_changed = false;
+        let mut scene_extents_changed = false;
+
         polyscope_ui::build_left_panel(&egui.context, |ui| {
             polyscope_ui::build_controls_section(ui, &mut bg_color);
+
+            // Camera settings panel
+            if polyscope_ui::build_camera_settings_section(ui, &mut self.camera_settings) {
+                camera_changed = true;
+            }
+
+            // Scene extents panel
+            if polyscope_ui::build_scene_extents_section(ui, &mut self.scene_extents) {
+                scene_extents_changed = true;
+            }
+
+            // Appearance settings panel
+            polyscope_ui::build_appearance_section(ui, &mut self.appearance_settings);
 
             polyscope_ui::build_ground_plane_section(
                 ui,
@@ -335,6 +366,16 @@ impl App {
         };
         self.ground_plane.height = gp_height;
         self.ground_plane.height_is_relative = gp_height_is_relative;
+
+        // Apply camera settings if changed
+        if camera_changed {
+            crate::apply_camera_settings(&mut engine.camera, &self.camera_settings);
+        }
+
+        // Apply scene extents settings if changed
+        if scene_extents_changed {
+            crate::set_auto_compute_extents(self.scene_extents.auto_compute);
+        }
 
         // End egui frame
         let egui_output = egui.end_frame(window);
