@@ -7,7 +7,9 @@ use wgpu::util::DeviceExt;
 use crate::camera::Camera;
 use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
+use crate::ground_plane::GroundPlaneRenderData;
 use crate::materials::MaterialRegistry;
+use polyscope_core::{GroundPlaneConfig, GroundPlaneMode};
 
 /// Camera uniforms for GPU.
 #[repr(C)]
@@ -80,6 +82,12 @@ pub struct RenderEngine {
     pub curve_network_edge_pipeline: Option<wgpu::RenderPipeline>,
     /// Curve network edge bind group layout.
     curve_network_edge_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Ground plane render pipeline.
+    ground_plane_pipeline: wgpu::RenderPipeline,
+    /// Ground plane bind group layout.
+    ground_plane_bind_group_layout: wgpu::BindGroupLayout,
+    /// Ground plane render data (lazily initialized).
+    ground_plane_render_data: Option<GroundPlaneRenderData>,
 }
 
 impl RenderEngine {
@@ -147,6 +155,87 @@ impl RenderEngine {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        // Ground plane bind group layout
+        let ground_plane_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Ground Plane Bind Group Layout"),
+                entries: &[
+                    // Camera uniforms
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    // Ground uniforms
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        // Ground plane shader
+        let ground_plane_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Ground Plane Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/ground_plane.wgsl").into()),
+        });
+
+        // Ground plane pipeline layout
+        let ground_plane_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Ground Plane Pipeline Layout"),
+                bind_group_layouts: &[&ground_plane_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        // Ground plane render pipeline (with alpha blending)
+        let ground_plane_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Ground Plane Pipeline"),
+                layout: Some(&ground_plane_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &ground_plane_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &ground_plane_shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: surface_config.format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: false, // Don't write depth for ground plane
+                    depth_compare: wgpu::CompareFunction::Always, // Always draw (handled by shader)
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
         let mut engine = Self {
             instance,
             adapter,
@@ -170,6 +259,9 @@ impl RenderEngine {
             mesh_bind_group_layout: None,
             curve_network_edge_pipeline: None,
             curve_network_edge_bind_group_layout: None,
+            ground_plane_pipeline,
+            ground_plane_bind_group_layout,
+            ground_plane_render_data: None,
         };
 
         engine.init_point_pipeline();
@@ -229,6 +321,87 @@ impl RenderEngine {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        // Ground plane bind group layout
+        let ground_plane_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Ground Plane Bind Group Layout"),
+                entries: &[
+                    // Camera uniforms
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    // Ground uniforms
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        // Ground plane shader
+        let ground_plane_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Ground Plane Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/ground_plane.wgsl").into()),
+        });
+
+        // Ground plane pipeline layout
+        let ground_plane_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Ground Plane Pipeline Layout"),
+                bind_group_layouts: &[&ground_plane_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        // Ground plane render pipeline (with alpha blending)
+        let ground_plane_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Ground Plane Pipeline"),
+                layout: Some(&ground_plane_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &ground_plane_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &ground_plane_shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: surface_config.format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: false, // Don't write depth for ground plane
+                    depth_compare: wgpu::CompareFunction::Always, // Always draw (handled by shader)
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
         let mut engine = Self {
             instance,
             adapter,
@@ -252,6 +425,9 @@ impl RenderEngine {
             mesh_bind_group_layout: None,
             curve_network_edge_pipeline: None,
             curve_network_edge_bind_group_layout: None,
+            ground_plane_pipeline,
+            ground_plane_bind_group_layout,
+            ground_plane_render_data: None,
         };
 
         engine.init_point_pipeline();
@@ -879,5 +1055,56 @@ impl RenderEngine {
 
         self.curve_network_edge_pipeline = Some(pipeline);
         self.curve_network_edge_bind_group_layout = Some(bind_group_layout);
+    }
+
+    /// Renders the ground plane.
+    pub fn render_ground_plane(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        config: &GroundPlaneConfig,
+        scene_min_y: f32,
+    ) {
+        if config.mode == GroundPlaneMode::None {
+            return;
+        }
+
+        // Initialize render data if needed
+        if self.ground_plane_render_data.is_none() {
+            self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
+                &self.device,
+                &self.ground_plane_bind_group_layout,
+                &self.camera_buffer,
+            ));
+        }
+
+        if let Some(render_data) = &self.ground_plane_render_data {
+            render_data.update(&self.queue, config, scene_min_y);
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Ground Plane Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load, // Preserve existing content
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+
+            render_pass.set_pipeline(&self.ground_plane_pipeline);
+            render_pass.set_bind_group(0, render_data.bind_group(), &[]);
+            render_pass.draw(0..3, 0..1); // Fullscreen triangle
+        }
     }
 }
