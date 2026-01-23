@@ -264,3 +264,70 @@ impl Default for Camera {
         Self::new(16.0 / 9.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_axis_direction_to_vec3() {
+        assert_eq!(AxisDirection::PosX.to_vec3(), Vec3::X);
+        assert_eq!(AxisDirection::NegX.to_vec3(), Vec3::NEG_X);
+        assert_eq!(AxisDirection::PosY.to_vec3(), Vec3::Y);
+        assert_eq!(AxisDirection::NegY.to_vec3(), Vec3::NEG_Y);
+        assert_eq!(AxisDirection::PosZ.to_vec3(), Vec3::Z);
+        assert_eq!(AxisDirection::NegZ.to_vec3(), Vec3::NEG_Z);
+    }
+
+    #[test]
+    fn test_camera_defaults() {
+        let camera = Camera::default();
+        assert_eq!(camera.navigation_style, NavigationStyle::Turntable);
+        assert_eq!(camera.projection_mode, ProjectionMode::Perspective);
+        assert_eq!(camera.up_direction, AxisDirection::PosY);
+        assert_eq!(camera.move_speed, 1.0);
+    }
+
+    #[test]
+    fn test_projection_mode_perspective() {
+        let camera = Camera::new(1.0);
+        let proj = camera.projection_matrix();
+        // Perspective matrix has non-zero w division
+        assert!(proj.w_axis.z != 0.0);
+    }
+
+    #[test]
+    fn test_projection_mode_orthographic() {
+        let mut camera = Camera::new(1.0);
+        camera.projection_mode = ProjectionMode::Orthographic;
+        camera.ortho_scale = 5.0;
+        let proj = camera.projection_matrix();
+        // Orthographic matrix has w_axis.w = 1.0, w_axis.z = 0.0
+        assert!((proj.w_axis.w - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_set_fov_clamping() {
+        let mut camera = Camera::new(1.0);
+        camera.set_fov(0.0); // Too small
+        assert!(camera.fov >= 0.1);
+
+        camera.set_fov(std::f32::consts::PI); // Too large
+        assert!(camera.fov < std::f32::consts::PI);
+    }
+
+    #[test]
+    fn test_fov_degrees_conversion() {
+        let mut camera = Camera::new(1.0);
+        camera.set_fov_degrees(90.0);
+        assert!((camera.fov_degrees() - 90.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_set_up_direction() {
+        let mut camera = Camera::new(1.0);
+        camera.set_up_direction(AxisDirection::PosZ);
+        assert_eq!(camera.up, Vec3::Z);
+        assert_eq!(camera.up_direction, AxisDirection::PosZ);
+    }
+}
