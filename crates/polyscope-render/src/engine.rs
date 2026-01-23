@@ -9,7 +9,6 @@ use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
 use crate::ground_plane::GroundPlaneRenderData;
 use crate::materials::MaterialRegistry;
-use polyscope_core::{GroundPlaneConfig, GroundPlaneMode};
 
 /// Camera uniforms for GPU.
 #[repr(C)]
@@ -1058,14 +1057,26 @@ impl RenderEngine {
     }
 
     /// Renders the ground plane.
+    ///
+    /// # Arguments
+    /// * `encoder` - The command encoder
+    /// * `view` - The render target view
+    /// * `enabled` - Whether the ground plane is enabled
+    /// * `scene_center` - Center of the scene bounding box
+    /// * `scene_min_y` - Minimum Y coordinate of scene bounding box
+    /// * `length_scale` - Scene length scale
+    /// * `height_override` - Optional manual height (None = auto below scene)
     pub fn render_ground_plane(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
-        config: &GroundPlaneConfig,
+        enabled: bool,
+        scene_center: [f32; 3],
         scene_min_y: f32,
+        length_scale: f32,
+        height_override: Option<f32>,
     ) {
-        if config.mode == GroundPlaneMode::None {
+        if !enabled {
             return;
         }
 
@@ -1078,8 +1089,18 @@ impl RenderEngine {
             ));
         }
 
+        // Get camera height
+        let camera_height = self.camera.position.y;
+
         if let Some(render_data) = &self.ground_plane_render_data {
-            render_data.update(&self.queue, config, scene_min_y);
+            render_data.update(
+                &self.queue,
+                scene_center,
+                scene_min_y,
+                length_scale,
+                camera_height,
+                height_override,
+            );
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Ground Plane Pass"),
@@ -1104,7 +1125,8 @@ impl RenderEngine {
 
             render_pass.set_pipeline(&self.ground_plane_pipeline);
             render_pass.set_bind_group(0, render_data.bind_group(), &[]);
-            render_pass.draw(0..3, 0..1); // Fullscreen triangle
+            // 4 triangles * 3 vertices = 12 vertices for infinite plane
+            render_pass.draw(0..12, 0..1);
         }
     }
 }

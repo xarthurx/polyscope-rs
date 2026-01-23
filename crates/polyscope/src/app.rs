@@ -176,10 +176,6 @@ impl App {
         };
         let mut gp_height = self.ground_plane.height;
         let mut gp_height_is_relative = self.ground_plane.height_is_relative;
-        let mut gp_color1 = self.ground_plane.color1;
-        let mut gp_color2 = self.ground_plane.color2;
-        let mut gp_tile_size = self.ground_plane.tile_size;
-        let mut gp_transparency = self.ground_plane.transparency;
 
         polyscope_ui::build_left_panel(&egui.context, |ui| {
             polyscope_ui::build_controls_section(ui, &mut bg_color);
@@ -189,10 +185,6 @@ impl App {
                 &mut gp_mode,
                 &mut gp_height,
                 &mut gp_height_is_relative,
-                &mut gp_color1,
-                &mut gp_color2,
-                &mut gp_tile_size,
-                &mut gp_transparency,
             );
 
             // Collect structure info
@@ -264,10 +256,6 @@ impl App {
         };
         self.ground_plane.height = gp_height;
         self.ground_plane.height_is_relative = gp_height_is_relative;
-        self.ground_plane.color1 = gp_color1;
-        self.ground_plane.color2 = gp_color2;
-        self.ground_plane.tile_size = gp_tile_size;
-        self.ground_plane.transparency = gp_transparency;
 
         // End egui frame
         let egui_output = egui.end_frame(window);
@@ -425,12 +413,27 @@ impl App {
         }
 
         // Render ground plane (after scene, before UI)
-        let scene_min_y = crate::with_context(|ctx| ctx.bounding_box.0.y);
+        let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
+            let center = ctx.center();
+            (
+                [center.x, center.y, center.z],
+                ctx.bounding_box.0.y,
+                ctx.length_scale,
+            )
+        });
+        let height_override = if self.ground_plane.height_is_relative {
+            None
+        } else {
+            Some(self.ground_plane.height)
+        };
         engine.render_ground_plane(
             &mut encoder,
             &view,
-            &self.ground_plane,
+            self.ground_plane.mode == GroundPlaneMode::Tile,
+            scene_center,
             scene_min_y,
+            length_scale,
+            height_override,
         );
 
         // Render egui on top

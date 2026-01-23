@@ -36,10 +36,6 @@ pub fn build_ground_plane_section(
     mode: &mut u32, // 0=None, 1=Tile
     height: &mut f32,
     height_is_relative: &mut bool,
-    color1: &mut [f32; 3],
-    color2: &mut [f32; 3],
-    tile_size: &mut f32,
-    transparency: &mut f32,
 ) -> bool {
     let mut changed = false;
 
@@ -77,44 +73,6 @@ pub fn build_ground_plane_section(
                         }
                     });
                 }
-
-                ui.separator();
-
-                // Colors
-                ui.horizontal(|ui| {
-                    ui.label("Color 1:");
-                    if ui.color_edit_button_rgb(color1).changed() {
-                        changed = true;
-                    }
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("Color 2:");
-                    if ui.color_edit_button_rgb(color2).changed() {
-                        changed = true;
-                    }
-                });
-
-                // Tile size
-                ui.horizontal(|ui| {
-                    ui.label("Tile size:");
-                    if ui
-                        .add(egui::DragValue::new(tile_size).speed(0.1).range(0.1..=100.0))
-                        .changed()
-                    {
-                        changed = true;
-                    }
-                });
-
-                // Transparency (displayed as opacity)
-                ui.horizontal(|ui| {
-                    ui.label("Opacity:");
-                    let mut opacity = 1.0 - *transparency;
-                    if ui.add(egui::Slider::new(&mut opacity, 0.0..=1.0)).changed() {
-                        *transparency = 1.0 - opacity;
-                        changed = true;
-                    }
-                });
             }
         });
 

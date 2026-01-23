@@ -8,7 +8,7 @@ pub enum GroundPlaneMode {
     /// No ground plane.
     #[default]
     None,
-    /// Tiled/checkered ground plane.
+    /// Tiled ground plane with subtle grid lines.
     Tile,
 }
 
@@ -17,18 +17,10 @@ pub enum GroundPlaneMode {
 pub struct GroundPlaneConfig {
     /// Rendering mode.
     pub mode: GroundPlaneMode,
-    /// Height of the ground plane (Y coordinate).
+    /// Height of the ground plane (Y coordinate), used when height_is_relative is false.
     pub height: f32,
-    /// Whether height is relative to scene bounds.
+    /// Whether height is relative to scene bounds (auto-placed below scene).
     pub height_is_relative: bool,
-    /// Primary tile color.
-    pub color1: [f32; 3],
-    /// Secondary tile color (checker).
-    pub color2: [f32; 3],
-    /// Tile size (world units).
-    pub tile_size: f32,
-    /// Transparency (0 = opaque, 1 = fully transparent).
-    pub transparency: f32,
 }
 
 impl Default for GroundPlaneConfig {
@@ -37,10 +29,6 @@ impl Default for GroundPlaneConfig {
             mode: GroundPlaneMode::None,
             height: 0.0,
             height_is_relative: true,
-            color1: [0.75, 0.75, 0.75],
-            color2: [0.55, 0.55, 0.55],
-            tile_size: 1.0,
-            transparency: 0.0,
         }
     }
 }
@@ -61,10 +49,6 @@ mod tests {
         assert_eq!(config.mode, GroundPlaneMode::None);
         assert_eq!(config.height, 0.0);
         assert!(config.height_is_relative);
-        assert_eq!(config.color1, [0.75, 0.75, 0.75]);
-        assert_eq!(config.color2, [0.55, 0.55, 0.55]);
-        assert_eq!(config.tile_size, 1.0);
-        assert_eq!(config.transparency, 0.0);
     }
 
     #[test]
@@ -73,15 +57,9 @@ mod tests {
             mode: GroundPlaneMode::Tile,
             height: -1.5,
             height_is_relative: false,
-            color1: [0.8, 0.8, 0.8],
-            color2: [0.4, 0.4, 0.4],
-            tile_size: 2.0,
-            transparency: 0.3,
         };
         assert_eq!(config.mode, GroundPlaneMode::Tile);
         assert_eq!(config.height, -1.5);
         assert!(!config.height_is_relative);
-        assert_eq!(config.tile_size, 2.0);
-        assert_eq!(config.transparency, 0.3);
     }
 }
