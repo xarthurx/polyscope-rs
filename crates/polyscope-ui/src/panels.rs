@@ -75,6 +75,52 @@ impl Default for AppearanceSettings {
     }
 }
 
+/// Settings for a single slice plane in the UI.
+#[derive(Debug, Clone)]
+pub struct SlicePlaneSettings {
+    /// Name of the slice plane.
+    pub name: String,
+    /// Whether the slice plane is enabled.
+    pub enabled: bool,
+    /// Origin point (x, y, z).
+    pub origin: [f32; 3],
+    /// Normal direction (x, y, z).
+    pub normal: [f32; 3],
+    /// Whether to draw the plane visualization.
+    pub draw_plane: bool,
+    /// Whether to draw the widget.
+    pub draw_widget: bool,
+    /// Color of the plane (r, g, b).
+    pub color: [f32; 3],
+    /// Transparency (0.0 = transparent, 1.0 = opaque).
+    pub transparency: f32,
+}
+
+impl Default for SlicePlaneSettings {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            enabled: true,
+            origin: [0.0, 0.0, 0.0],
+            normal: [0.0, 1.0, 0.0],
+            draw_plane: true,
+            draw_widget: true,
+            color: [0.5, 0.5, 0.5],
+            transparency: 0.3,
+        }
+    }
+}
+
+impl SlicePlaneSettings {
+    /// Creates settings with a name.
+    pub fn with_name(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            ..Default::default()
+        }
+    }
+}
+
 /// Builds the main left panel.
 pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
     SidePanel::left("polyscope_main_panel")
