@@ -49,6 +49,9 @@ pub struct App {
     // Slice plane UI state
     slice_plane_settings: Vec<polyscope_ui::SlicePlaneSettings>,
     new_slice_plane_name: String,
+    // Group UI state
+    group_settings: Vec<polyscope_ui::GroupSettings>,
+    new_group_name: String,
 }
 
 impl App {
@@ -73,6 +76,8 @@ impl App {
             appearance_settings: polyscope_ui::AppearanceSettings::default(),
             slice_plane_settings: crate::get_slice_plane_settings(),
             new_slice_plane_name: String::new(),
+            group_settings: crate::get_group_settings(),
+            new_group_name: String::new(),
         }
     }
 
@@ -293,6 +298,19 @@ impl App {
                 );
                 if matches!(slice_action, polyscope_ui::SlicePlanesAction::Add(_)) {
                     self.new_slice_plane_name.clear();
+                }
+            }
+
+            // Groups section
+            let groups_action = polyscope_ui::panels::build_groups_section(
+                ui,
+                &mut self.group_settings,
+                &mut self.new_group_name,
+            );
+            if groups_action != polyscope_ui::GroupsAction::None {
+                crate::handle_group_action(groups_action.clone(), &mut self.group_settings);
+                if matches!(groups_action, polyscope_ui::GroupsAction::Create(_)) {
+                    self.new_group_name.clear();
                 }
             }
 
