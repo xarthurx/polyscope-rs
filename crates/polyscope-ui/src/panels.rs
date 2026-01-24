@@ -121,6 +121,46 @@ impl SlicePlaneSettings {
     }
 }
 
+/// Settings for a single group in the UI.
+#[derive(Debug, Clone)]
+pub struct GroupSettings {
+    /// Name of the group.
+    pub name: String,
+    /// Whether the group is enabled (visible).
+    pub enabled: bool,
+    /// Whether to show child details in UI.
+    pub show_child_details: bool,
+    /// Parent group name (if any).
+    pub parent_group: Option<String>,
+    /// Child structure identifiers (type_name, name).
+    pub child_structures: Vec<(String, String)>,
+    /// Child group names.
+    pub child_groups: Vec<String>,
+}
+
+impl Default for GroupSettings {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            enabled: true,
+            show_child_details: true,
+            parent_group: None,
+            child_structures: Vec::new(),
+            child_groups: Vec::new(),
+        }
+    }
+}
+
+impl GroupSettings {
+    /// Creates settings with a name.
+    pub fn with_name(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            ..Default::default()
+        }
+    }
+}
+
 /// Builds the main left panel.
 pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
     SidePanel::left("polyscope_main_panel")
