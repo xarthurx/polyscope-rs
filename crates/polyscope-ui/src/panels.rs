@@ -176,6 +176,64 @@ pub enum GroupsAction {
     ToggleDetails(usize),
 }
 
+/// Builds UI for a single group item.
+/// Returns true if enabled was toggled.
+fn build_group_item(ui: &mut Ui, settings: &mut GroupSettings) -> bool {
+    let mut toggled = false;
+
+    // Enabled checkbox
+    ui.horizontal(|ui| {
+        if ui.checkbox(&mut settings.enabled, "Enabled").changed() {
+            toggled = true;
+        }
+    });
+
+    // Show child details checkbox
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut settings.show_child_details, "Show details");
+    });
+
+    // Show parent if any
+    if let Some(ref parent) = settings.parent_group {
+        ui.horizontal(|ui| {
+            ui.label("Parent:");
+            ui.label(parent);
+        });
+    }
+
+    // Show child structures
+    if !settings.child_structures.is_empty() {
+        ui.separator();
+        ui.label("Structures:");
+        ui.indent("structures", |ui| {
+            for (type_name, name) in &settings.child_structures {
+                ui.horizontal(|ui| {
+                    ui.label(format!("[{}]", type_name));
+                    ui.label(name);
+                });
+            }
+        });
+    }
+
+    // Show child groups
+    if !settings.child_groups.is_empty() {
+        ui.separator();
+        ui.label("Child groups:");
+        ui.indent("child_groups", |ui| {
+            for child_name in &settings.child_groups {
+                ui.label(format!("  {}", child_name));
+            }
+        });
+    }
+
+    // Show empty state
+    if settings.child_structures.is_empty() && settings.child_groups.is_empty() {
+        ui.label("(empty)");
+    }
+
+    toggled
+}
+
 /// Builds the main left panel.
 pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
     SidePanel::left("polyscope_main_panel")
