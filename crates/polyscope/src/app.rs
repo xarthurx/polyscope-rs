@@ -29,9 +29,14 @@ pub struct App {
     close_requested: bool,
     background_color: Vec3,
     // Mouse state for camera control
+    // These track the PHYSICAL button state, updated on every press/release
     mouse_pos: (f64, f64),
-    mouse_down: bool,
+    left_mouse_down: bool,
     right_mouse_down: bool,
+    // Modifier keys
+    shift_down: bool,
+    // Drag tracking - accumulated distance since mouse press
+    drag_distance: f64,
     // Selection state
     selection: Option<PickResult>,
     last_click_pos: Option<(f64, f64)>,
@@ -57,6 +62,8 @@ pub struct App {
     selection_info: polyscope_ui::SelectionInfo,
     // Visual gizmo
     transform_gizmo: polyscope_ui::TransformGizmo,
+    // Tone mapping settings
+    tone_mapping_settings: polyscope_ui::ToneMappingSettings,
 }
 
 impl App {
@@ -69,8 +76,10 @@ impl App {
             close_requested: false,
             background_color: Vec3::new(0.1, 0.1, 0.1),
             mouse_pos: (0.0, 0.0),
-            mouse_down: false,
+            left_mouse_down: false,
             right_mouse_down: false,
+            shift_down: false,
+            drag_distance: 0.0,
             selection: None,
             last_click_pos: None,
             ground_plane: GroundPlaneConfig::default(),
@@ -86,6 +95,7 @@ impl App {
             gizmo_settings: crate::get_gizmo_settings(),
             selection_info: polyscope_ui::SelectionInfo::default(),
             transform_gizmo: polyscope_ui::TransformGizmo::new(),
+            tone_mapping_settings: polyscope_ui::ToneMappingSettings::default(),
         }
     }
 
@@ -359,6 +369,7 @@ impl App {
         let mut gp_mode = match self.ground_plane.mode {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::Tile => 1u32,
+            GroundPlaneMode::ShadowOnly => 2u32,
         };
         let mut gp_height = self.ground_plane.height;
         let mut gp_height_is_relative = self.ground_plane.height_is_relative;
@@ -387,6 +398,9 @@ impl App {
 
             // Appearance settings panel
             polyscope_ui::build_appearance_section(ui, &mut self.appearance_settings);
+
+            // Tone mapping settings panel
+            polyscope_ui::panels::build_tone_mapping_section(ui, &mut self.tone_mapping_settings);
 
             // Slice Planes section
             let slice_action = polyscope_ui::panels::build_slice_planes_section(
@@ -536,10 +550,15 @@ impl App {
                 egui::Vec2::new(engine.width as f32, engine.height as f32),
             );
 
-            // Create a central panel for the gizmo overlay
-            egui::CentralPanel::default()
-                .frame(egui::Frame::NONE)
+            // Use Area instead of CentralPanel to avoid consuming all mouse events
+            // The gizmo handles its own interaction detection
+            egui::Area::new(egui::Id::new("gizmo_overlay"))
+                .fixed_pos(egui::Pos2::ZERO)
+                .interactable(false) // Don't consume mouse events at the area level
                 .show(&egui.context, |ui| {
+                    // Set the clip rect to full window
+                    ui.set_clip_rect(full_window_viewport);
+
                     if let Some(new_transform) = self.transform_gizmo.interact(
                         ui,
                         view_matrix,
@@ -589,7 +608,8 @@ impl App {
         // Update ground plane settings from UI
         self.ground_plane.mode = match gp_mode {
             0 => GroundPlaneMode::None,
-            _ => GroundPlaneMode::Tile,
+            1 => GroundPlaneMode::Tile,
+            _ => GroundPlaneMode::ShadowOnly,
         };
         self.ground_plane.height = gp_height;
         self.ground_plane.height_is_relative = gp_height_is_relative;
@@ -638,17 +658,48 @@ impl App {
                 label: Some("render encoder"),
             });
 
+        // Update tone mapping uniforms and check if tone mapping is available
+        let tone_mapping_enabled = self.tone_mapping_settings.enabled && engine.hdr_view().is_some();
+        if tone_mapping_enabled {
+            engine.update_tone_mapping(
+                self.tone_mapping_settings.exposure,
+                self.tone_mapping_settings.white_level,
+                self.tone_mapping_settings.gamma,
+            );
+        }
+
+        // Store background color for use in render passes
+        let bg_r = self.background_color.x as f64;
+        let bg_g = self.background_color.y as f64;
+        let bg_b = self.background_color.z as f64;
+
+        // Store ground plane settings for later use
+        let gp_enabled = self.ground_plane.mode == GroundPlaneMode::Tile;
+        let gp_height_override = if self.ground_plane.height_is_relative {
+            None
+        } else {
+            Some(self.ground_plane.height)
+        };
+
+        // Main render pass - render scene to HDR or directly to surface
         {
+            // Get the appropriate render target
+            let scene_view = if tone_mapping_enabled {
+                engine.hdr_view().unwrap()
+            } else {
+                &view
+            };
+
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("main render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view: scene_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: self.background_color.x as f64,
-                            g: self.background_color.y as f64,
-                            b: self.background_color.z as f64,
+                            r: bg_r,
+                            g: bg_g,
+                            b: bg_b,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -788,9 +839,15 @@ impl App {
                     }
                 });
             }
+        }  // End of main render pass scope
+
+        // Apply tone mapping pass if enabled (before ground plane and UI)
+        if tone_mapping_enabled {
+            engine.render_tone_mapping(&mut encoder, &view);
         }
 
-        // Render ground plane (after scene, before UI)
+        // Render ground plane (after tone mapping, directly to surface)
+        // Ground plane is rendered without tone mapping for simplicity
         let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
             let center = ctx.center();
             (
@@ -799,19 +856,15 @@ impl App {
                 ctx.length_scale,
             )
         });
-        let height_override = if self.ground_plane.height_is_relative {
-            None
-        } else {
-            Some(self.ground_plane.height)
-        };
+
         engine.render_ground_plane(
             &mut encoder,
             &view,
-            self.ground_plane.mode == GroundPlaneMode::Tile,
+            gp_enabled,
             scene_center,
             scene_min_y,
             length_scale,
-            height_override,
+            gp_height_override,
         );
 
         // Render egui on top
@@ -1082,12 +1135,47 @@ impl ApplicationHandler for App {
         _window_id: WindowId,
         event: WindowEvent,
     ) {
-        // Let egui handle events first
-        if let (Some(egui), Some(window)) = (&mut self.egui, &self.window) {
-            if egui.handle_event(window, &event) {
-                return; // egui consumed the event
+        // ALWAYS track physical mouse button state, even if egui consumes the event.
+        // This prevents the mouse state from getting "stuck" when egui intercepts events.
+        match &event {
+            WindowEvent::MouseInput { state, button, .. } => {
+                match (button, state) {
+                    (MouseButton::Left, ElementState::Pressed) => {
+                        self.left_mouse_down = true;
+                        self.last_click_pos = Some(self.mouse_pos);
+                        self.drag_distance = 0.0;
+                    }
+                    (MouseButton::Left, ElementState::Released) => {
+                        self.left_mouse_down = false;
+                    }
+                    (MouseButton::Right, ElementState::Pressed) => {
+                        self.right_mouse_down = true;
+                        self.drag_distance = 0.0;
+                    }
+                    (MouseButton::Right, ElementState::Released) => {
+                        self.right_mouse_down = false;
+                    }
+                    _ => {}
+                }
             }
+            WindowEvent::ModifiersChanged(modifiers) => {
+                self.shift_down = modifiers.state().shift_key();
+            }
+            _ => {}
         }
+
+        // Let egui handle events
+        let egui_consumed = if let (Some(egui), Some(window)) = (&mut self.egui, &self.window) {
+            egui.handle_event(window, &event)
+        } else {
+            false
+        };
+
+        // Check if egui is actively using the pointer (e.g., dragging a widget or gizmo)
+        let egui_using_pointer = self
+            .egui
+            .as_ref()
+            .is_some_and(|e| e.context.is_using_pointer());
 
         match event {
             WindowEvent::CloseRequested => {
@@ -1109,86 +1197,101 @@ impl ApplicationHandler for App {
                 let delta_y = position.y - self.mouse_pos.1;
                 self.mouse_pos = (position.x, position.y);
 
-                if let Some(engine) = &mut self.engine {
-                    if self.mouse_down {
-                        // Orbit camera
-                        engine
-                            .camera
-                            .orbit(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
-                    } else if self.right_mouse_down {
-                        // Pan camera
-                        let scale = engine.camera.position.distance(engine.camera.target) * 0.002;
-                        engine
-                            .camera
-                            .pan(-delta_x as f32 * scale, delta_y as f32 * scale);
+                // Accumulate drag distance
+                if self.left_mouse_down || self.right_mouse_down {
+                    self.drag_distance += (delta_x.abs() + delta_y.abs());
+                }
+
+                // Camera control: only if egui isn't using the pointer
+                // Controls (matching C++ Polyscope):
+                // - Left drag (no Shift): Rotate/orbit
+                // - Left drag + Shift OR Right drag: Pan
+                if !egui_using_pointer {
+                    if let Some(engine) = &mut self.engine {
+                        let is_rotate = self.left_mouse_down && !self.shift_down;
+                        let is_pan = (self.left_mouse_down && self.shift_down) || self.right_mouse_down;
+
+                        if is_rotate {
+                            engine
+                                .camera
+                                .orbit(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
+                        } else if is_pan {
+                            let scale =
+                                engine.camera.position.distance(engine.camera.target) * 0.002;
+                            engine
+                                .camera
+                                .pan(-delta_x as f32 * scale, delta_y as f32 * scale);
+                        }
                     }
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
+                // Skip if egui consumed this event (clicking on UI widgets)
+                if egui_consumed {
+                    return;
+                }
+
+                // Threshold for distinguishing click from drag (in pixels)
+                const DRAG_THRESHOLD: f64 = 5.0;
+
                 match (button, state) {
-                    (MouseButton::Left, ElementState::Pressed) => {
-                        self.mouse_down = true;
-                        self.last_click_pos = Some(self.mouse_pos);
-                    }
                     (MouseButton::Left, ElementState::Released) => {
                         // Check if this was a click (not a drag)
-                        if let Some(click_pos) = self.last_click_pos {
-                            let dx = self.mouse_pos.0 - click_pos.0;
-                            let dy = self.mouse_pos.1 - click_pos.1;
-                            let drag_distance = (dx * dx + dy * dy).sqrt();
+                        if self.drag_distance < DRAG_THRESHOLD {
+                            if let Some(engine) = &self.engine {
+                                let click_screen = glam::Vec2::new(
+                                    self.mouse_pos.0 as f32,
+                                    self.mouse_pos.1 as f32,
+                                );
 
-                            // If we didn't drag much, it's a click - do picking
-                            if drag_distance < 5.0 {
-                                if let Some(engine) = &self.engine {
-                                    let click_screen = glam::Vec2::new(
-                                        self.mouse_pos.0 as f32,
-                                        self.mouse_pos.1 as f32,
-                                    );
+                                // Perform screen-space picking
+                                let picked = self.pick_structure_at_screen_pos(
+                                    click_screen,
+                                    engine.width,
+                                    engine.height,
+                                    &engine.camera,
+                                );
 
-                                    // Perform screen-space picking
-                                    let picked = self.pick_structure_at_screen_pos(
-                                        click_screen,
-                                        engine.width,
-                                        engine.height,
-                                        &engine.camera,
-                                    );
-
-                                    if let Some((type_name, name)) = picked {
-                                        // Something was clicked - select it
-                                        self.selection = Some(PickResult {
-                                            hit: true,
-                                            structure_type: type_name.clone(),
-                                            structure_name: name.clone(),
-                                            element_index: 0,
-                                            element_type: polyscope_render::PickElementType::None,
-                                            screen_pos: click_screen,
-                                            depth: 0.5,
-                                        });
-                                        crate::select_structure(&type_name, &name);
-                                        self.selection_info = crate::get_selection_info();
-                                    } else {
-                                        // Nothing was clicked - deselect
-                                        self.selection = None;
-                                        self.selection_info = polyscope_ui::SelectionInfo::default();
-                                        crate::deselect_structure();
-                                    }
+                                if let Some((type_name, name)) = picked {
+                                    // Something was clicked - select it
+                                    self.selection = Some(PickResult {
+                                        hit: true,
+                                        structure_type: type_name.clone(),
+                                        structure_name: name.clone(),
+                                        element_index: 0,
+                                        element_type: polyscope_render::PickElementType::None,
+                                        screen_pos: click_screen,
+                                        depth: 0.5,
+                                    });
+                                    crate::select_structure(&type_name, &name);
+                                    self.selection_info = crate::get_selection_info();
+                                } else {
+                                    // Nothing was clicked - deselect
+                                    self.selection = None;
+                                    self.selection_info = polyscope_ui::SelectionInfo::default();
+                                    crate::deselect_structure();
                                 }
                             }
                         }
-                        self.mouse_down = false;
                         self.last_click_pos = None;
                     }
-                    (MouseButton::Right, ElementState::Pressed) => {
-                        self.right_mouse_down = true;
-                    }
                     (MouseButton::Right, ElementState::Released) => {
-                        // Right-click is for camera rotation only, no selection changes
-                        self.right_mouse_down = false;
+                        // Right-click (not drag) clears selection (matching C++ Polyscope)
+                        if self.drag_distance < DRAG_THRESHOLD {
+                            self.selection = None;
+                            self.selection_info = polyscope_ui::SelectionInfo::default();
+                            crate::deselect_structure();
+                        }
                     }
                     _ => {}
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
+                // Skip if egui consumed this event
+                if egui_consumed {
+                    return;
+                }
+
                 if let Some(engine) = &mut self.engine {
                     let scroll = match delta {
                         winit::event::MouseScrollDelta::LineDelta(_, y) => y,
