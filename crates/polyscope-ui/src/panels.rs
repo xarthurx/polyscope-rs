@@ -75,6 +75,30 @@ impl Default for AppearanceSettings {
     }
 }
 
+/// Tone mapping settings for UI.
+#[derive(Debug, Clone)]
+pub struct ToneMappingSettings {
+    /// Whether tone mapping is enabled.
+    pub enabled: bool,
+    /// Exposure value (0.1 - 4.0).
+    pub exposure: f32,
+    /// White level (0.5 - 4.0).
+    pub white_level: f32,
+    /// Gamma value (1.0 - 3.0).
+    pub gamma: f32,
+}
+
+impl Default for ToneMappingSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            exposure: 1.0,
+            white_level: 1.0,
+            gamma: 2.2,
+        }
+    }
+}
+
 /// Settings for a single slice plane in the UI.
 #[derive(Debug, Clone)]
 pub struct SlicePlaneSettings {
@@ -918,6 +942,73 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
                     ui.label("(unlimited)");
                 }
             });
+        });
+
+    changed
+}
+
+/// Builds the tone mapping settings section.
+/// Returns true if any setting changed.
+pub fn build_tone_mapping_section(ui: &mut Ui, settings: &mut ToneMappingSettings) -> bool {
+    let mut changed = false;
+
+    CollapsingHeader::new("Tone Mapping")
+        .default_open(false)
+        .show(ui, |ui| {
+            if ui.checkbox(&mut settings.enabled, "Enable").changed() {
+                changed = true;
+            }
+
+            if settings.enabled {
+                ui.separator();
+
+                ui.horizontal(|ui| {
+                    ui.label("Exposure:");
+                    if ui
+                        .add(
+                            Slider::new(&mut settings.exposure, 0.1..=4.0)
+                                .logarithmic(true)
+                                .clamping(egui::SliderClamping::Always),
+                        )
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("White Level:");
+                    if ui
+                        .add(
+                            Slider::new(&mut settings.white_level, 0.5..=4.0)
+                                .logarithmic(true)
+                                .clamping(egui::SliderClamping::Always),
+                        )
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Gamma:");
+                    if ui
+                        .add(
+                            Slider::new(&mut settings.gamma, 1.0..=3.0)
+                                .clamping(egui::SliderClamping::Always),
+                        )
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+
+                ui.separator();
+                if ui.button("Reset to Defaults").clicked() {
+                    *settings = ToneMappingSettings::default();
+                    changed = true;
+                }
+            }
         });
 
     changed
