@@ -420,6 +420,51 @@ impl App {
             }
         }
 
+        // Render transform gizmo if visible and something is selected
+        if self.gizmo_settings.visible && self.selection_info.has_selection {
+            // Get camera matrices from engine
+            let view_matrix = engine.camera.view_matrix();
+            let projection_matrix = engine.camera.projection_matrix();
+
+            // Get current transform as matrix
+            let current_transform = polyscope_ui::TransformGizmo::compose_transform(
+                glam::Vec3::from(self.selection_info.translation),
+                glam::Vec3::from(self.selection_info.rotation_degrees),
+                glam::Vec3::from(self.selection_info.scale),
+            );
+
+            // Create a central panel for the gizmo overlay
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE)
+                .show(&egui.context, |ui| {
+                    let viewport = ui.clip_rect();
+
+                    if let Some(new_transform) = self.transform_gizmo.interact(
+                        ui,
+                        view_matrix,
+                        projection_matrix,
+                        current_transform,
+                        self.gizmo_settings.mode,
+                        self.gizmo_settings.space,
+                        viewport,
+                    ) {
+                        // Decompose and update selection info
+                        let (translation, rotation, scale) =
+                            polyscope_ui::TransformGizmo::decompose_transform(new_transform);
+                        self.selection_info.translation = translation.into();
+                        self.selection_info.rotation_degrees = rotation.into();
+                        self.selection_info.scale = scale.into();
+
+                        // Apply to selected structure
+                        crate::handle_gizmo_action(
+                            polyscope_ui::GizmoAction::TransformChanged,
+                            &self.gizmo_settings,
+                            &self.selection_info,
+                        );
+                    }
+                });
+        }
+
         // Update background color if changed
         self.background_color = Vec3::new(bg_color[0], bg_color[1], bg_color[2]);
 
