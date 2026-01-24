@@ -10,6 +10,8 @@ pub enum GroundPlaneMode {
     None,
     /// Tiled ground plane with subtle grid lines.
     Tile,
+    /// Shadow only (no visible ground plane, just shadows).
+    ShadowOnly,
 }
 
 /// Ground plane configuration.
@@ -21,6 +23,10 @@ pub struct GroundPlaneConfig {
     pub height: f32,
     /// Whether height is relative to scene bounds (auto-placed below scene).
     pub height_is_relative: bool,
+    /// Shadow blur iterations (0-5).
+    pub shadow_blur_iters: u32,
+    /// Shadow darkness (0.0 = no shadow, 1.0 = full black).
+    pub shadow_darkness: f32,
 }
 
 impl Default for GroundPlaneConfig {
@@ -29,6 +35,8 @@ impl Default for GroundPlaneConfig {
             mode: GroundPlaneMode::None,
             height: 0.0,
             height_is_relative: true,
+            shadow_blur_iters: 2,
+            shadow_darkness: 0.4,
         }
     }
 }
@@ -57,9 +65,13 @@ mod tests {
             mode: GroundPlaneMode::Tile,
             height: -1.5,
             height_is_relative: false,
+            shadow_blur_iters: 3,
+            shadow_darkness: 0.6,
         };
         assert_eq!(config.mode, GroundPlaneMode::Tile);
         assert_eq!(config.height, -1.5);
         assert!(!config.height_is_relative);
+        assert_eq!(config.shadow_blur_iters, 3);
+        assert_eq!(config.shadow_darkness, 0.6);
     }
 }
