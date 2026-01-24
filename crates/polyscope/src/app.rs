@@ -422,7 +422,7 @@ impl App {
 
         // Render transform gizmo if visible and something is selected
         if self.gizmo_settings.visible && self.selection_info.has_selection {
-            // Get camera matrices from engine
+            // Get camera matrices from engine - MUST match what's used for 3D rendering
             let view_matrix = engine.camera.view_matrix();
             let projection_matrix = engine.camera.projection_matrix();
 
@@ -433,12 +433,18 @@ impl App {
                 glam::Vec3::from(self.selection_info.scale),
             );
 
+            // Use full window viewport to match 3D rendering projection
+            // The 3D scene is rendered with full window aspect ratio, so the gizmo
+            // must use the same viewport for correct alignment
+            let full_window_viewport = egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::Vec2::new(engine.width as f32, engine.height as f32),
+            );
+
             // Create a central panel for the gizmo overlay
             egui::CentralPanel::default()
                 .frame(egui::Frame::NONE)
                 .show(&egui.context, |ui| {
-                    let viewport = ui.clip_rect();
-
                     if let Some(new_transform) = self.transform_gizmo.interact(
                         ui,
                         view_matrix,
@@ -446,7 +452,7 @@ impl App {
                         current_transform,
                         self.gizmo_settings.mode,
                         self.gizmo_settings.space,
-                        viewport,
+                        full_window_viewport,
                     ) {
                         // Decompose and update selection info
                         let (translation, rotation, scale) =
