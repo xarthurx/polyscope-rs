@@ -161,6 +161,21 @@ impl GroupSettings {
     }
 }
 
+/// Actions that can be triggered from the groups UI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GroupsAction {
+    /// No action.
+    None,
+    /// Create a new group with the given name.
+    Create(String),
+    /// Remove group at the given index.
+    Remove(usize),
+    /// Toggle enabled state for group at index.
+    ToggleEnabled(usize),
+    /// Toggle show_child_details for group at index.
+    ToggleDetails(usize),
+}
+
 /// Builds the main left panel.
 pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
     SidePanel::left("polyscope_main_panel")
