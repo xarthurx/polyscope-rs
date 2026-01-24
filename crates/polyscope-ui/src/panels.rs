@@ -176,6 +176,53 @@ pub enum GroupsAction {
     ToggleDetails(usize),
 }
 
+/// Gizmo settings for UI.
+#[derive(Debug, Clone)]
+pub struct GizmoSettings {
+    /// Gizmo mode (0=Translate, 1=Rotate, 2=Scale).
+    pub mode: u32,
+    /// Coordinate space (0=World, 1=Local).
+    pub space: u32,
+    /// Whether gizmo is visible.
+    pub visible: bool,
+    /// Translation snap value (0 = disabled).
+    pub snap_translate: f32,
+    /// Rotation snap value in degrees (0 = disabled).
+    pub snap_rotate: f32,
+    /// Scale snap value (0 = disabled).
+    pub snap_scale: f32,
+}
+
+impl Default for GizmoSettings {
+    fn default() -> Self {
+        Self {
+            mode: 0,  // Translate
+            space: 0, // World
+            visible: true,
+            snap_translate: 0.0,
+            snap_rotate: 0.0,
+            snap_scale: 0.0,
+        }
+    }
+}
+
+/// Current selection info for UI.
+#[derive(Debug, Clone, Default)]
+pub struct SelectionInfo {
+    /// Whether something is selected.
+    pub has_selection: bool,
+    /// Selected structure type name.
+    pub type_name: String,
+    /// Selected structure name.
+    pub name: String,
+    /// Transform translation.
+    pub translation: [f32; 3],
+    /// Transform rotation as Euler angles in degrees.
+    pub rotation_degrees: [f32; 3],
+    /// Transform scale.
+    pub scale: [f32; 3],
+}
+
 /// Builds UI for a single group item.
 /// Returns true if enabled was toggled.
 fn build_group_item(ui: &mut Ui, settings: &mut GroupSettings) -> bool {
