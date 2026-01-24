@@ -23,8 +23,11 @@ The current screen-space picking is an approximation. For pixel-perfect picking:
 - [ ] Decode color to determine clicked structure/element
 - [ ] Add pick shaders for SurfaceMesh, CurveNetwork, etc.
 
+## Current Limitations
+- **Sparse point clouds**: Clicks between points may not register because we only sample up to 100 points. For very sparse point clouds, you may need to click directly on a visible point.
+- **Accuracy**: Screen-space picking uses a 20px threshold, which may select unintended structures if they are close together in screen space.
+- **Performance**: For structures with many elements, sampling is limited to 100 points for efficiency.
+
 ## Notes
 - The `pick.wgsl` shader exists for PointCloud but the pick buffer infrastructure in RenderEngine is not implemented
-- Screen-space picking samples up to 100 points per structure for efficiency
-- For sparse structures like point clouds, this may miss clicks between points
-- GPU picking would give exact results but requires more infrastructure
+- GPU picking would give pixel-perfect results but requires more infrastructure (pick buffer, staging buffer readback, etc.)
