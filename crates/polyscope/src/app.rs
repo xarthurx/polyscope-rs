@@ -461,6 +461,23 @@ impl App {
                             &self.gizmo_settings,
                             &self.selection_info,
                         );
+
+                        // Immediately update GPU buffers so structure renders at new position this frame
+                        crate::with_context(|ctx| {
+                            if let Some((type_name, name)) = ctx.selected_structure() {
+                                if let Some(structure) = ctx.registry.get(type_name, name) {
+                                    if type_name == "PointCloud" {
+                                        if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                                            pc.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                                        }
+                                    } else if type_name == "SurfaceMesh" {
+                                        if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                            mesh.update_gpu_buffers(&engine.queue);
+                                        }
+                                    }
+                                }
+                            }
+                        });
                     }
                 });
         }
