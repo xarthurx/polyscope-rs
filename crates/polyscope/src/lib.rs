@@ -1722,6 +1722,129 @@ pub fn handle_group_action(
     }
 }
 
+// ============================================================================
+// Gizmo UI Sync Functions
+// ============================================================================
+
+/// Gets gizmo settings for UI.
+pub fn get_gizmo_settings() -> polyscope_ui::GizmoSettings {
+    with_context(|ctx| {
+        let gizmo = ctx.gizmo();
+        polyscope_ui::GizmoSettings {
+            mode: match gizmo.mode {
+                GizmoMode::Translate => 0,
+                GizmoMode::Rotate => 1,
+                GizmoMode::Scale => 2,
+            },
+            space: match gizmo.space {
+                GizmoSpace::World => 0,
+                GizmoSpace::Local => 1,
+            },
+            visible: gizmo.visible,
+            snap_translate: gizmo.snap_translate,
+            snap_rotate: gizmo.snap_rotate,
+            snap_scale: gizmo.snap_scale,
+        }
+    })
+}
+
+/// Applies gizmo settings from UI.
+pub fn apply_gizmo_settings(settings: &polyscope_ui::GizmoSettings) {
+    with_context_mut(|ctx| {
+        let gizmo = ctx.gizmo_mut();
+        gizmo.mode = match settings.mode {
+            0 => GizmoMode::Translate,
+            1 => GizmoMode::Rotate,
+            _ => GizmoMode::Scale,
+        };
+        gizmo.space = match settings.space {
+            0 => GizmoSpace::World,
+            _ => GizmoSpace::Local,
+        };
+        gizmo.visible = settings.visible;
+        gizmo.snap_translate = settings.snap_translate;
+        gizmo.snap_rotate = settings.snap_rotate;
+        gizmo.snap_scale = settings.snap_scale;
+    });
+}
+
+/// Gets selection info for UI.
+pub fn get_selection_info() -> polyscope_ui::SelectionInfo {
+    with_context(|ctx| {
+        if let Some((type_name, name)) = ctx.selected_structure() {
+            // Get transform from selected structure
+            let transform = ctx
+                .registry
+                .get(type_name, name)
+                .map(|s| s.transform())
+                .unwrap_or(Mat4::IDENTITY);
+
+            let t = Transform::from_matrix(transform);
+            let euler = t.euler_angles_degrees();
+
+            polyscope_ui::SelectionInfo {
+                has_selection: true,
+                type_name: type_name.to_string(),
+                name: name.to_string(),
+                translation: t.translation.to_array(),
+                rotation_degrees: euler.to_array(),
+                scale: t.scale.to_array(),
+            }
+        } else {
+            polyscope_ui::SelectionInfo::default()
+        }
+    })
+}
+
+/// Applies transform from selection info to the selected structure.
+pub fn apply_selection_transform(selection: &polyscope_ui::SelectionInfo) {
+    if !selection.has_selection {
+        return;
+    }
+
+    let translation = Vec3::from_array(selection.translation);
+    let rotation = glam::Quat::from_euler(
+        glam::EulerRot::XYZ,
+        selection.rotation_degrees[0].to_radians(),
+        selection.rotation_degrees[1].to_radians(),
+        selection.rotation_degrees[2].to_radians(),
+    );
+    let scale = Vec3::from_array(selection.scale);
+
+    let transform = Mat4::from_scale_rotation_translation(scale, rotation, translation);
+
+    with_context_mut(|ctx| {
+        if let Some((type_name, name)) = ctx.selected_structure.clone() {
+            if let Some(structure) = ctx.registry.get_mut(&type_name, &name) {
+                structure.set_transform(transform);
+            }
+        }
+    });
+}
+
+/// Handles a gizmo UI action.
+pub fn handle_gizmo_action(
+    action: polyscope_ui::GizmoAction,
+    settings: &polyscope_ui::GizmoSettings,
+    selection: &polyscope_ui::SelectionInfo,
+) {
+    match action {
+        polyscope_ui::GizmoAction::None => {}
+        polyscope_ui::GizmoAction::SettingsChanged => {
+            apply_gizmo_settings(settings);
+        }
+        polyscope_ui::GizmoAction::TransformChanged => {
+            apply_selection_transform(selection);
+        }
+        polyscope_ui::GizmoAction::Deselect => {
+            deselect_structure();
+        }
+        polyscope_ui::GizmoAction::ResetTransform => {
+            reset_selected_transform();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
