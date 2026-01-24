@@ -2145,4 +2145,85 @@ mod tests {
         assert!(settings.is_empty());
         assert!(get_slice_plane(&name).is_none());
     }
+
+    #[test]
+    fn test_get_group_settings() {
+        setup();
+        let name = unique_name("ui_group");
+        let pc_name = unique_name("pc_in_ui_group");
+
+        // Create group and add a structure
+        let handle = create_group(&name);
+        register_point_cloud(&pc_name, vec![Vec3::ZERO]);
+        handle.add_point_cloud(&pc_name);
+
+        // Get settings
+        let settings = get_group_settings();
+        let found = settings.iter().find(|s| s.name == name);
+        assert!(found.is_some());
+
+        let s = found.unwrap();
+        assert!(s.enabled);
+        assert!(s.show_child_details);
+        assert_eq!(s.child_structures.len(), 1);
+        assert_eq!(s.child_structures[0], ("PointCloud".to_string(), pc_name));
+    }
+
+    #[test]
+    fn test_apply_group_settings() {
+        setup();
+        let name = unique_name("apply_group");
+
+        // Create group
+        create_group(&name);
+
+        // Create modified settings
+        let settings = polyscope_ui::GroupSettings {
+            name: name.clone(),
+            enabled: false,
+            show_child_details: false,
+            parent_group: None,
+            child_structures: Vec::new(),
+            child_groups: Vec::new(),
+        };
+
+        // Apply settings
+        apply_group_settings(&settings);
+
+        // Verify
+        let handle = get_group(&name).unwrap();
+        assert!(!handle.is_enabled());
+    }
+
+    #[test]
+    fn test_handle_group_action_create() {
+        setup();
+        let name = unique_name("action_create_group");
+        let mut settings = Vec::new();
+
+        handle_group_action(
+            polyscope_ui::GroupsAction::Create(name.clone()),
+            &mut settings,
+        );
+
+        assert_eq!(settings.len(), 1);
+        assert_eq!(settings[0].name, name);
+        assert!(get_group(&name).is_some());
+    }
+
+    #[test]
+    fn test_handle_group_action_remove() {
+        setup();
+        let name = unique_name("action_remove_group");
+
+        // Create group
+        create_group(&name);
+        let mut settings = vec![polyscope_ui::GroupSettings::with_name(&name)];
+
+        // Remove via action
+        handle_group_action(polyscope_ui::GroupsAction::Remove(0), &mut settings);
+
+        assert!(settings.is_empty());
+        assert!(get_group(&name).is_none());
+    }
 }
