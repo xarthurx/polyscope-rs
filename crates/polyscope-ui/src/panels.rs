@@ -234,6 +234,76 @@ fn build_group_item(ui: &mut Ui, settings: &mut GroupSettings) -> bool {
     toggled
 }
 
+/// Builds the groups section.
+/// Returns an action if one was triggered.
+pub fn build_groups_section(
+    ui: &mut Ui,
+    groups: &mut Vec<GroupSettings>,
+    new_group_name: &mut String,
+) -> GroupsAction {
+    let mut action = GroupsAction::None;
+
+    CollapsingHeader::new("Groups")
+        .default_open(false)
+        .show(ui, |ui| {
+            // Add new group controls
+            ui.horizontal(|ui| {
+                ui.label("New group:");
+                ui.text_edit_singleline(new_group_name);
+                if ui.button("Create").clicked() && !new_group_name.is_empty() {
+                    action = GroupsAction::Create(new_group_name.clone());
+                }
+            });
+
+            if groups.is_empty() {
+                ui.label("No groups");
+                return;
+            }
+
+            ui.separator();
+
+            // Show only root groups (those without parents)
+            let root_groups: Vec<usize> = groups
+                .iter()
+                .enumerate()
+                .filter(|(_, g)| g.parent_group.is_none())
+                .map(|(i, _)| i)
+                .collect();
+
+            let mut remove_idx = None;
+
+            for idx in root_groups {
+                let group = &mut groups[idx];
+                let header_text = format!(
+                    "{} {} ({})",
+                    if group.enabled { "●" } else { "○" },
+                    group.name,
+                    group.child_structures.len()
+                );
+
+                CollapsingHeader::new(header_text)
+                    .id_salt(format!("group_{}", idx))
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        if build_group_item(ui, group) && action == GroupsAction::None {
+                            action = GroupsAction::ToggleEnabled(idx);
+                        }
+
+                        ui.separator();
+                        if ui.button("Remove").clicked() {
+                            remove_idx = Some(idx);
+                        }
+                    });
+            }
+
+            if let Some(idx) = remove_idx {
+                action = GroupsAction::Remove(idx);
+            }
+        });
+
+    action
+}
+
 /// Builds the main left panel.
 pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
     SidePanel::left("polyscope_main_panel")
