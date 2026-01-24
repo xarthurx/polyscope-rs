@@ -3,9 +3,8 @@
 use egui::Ui;
 use glam::{DMat4, Mat4, Quat, Vec3};
 use transform_gizmo_egui::{
-    config::TransformPivotPoint,
-    mint, Gizmo, GizmoConfig, GizmoMode, GizmoOrientation, GizmoVisuals, GizmoExt,
-    math::Transform,
+    config::TransformPivotPoint, math::Transform, mint, Gizmo, GizmoConfig, GizmoExt, GizmoMode,
+    GizmoOrientation, GizmoVisuals,
 };
 
 /// Wrapper around transform-gizmo-egui for polyscope integration.
@@ -51,10 +50,18 @@ impl TransformGizmo {
     ) -> Option<Mat4> {
         // Get modes based on user selection
         let modes = match mode {
-            0 => GizmoMode::TranslateX | GizmoMode::TranslateY | GizmoMode::TranslateZ
-                 | GizmoMode::TranslateXY | GizmoMode::TranslateXZ | GizmoMode::TranslateYZ,
+            0 => {
+                GizmoMode::TranslateX
+                    | GizmoMode::TranslateY
+                    | GizmoMode::TranslateZ
+                    | GizmoMode::TranslateXY
+                    | GizmoMode::TranslateXZ
+                    | GizmoMode::TranslateYZ
+            }
             1 => GizmoMode::RotateX | GizmoMode::RotateY | GizmoMode::RotateZ,
-            2 => GizmoMode::ScaleX | GizmoMode::ScaleY | GizmoMode::ScaleZ | GizmoMode::ScaleUniform,
+            2 => {
+                GizmoMode::ScaleX | GizmoMode::ScaleY | GizmoMode::ScaleZ | GizmoMode::ScaleUniform
+            }
             _ => GizmoMode::TranslateX | GizmoMode::TranslateY | GizmoMode::TranslateZ,
         };
 
@@ -135,7 +142,11 @@ impl TransformGizmo {
                     new_transform.scale.z as f32,
                 );
 
-                return Some(Mat4::from_scale_rotation_translation(scale, rotation, translation));
+                return Some(Mat4::from_scale_rotation_translation(
+                    scale,
+                    rotation,
+                    translation,
+                ));
             }
         }
 
@@ -169,10 +180,22 @@ impl TransformGizmo {
 /// Convert glam Mat4 (f32) to DMat4 (f64).
 fn mat4_to_dmat4(m: Mat4) -> DMat4 {
     DMat4::from_cols_array(&[
-        m.x_axis.x as f64, m.x_axis.y as f64, m.x_axis.z as f64, m.x_axis.w as f64,
-        m.y_axis.x as f64, m.y_axis.y as f64, m.y_axis.z as f64, m.y_axis.w as f64,
-        m.z_axis.x as f64, m.z_axis.y as f64, m.z_axis.z as f64, m.z_axis.w as f64,
-        m.w_axis.x as f64, m.w_axis.y as f64, m.w_axis.z as f64, m.w_axis.w as f64,
+        m.x_axis.x as f64,
+        m.x_axis.y as f64,
+        m.x_axis.z as f64,
+        m.x_axis.w as f64,
+        m.y_axis.x as f64,
+        m.y_axis.y as f64,
+        m.y_axis.z as f64,
+        m.y_axis.w as f64,
+        m.z_axis.x as f64,
+        m.z_axis.y as f64,
+        m.z_axis.z as f64,
+        m.z_axis.w as f64,
+        m.w_axis.x as f64,
+        m.w_axis.y as f64,
+        m.w_axis.z as f64,
+        m.w_axis.w as f64,
     ])
 }
 
@@ -180,10 +203,30 @@ fn mat4_to_dmat4(m: Mat4) -> DMat4 {
 fn dmat4_to_row_mint(m: DMat4) -> mint::RowMatrix4<f64> {
     // glam stores column-major, mint::RowMatrix4 expects row-major
     mint::RowMatrix4 {
-        x: mint::Vector4 { x: m.x_axis.x, y: m.y_axis.x, z: m.z_axis.x, w: m.w_axis.x },
-        y: mint::Vector4 { x: m.x_axis.y, y: m.y_axis.y, z: m.z_axis.y, w: m.w_axis.y },
-        z: mint::Vector4 { x: m.x_axis.z, y: m.y_axis.z, z: m.z_axis.z, w: m.w_axis.z },
-        w: mint::Vector4 { x: m.x_axis.w, y: m.y_axis.w, z: m.z_axis.w, w: m.w_axis.w },
+        x: mint::Vector4 {
+            x: m.x_axis.x,
+            y: m.y_axis.x,
+            z: m.z_axis.x,
+            w: m.w_axis.x,
+        },
+        y: mint::Vector4 {
+            x: m.x_axis.y,
+            y: m.y_axis.y,
+            z: m.z_axis.y,
+            w: m.w_axis.y,
+        },
+        z: mint::Vector4 {
+            x: m.x_axis.z,
+            y: m.y_axis.z,
+            z: m.z_axis.z,
+            w: m.w_axis.z,
+        },
+        w: mint::Vector4 {
+            x: m.x_axis.w,
+            y: m.y_axis.w,
+            z: m.z_axis.w,
+            w: m.w_axis.w,
+        },
     }
 }
 

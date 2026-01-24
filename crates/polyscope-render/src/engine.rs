@@ -113,16 +113,14 @@ impl RenderEngine {
             .map_err(|_| RenderError::AdapterCreationFailed)?;
 
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: Some("polyscope device"),
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    memory_hints: Default::default(),
-                    trace: Default::default(),
-                    experimental_features: Default::default(),
-                },
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("polyscope device"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: Default::default(),
+                trace: Default::default(),
+                experimental_features: Default::default(),
+            })
             .await?;
 
         let size = window.inner_size();
@@ -295,16 +293,14 @@ impl RenderEngine {
             .map_err(|_| RenderError::AdapterCreationFailed)?;
 
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: Some("polyscope device (headless)"),
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    memory_hints: Default::default(),
-                    trace: Default::default(),
-                    experimental_features: Default::default(),
-                },
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("polyscope device (headless)"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: Default::default(),
+                trace: Default::default(),
+                experimental_features: Default::default(),
+            })
             .await?;
 
         let surface_config = wgpu::SurfaceConfiguration {

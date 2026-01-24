@@ -26,11 +26,8 @@ impl EguiIntegration {
         let viewport_id = context.viewport_id();
         let state = EguiWinitState::new(context.clone(), viewport_id, window, None, None, None);
 
-        let renderer = EguiRenderer::new(
-            device,
-            output_format,
-            egui_wgpu::RendererOptions::default(),
-        );
+        let renderer =
+            EguiRenderer::new(device, output_format, egui_wgpu::RendererOptions::default());
 
         Self {
             context,
