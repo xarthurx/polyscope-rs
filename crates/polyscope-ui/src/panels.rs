@@ -278,7 +278,10 @@ pub fn build_gizmo_section(
             // Gizmo mode
             ui.label("Mode:");
             ui.horizontal(|ui| {
-                if ui.selectable_label(settings.mode == 0, "Translate").clicked() {
+                if ui
+                    .selectable_label(settings.mode == 0, "Translate")
+                    .clicked()
+                {
                     settings.mode = 0;
                     action = GizmoAction::SettingsChanged;
                 }
@@ -312,7 +315,11 @@ pub fn build_gizmo_section(
             ui.horizontal(|ui| {
                 ui.label("Translate:");
                 if ui
-                    .add(DragValue::new(&mut settings.snap_translate).speed(0.1).range(0.0..=10.0))
+                    .add(
+                        DragValue::new(&mut settings.snap_translate)
+                            .speed(0.1)
+                            .range(0.0..=10.0),
+                    )
                     .changed()
                 {
                     action = GizmoAction::SettingsChanged;
@@ -321,7 +328,12 @@ pub fn build_gizmo_section(
             ui.horizontal(|ui| {
                 ui.label("Rotate:");
                 if ui
-                    .add(DragValue::new(&mut settings.snap_rotate).speed(1.0).range(0.0..=90.0).suffix("°"))
+                    .add(
+                        DragValue::new(&mut settings.snap_rotate)
+                            .speed(1.0)
+                            .range(0.0..=90.0)
+                            .suffix("°"),
+                    )
                     .changed()
                 {
                     action = GizmoAction::SettingsChanged;
@@ -330,7 +342,11 @@ pub fn build_gizmo_section(
             ui.horizontal(|ui| {
                 ui.label("Scale:");
                 if ui
-                    .add(DragValue::new(&mut settings.snap_scale).speed(0.1).range(0.0..=1.0))
+                    .add(
+                        DragValue::new(&mut settings.snap_scale)
+                            .speed(0.1)
+                            .range(0.0..=1.0),
+                    )
                     .changed()
                 {
                     action = GizmoAction::SettingsChanged;
@@ -346,9 +362,27 @@ pub fn build_gizmo_section(
                 ui.horizontal(|ui| {
                     ui.label("Pos:");
                     let mut changed = false;
-                    changed |= ui.add(DragValue::new(&mut selection.translation[0]).speed(0.1).prefix("X:")).changed();
-                    changed |= ui.add(DragValue::new(&mut selection.translation[1]).speed(0.1).prefix("Y:")).changed();
-                    changed |= ui.add(DragValue::new(&mut selection.translation[2]).speed(0.1).prefix("Z:")).changed();
+                    changed |= ui
+                        .add(
+                            DragValue::new(&mut selection.translation[0])
+                                .speed(0.1)
+                                .prefix("X:"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            DragValue::new(&mut selection.translation[1])
+                                .speed(0.1)
+                                .prefix("Y:"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            DragValue::new(&mut selection.translation[2])
+                                .speed(0.1)
+                                .prefix("Z:"),
+                        )
+                        .changed();
                     if changed && action == GizmoAction::None {
                         action = GizmoAction::TransformChanged;
                     }
@@ -358,9 +392,30 @@ pub fn build_gizmo_section(
                 ui.horizontal(|ui| {
                     ui.label("Rot:");
                     let mut changed = false;
-                    changed |= ui.add(DragValue::new(&mut selection.rotation_degrees[0]).speed(1.0).prefix("X:").suffix("°")).changed();
-                    changed |= ui.add(DragValue::new(&mut selection.rotation_degrees[1]).speed(1.0).prefix("Y:").suffix("°")).changed();
-                    changed |= ui.add(DragValue::new(&mut selection.rotation_degrees[2]).speed(1.0).prefix("Z:").suffix("°")).changed();
+                    changed |= ui
+                        .add(
+                            DragValue::new(&mut selection.rotation_degrees[0])
+                                .speed(1.0)
+                                .prefix("X:")
+                                .suffix("°"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            DragValue::new(&mut selection.rotation_degrees[1])
+                                .speed(1.0)
+                                .prefix("Y:")
+                                .suffix("°"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            DragValue::new(&mut selection.rotation_degrees[2])
+                                .speed(1.0)
+                                .prefix("Z:")
+                                .suffix("°"),
+                        )
+                        .changed();
                     if changed && action == GizmoAction::None {
                         action = GizmoAction::TransformChanged;
                     }
@@ -370,9 +425,30 @@ pub fn build_gizmo_section(
                 ui.horizontal(|ui| {
                     ui.label("Scale:");
                     let mut changed = false;
-                    changed |= ui.add(DragValue::new(&mut selection.scale[0]).speed(0.01).prefix("X:").range(0.01..=100.0)).changed();
-                    changed |= ui.add(DragValue::new(&mut selection.scale[1]).speed(0.01).prefix("Y:").range(0.01..=100.0)).changed();
-                    changed |= ui.add(DragValue::new(&mut selection.scale[2]).speed(0.01).prefix("Z:").range(0.01..=100.0)).changed();
+                    changed |= ui
+                        .add(
+                            DragValue::new(&mut selection.scale[0])
+                                .speed(0.01)
+                                .prefix("X:")
+                                .range(0.01..=100.0),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            DragValue::new(&mut selection.scale[1])
+                                .speed(0.01)
+                                .prefix("Y:")
+                                .range(0.01..=100.0),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            DragValue::new(&mut selection.scale[2])
+                                .speed(0.01)
+                                .prefix("Z:")
+                                .range(0.01..=100.0),
+                        )
+                        .changed();
                     if changed && action == GizmoAction::None {
                         action = GizmoAction::TransformChanged;
                     }
