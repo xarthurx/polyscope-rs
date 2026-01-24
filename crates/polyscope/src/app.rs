@@ -1031,20 +1031,34 @@ impl ApplicationHandler for App {
                                     });
 
                                 if let Some((type_name, name)) = first_structure {
-                                    self.selection = Some(PickResult {
-                                        hit: true,
-                                        structure_type: type_name.clone(),
-                                        structure_name: name.clone(),
-                                        element_index: 0,
-                                        element_type: polyscope_render::PickElementType::None,
-                                        screen_pos: glam::Vec2::new(
-                                            self.mouse_pos.0 as f32,
-                                            self.mouse_pos.1 as f32,
-                                        ),
-                                        depth: 0.5,
-                                    });
-                                    // Also select the structure for gizmo manipulation
-                                    crate::select_structure(&type_name, &name);
+                                    // Check if clicking on already-selected structure (toggle off)
+                                    let already_selected = self.selection_info.has_selection
+                                        && self.selection_info.type_name == type_name
+                                        && self.selection_info.name == name;
+
+                                    if already_selected {
+                                        // Deselect
+                                        self.selection = None;
+                                        self.selection_info = polyscope_ui::SelectionInfo::default();
+                                        crate::deselect_structure();
+                                    } else {
+                                        // Select the structure
+                                        self.selection = Some(PickResult {
+                                            hit: true,
+                                            structure_type: type_name.clone(),
+                                            structure_name: name.clone(),
+                                            element_index: 0,
+                                            element_type: polyscope_render::PickElementType::None,
+                                            screen_pos: glam::Vec2::new(
+                                                self.mouse_pos.0 as f32,
+                                                self.mouse_pos.1 as f32,
+                                            ),
+                                            depth: 0.5,
+                                        });
+                                        crate::select_structure(&type_name, &name);
+                                        // Update selection_info with structure's current transform
+                                        self.selection_info = crate::get_selection_info();
+                                    }
                                 }
                             }
                         }
@@ -1057,6 +1071,7 @@ impl ApplicationHandler for App {
                     (MouseButton::Right, ElementState::Released) => {
                         // Clear selection on right click
                         self.selection = None;
+                        self.selection_info = polyscope_ui::SelectionInfo::default();
                         crate::deselect_structure();
                         self.right_mouse_down = false;
                     }
