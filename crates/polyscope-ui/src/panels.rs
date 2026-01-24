@@ -223,6 +223,21 @@ pub struct SelectionInfo {
     pub scale: [f32; 3],
 }
 
+/// Actions that can be triggered from the gizmo UI.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GizmoAction {
+    /// No action.
+    None,
+    /// Gizmo settings changed.
+    SettingsChanged,
+    /// Transform was edited.
+    TransformChanged,
+    /// Deselect was clicked.
+    Deselect,
+    /// Reset transform was clicked.
+    ResetTransform,
+}
+
 /// Builds UI for a single group item.
 /// Returns true if enabled was toggled.
 fn build_group_item(ui: &mut Ui, settings: &mut GroupSettings) -> bool {
