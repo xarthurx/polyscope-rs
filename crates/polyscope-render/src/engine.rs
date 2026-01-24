@@ -9,6 +9,7 @@ use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
 use crate::ground_plane::GroundPlaneRenderData;
 use crate::materials::MaterialRegistry;
+use crate::tone_mapping::ToneMapPass;
 
 /// Camera uniforms for GPU.
 #[repr(C)]
@@ -91,6 +92,12 @@ pub struct RenderEngine {
     screenshot_texture: Option<wgpu::Texture>,
     /// Screenshot capture buffer (lazily initialized).
     screenshot_buffer: Option<wgpu::Buffer>,
+    /// HDR intermediate texture for tone mapping.
+    hdr_texture: Option<wgpu::Texture>,
+    /// HDR texture view.
+    hdr_view: Option<wgpu::TextureView>,
+    /// Tone mapping post-processing pass.
+    tone_map_pass: Option<ToneMapPass>,
 }
 
 impl RenderEngine {
@@ -266,12 +273,16 @@ impl RenderEngine {
             ground_plane_render_data: None,
             screenshot_texture: None,
             screenshot_buffer: None,
+            hdr_texture: None,
+            hdr_view: None,
+            tone_map_pass: None,
         };
 
         engine.init_point_pipeline();
         engine.init_vector_pipeline();
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
+        engine.init_tone_mapping();
 
         Ok(engine)
     }
@@ -433,12 +444,16 @@ impl RenderEngine {
             ground_plane_render_data: None,
             screenshot_texture: None,
             screenshot_buffer: None,
+            hdr_texture: None,
+            hdr_view: None,
+            tone_map_pass: None,
         };
 
         engine.init_point_pipeline();
         engine.init_vector_pipeline();
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
+        engine.init_tone_mapping();
 
         Ok(engine)
     }
@@ -461,6 +476,9 @@ impl RenderEngine {
         let (depth_texture, depth_view) = Self::create_depth_texture(&self.device, width, height);
         self.depth_texture = depth_texture;
         self.depth_view = depth_view;
+
+        // Recreate HDR texture for tone mapping
+        self.create_hdr_texture();
 
         self.camera.set_aspect_ratio(width as f32 / height as f32);
     }
@@ -1275,5 +1293,63 @@ impl RenderEngine {
     /// Returns the current viewport dimensions.
     pub fn dimensions(&self) -> (u32, u32) {
         (self.width, self.height)
+    }
+
+    /// Initializes tone mapping resources.
+    fn init_tone_mapping(&mut self) {
+        self.tone_map_pass = Some(ToneMapPass::new(&self.device, self.surface_config.format));
+        self.create_hdr_texture();
+    }
+
+    /// Creates the HDR intermediate texture for tone mapping.
+    fn create_hdr_texture(&mut self) {
+        let hdr_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("HDR Texture"),
+            size: wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba16Float, // HDR format
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let hdr_view = hdr_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.hdr_texture = Some(hdr_texture);
+        self.hdr_view = Some(hdr_view);
+    }
+
+    /// Returns the HDR texture view for rendering the scene.
+    pub fn hdr_view(&self) -> Option<&wgpu::TextureView> {
+        self.hdr_view.as_ref()
+    }
+
+    /// Returns the tone map pass.
+    pub fn tone_map_pass(&self) -> Option<&ToneMapPass> {
+        self.tone_map_pass.as_ref()
+    }
+
+    /// Updates tone mapping uniforms.
+    pub fn update_tone_mapping(&self, exposure: f32, white_level: f32, gamma: f32) {
+        if let Some(tone_map) = &self.tone_map_pass {
+            tone_map.update_uniforms(&self.queue, exposure, white_level, gamma);
+        }
+    }
+
+    /// Renders the tone mapping pass from HDR to the output view.
+    pub fn render_tone_mapping(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        output_view: &wgpu::TextureView,
+    ) {
+        if let (Some(tone_map), Some(hdr_view)) = (&self.tone_map_pass, &self.hdr_view) {
+            let bind_group = tone_map.create_bind_group(&self.device, hdr_view);
+            tone_map.render(encoder, output_view, &bind_group);
+        }
     }
 }
