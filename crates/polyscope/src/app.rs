@@ -1021,19 +1021,31 @@ impl ApplicationHandler for App {
 
                             // If we didn't drag much, it's a click - do picking
                             if drag_distance < 5.0 {
-                                // Placeholder selection - actual GPU picking can be added later
-                                self.selection = Some(PickResult {
-                                    hit: true,
-                                    structure_type: "PointCloud".to_string(),
-                                    structure_name: "test".to_string(),
-                                    element_index: 42,
-                                    element_type: polyscope_render::PickElementType::Point,
-                                    screen_pos: glam::Vec2::new(
-                                        self.mouse_pos.0 as f32,
-                                        self.mouse_pos.1 as f32,
-                                    ),
-                                    depth: 0.5,
-                                });
+                                // Temporary workaround: select first structure in registry
+                                // TODO: Replace with real GPU picking
+                                let first_structure: Option<(String, String)> =
+                                    crate::with_context(|ctx| {
+                                        ctx.registry.iter().next().map(|s| {
+                                            (s.type_name().to_string(), s.name().to_string())
+                                        })
+                                    });
+
+                                if let Some((type_name, name)) = first_structure {
+                                    self.selection = Some(PickResult {
+                                        hit: true,
+                                        structure_type: type_name.clone(),
+                                        structure_name: name.clone(),
+                                        element_index: 0,
+                                        element_type: polyscope_render::PickElementType::None,
+                                        screen_pos: glam::Vec2::new(
+                                            self.mouse_pos.0 as f32,
+                                            self.mouse_pos.1 as f32,
+                                        ),
+                                        depth: 0.5,
+                                    });
+                                    // Also select the structure for gizmo manipulation
+                                    crate::select_structure(&type_name, &name);
+                                }
                             }
                         }
                         self.mouse_down = false;
@@ -1045,6 +1057,7 @@ impl ApplicationHandler for App {
                     (MouseButton::Right, ElementState::Released) => {
                         // Clear selection on right click
                         self.selection = None;
+                        crate::deselect_structure();
                         self.right_mouse_down = false;
                     }
                     _ => {}

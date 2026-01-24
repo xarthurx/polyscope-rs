@@ -1860,9 +1860,8 @@ mod tests {
 
     fn setup() {
         // Initialize context (only once)
-        if !is_initialized() {
-            init().unwrap();
-        }
+        // Use ok() to handle race conditions in parallel tests
+        let _ = init();
     }
 
     #[test]
