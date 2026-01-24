@@ -26,7 +26,11 @@ impl EguiIntegration {
         let viewport_id = context.viewport_id();
         let state = EguiWinitState::new(context.clone(), viewport_id, window, None, None, None);
 
-        let renderer = EguiRenderer::new(device, output_format, None, 1, false);
+        let renderer = EguiRenderer::new(
+            device,
+            output_format,
+            egui_wgpu::RendererOptions::default(),
+        );
 
         Self {
             context,
@@ -88,6 +92,7 @@ impl EguiIntegration {
                         load: wgpu::LoadOp::Load, // Don't clear - render on top
                         store: wgpu::StoreOp::Store,
                     },
+                    depth_slice: None,
                 })],
                 depth_stencil_attachment: None,
                 ..Default::default()

@@ -110,7 +110,7 @@ impl RenderEngine {
                 force_fallback_adapter: false,
             })
             .await
-            .ok_or(RenderError::AdapterCreationFailed)?;
+            .map_err(|_| RenderError::AdapterCreationFailed)?;
 
         let (device, queue) = adapter
             .request_device(
@@ -119,8 +119,9 @@ impl RenderEngine {
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::default(),
                     memory_hints: Default::default(),
+                    trace: Default::default(),
+                    experimental_features: Default::default(),
                 },
-                None,
             )
             .await?;
 
@@ -291,7 +292,7 @@ impl RenderEngine {
                 force_fallback_adapter: false,
             })
             .await
-            .ok_or(RenderError::AdapterCreationFailed)?;
+            .map_err(|_| RenderError::AdapterCreationFailed)?;
 
         let (device, queue) = adapter
             .request_device(
@@ -300,8 +301,9 @@ impl RenderEngine {
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::default(),
                     memory_hints: Default::default(),
+                    trace: Default::default(),
+                    experimental_features: Default::default(),
                 },
-                None,
             )
             .await?;
 
@@ -1119,6 +1121,7 @@ impl RenderEngine {
                         load: wgpu::LoadOp::Load, // Preserve existing content
                         store: wgpu::StoreOp::Store,
                     },
+                    depth_slice: None,
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &self.depth_view,
@@ -1247,7 +1250,7 @@ impl RenderEngine {
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             tx.send(result).unwrap();
         });
-        self.device.poll(wgpu::Maintain::Wait);
+        let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
         rx.recv()
             .map_err(|_| crate::screenshot::ScreenshotError::BufferMapFailed)?
             .map_err(|_| crate::screenshot::ScreenshotError::BufferMapFailed)?;
