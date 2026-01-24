@@ -52,6 +52,9 @@ pub struct App {
     // Group UI state
     group_settings: Vec<polyscope_ui::GroupSettings>,
     new_group_name: String,
+    // Gizmo UI state
+    gizmo_settings: polyscope_ui::GizmoSettings,
+    selection_info: polyscope_ui::SelectionInfo,
 }
 
 impl App {
@@ -78,6 +81,8 @@ impl App {
             new_slice_plane_name: String::new(),
             group_settings: crate::get_group_settings(),
             new_group_name: String::new(),
+            gizmo_settings: crate::get_gizmo_settings(),
+            selection_info: polyscope_ui::SelectionInfo::default(),
         }
     }
 
@@ -312,6 +317,23 @@ impl App {
                 if matches!(groups_action, polyscope_ui::GroupsAction::Create(_)) {
                     self.new_group_name.clear();
                 }
+            }
+
+            // Sync selection info from context
+            self.selection_info = crate::get_selection_info();
+
+            // Gizmo section
+            let gizmo_action = polyscope_ui::panels::build_gizmo_section(
+                ui,
+                &mut self.gizmo_settings,
+                &mut self.selection_info,
+            );
+            if gizmo_action != polyscope_ui::GizmoAction::None {
+                crate::handle_gizmo_action(
+                    gizmo_action,
+                    &self.gizmo_settings,
+                    &self.selection_info,
+                );
             }
 
             polyscope_ui::build_ground_plane_section(
