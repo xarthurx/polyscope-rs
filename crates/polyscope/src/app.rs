@@ -55,6 +55,8 @@ pub struct App {
     // Gizmo UI state
     gizmo_settings: polyscope_ui::GizmoSettings,
     selection_info: polyscope_ui::SelectionInfo,
+    // Visual gizmo
+    transform_gizmo: polyscope_ui::TransformGizmo,
 }
 
 impl App {
@@ -83,6 +85,7 @@ impl App {
             new_group_name: String::new(),
             gizmo_settings: crate::get_gizmo_settings(),
             selection_info: polyscope_ui::SelectionInfo::default(),
+            transform_gizmo: polyscope_ui::TransformGizmo::new(),
         }
     }
 
