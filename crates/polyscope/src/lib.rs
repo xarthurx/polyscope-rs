@@ -2349,4 +2349,96 @@ mod tests {
         assert!(settings.is_empty());
         assert!(get_group(&name).is_none());
     }
+
+    #[test]
+    fn test_get_gizmo_settings() {
+        setup();
+
+        // Set known values
+        set_gizmo_mode(GizmoMode::Rotate);
+        set_gizmo_space(GizmoSpace::Local);
+        set_gizmo_visible(false);
+        set_gizmo_snap_translate(0.5);
+        set_gizmo_snap_rotate(15.0);
+        set_gizmo_snap_scale(0.1);
+
+        let settings = get_gizmo_settings();
+        assert_eq!(settings.mode, 1); // Rotate
+        assert_eq!(settings.space, 1); // Local
+        assert!(!settings.visible);
+        assert!((settings.snap_translate - 0.5).abs() < 0.001);
+        assert!((settings.snap_rotate - 15.0).abs() < 0.001);
+        assert!((settings.snap_scale - 0.1).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_apply_gizmo_settings() {
+        setup();
+
+        let settings = polyscope_ui::GizmoSettings {
+            mode: 2,  // Scale
+            space: 0, // World
+            visible: true,
+            snap_translate: 1.0,
+            snap_rotate: 45.0,
+            snap_scale: 0.25,
+        };
+
+        apply_gizmo_settings(&settings);
+
+        assert_eq!(get_gizmo_mode(), GizmoMode::Scale);
+        assert_eq!(get_gizmo_space(), GizmoSpace::World);
+        assert!(is_gizmo_visible());
+    }
+
+    #[test]
+    fn test_get_selection_info_no_selection() {
+        setup();
+        deselect_structure();
+
+        let info = get_selection_info();
+        assert!(!info.has_selection);
+    }
+
+    #[test]
+    fn test_get_selection_info_with_selection() {
+        setup();
+        let name = unique_name("gizmo_select_pc");
+
+        register_point_cloud(&name, vec![Vec3::ZERO]);
+        select_structure("PointCloud", &name);
+
+        let info = get_selection_info();
+        assert!(info.has_selection);
+        assert_eq!(info.type_name, "PointCloud");
+        assert_eq!(info.name, name);
+
+        deselect_structure();
+    }
+
+    #[test]
+    fn test_apply_selection_transform() {
+        setup();
+        let name = unique_name("gizmo_transform_pc");
+
+        register_point_cloud(&name, vec![Vec3::ZERO]);
+        select_structure("PointCloud", &name);
+
+        let selection = polyscope_ui::SelectionInfo {
+            has_selection: true,
+            type_name: "PointCloud".to_string(),
+            name: name.clone(),
+            translation: [1.0, 2.0, 3.0],
+            rotation_degrees: [0.0, 0.0, 0.0],
+            scale: [1.0, 1.0, 1.0],
+        };
+
+        apply_selection_transform(&selection);
+
+        let transform = get_point_cloud_transform(&name).unwrap();
+        let translation = transform.w_axis.truncate();
+        assert!((translation - Vec3::new(1.0, 2.0, 3.0)).length() < 0.001);
+
+        deselect_structure();
+    }
 }
