@@ -69,7 +69,8 @@ pub use polyscope_render::{
 
 // Re-export UI types
 pub use polyscope_ui::{
-    AppearanceSettings, CameraSettings, SceneExtents, SlicePlaneSettings, SlicePlanesAction,
+    AppearanceSettings, CameraSettings, GroupSettings, GroupsAction, SceneExtents,
+    SlicePlaneSettings, SlicePlanesAction,
 };
 
 // Re-export structures
@@ -1651,6 +1652,71 @@ pub fn handle_slice_plane_action(
         polyscope_ui::SlicePlanesAction::Modified(idx) => {
             if idx < current_settings.len() {
                 apply_slice_plane_settings(&current_settings[idx]);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Group UI Sync Functions
+// ============================================================================
+
+/// Gets all groups as UI settings.
+pub fn get_group_settings() -> Vec<polyscope_ui::GroupSettings> {
+    with_context(|ctx| {
+        ctx.groups
+            .values()
+            .map(|group| polyscope_ui::GroupSettings {
+                name: group.name().to_string(),
+                enabled: group.is_enabled(),
+                show_child_details: group.show_child_details(),
+                parent_group: group.parent_group().map(|s| s.to_string()),
+                child_structures: group
+                    .child_structures()
+                    .map(|(t, n)| (t.to_string(), n.to_string()))
+                    .collect(),
+                child_groups: group.child_groups().map(|s| s.to_string()).collect(),
+            })
+            .collect()
+    })
+}
+
+/// Applies UI settings to a group.
+pub fn apply_group_settings(settings: &polyscope_ui::GroupSettings) {
+    with_context_mut(|ctx| {
+        if let Some(group) = ctx.get_group_mut(&settings.name) {
+            group.set_enabled(settings.enabled);
+            group.set_show_child_details(settings.show_child_details);
+        }
+    });
+}
+
+/// Handles a group UI action.
+pub fn handle_group_action(
+    action: polyscope_ui::GroupsAction,
+    current_settings: &mut Vec<polyscope_ui::GroupSettings>,
+) {
+    match action {
+        polyscope_ui::GroupsAction::None => {}
+        polyscope_ui::GroupsAction::Create(name) => {
+            create_group(&name);
+            current_settings.push(polyscope_ui::GroupSettings::with_name(&name));
+        }
+        polyscope_ui::GroupsAction::Remove(idx) => {
+            if idx < current_settings.len() {
+                let name = &current_settings[idx].name;
+                remove_group(name);
+                current_settings.remove(idx);
+            }
+        }
+        polyscope_ui::GroupsAction::ToggleEnabled(idx) => {
+            if idx < current_settings.len() {
+                apply_group_settings(&current_settings[idx]);
+            }
+        }
+        polyscope_ui::GroupsAction::ToggleDetails(idx) => {
+            if idx < current_settings.len() {
+                apply_group_settings(&current_settings[idx]);
             }
         }
     }
