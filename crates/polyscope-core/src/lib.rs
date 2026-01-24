@@ -17,6 +17,7 @@ pub mod registry;
 pub mod slice_plane;
 pub mod state;
 pub mod structure;
+pub mod tone_mapping;
 
 pub use error::{PolyscopeError, Result};
 pub use gizmo::{GizmoAxis, GizmoConfig, GizmoMode, GizmoSpace, GizmoUniforms, Transform};
@@ -29,6 +30,7 @@ pub use registry::Registry;
 pub use slice_plane::{SlicePlane, SlicePlaneUniforms, MAX_SLICE_PLANES};
 pub use state::{with_context, with_context_mut, Context};
 pub use structure::{HasQuantities, Structure};
+pub use tone_mapping::ToneMappingConfig;
 
 // Re-export glam types for convenience
 pub use glam::{Mat4, Vec2, Vec3, Vec4};
