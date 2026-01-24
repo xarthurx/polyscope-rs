@@ -238,6 +238,156 @@ pub enum GizmoAction {
     ResetTransform,
 }
 
+/// Builds the gizmo/transform section.
+/// Returns an action if one was triggered.
+pub fn build_gizmo_section(
+    ui: &mut Ui,
+    settings: &mut GizmoSettings,
+    selection: &mut SelectionInfo,
+) -> GizmoAction {
+    let mut action = GizmoAction::None;
+
+    CollapsingHeader::new("Transform / Gizmo")
+        .default_open(false)
+        .show(ui, |ui| {
+            // Selection info
+            if selection.has_selection {
+                ui.horizontal(|ui| {
+                    ui.label("Selected:");
+                    ui.label(format!("[{}] {}", selection.type_name, selection.name));
+                });
+
+                if ui.button("Deselect").clicked() {
+                    action = GizmoAction::Deselect;
+                }
+
+                ui.separator();
+            } else {
+                ui.label("No selection");
+                ui.label("Click a structure to select");
+                ui.separator();
+            }
+
+            // Gizmo visibility
+            if ui.checkbox(&mut settings.visible, "Show gizmo").changed() {
+                action = GizmoAction::SettingsChanged;
+            }
+
+            ui.separator();
+
+            // Gizmo mode
+            ui.label("Mode:");
+            ui.horizontal(|ui| {
+                if ui.selectable_label(settings.mode == 0, "Translate").clicked() {
+                    settings.mode = 0;
+                    action = GizmoAction::SettingsChanged;
+                }
+                if ui.selectable_label(settings.mode == 1, "Rotate").clicked() {
+                    settings.mode = 1;
+                    action = GizmoAction::SettingsChanged;
+                }
+                if ui.selectable_label(settings.mode == 2, "Scale").clicked() {
+                    settings.mode = 2;
+                    action = GizmoAction::SettingsChanged;
+                }
+            });
+
+            // Gizmo space
+            ui.label("Space:");
+            ui.horizontal(|ui| {
+                if ui.selectable_label(settings.space == 0, "World").clicked() {
+                    settings.space = 0;
+                    action = GizmoAction::SettingsChanged;
+                }
+                if ui.selectable_label(settings.space == 1, "Local").clicked() {
+                    settings.space = 1;
+                    action = GizmoAction::SettingsChanged;
+                }
+            });
+
+            ui.separator();
+
+            // Snap settings
+            ui.label("Snap:");
+            ui.horizontal(|ui| {
+                ui.label("Translate:");
+                if ui
+                    .add(DragValue::new(&mut settings.snap_translate).speed(0.1).range(0.0..=10.0))
+                    .changed()
+                {
+                    action = GizmoAction::SettingsChanged;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Rotate:");
+                if ui
+                    .add(DragValue::new(&mut settings.snap_rotate).speed(1.0).range(0.0..=90.0).suffix("°"))
+                    .changed()
+                {
+                    action = GizmoAction::SettingsChanged;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Scale:");
+                if ui
+                    .add(DragValue::new(&mut settings.snap_scale).speed(0.1).range(0.0..=1.0))
+                    .changed()
+                {
+                    action = GizmoAction::SettingsChanged;
+                }
+            });
+
+            // Transform editing (only if selected)
+            if selection.has_selection {
+                ui.separator();
+                ui.label("Transform:");
+
+                // Translation
+                ui.horizontal(|ui| {
+                    ui.label("Pos:");
+                    let mut changed = false;
+                    changed |= ui.add(DragValue::new(&mut selection.translation[0]).speed(0.1).prefix("X:")).changed();
+                    changed |= ui.add(DragValue::new(&mut selection.translation[1]).speed(0.1).prefix("Y:")).changed();
+                    changed |= ui.add(DragValue::new(&mut selection.translation[2]).speed(0.1).prefix("Z:")).changed();
+                    if changed && action == GizmoAction::None {
+                        action = GizmoAction::TransformChanged;
+                    }
+                });
+
+                // Rotation (Euler angles)
+                ui.horizontal(|ui| {
+                    ui.label("Rot:");
+                    let mut changed = false;
+                    changed |= ui.add(DragValue::new(&mut selection.rotation_degrees[0]).speed(1.0).prefix("X:").suffix("°")).changed();
+                    changed |= ui.add(DragValue::new(&mut selection.rotation_degrees[1]).speed(1.0).prefix("Y:").suffix("°")).changed();
+                    changed |= ui.add(DragValue::new(&mut selection.rotation_degrees[2]).speed(1.0).prefix("Z:").suffix("°")).changed();
+                    if changed && action == GizmoAction::None {
+                        action = GizmoAction::TransformChanged;
+                    }
+                });
+
+                // Scale
+                ui.horizontal(|ui| {
+                    ui.label("Scale:");
+                    let mut changed = false;
+                    changed |= ui.add(DragValue::new(&mut selection.scale[0]).speed(0.01).prefix("X:").range(0.01..=100.0)).changed();
+                    changed |= ui.add(DragValue::new(&mut selection.scale[1]).speed(0.01).prefix("Y:").range(0.01..=100.0)).changed();
+                    changed |= ui.add(DragValue::new(&mut selection.scale[2]).speed(0.01).prefix("Z:").range(0.01..=100.0)).changed();
+                    if changed && action == GizmoAction::None {
+                        action = GizmoAction::TransformChanged;
+                    }
+                });
+
+                ui.separator();
+                if ui.button("Reset Transform").clicked() {
+                    action = GizmoAction::ResetTransform;
+                }
+            }
+        });
+
+    action
+}
+
 /// Builds UI for a single group item.
 /// Returns true if enabled was toggled.
 fn build_group_item(ui: &mut Ui, settings: &mut GroupSettings) -> bool {
