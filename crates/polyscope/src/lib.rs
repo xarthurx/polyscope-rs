@@ -69,8 +69,8 @@ pub use polyscope_render::{
 
 // Re-export UI types
 pub use polyscope_ui::{
-    AppearanceSettings, CameraSettings, GroupSettings, GroupsAction, SceneExtents,
-    SlicePlaneSettings, SlicePlanesAction,
+    AppearanceSettings, CameraSettings, GizmoAction, GizmoSettings, GroupSettings, GroupsAction,
+    SceneExtents, SelectionInfo, SlicePlaneSettings, SlicePlanesAction,
 };
 
 // Re-export structures
