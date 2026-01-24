@@ -19,6 +19,7 @@ pub mod point_cloud_render;
 pub mod screenshot;
 pub mod shader;
 pub mod surface_mesh_render;
+pub mod tone_mapping;
 pub mod vector_render;
 
 pub use camera::{AxisDirection, Camera, NavigationStyle, ProjectionMode};
@@ -33,6 +34,7 @@ pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use screenshot::{save_image, save_to_buffer, ScreenshotError, ScreenshotOptions};
 pub use shader::{ShaderBuilder, ShaderProgram};
 pub use surface_mesh_render::{MeshUniforms, SurfaceMeshRenderData};
+pub use tone_mapping::{ToneMapPass, ToneMapUniforms};
 pub use vector_render::{VectorRenderData, VectorUniforms};
 
 /// Render context passed to structures during drawing.
