@@ -107,6 +107,101 @@ impl App {
         self.background_color = color;
     }
 
+    /// Performs screen-space picking to find which structure (if any) is at the given screen position.
+    ///
+    /// Projects sample points from each structure to screen space and checks if the click
+    /// is within a threshold distance. Returns the (type_name, name) of the clicked structure,
+    /// or None if clicking on empty space.
+    fn pick_structure_at_screen_pos(
+        &self,
+        click_pos: glam::Vec2,
+        screen_width: u32,
+        screen_height: u32,
+        camera: &polyscope_render::Camera,
+    ) -> Option<(String, String)> {
+        let view_proj = camera.view_projection_matrix();
+        let half_width = screen_width as f32 / 2.0;
+        let half_height = screen_height as f32 / 2.0;
+
+        // Threshold distance in pixels for considering a click "on" a structure
+        let pick_threshold = 20.0_f32;
+        let mut best_match: Option<(String, String, f32)> = None;
+
+        crate::with_context(|ctx| {
+            for structure in ctx.registry.iter() {
+                if !structure.is_enabled() {
+                    continue;
+                }
+
+                let model = structure.transform();
+                let mvp = view_proj * model;
+
+                // Get sample points based on structure type
+                let sample_points: Vec<Vec3> = if structure.type_name() == "PointCloud" {
+                    if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                        // Sample up to 100 points for efficiency
+                        let points = pc.points();
+                        let step = (points.len() / 100).max(1);
+                        points.iter().step_by(step).copied().collect()
+                    } else {
+                        continue;
+                    }
+                } else if structure.type_name() == "SurfaceMesh" {
+                    if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                        // Sample vertices
+                        let verts = mesh.vertices();
+                        let step = (verts.len() / 100).max(1);
+                        verts.iter().step_by(step).copied().collect()
+                    } else {
+                        continue;
+                    }
+                } else {
+                    // For other structure types, use bounding box center
+                    if let Some((min, max)) = structure.bounding_box() {
+                        vec![(min + max) * 0.5]
+                    } else {
+                        continue;
+                    }
+                };
+
+                // Project each sample point and check distance to click
+                for point in sample_points {
+                    let clip = mvp * glam::Vec4::new(point.x, point.y, point.z, 1.0);
+
+                    // Skip points behind camera
+                    if clip.w <= 0.0 {
+                        continue;
+                    }
+
+                    // NDC to screen
+                    let ndc = clip.truncate() / clip.w;
+                    let screen_x = (ndc.x + 1.0) * half_width;
+                    let screen_y = (1.0 - ndc.y) * half_height; // Y is flipped
+
+                    let dist = ((screen_x - click_pos.x).powi(2)
+                        + (screen_y - click_pos.y).powi(2))
+                    .sqrt();
+
+                    if dist < pick_threshold {
+                        // Check if this is closer than previous best match
+                        let dominated = best_match
+                            .as_ref()
+                            .is_some_and(|(_, _, best_dist)| dist >= *best_dist);
+                        if !dominated {
+                            best_match = Some((
+                                structure.type_name().to_string(),
+                                structure.name().to_string(),
+                                dist,
+                            ));
+                        }
+                    }
+                }
+            }
+        });
+
+        best_match.map(|(type_name, name, _)| (type_name, name))
+    }
+
     /// Renders a single frame.
     fn render(&mut self) {
         let (Some(engine), Some(egui), Some(window)) =
@@ -1044,43 +1139,38 @@ impl ApplicationHandler for App {
 
                             // If we didn't drag much, it's a click - do picking
                             if drag_distance < 5.0 {
-                                // Temporary workaround: select first structure in registry
-                                // TODO: Replace with real GPU picking
-                                let first_structure: Option<(String, String)> =
-                                    crate::with_context(|ctx| {
-                                        ctx.registry.iter().next().map(|s| {
-                                            (s.type_name().to_string(), s.name().to_string())
-                                        })
-                                    });
+                                if let Some(engine) = &self.engine {
+                                    let click_screen = glam::Vec2::new(
+                                        self.mouse_pos.0 as f32,
+                                        self.mouse_pos.1 as f32,
+                                    );
 
-                                if let Some((type_name, name)) = first_structure {
-                                    // Check if clicking on already-selected structure (toggle off)
-                                    let already_selected = self.selection_info.has_selection
-                                        && self.selection_info.type_name == type_name
-                                        && self.selection_info.name == name;
+                                    // Perform screen-space picking
+                                    let picked = self.pick_structure_at_screen_pos(
+                                        click_screen,
+                                        engine.width,
+                                        engine.height,
+                                        &engine.camera,
+                                    );
 
-                                    if already_selected {
-                                        // Deselect
-                                        self.selection = None;
-                                        self.selection_info = polyscope_ui::SelectionInfo::default();
-                                        crate::deselect_structure();
-                                    } else {
-                                        // Select the structure
+                                    if let Some((type_name, name)) = picked {
+                                        // Something was clicked - select it
                                         self.selection = Some(PickResult {
                                             hit: true,
                                             structure_type: type_name.clone(),
                                             structure_name: name.clone(),
                                             element_index: 0,
                                             element_type: polyscope_render::PickElementType::None,
-                                            screen_pos: glam::Vec2::new(
-                                                self.mouse_pos.0 as f32,
-                                                self.mouse_pos.1 as f32,
-                                            ),
+                                            screen_pos: click_screen,
                                             depth: 0.5,
                                         });
                                         crate::select_structure(&type_name, &name);
-                                        // Update selection_info with structure's current transform
                                         self.selection_info = crate::get_selection_info();
+                                    } else {
+                                        // Nothing was clicked - deselect
+                                        self.selection = None;
+                                        self.selection_info = polyscope_ui::SelectionInfo::default();
+                                        crate::deselect_structure();
                                     }
                                 }
                             }
@@ -1092,10 +1182,7 @@ impl ApplicationHandler for App {
                         self.right_mouse_down = true;
                     }
                     (MouseButton::Right, ElementState::Released) => {
-                        // Clear selection on right click
-                        self.selection = None;
-                        self.selection_info = polyscope_ui::SelectionInfo::default();
-                        crate::deselect_structure();
+                        // Right-click is for camera rotation only, no selection changes
                         self.right_mouse_down = false;
                     }
                     _ => {}
