@@ -646,7 +646,11 @@ impl SurfaceMesh {
             return;
         };
 
+        // Convert glam Mat4 to [[f32; 4]; 4] for GPU
+        let model_matrix = self.transform.to_cols_array_2d();
+
         let uniforms = MeshUniforms {
+            model_matrix,
             shade_style: self.shade_style as u32,
             show_edges: u32::from(self.show_edges),
             edge_width: self.edge_width,

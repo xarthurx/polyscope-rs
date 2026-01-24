@@ -11,6 +11,7 @@ struct CameraUniforms {
 }
 
 struct MeshUniforms {
+    model: mat4x4<f32>,
     shade_style: u32,      // 0 = smooth, 1 = flat, 2 = tri-flat
     show_edges: u32,       // 0 = off, 1 = on
     edge_width: f32,
@@ -52,15 +53,20 @@ fn vs_main(
     var out: VertexOutput;
 
     // Read position, normal, barycentric, color from storage buffers
-    let position = positions[vertex_index].xyz;
-    let normal = normals[vertex_index].xyz;
+    let local_position = positions[vertex_index].xyz;
+    let local_normal = normals[vertex_index].xyz;
     let bary = barycentrics[vertex_index].xyz;
     let color = colors[vertex_index];
 
+    // Apply model transform
+    let world_position = (mesh_uniforms.model * vec4<f32>(local_position, 1.0)).xyz;
+    // Transform normal with upper-left 3x3 of model matrix (assuming uniform scale)
+    let world_normal = normalize((mesh_uniforms.model * vec4<f32>(local_normal, 0.0)).xyz);
+
     // Transform position with view_proj matrix
-    out.clip_position = camera.view_proj * vec4<f32>(position, 1.0);
-    out.world_position = position;
-    out.world_normal = normal;
+    out.clip_position = camera.view_proj * vec4<f32>(world_position, 1.0);
+    out.world_position = world_position;
+    out.world_normal = world_normal;
     out.barycentric = bary;
     out.vertex_color = color;
     out.edge_real = edge_is_real[vertex_index].xyz;

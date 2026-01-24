@@ -4,11 +4,13 @@ use glam::Vec3;
 use wgpu::util::DeviceExt;
 
 /// Uniforms for surface mesh rendering.
-/// Note: Layout must match WGSL MeshUniforms exactly (96 bytes).
+/// Note: Layout must match WGSL MeshUniforms exactly.
 /// WGSL vec3<f32> has 16-byte alignment, requiring extra padding.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct MeshUniforms {
+    /// Model transform matrix (must be first for alignment)
+    pub model_matrix: [[f32; 4]; 4],
     /// Shading style: 0 = smooth, 1 = flat, 2 = tri-flat
     pub shade_style: u32,
     /// Show edges: 0 = off, 1 = on
@@ -36,6 +38,12 @@ pub struct MeshUniforms {
 impl Default for MeshUniforms {
     fn default() -> Self {
         Self {
+            model_matrix: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
             shade_style: 0,                      // smooth shading
             show_edges: 0,                       // edges off
             edge_width: 1.0,                     // 1 pixel edge
@@ -315,6 +323,7 @@ mod tests {
         );
 
         // Expected size breakdown:
+        // model_matrix: 64 bytes ([[f32; 4]; 4])
         // shade_style: 4 bytes (u32)
         // show_edges: 4 bytes (u32)
         // edge_width: 4 bytes (f32)
@@ -326,10 +335,10 @@ mod tests {
         // _pad2: 12 bytes ([f32; 3])
         // _pad3: 4 bytes (f32)
         // backface_color: 16 bytes ([f32; 4])
-        // Total: 96 bytes (matches WGSL layout with vec3 alignment)
+        // Total: 160 bytes (matches WGSL layout with vec3 alignment)
         assert_eq!(
-            size, 96,
-            "MeshUniforms should be 96 bytes, got {} bytes",
+            size, 160,
+            "MeshUniforms should be 160 bytes, got {} bytes",
             size
         );
     }

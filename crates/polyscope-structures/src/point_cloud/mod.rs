@@ -217,7 +217,11 @@ impl PointCloud {
             return;
         };
 
+        // Convert glam Mat4 to [[f32; 4]; 4] for GPU
+        let model_matrix = self.transform.to_cols_array_2d();
+
         let mut uniforms = PointUniforms {
+            model_matrix,
             point_radius: self.point_radius,
             use_per_point_color: 0,
             _padding: [0.0; 2],

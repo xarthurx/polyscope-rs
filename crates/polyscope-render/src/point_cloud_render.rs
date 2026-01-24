@@ -21,6 +21,7 @@ pub struct PointCloudRenderData {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PointUniforms {
+    pub model_matrix: [[f32; 4]; 4],
     pub point_radius: f32,
     pub use_per_point_color: u32,
     pub _padding: [f32; 2],
@@ -30,6 +31,12 @@ pub struct PointUniforms {
 impl Default for PointUniforms {
     fn default() -> Self {
         Self {
+            model_matrix: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
             point_radius: 0.01,
             use_per_point_color: 0,
             _padding: [0.0; 2],
