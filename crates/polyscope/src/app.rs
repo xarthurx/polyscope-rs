@@ -245,9 +245,10 @@ impl App {
             return;
         };
 
-        let Some(surface) = &engine.surface else {
+        // Check surface exists (but don't hold borrow yet - needed for structure ID assignment)
+        if engine.surface.is_none() {
             return;
-        };
+        }
 
         // Update camera uniforms
         engine.update_camera_uniforms();
@@ -256,6 +257,7 @@ impl App {
         crate::with_context_mut(|ctx| {
             for structure in ctx.registry.iter_mut() {
                 if structure.type_name() == "PointCloud" {
+                    let structure_name = structure.name().to_string();
                     if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>() {
                         // Initialize point cloud render data
                         if pc.render_data().is_none() {
@@ -263,6 +265,17 @@ impl App {
                                 &engine.device,
                                 engine.point_bind_group_layout(),
                                 engine.camera_buffer(),
+                            );
+                        }
+
+                        // Initialize pick resources (after render data)
+                        if pc.pick_bind_group().is_none() && pc.render_data().is_some() {
+                            let structure_id = engine.assign_structure_id("PointCloud", &structure_name);
+                            pc.init_pick_resources(
+                                &engine.device,
+                                engine.pick_bind_group_layout(),
+                                engine.camera_buffer(),
+                                structure_id,
                             );
                         }
 
@@ -352,6 +365,8 @@ impl App {
                 if structure.type_name() == "PointCloud" {
                     if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
                         pc.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                        // Update pick uniforms (point radius may have changed)
+                        pc.update_pick_uniforms(&engine.queue);
 
                         // Update vector quantity uniforms
                         if let Some(vq) = pc.active_vector_quantity() {
@@ -379,6 +394,44 @@ impl App {
                 }
             }
         });
+
+        // Render pick pass (GPU picking)
+        {
+            let mut encoder = engine
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("pick pass encoder"),
+                });
+
+            if let Some(mut pick_pass) = engine.begin_pick_pass(&mut encoder) {
+                // Draw point clouds to pick buffer
+                pick_pass.set_pipeline(engine.point_pick_pipeline());
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "PointCloud" {
+                            if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                                if let (Some(pick_bind_group), Some(render_data)) =
+                                    (pc.pick_bind_group(), pc.render_data())
+                                {
+                                    pick_pass.set_bind_group(0, pick_bind_group, &[]);
+                                    // 6 vertices per quad, num_points instances
+                                    pick_pass.draw(0..6, 0..render_data.num_points);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Note: SurfaceMesh and CurveNetwork pick rendering would go here
+                // once their pick pipelines are created
+            }
+
+            engine.queue.submit(std::iter::once(encoder.finish()));
+        }
 
         // Begin egui frame
         egui.begin_frame(window);
@@ -663,6 +716,8 @@ impl App {
         // End egui frame
         let egui_output = egui.end_frame(window);
 
+        // Now borrow surface for rendering
+        let surface = engine.surface.as_ref().expect("surface checked above");
         let output = match surface.get_current_texture() {
             Ok(output) => output,
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {

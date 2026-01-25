@@ -6,7 +6,8 @@ use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{ColorMapRegistry, PointCloudRenderData, PointUniforms};
+use polyscope_render::{ColorMapRegistry, PickUniforms, PointCloudRenderData, PointUniforms};
+use wgpu::util::DeviceExt;
 
 pub use quantities::*;
 
@@ -20,6 +21,10 @@ pub struct PointCloud {
     render_data: Option<PointCloudRenderData>,
     point_radius: f32,
     base_color: Vec3,
+    // GPU picking resources
+    pick_uniform_buffer: Option<wgpu::Buffer>,
+    pick_bind_group: Option<wgpu::BindGroup>,
+    structure_id: u16,
 }
 
 impl PointCloud {
@@ -34,6 +39,9 @@ impl PointCloud {
             render_data: None,
             point_radius: 0.01,
             base_color: Vec3::new(0.2, 0.5, 0.8),
+            pick_uniform_buffer: None,
+            pick_bind_group: None,
+            structure_id: 0,
         }
     }
 
@@ -97,6 +105,71 @@ impl PointCloud {
     /// Returns the render data if initialized.
     pub fn render_data(&self) -> Option<&PointCloudRenderData> {
         self.render_data.as_ref()
+    }
+
+    /// Initializes GPU resources for pick rendering.
+    pub fn init_pick_resources(
+        &mut self,
+        device: &wgpu::Device,
+        pick_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        structure_id: u16,
+    ) {
+        self.structure_id = structure_id;
+
+        // Create pick uniform buffer
+        let pick_uniforms = PickUniforms {
+            structure_id: structure_id as u32,
+            point_radius: self.point_radius,
+            _padding: [0.0; 2],
+        };
+        let pick_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("point cloud pick uniforms"),
+            contents: bytemuck::cast_slice(&[pick_uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        // Create pick bind group (reuses position buffer from render_data)
+        if let Some(render_data) = &self.render_data {
+            let pick_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("point cloud pick bind group"),
+                layout: pick_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: camera_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: pick_uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: render_data.position_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+            self.pick_bind_group = Some(pick_bind_group);
+        }
+
+        self.pick_uniform_buffer = Some(pick_uniform_buffer);
+    }
+
+    /// Returns the pick bind group if initialized.
+    pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.pick_bind_group.as_ref()
+    }
+
+    /// Updates pick uniforms (e.g., when point radius changes).
+    pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let pick_uniforms = PickUniforms {
+                structure_id: self.structure_id as u32,
+                point_radius: self.point_radius,
+                _padding: [0.0; 2],
+            };
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[pick_uniforms]));
+        }
     }
 
     /// Sets the point radius.
