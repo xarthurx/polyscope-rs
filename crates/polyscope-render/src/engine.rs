@@ -84,6 +84,14 @@ pub struct RenderEngine {
     pub curve_network_edge_pipeline: Option<wgpu::RenderPipeline>,
     /// Curve network edge bind group layout.
     curve_network_edge_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Curve network tube render pipeline (cylinder impostor rendering).
+    pub curve_network_tube_pipeline: Option<wgpu::RenderPipeline>,
+    /// Curve network tube compute pipeline (generates bounding box geometry).
+    pub curve_network_tube_compute_pipeline: Option<wgpu::ComputePipeline>,
+    /// Curve network tube render bind group layout.
+    curve_network_tube_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Curve network tube compute bind group layout.
+    curve_network_tube_compute_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Ground plane render pipeline.
     ground_plane_pipeline: wgpu::RenderPipeline,
     /// Ground plane bind group layout.
@@ -332,6 +340,10 @@ impl RenderEngine {
             mesh_bind_group_layout: None,
             curve_network_edge_pipeline: None,
             curve_network_edge_bind_group_layout: None,
+            curve_network_tube_pipeline: None,
+            curve_network_tube_compute_pipeline: None,
+            curve_network_tube_bind_group_layout: None,
+            curve_network_tube_compute_bind_group_layout: None,
             ground_plane_pipeline,
             ground_plane_bind_group_layout,
             ground_plane_render_data: None,
@@ -359,6 +371,7 @@ impl RenderEngine {
         engine.init_vector_pipeline();
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
+        engine.create_curve_network_tube_pipelines();
         engine.init_tone_mapping();
         engine.init_reflection_pass();
         engine.init_pick_pipeline();
@@ -550,6 +563,10 @@ impl RenderEngine {
             mesh_bind_group_layout: None,
             curve_network_edge_pipeline: None,
             curve_network_edge_bind_group_layout: None,
+            curve_network_tube_pipeline: None,
+            curve_network_tube_compute_pipeline: None,
+            curve_network_tube_bind_group_layout: None,
+            curve_network_tube_compute_bind_group_layout: None,
             ground_plane_pipeline,
             ground_plane_bind_group_layout,
             ground_plane_render_data: None,
@@ -577,6 +594,7 @@ impl RenderEngine {
         engine.init_vector_pipeline();
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
+        engine.create_curve_network_tube_pipelines();
         engine.init_tone_mapping();
         engine.init_reflection_pass();
         engine.init_pick_pipeline();
@@ -1209,6 +1227,246 @@ impl RenderEngine {
 
         self.curve_network_edge_pipeline = Some(pipeline);
         self.curve_network_edge_bind_group_layout = Some(bind_group_layout);
+    }
+
+    /// Creates the curve network tube pipelines (compute and render).
+    fn create_curve_network_tube_pipelines(&mut self) {
+        // Compute shader
+        let compute_shader_source = include_str!("shaders/curve_network_tube_compute.wgsl");
+        let compute_shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Curve Network Tube Compute Shader"),
+                source: wgpu::ShaderSource::Wgsl(compute_shader_source.into()),
+            });
+
+        // Compute bind group layout
+        let compute_bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Curve Network Tube Compute Bind Group Layout"),
+                    entries: &[
+                        // Edge vertices (input)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Output vertices
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Num edges
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let compute_pipeline_layout =
+            self.device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Curve Network Tube Compute Pipeline Layout"),
+                    bind_group_layouts: &[&compute_bind_group_layout],
+                    push_constant_ranges: &[],
+                });
+
+        let compute_pipeline = self
+            .device
+            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Curve Network Tube Compute Pipeline"),
+                layout: Some(&compute_pipeline_layout),
+                module: &compute_shader,
+                entry_point: Some("main"),
+                compilation_options: Default::default(),
+                cache: None,
+            });
+
+        // Render shader
+        let render_shader_source = include_str!("shaders/curve_network_tube.wgsl");
+        let render_shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Curve Network Tube Render Shader"),
+                source: wgpu::ShaderSource::Wgsl(render_shader_source.into()),
+            });
+
+        // Render bind group layout
+        let render_bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Curve Network Tube Render Bind Group Layout"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Curve network uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Edge vertices (for raycast)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Edge colors
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let render_pipeline_layout =
+            self.device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Curve Network Tube Render Pipeline Layout"),
+                    bind_group_layouts: &[&render_bind_group_layout],
+                    push_constant_ranges: &[],
+                });
+
+        let render_pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Curve Network Tube Render Pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &render_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[
+                        // Generated vertex buffer layout
+                        wgpu::VertexBufferLayout {
+                            array_stride: 32, // vec4<f32> position + vec4<u32> edge_id_and_vertex_id
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &[
+                                wgpu::VertexAttribute {
+                                    format: wgpu::VertexFormat::Float32x4,
+                                    offset: 0,
+                                    shader_location: 0,
+                                },
+                                wgpu::VertexAttribute {
+                                    format: wgpu::VertexFormat::Uint32x4,
+                                    offset: 16,
+                                    shader_location: 1,
+                                },
+                            ],
+                        },
+                    ],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &render_shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None, // Don't cull - we need to see box from inside too
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.curve_network_tube_pipeline = Some(render_pipeline);
+        self.curve_network_tube_compute_pipeline = Some(compute_pipeline);
+        self.curve_network_tube_bind_group_layout = Some(render_bind_group_layout);
+        self.curve_network_tube_compute_bind_group_layout = Some(compute_bind_group_layout);
+    }
+
+    /// Gets the curve network tube render bind group layout.
+    pub fn curve_network_tube_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.curve_network_tube_bind_group_layout
+            .as_ref()
+            .expect("Tube bind group layout not initialized")
+    }
+
+    /// Gets the curve network tube compute bind group layout.
+    pub fn curve_network_tube_compute_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.curve_network_tube_compute_bind_group_layout
+            .as_ref()
+            .expect("Tube compute bind group layout not initialized")
+    }
+
+    /// Gets the curve network tube compute pipeline.
+    pub fn curve_network_tube_compute_pipeline(&self) -> &wgpu::ComputePipeline {
+        self.curve_network_tube_compute_pipeline
+            .as_ref()
+            .expect("Tube compute pipeline not initialized")
     }
 
     /// Renders the ground plane.
