@@ -120,6 +120,8 @@ pub struct RenderEngine {
     shadow_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Reflection pass for ground plane reflections.
     reflection_pass: Option<crate::reflection_pass::ReflectionPass>,
+    /// Stencil pipeline for ground plane reflection mask.
+    ground_stencil_pipeline: Option<wgpu::RenderPipeline>,
 
     // Pick system - structure ID management
     /// Map from (type_name, name) to structure pick ID.
@@ -366,6 +368,7 @@ impl RenderEngine {
             shadow_pipeline: None,
             shadow_bind_group_layout: None,
             reflection_pass: None,
+            ground_stencil_pipeline: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
@@ -387,6 +390,7 @@ impl RenderEngine {
         engine.create_shadow_pipeline();
         engine.init_tone_mapping();
         engine.init_reflection_pass();
+        engine.create_ground_stencil_pipeline();
         engine.init_pick_pipeline();
 
         Ok(engine)
@@ -594,6 +598,7 @@ impl RenderEngine {
             shadow_pipeline: None,
             shadow_bind_group_layout: None,
             reflection_pass: None,
+            ground_stencil_pipeline: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
@@ -615,6 +620,7 @@ impl RenderEngine {
         engine.create_shadow_pipeline();
         engine.init_tone_mapping();
         engine.init_reflection_pass();
+        engine.create_ground_stencil_pipeline();
         engine.init_pick_pipeline();
 
         Ok(engine)
@@ -1602,6 +1608,79 @@ impl RenderEngine {
     /// Gets the shadow bind group layout.
     pub fn shadow_bind_group_layout(&self) -> Option<&wgpu::BindGroupLayout> {
         self.shadow_bind_group_layout.as_ref()
+    }
+
+    /// Creates the ground stencil pipeline for reflection masking.
+    fn create_ground_stencil_pipeline(&mut self) {
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Ground Stencil Shader"),
+                source: wgpu::ShaderSource::Wgsl(
+                    include_str!("shaders/ground_stencil.wgsl").into(),
+                ),
+            });
+
+        // Use existing ground plane bind group layout (camera + ground uniforms)
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Ground Stencil Pipeline Layout"),
+                bind_group_layouts: &[&self.ground_plane_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        self.ground_stencil_pipeline = Some(self.device.create_render_pipeline(
+            &wgpu::RenderPipelineDescriptor {
+                label: Some("Ground Stencil Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::empty(), // No color writes
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24PlusStencil8,
+                    depth_write_enabled: false, // Don't write depth
+                    depth_compare: wgpu::CompareFunction::Always,
+                    stencil: wgpu::StencilState {
+                        front: wgpu::StencilFaceState {
+                            compare: wgpu::CompareFunction::Always,
+                            fail_op: wgpu::StencilOperation::Keep,
+                            depth_fail_op: wgpu::StencilOperation::Keep,
+                            pass_op: wgpu::StencilOperation::Replace, // Write stencil ref
+                        },
+                        back: wgpu::StencilFaceState {
+                            compare: wgpu::CompareFunction::Always,
+                            fail_op: wgpu::StencilOperation::Keep,
+                            depth_fail_op: wgpu::StencilOperation::Keep,
+                            pass_op: wgpu::StencilOperation::Replace,
+                        },
+                        read_mask: 0xFF,
+                        write_mask: 0xFF,
+                    },
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            },
+        ));
     }
 
     /// Renders the ground plane.
