@@ -204,8 +204,8 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Feature | C++ Polyscope | polyscope-rs |
 |---------|--------------|--------------|
 | Ground Plane | ✅ | ✅ |
-| Ground Shadows | ✅ | ✅ |
-| Ground Reflections | ✅ | ✅ |
+| Ground Shadows | ✅ | ⚠️ Infrastructure only |
+| Ground Reflections | ✅ | ⚠️ Infrastructure only |
 | Tone Mapping | ✅ | ✅ |
 | SSAO | ✅ | ❌ |
 | Slice Planes | ✅ | ✅ (max 4) |
@@ -322,6 +322,27 @@ with_point_cloud("my points", |pc| {
 4. **Shader Language**: GLSL → WGSL syntax differences
 
 ---
+
+## Partially Implemented Features
+
+The following features have infrastructure but are not fully functional:
+
+### Ground Shadows (Infrastructure Only)
+- ✅ `ShadowMapPass` with depth texture (2048x2048)
+- ✅ Light uniform buffer and comparison sampler
+- ✅ `begin_shadow_pass()` and `compute_light_matrix()` methods
+- ✅ Ground plane shader samples shadow map with PCF
+- ❌ No shadow render pipeline to render objects from light's perspective
+- ❌ No shadow pass in main render loop
+- **Result:** Shadow map remains empty, all pixels appear fully lit
+
+### Ground Reflections (Infrastructure Only)
+- ✅ `ReflectionPass` infrastructure and shaders
+- ✅ Reflection matrix computation functions
+- ✅ Ground stencil shader exists
+- ❌ No stencil pass to mark ground plane regions
+- ❌ No reflected geometry rendering in render loop
+- **Result:** No reflections appear
 
 ## Missing Features (Planned)
 
