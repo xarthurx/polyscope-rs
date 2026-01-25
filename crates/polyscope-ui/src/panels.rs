@@ -624,7 +624,11 @@ pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
         .show(ctx, |ui| {
             ui.heading("polyscope-rs");
             ui.separator();
-            build_contents(ui);
+            egui::ScrollArea::vertical()
+                .auto_shrink([false; 2])
+                .show(ui, |ui| {
+                    build_contents(ui);
+                });
         });
 }
 
