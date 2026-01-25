@@ -122,6 +122,10 @@ pub struct RenderEngine {
     reflection_pass: Option<crate::reflection_pass::ReflectionPass>,
     /// Stencil pipeline for ground plane reflection mask.
     ground_stencil_pipeline: Option<wgpu::RenderPipeline>,
+    /// Pipeline for rendering reflected surface meshes.
+    reflected_mesh_pipeline: Option<wgpu::RenderPipeline>,
+    /// Bind group layout for reflected mesh (includes reflection uniforms).
+    reflected_mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
 
     // Pick system - structure ID management
     /// Map from (type_name, name) to structure pick ID.
@@ -369,6 +373,8 @@ impl RenderEngine {
             shadow_bind_group_layout: None,
             reflection_pass: None,
             ground_stencil_pipeline: None,
+            reflected_mesh_pipeline: None,
+            reflected_mesh_bind_group_layout: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
@@ -391,6 +397,7 @@ impl RenderEngine {
         engine.init_tone_mapping();
         engine.init_reflection_pass();
         engine.create_ground_stencil_pipeline();
+        engine.create_reflected_mesh_pipeline();
         engine.init_pick_pipeline();
 
         Ok(engine)
@@ -599,6 +606,8 @@ impl RenderEngine {
             shadow_bind_group_layout: None,
             reflection_pass: None,
             ground_stencil_pipeline: None,
+            reflected_mesh_pipeline: None,
+            reflected_mesh_bind_group_layout: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
@@ -621,6 +630,7 @@ impl RenderEngine {
         engine.init_tone_mapping();
         engine.init_reflection_pass();
         engine.create_ground_stencil_pipeline();
+        engine.create_reflected_mesh_pipeline();
         engine.init_pick_pipeline();
 
         Ok(engine)
@@ -1681,6 +1691,184 @@ impl RenderEngine {
                 cache: None,
             },
         ));
+    }
+
+    /// Creates the reflected mesh pipeline for ground reflections.
+    fn create_reflected_mesh_pipeline(&mut self) {
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Reflected Mesh Shader"),
+                source: wgpu::ShaderSource::Wgsl(
+                    include_str!("shaders/reflected_mesh.wgsl").into(),
+                ),
+            });
+
+        // Bind group 0: camera, mesh uniforms, buffers (same as surface mesh)
+        // Bind group 1: reflection uniforms
+        let Some(reflection_pass) = &self.reflection_pass else {
+            return;
+        };
+
+        // Create bind group layout for group 0 (mesh data)
+        let mesh_bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Reflected Mesh Bind Group Layout 0"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Mesh uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Positions
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Normals
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Barycentrics
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 4,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Colors
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 5,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Edge is real
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 6,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Reflected Mesh Pipeline Layout"),
+                bind_group_layouts: &[&mesh_bind_group_layout, reflection_pass.bind_group_layout()],
+                push_constant_ranges: &[],
+            });
+
+        self.reflected_mesh_pipeline = Some(self.device.create_render_pipeline(
+            &wgpu::RenderPipelineDescriptor {
+                label: Some("Reflected Mesh Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::SrcAlpha,
+                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                operation: wgpu::BlendOperation::Add,
+                            },
+                            alpha: wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::One,
+                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                operation: wgpu::BlendOperation::Add,
+                            },
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    cull_mode: Some(wgpu::Face::Front), // Cull front faces (they become back after reflection)
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24PlusStencil8,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState {
+                        front: wgpu::StencilFaceState {
+                            compare: wgpu::CompareFunction::Equal, // Only render where stencil == ref
+                            fail_op: wgpu::StencilOperation::Keep,
+                            depth_fail_op: wgpu::StencilOperation::Keep,
+                            pass_op: wgpu::StencilOperation::Keep,
+                        },
+                        back: wgpu::StencilFaceState {
+                            compare: wgpu::CompareFunction::Equal,
+                            fail_op: wgpu::StencilOperation::Keep,
+                            depth_fail_op: wgpu::StencilOperation::Keep,
+                            pass_op: wgpu::StencilOperation::Keep,
+                        },
+                        read_mask: 0xFF,
+                        write_mask: 0x00, // Don't modify stencil
+                    },
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            },
+        ));
+
+        self.reflected_mesh_bind_group_layout = Some(mesh_bind_group_layout);
     }
 
     /// Renders the ground plane.
