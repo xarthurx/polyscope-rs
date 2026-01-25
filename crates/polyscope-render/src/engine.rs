@@ -1843,8 +1843,8 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: false, // Don't write depth for reflections
+                    depth_compare: wgpu::CompareFunction::Always, // Always pass depth test, stencil does the masking
                     stencil: wgpu::StencilState {
                         front: wgpu::StencilFaceState {
                             compare: wgpu::CompareFunction::Equal, // Only render where stencil == ref

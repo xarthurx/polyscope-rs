@@ -1163,7 +1163,7 @@ impl App {
             )
         });
 
-        // Reflection pass (only for TileReflection mode)
+        // Ground plane and reflection rendering
         if self.ground_plane.mode == GroundPlaneMode::TileReflection {
             // Compute ground height
             let ground_height = if self.ground_plane.height_is_relative {
@@ -1189,7 +1189,21 @@ impl App {
                 length_scale,
             );
 
-            // 2. Render reflected meshes
+            // 2. Render ground plane FIRST (opaque base)
+            engine.render_ground_plane(
+                &mut encoder,
+                &view,
+                true, // enabled
+                scene_center,
+                scene_min_y,
+                length_scale,
+                gp_height_override,
+                self.ground_plane.shadow_darkness,
+                gp_shadow_mode,
+                0.0, // No transparency - fully opaque ground
+            );
+
+            // 3. Render reflected meshes ON TOP of ground
             {
                 let hdr_view = engine.hdr_texture_view().unwrap_or(&view);
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -1241,26 +1255,21 @@ impl App {
                     }
                 });
             }
-        }
-
-        // Ground plane renders to HDR internally (surface_view passed for fallback)
-        let gp_reflection_intensity = if self.ground_plane.mode == GroundPlaneMode::TileReflection {
-            self.ground_plane.reflection_intensity
         } else {
-            0.0
-        };
-        engine.render_ground_plane(
-            &mut encoder,
-            &view,
-            gp_enabled,
-            scene_center,
-            scene_min_y,
-            length_scale,
-            gp_height_override,
-            self.ground_plane.shadow_darkness,
-            gp_shadow_mode,
-            gp_reflection_intensity,
-        );
+            // Non-reflection ground plane modes
+            engine.render_ground_plane(
+                &mut encoder,
+                &view,
+                gp_enabled,
+                scene_center,
+                scene_min_y,
+                length_scale,
+                gp_height_override,
+                self.ground_plane.shadow_darkness,
+                gp_shadow_mode,
+                0.0,
+            );
+        }
 
         // Apply tone mapping from HDR to surface (always runs, uses passthrough if disabled)
         engine.render_tone_mapping(&mut encoder, &view);

@@ -114,10 +114,9 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) front_facing: bool) -> @loca
     let half_vec = normalize(light_dir + view_dir);
     let specular = pow(max(dot(normal, half_vec), 0.0), 32.0) * 0.2;
 
-    var final_color = base_color * (ambient + diffuse) + vec3<f32>(specular);
+    let final_color = base_color * (ambient + diffuse) + vec3<f32>(specular);
 
-    // Apply reflection intensity (fade out reflection)
-    final_color *= reflection.intensity;
-
+    // Output with reflection intensity as alpha
+    // Standard alpha blending will do: reflection * intensity + ground * (1 - intensity)
     return vec4<f32>(final_color, reflection.intensity);
 }
