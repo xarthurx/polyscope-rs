@@ -112,8 +112,9 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
         corners[3] = vec4<f32>(base + offset_x - offset_y, 1.0);  // +X -Y
     } else {
         // Perspective: use original infinite vertex technique
-        // Center at ground height (relative to origin, not ground.center)
-        center = vec4<f32>(ground.basis_z.xyz * ground.height, 1.0);
+        // Center at ground height relative to scene center (consistent with orthographic)
+        let base = ground.center.xyz + ground.basis_z.xyz * ground.height;
+        center = vec4<f32>(base, 1.0);
 
         // Corners at infinity (w=0)
         corners[0] = vec4<f32>( ground.basis_x.xyz + ground.basis_y.xyz, 0.0);  // +X +Y
@@ -132,18 +133,9 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
         world_pos = corners[tri_idx];
     }
 
-    // Adjust position by ground height
-    // For perspective (w=0 corners): multiplication by w cancels adjustment (correct - they're directions)
-    // For perspective center (w=1): adjustment applied
-    // For orthographic (all w=1): vertices already at correct height, no extra adjustment needed
-    var adjusted_pos: vec4<f32>;
-    if (ground.is_orthographic == 1u) {
-        // Orthographic vertices are already positioned correctly
-        adjusted_pos = world_pos;
-    } else {
-        // Original Polyscope formula: multiply by w so corners at infinity aren't offset
-        adjusted_pos = world_pos + vec4<f32>(ground.basis_z.xyz, 0.0) * ground.height * world_pos.w;
-    }
+    // Both perspective and orthographic vertices are already positioned at the correct height
+    // (center at ground.center + height, corners either at infinity or at large offsets)
+    let adjusted_pos = world_pos;
 
     out.position = camera.view_proj * adjusted_pos;
     out.pos_world_homog = adjusted_pos;
