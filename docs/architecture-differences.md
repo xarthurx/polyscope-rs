@@ -34,6 +34,34 @@ Since wgpu does not support geometry shaders, we use **instanced rendering**:
 - Potentially better performance on modern GPUs (geometry shaders are often slow)
 - More portable (WebGPU compatible)
 
+## Curve Network Tube Rendering
+
+### C++ Polyscope Approach
+Uses a **geometry shader pipeline** for cylinder impostors:
+
+1. **Vertex Shader**: Passes through cylinder endpoints (tail, tip)
+2. **Geometry Shader**: Expands each edge into a bounding cube (8 corners → 14 vertices as triangle strip)
+3. **Fragment Shader**: Ray-casts against cylinder to find intersection point, computes normal and depth for lighting
+
+### polyscope-rs Approach
+Since wgpu does not support geometry shaders, we use **compute shaders** for geometry generation:
+
+1. **Compute Shader**: Generates bounding box geometry (36 vertices per edge = 12 triangles) from edge endpoints
+2. **Vertex Shader**: Transforms generated box vertices, passes edge ID to fragment shader
+3. **Fragment Shader**: Same ray-cylinder intersection logic as C++ version
+
+**Trade-offs:**
+- Compute shaders are the modern replacement for geometry shaders in WebGPU
+- Explicit geometry buffer management (compute output → vertex input)
+- Better separation of concerns (geometry generation vs. rendering)
+- More flexible for future enhancements (variable radius, caps)
+
+**Features:**
+- Render mode toggle (Lines / Tubes) in UI
+- Proper depth output for correct occlusion
+- Per-edge colors supported
+- Adjustable radius
+
 ## Vector Arrow Rendering
 
 ### C++ Polyscope Approach
@@ -153,7 +181,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 |-----------|--------------|--------------|-------|
 | Point Cloud | ✅ Full | ✅ Full | Complete feature parity |
 | Surface Mesh | ✅ Full | ✅ Basic | Triangles supported, polygons basic |
-| Curve Network | ✅ Full | ✅ Full | Line, loop, segments variants |
+| Curve Network | ✅ Full | ✅ Full | Line, loop, segments; tube rendering via compute shaders |
 | Volume Mesh | ✅ Full | ✅ Basic | Tet/hex cells, no cuts |
 | Volume Grid | ✅ Full | ✅ Basic | Node/cell scalars, basic isosurface |
 | Camera View | ✅ Full | ✅ Full | Frustum visualization |

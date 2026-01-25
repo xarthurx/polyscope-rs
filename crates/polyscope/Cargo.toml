@@ -26,6 +26,7 @@ egui-winit.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+tobj.workspace = true
 
 [[example]]
 name = "surface_mesh_demo"
