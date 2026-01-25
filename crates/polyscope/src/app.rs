@@ -315,6 +315,17 @@ impl App {
                                 engine.camera_buffer(),
                             );
                         }
+                        // Initialize tube resources if not already done
+                        if let Some(rd) = cn.render_data() {
+                            if !rd.has_tube_resources() {
+                                cn.init_tube_resources(
+                                    &engine.device,
+                                    engine.curve_network_tube_compute_bind_group_layout(),
+                                    engine.curve_network_tube_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -783,6 +794,38 @@ impl App {
             GroundPlaneMode::TileReflection => 2u32, // TileReflection also uses tile mode with shadows
         };
 
+        // Compute pass for curve network tubes
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Curve Network Tube Compute Pass"),
+                timestamp_writes: None,
+            });
+
+            compute_pass.set_pipeline(engine.curve_network_tube_compute_pipeline());
+
+            crate::with_context(|ctx| {
+                for structure in ctx.registry.iter() {
+                    if !structure.is_enabled() {
+                        continue;
+                    }
+                    if structure.type_name() == "CurveNetwork" {
+                        if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                            if cn.render_mode() == 1 {
+                                // Tube mode
+                                if let Some(render_data) = cn.render_data() {
+                                    if let Some(compute_bg) = &render_data.compute_bind_group {
+                                        compute_pass.set_bind_group(0, compute_bg, &[]);
+                                        let num_workgroups = (render_data.num_edges + 63) / 64;
+                                        compute_pass.dispatch_workgroups(num_workgroups, 1, 1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         // Main render pass - always render scene to HDR texture
         {
             // All scene content renders to HDR texture for consistent format
@@ -898,7 +941,7 @@ impl App {
                 });
             }
 
-            // Draw curve network edges and camera views
+            // Draw curve network edges (line mode) and camera views
             if let Some(pipeline) = &engine.curve_network_edge_pipeline {
                 render_pass.set_pipeline(pipeline);
 
@@ -909,10 +952,13 @@ impl App {
                         }
                         if structure.type_name() == "CurveNetwork" {
                             if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
-                                if let Some(render_data) = cn.render_data() {
-                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                    // 2 vertices per edge (LineList topology)
-                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                // Only render in line mode (0)
+                                if cn.render_mode() == 0 {
+                                    if let Some(render_data) = cn.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        // 2 vertices per edge (LineList topology)
+                                        render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                    }
                                 }
                             }
                         }
@@ -931,6 +977,37 @@ impl App {
                                     render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                     // 2 vertices per edge (LineList topology)
                                     render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Draw curve network tubes (tube mode)
+            if let Some(pipeline) = &engine.curve_network_tube_pipeline {
+                render_pass.set_pipeline(pipeline);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "CurveNetwork" {
+                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                                // Only render in tube mode (1)
+                                if cn.render_mode() == 1 {
+                                    if let Some(render_data) = cn.render_data() {
+                                        if let (Some(tube_bg), Some(gen_vb)) = (
+                                            &render_data.tube_render_bind_group,
+                                            &render_data.generated_vertex_buffer,
+                                        ) {
+                                            render_pass.set_bind_group(0, tube_bg, &[]);
+                                            render_pass.set_vertex_buffer(0, gen_vb.slice(..));
+                                            // 36 vertices per edge (12 triangles for bounding box)
+                                            render_pass.draw(0..render_data.num_edges * 36, 0..1);
+                                        }
+                                    }
                                 }
                             }
                         }
