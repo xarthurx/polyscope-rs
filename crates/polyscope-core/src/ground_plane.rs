@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum GroundPlaneMode {
     /// No ground plane.
-    #[default]
     None,
     /// Tiled ground plane with subtle grid lines.
+    #[default]
     Tile,
     /// Shadow only (no visible ground plane, just shadows).
     ShadowOnly,
@@ -36,7 +36,7 @@ pub struct GroundPlaneConfig {
 impl Default for GroundPlaneConfig {
     fn default() -> Self {
         Self {
-            mode: GroundPlaneMode::None,
+            mode: GroundPlaneMode::Tile,
             height: 0.0,
             height_is_relative: true,
             shadow_blur_iters: 2,
@@ -53,13 +53,13 @@ mod tests {
     #[test]
     fn test_ground_plane_mode_default() {
         let mode = GroundPlaneMode::default();
-        assert_eq!(mode, GroundPlaneMode::None);
+        assert_eq!(mode, GroundPlaneMode::Tile);
     }
 
     #[test]
     fn test_ground_plane_config_default() {
         let config = GroundPlaneConfig::default();
-        assert_eq!(config.mode, GroundPlaneMode::None);
+        assert_eq!(config.mode, GroundPlaneMode::Tile);
         assert_eq!(config.height, 0.0);
         assert!(config.height_is_relative);
     }

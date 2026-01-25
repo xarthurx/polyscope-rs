@@ -216,7 +216,8 @@ impl Camera {
             ProjectionMode::Orthographic => {
                 // For orthographic, adjust the scale (smaller = zoom in, larger = zoom out)
                 // delta > 0 means zoom in (scroll up), so decrease scale
-                let zoom_factor = 1.0 - delta * 0.1;
+                // Use a proportional factor based on current scale for consistent feel
+                let zoom_factor = 1.0 - delta * 0.2;
                 self.ortho_scale = (self.ortho_scale * zoom_factor).clamp(0.01, 1000.0);
             }
         }
@@ -226,11 +227,17 @@ impl Camera {
     pub fn look_at_box(&mut self, min: Vec3, max: Vec3) {
         let center = (min + max) * 0.5;
         let size = (max - min).length();
+        let extents = max - min;
 
         self.target = center;
         self.position = center + Vec3::new(0.0, 0.0, size * 1.5);
         self.near = size * 0.001;
         self.far = size * 100.0;
+
+        // Set ortho_scale to fit the model in view
+        // Use the larger of height or width/aspect_ratio to ensure model fits
+        let half_height = extents.y.max(extents.x / self.aspect_ratio) * 0.6;
+        self.ortho_scale = half_height.max(0.1);
     }
 
     /// Sets the navigation style.
