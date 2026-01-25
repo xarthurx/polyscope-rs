@@ -425,12 +425,13 @@ impl CurveNetwork {
 
         render_data.update_uniforms(queue, &uniforms);
 
-        // Update node sphere uniforms for tube mode (same radius and color as edges)
+        // Update node sphere uniforms for tube mode (slightly larger than tube radius to fill gaps)
         if self.render_mode == 1 && render_data.has_node_render_resources() {
             let model_matrix = self.transform.to_cols_array_2d();
             let node_uniforms = PointUniforms {
                 model_matrix,
-                point_radius: self.radius,
+                // Make spheres slightly larger than tubes to ensure they fill gaps at joints
+                point_radius: self.radius * 1.02,
                 use_per_point_color: 0, // Use base color
                 _padding: [0.0; 2],
                 base_color: [self.color.x, self.color.y, self.color.z, 1.0],
