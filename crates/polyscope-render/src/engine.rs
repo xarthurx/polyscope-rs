@@ -1,5 +1,6 @@
 //! The main rendering engine.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use wgpu::util::DeviceExt;
@@ -103,6 +104,14 @@ pub struct RenderEngine {
     shadow_map_pass: Option<ShadowMapPass>,
     /// Reflection pass for ground plane reflections.
     reflection_pass: Option<crate::reflection_pass::ReflectionPass>,
+
+    // Pick system - structure ID management
+    /// Map from (type_name, name) to structure pick ID.
+    structure_id_map: HashMap<(String, String), u16>,
+    /// Reverse map from structure pick ID to (type_name, name).
+    structure_id_reverse: HashMap<u16, (String, String)>,
+    /// Next available structure ID (0 is reserved for background).
+    next_structure_id: u16,
 }
 
 impl RenderEngine {
@@ -315,6 +324,9 @@ impl RenderEngine {
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             reflection_pass: None,
+            structure_id_map: HashMap::new(),
+            structure_id_reverse: HashMap::new(),
+            next_structure_id: 1, // 0 is reserved for background
         };
 
         engine.init_point_pipeline();
@@ -521,6 +533,9 @@ impl RenderEngine {
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             reflection_pass: None,
+            structure_id_map: HashMap::new(),
+            structure_id_reverse: HashMap::new(),
+            next_structure_id: 1, // 0 is reserved for background
         };
 
         engine.init_point_pipeline();
@@ -1467,5 +1482,41 @@ impl RenderEngine {
         if let Some(reflection) = &self.reflection_pass {
             reflection.update_uniforms(&self.queue, reflection_matrix, intensity, ground_height);
         }
+    }
+
+    // ========== Pick System - Structure ID Management ==========
+
+    /// Assigns a unique pick ID to a structure. Returns the assigned ID.
+    pub fn assign_structure_id(&mut self, type_name: &str, name: &str) -> u16 {
+        let key = (type_name.to_string(), name.to_string());
+        if let Some(&id) = self.structure_id_map.get(&key) {
+            return id;
+        }
+        let id = self.next_structure_id;
+        self.next_structure_id += 1;
+        self.structure_id_map.insert(key.clone(), id);
+        self.structure_id_reverse.insert(id, key);
+        id
+    }
+
+    /// Removes a structure's pick ID.
+    pub fn remove_structure_id(&mut self, type_name: &str, name: &str) {
+        let key = (type_name.to_string(), name.to_string());
+        if let Some(id) = self.structure_id_map.remove(&key) {
+            self.structure_id_reverse.remove(&id);
+        }
+    }
+
+    /// Looks up structure info from a pick ID.
+    pub fn lookup_structure_id(&self, id: u16) -> Option<(&str, &str)> {
+        self.structure_id_reverse
+            .get(&id)
+            .map(|(t, n)| (t.as_str(), n.as_str()))
+    }
+
+    /// Gets the pick ID for a structure, if assigned.
+    pub fn get_structure_id(&self, type_name: &str, name: &str) -> Option<u16> {
+        let key = (type_name.to_string(), name.to_string());
+        self.structure_id_map.get(&key).copied()
     }
 }
