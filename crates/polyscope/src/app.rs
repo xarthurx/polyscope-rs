@@ -669,6 +669,13 @@ impl App {
 
         // Render transform gizmo if visible and something is selected
         if self.gizmo_settings.visible && self.selection_info.has_selection {
+            // Check if pointer is over the left UI panel - skip gizmo interaction to prevent
+            // interfering with panel widgets (causes blinking/flickering otherwise)
+            const LEFT_PANEL_WIDTH: f32 = 320.0;
+            let pointer_over_ui = egui.context.input(|i| {
+                i.pointer.hover_pos().map_or(false, |pos| pos.x <= LEFT_PANEL_WIDTH)
+            });
+
             // Get camera matrices from engine - MUST match what's used for 3D rendering
             let view_matrix = engine.camera.view_matrix();
             let projection_matrix = engine.camera.projection_matrix();
@@ -696,6 +703,11 @@ impl App {
                 .show(&egui.context, |ui| {
                     // Set the clip rect to full window
                     ui.set_clip_rect(full_window_viewport);
+
+                    // Skip gizmo interaction when pointer is over UI panel to prevent flickering
+                    if pointer_over_ui {
+                        return;
+                    }
 
                     if let Some(new_transform) = self.transform_gizmo.interact(
                         ui,
