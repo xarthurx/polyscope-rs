@@ -110,6 +110,10 @@ pub struct RenderEngine {
     tone_map_pass: Option<ToneMapPass>,
     /// Shadow map pass for ground plane shadows.
     shadow_map_pass: Option<ShadowMapPass>,
+    /// Shadow render pipeline (depth-only, renders objects from light's perspective).
+    shadow_pipeline: Option<wgpu::RenderPipeline>,
+    /// Shadow bind group layout for shadow pass rendering.
+    shadow_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Reflection pass for ground plane reflections.
     reflection_pass: Option<crate::reflection_pass::ReflectionPass>,
 
@@ -353,6 +357,8 @@ impl RenderEngine {
             hdr_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
+            shadow_pipeline: None,
+            shadow_bind_group_layout: None,
             reflection_pass: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
@@ -372,6 +378,7 @@ impl RenderEngine {
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
         engine.create_curve_network_tube_pipelines();
+        engine.create_shadow_pipeline();
         engine.init_tone_mapping();
         engine.init_reflection_pass();
         engine.init_pick_pipeline();
@@ -576,6 +583,8 @@ impl RenderEngine {
             hdr_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
+            shadow_pipeline: None,
+            shadow_bind_group_layout: None,
             reflection_pass: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
@@ -595,6 +604,7 @@ impl RenderEngine {
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
         engine.create_curve_network_tube_pipelines();
+        engine.create_shadow_pipeline();
         engine.init_tone_mapping();
         engine.init_reflection_pass();
         engine.init_pick_pipeline();
@@ -1467,6 +1477,123 @@ impl RenderEngine {
         self.curve_network_tube_compute_pipeline
             .as_ref()
             .expect("Tube compute pipeline not initialized")
+    }
+
+    /// Creates the shadow render pipeline (depth-only, for rendering objects from light's perspective).
+    fn create_shadow_pipeline(&mut self) {
+        let shader_source = include_str!("shaders/shadow_map.wgsl");
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Shadow Map Shader"),
+                source: wgpu::ShaderSource::Wgsl(shader_source.into()),
+            });
+
+        // Bind group layout matching shadow_map.wgsl:
+        // binding 0: light uniforms (view_proj, light_dir)
+        // binding 1: model uniforms (model matrix)
+        // binding 2: vertex positions (storage buffer)
+        let bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Shadow Bind Group Layout"),
+                    entries: &[
+                        // Light uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Model uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Vertex positions (storage buffer)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout =
+            self.device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Shadow Pipeline Layout"),
+                    bind_group_layouts: &[&bind_group_layout],
+                    push_constant_ranges: &[],
+                });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Shadow Render Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[], // Depth-only, no color attachments
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState {
+                        constant: 2,     // Bias to prevent shadow acne
+                        slope_scale: 2.0,
+                        clamp: 0.0,
+                    },
+                }),
+                multisample: wgpu::MultisampleState::default(), // No MSAA for shadow map
+                multiview: None,
+                cache: None,
+            });
+
+        self.shadow_pipeline = Some(pipeline);
+        self.shadow_bind_group_layout = Some(bind_group_layout);
+    }
+
+    /// Gets the shadow render pipeline.
+    pub fn shadow_pipeline(&self) -> Option<&wgpu::RenderPipeline> {
+        self.shadow_pipeline.as_ref()
+    }
+
+    /// Gets the shadow bind group layout.
+    pub fn shadow_bind_group_layout(&self) -> Option<&wgpu::BindGroupLayout> {
+        self.shadow_bind_group_layout.as_ref()
     }
 
     /// Renders the ground plane.
