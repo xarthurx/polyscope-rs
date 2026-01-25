@@ -1733,4 +1733,69 @@ impl RenderEngine {
             .as_ref()
             .expect("pick pipeline not initialized")
     }
+
+    /// Reads the pick buffer at (x, y) and returns the decoded structure/element.
+    ///
+    /// Returns None if picking system not initialized or coordinates out of bounds.
+    /// Returns Some((0, 0)) for background clicks.
+    pub fn pick_at(&self, x: u32, y: u32) -> Option<(u16, u16)> {
+        let pick_texture = self.pick_texture.as_ref()?;
+        let staging_buffer = self.pick_staging_buffer.as_ref()?;
+
+        // Bounds check
+        let (width, height) = self.pick_buffer_size;
+        if x >= width || y >= height {
+            return None;
+        }
+
+        // Create encoder for copy operation
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Pick Readback Encoder"),
+            });
+
+        // Copy single pixel from pick texture to staging buffer
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: pick_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d { x, y, z: 0 },
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: staging_buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(256), // Aligned
+                    rows_per_image: Some(1),
+                },
+            },
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        // Map buffer and read pixel
+        let buffer_slice = staging_buffer.slice(..4);
+        let (tx, rx) = std::sync::mpsc::channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send(result).unwrap();
+        });
+
+        let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
+        rx.recv().unwrap().ok()?;
+
+        let data = buffer_slice.get_mapped_range();
+        let pixel: [u8; 4] = [data[0], data[1], data[2], data[3]];
+        drop(data);
+        staging_buffer.unmap();
+
+        let (struct_id, elem_id) = crate::pick::decode_pick_id(pixel[0], pixel[1], pixel[2]);
+        Some((struct_id, elem_id))
+    }
 }
