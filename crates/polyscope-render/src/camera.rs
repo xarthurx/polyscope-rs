@@ -70,6 +70,51 @@ impl AxisDirection {
             AxisDirection::NegZ => "-Z",
         }
     }
+
+    /// Returns the corresponding front direction for this up direction.
+    /// Follows right-hand coordinate system conventions:
+    /// - +Y up → -Z front (standard graphics convention)
+    /// - -Y up → +Z front
+    /// - +Z up → +X front (CAD/engineering convention)
+    /// - -Z up → -X front
+    /// - +X up → +Y front
+    /// - -X up → -Y front
+    pub fn default_front_direction(self) -> AxisDirection {
+        match self {
+            AxisDirection::PosY => AxisDirection::NegZ,
+            AxisDirection::NegY => AxisDirection::PosZ,
+            AxisDirection::PosZ => AxisDirection::PosX,
+            AxisDirection::NegZ => AxisDirection::NegX,
+            AxisDirection::PosX => AxisDirection::PosY,
+            AxisDirection::NegX => AxisDirection::NegY,
+        }
+    }
+
+    /// Converts from a u32 index (used in UI) to AxisDirection.
+    /// Order: 0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z
+    pub fn from_index(index: u32) -> Self {
+        match index {
+            0 => AxisDirection::PosX,
+            1 => AxisDirection::NegX,
+            2 => AxisDirection::PosY,
+            3 => AxisDirection::NegY,
+            4 => AxisDirection::PosZ,
+            5 => AxisDirection::NegZ,
+            _ => AxisDirection::PosY, // Default
+        }
+    }
+
+    /// Converts to a u32 index (used in UI).
+    pub fn to_index(self) -> u32 {
+        match self {
+            AxisDirection::PosX => 0,
+            AxisDirection::NegX => 1,
+            AxisDirection::PosY => 2,
+            AxisDirection::NegY => 3,
+            AxisDirection::PosZ => 4,
+            AxisDirection::NegZ => 5,
+        }
+    }
 }
 
 /// A 3D camera for viewing the scene.
@@ -250,10 +295,12 @@ impl Camera {
         self.projection_mode = mode;
     }
 
-    /// Sets the up direction and updates the up vector.
+    /// Sets the up direction and updates both the up vector and front direction.
+    /// The front direction is automatically derived using right-hand coordinate conventions.
     pub fn set_up_direction(&mut self, direction: AxisDirection) {
         self.up_direction = direction;
         self.up = direction.to_vec3();
+        self.front_direction = direction.default_front_direction();
     }
 
     /// Sets the movement speed.

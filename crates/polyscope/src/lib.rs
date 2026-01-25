@@ -1609,15 +1609,7 @@ pub fn apply_camera_settings(
         4 => AxisDirection::PosZ,
         _ => AxisDirection::NegZ,
     });
-
-    camera.front_direction = match settings.front_direction {
-        0 => AxisDirection::PosX,
-        1 => AxisDirection::NegX,
-        2 => AxisDirection::PosY,
-        3 => AxisDirection::NegY,
-        4 => AxisDirection::PosZ,
-        _ => AxisDirection::NegZ,
-    };
+    // Note: front_direction is now auto-derived by set_up_direction()
 
     camera.set_fov_degrees(settings.fov_degrees);
     camera.set_near(settings.near);
@@ -1650,14 +1642,7 @@ pub fn camera_to_settings(camera: &polyscope_render::Camera) -> polyscope_ui::Ca
             AxisDirection::PosZ => 4,
             AxisDirection::NegZ => 5,
         },
-        front_direction: match camera.front_direction {
-            AxisDirection::PosX => 0,
-            AxisDirection::NegX => 1,
-            AxisDirection::PosY => 2,
-            AxisDirection::NegY => 3,
-            AxisDirection::PosZ => 4,
-            AxisDirection::NegZ => 5,
-        },
+        // Note: front_direction is auto-derived from up_direction
         fov_degrees: camera.fov_degrees(),
         near: camera.near,
         far: camera.far,

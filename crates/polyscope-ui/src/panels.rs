@@ -10,9 +10,8 @@ pub struct CameraSettings {
     /// Projection mode (0=Perspective, 1=Orthographic)
     pub projection_mode: u32,
     /// Up direction (0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z)
+    /// Note: Front direction is automatically derived using right-hand coordinate conventions.
     pub up_direction: u32,
-    /// Front direction
-    pub front_direction: u32,
     /// Field of view in degrees
     pub fov_degrees: f32,
     /// Near clip plane
@@ -30,8 +29,7 @@ impl Default for CameraSettings {
         Self {
             navigation_style: 0, // Turntable
             projection_mode: 0,  // Perspective
-            up_direction: 2,     // +Y
-            front_direction: 5,  // -Z
+            up_direction: 2,     // +Y (front direction auto-derived as -Z)
             fov_degrees: 45.0,
             near: 0.01,
             far: 1000.0,
@@ -726,8 +724,11 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
 
             ui.separator();
 
-            // Up direction
+            // Up direction (front direction is auto-derived using right-hand rule)
             let directions = ["+X", "-X", "+Y", "-Y", "+Z", "-Z"];
+            // Front directions corresponding to each up direction (right-hand rule)
+            let front_for_up = ["+Y", "-Y", "-Z", "+Z", "+X", "-X"];
+
             egui::ComboBox::from_label("Up")
                 .selected_text(directions[settings.up_direction as usize])
                 .show_ui(ui, |ui| {
@@ -741,19 +742,12 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                     }
                 });
 
-            // Front direction
-            egui::ComboBox::from_label("Front")
-                .selected_text(directions[settings.front_direction as usize])
-                .show_ui(ui, |ui| {
-                    for (i, name) in directions.iter().enumerate() {
-                        if ui
-                            .selectable_value(&mut settings.front_direction, i as u32, *name)
-                            .changed()
-                        {
-                            changed = true;
-                        }
-                    }
-                });
+            // Show the auto-derived front direction (read-only)
+            ui.horizontal(|ui| {
+                ui.label("Front:");
+                ui.label(front_for_up[settings.up_direction as usize]);
+                ui.label("(auto)");
+            });
 
             ui.separator();
 
