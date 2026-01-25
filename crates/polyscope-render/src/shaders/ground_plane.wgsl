@@ -132,10 +132,17 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
         world_pos = corners[tri_idx];
     }
 
-    // Adjust position by ground height (only for infinite vertices with w=0)
-    var adjusted_pos = world_pos;
-    if (world_pos.w == 0.0) {
-        adjusted_pos = world_pos + vec4<f32>(ground.basis_z.xyz, 0.0) * ground.height;
+    // Adjust position by ground height
+    // For perspective (w=0 corners): multiplication by w cancels adjustment (correct - they're directions)
+    // For perspective center (w=1): adjustment applied
+    // For orthographic (all w=1): vertices already at correct height, no extra adjustment needed
+    var adjusted_pos: vec4<f32>;
+    if (ground.is_orthographic == 1u) {
+        // Orthographic vertices are already positioned correctly
+        adjusted_pos = world_pos;
+    } else {
+        // Original Polyscope formula: multiply by w so corners at infinity aren't offset
+        adjusted_pos = world_pos + vec4<f32>(ground.basis_z.xyz, 0.0) * ground.height * world_pos.w;
     }
 
     out.position = camera.view_proj * adjusted_pos;

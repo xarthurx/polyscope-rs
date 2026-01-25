@@ -6,7 +6,7 @@ use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{ColorMapRegistry, CurveNetworkRenderData, CurveNetworkUniforms};
+use polyscope_render::{ColorMapRegistry, CurveNetworkRenderData, CurveNetworkUniforms, PointUniforms};
 
 pub use quantities::*;
 
@@ -393,6 +393,22 @@ impl CurveNetwork {
         }
     }
 
+    /// Initializes node sphere rendering resources for tube mode joints.
+    pub fn init_node_render_resources(
+        &mut self,
+        device: &wgpu::Device,
+        point_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+    ) {
+        if let Some(render_data) = &mut self.render_data {
+            render_data.init_node_render_resources(
+                device,
+                point_bind_group_layout,
+                camera_buffer,
+            );
+        }
+    }
+
     /// Updates GPU buffers based on current state.
     pub fn update_gpu_buffers(&self, queue: &wgpu::Queue, color_maps: &ColorMapRegistry) {
         let Some(render_data) = &self.render_data else {
@@ -408,6 +424,23 @@ impl CurveNetwork {
         };
 
         render_data.update_uniforms(queue, &uniforms);
+
+        // Update node sphere uniforms for tube mode (same radius and color as edges)
+        if self.render_mode == 1 && render_data.has_node_render_resources() {
+            let node_uniforms = PointUniforms {
+                model_matrix: [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [0.0, 0.0, 0.0, 1.0],
+                ],
+                point_radius: self.radius,
+                use_per_point_color: 0, // Use base color
+                _padding: [0.0; 2],
+                base_color: [self.color.x, self.color.y, self.color.z, 1.0],
+            };
+            render_data.update_node_uniforms(queue, &node_uniforms);
+        }
 
         // Apply node color quantities
         if let Some(color_q) = self.active_node_color_quantity() {

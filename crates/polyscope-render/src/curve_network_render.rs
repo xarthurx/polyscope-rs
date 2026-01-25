@@ -3,6 +3,8 @@
 use glam::Vec3;
 use wgpu::util::DeviceExt;
 
+use crate::point_cloud_render::PointUniforms;
+
 /// Uniforms for curve network rendering.
 /// Layout must match WGSL CurveNetworkUniforms exactly (32 bytes).
 #[repr(C)]
@@ -64,6 +66,12 @@ pub struct CurveNetworkRenderData {
     pub compute_bind_group: Option<wgpu::BindGroup>,
     /// Bind group for tube render shader.
     pub tube_render_bind_group: Option<wgpu::BindGroup>,
+
+    // Node sphere rendering resources (for tube mode joint filling)
+    /// Uniform buffer for node sphere rendering (matches PointUniforms).
+    pub node_uniform_buffer: Option<wgpu::Buffer>,
+    /// Bind group for node sphere rendering (uses point pipeline).
+    pub node_render_bind_group: Option<wgpu::BindGroup>,
 }
 
 impl CurveNetworkRenderData {
@@ -188,6 +196,8 @@ impl CurveNetworkRenderData {
             num_edges_buffer: None,
             compute_bind_group: None,
             tube_render_bind_group: None,
+            node_uniform_buffer: None,
+            node_render_bind_group: None,
         }
     }
 
@@ -272,6 +282,62 @@ impl CurveNetworkRenderData {
     /// Returns whether tube resources are initialized.
     pub fn has_tube_resources(&self) -> bool {
         self.generated_vertex_buffer.is_some()
+    }
+
+    /// Initializes node sphere rendering resources for tube mode.
+    /// Uses the point pipeline to render spheres at each node to fill gaps at joints.
+    pub fn init_node_render_resources(
+        &mut self,
+        device: &wgpu::Device,
+        point_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+    ) {
+        // Create uniform buffer matching PointUniforms structure
+        let uniforms = PointUniforms::default();
+        let node_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Curve Network Node Uniforms"),
+            contents: bytemuck::cast_slice(&[uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        // Create bind group matching point pipeline layout
+        let node_render_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Curve Network Node Render Bind Group"),
+            layout: point_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: node_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.node_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.node_color_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        self.node_uniform_buffer = Some(node_uniform_buffer);
+        self.node_render_bind_group = Some(node_render_bind_group);
+    }
+
+    /// Returns whether node render resources are initialized.
+    pub fn has_node_render_resources(&self) -> bool {
+        self.node_render_bind_group.is_some()
+    }
+
+    /// Updates node sphere uniforms (radius, color, etc.).
+    pub fn update_node_uniforms(&self, queue: &wgpu::Queue, uniforms: &PointUniforms) {
+        if let Some(buffer) = &self.node_uniform_buffer {
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[*uniforms]));
+        }
     }
 
     /// Updates the uniform buffer.

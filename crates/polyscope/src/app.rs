@@ -315,16 +315,26 @@ impl App {
                                 engine.camera_buffer(),
                             );
                         }
+                        // Check what needs initialization
+                        let needs_tube = cn.render_data().map_or(false, |rd| !rd.has_tube_resources());
+                        let needs_node = cn.render_data().map_or(false, |rd| !rd.has_node_render_resources());
+
                         // Initialize tube resources if not already done
-                        if let Some(rd) = cn.render_data() {
-                            if !rd.has_tube_resources() {
-                                cn.init_tube_resources(
-                                    &engine.device,
-                                    engine.curve_network_tube_compute_bind_group_layout(),
-                                    engine.curve_network_tube_bind_group_layout(),
-                                    engine.camera_buffer(),
-                                );
-                            }
+                        if needs_tube {
+                            cn.init_tube_resources(
+                                &engine.device,
+                                engine.curve_network_tube_compute_bind_group_layout(),
+                                engine.curve_network_tube_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                        // Initialize node render resources for sphere joints
+                        if needs_node {
+                            cn.init_node_render_resources(
+                                &engine.device,
+                                engine.point_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
                         }
                     }
                 }
@@ -1006,6 +1016,33 @@ impl App {
                                             render_pass.set_vertex_buffer(0, gen_vb.slice(..));
                                             // 36 vertices per edge (12 triangles for bounding box)
                                             render_pass.draw(0..render_data.num_edges * 36, 0..1);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Draw curve network node spheres (tube mode - fills gaps at joints)
+            if let Some(pipeline) = &engine.point_pipeline {
+                render_pass.set_pipeline(pipeline);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "CurveNetwork" {
+                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                                // Only render node spheres in tube mode (1)
+                                if cn.render_mode() == 1 {
+                                    if let Some(render_data) = cn.render_data() {
+                                        if let Some(node_bg) = &render_data.node_render_bind_group {
+                                            render_pass.set_bind_group(0, node_bg, &[]);
+                                            // 6 vertices per quad, num_nodes instances
+                                            render_pass.draw(0..6, 0..render_data.num_nodes);
                                         }
                                     }
                                 }
