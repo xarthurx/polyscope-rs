@@ -66,6 +66,8 @@ pub struct App {
     transform_gizmo: polyscope_ui::TransformGizmo,
     // Tone mapping settings
     tone_mapping_settings: polyscope_ui::ToneMappingSettings,
+    // Whether the camera has been auto-fitted to the scene
+    camera_fitted: bool,
 }
 
 impl App {
@@ -99,6 +101,7 @@ impl App {
             selection_info: polyscope_ui::SelectionInfo::default(),
             transform_gizmo: polyscope_ui::TransformGizmo::new(),
             tone_mapping_settings: polyscope_ui::ToneMappingSettings::default(),
+            camera_fitted: false,
         }
     }
 
@@ -250,6 +253,23 @@ impl App {
             return;
         }
 
+        // Auto-fit camera to scene on first render with structures
+        if !self.camera_fitted {
+            let (has_structures, bbox) = crate::with_context(|ctx| {
+                let has_structures = ctx.registry.len() > 0;
+                (has_structures, ctx.bounding_box)
+            });
+
+            if has_structures {
+                let (min, max) = bbox;
+                // Only fit if bounding box is valid (not default zeros or infinities)
+                if min.x.is_finite() && max.x.is_finite() && (max - min).length() > 0.0 {
+                    engine.camera.look_at_box(min, max);
+                    self.camera_fitted = true;
+                }
+            }
+        }
+
         // Update camera uniforms
         engine.update_camera_uniforms();
 
@@ -302,6 +322,18 @@ impl App {
                                 engine.mesh_bind_group_layout(),
                                 engine.camera_buffer(),
                             );
+                        }
+                        // Initialize shadow resources if render data exists but shadow doesn't
+                        if mesh.render_data().is_some() && !mesh.has_shadow_resources() {
+                            if let (Some(shadow_layout), Some(shadow_pass)) =
+                                (engine.shadow_bind_group_layout(), engine.shadow_map_pass())
+                            {
+                                mesh.init_shadow_resources(
+                                    &engine.device,
+                                    shadow_layout,
+                                    shadow_pass.light_buffer(),
+                                );
+                            }
                         }
                     }
                 }
@@ -834,6 +866,50 @@ impl App {
                     }
                 }
             });
+        }
+
+        // Shadow pass - render scene objects from light's perspective to shadow map
+        if let (Some(shadow_pipeline), Some(shadow_map_pass)) =
+            (engine.shadow_pipeline(), engine.shadow_map_pass())
+        {
+            // Compute light matrix from scene bounds
+            let (scene_center, scene_radius) = crate::with_context(|ctx| {
+                (ctx.center(), ctx.length_scale * 2.0)
+            });
+            let light_dir = glam::Vec3::new(0.5, -1.0, 0.3).normalize();
+            let light_matrix = polyscope_render::ShadowMapPass::compute_light_matrix(
+                scene_center,
+                scene_radius,
+                light_dir,
+            );
+
+            // Update light uniforms
+            shadow_map_pass.update_light(&engine.queue, light_matrix, light_dir);
+
+            // Begin shadow pass
+            {
+                let mut shadow_pass = shadow_map_pass.begin_shadow_pass(&mut encoder);
+                shadow_pass.set_pipeline(shadow_pipeline);
+
+                // Render shadow-casting structures (SurfaceMesh only for now)
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                if let Some(shadow_bg) = mesh.shadow_bind_group() {
+                                    shadow_pass.set_bind_group(0, shadow_bg, &[]);
+                                    if let Some(rd) = mesh.render_data() {
+                                        shadow_pass.draw(0..rd.num_vertices(), 0..1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
         }
 
         // Main render pass - always render scene to HDR texture
@@ -1557,7 +1633,16 @@ impl ApplicationHandler for App {
                         winit::event::MouseScrollDelta::LineDelta(_, y) => y,
                         winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32 * 0.1,
                     };
-                    let scale = engine.camera.position.distance(engine.camera.target) * 0.1;
+                    // Scale zoom delta based on projection mode
+                    let scale = match engine.camera.projection_mode {
+                        polyscope_render::ProjectionMode::Perspective => {
+                            engine.camera.position.distance(engine.camera.target) * 0.1
+                        }
+                        polyscope_render::ProjectionMode::Orthographic => {
+                            // For orthographic, scale based on current ortho_scale
+                            engine.camera.ortho_scale * 0.5
+                        }
+                    };
                     engine.camera.zoom(scroll * scale);
                 }
             }
