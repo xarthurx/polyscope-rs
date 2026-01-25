@@ -1798,4 +1798,48 @@ impl RenderEngine {
         let (struct_id, elem_id) = crate::pick::decode_pick_id(pixel[0], pixel[1], pixel[2]);
         Some((struct_id, elem_id))
     }
+
+    /// Returns the pick texture view for external rendering.
+    pub fn pick_texture_view(&self) -> Option<&wgpu::TextureView> {
+        self.pick_texture_view.as_ref()
+    }
+
+    /// Returns the pick depth texture view for external rendering.
+    pub fn pick_depth_view(&self) -> Option<&wgpu::TextureView> {
+        self.pick_depth_view.as_ref()
+    }
+
+    /// Begins a pick render pass. Returns the render pass encoder.
+    ///
+    /// The caller is responsible for rendering structures to this pass
+    /// and then dropping the encoder to finish the pass.
+    pub fn begin_pick_pass<'a>(
+        &'a self,
+        encoder: &'a mut wgpu::CommandEncoder,
+    ) -> Option<wgpu::RenderPass<'a>> {
+        let pick_view = self.pick_texture_view.as_ref()?;
+        let pick_depth = self.pick_depth_view.as_ref()?;
+
+        Some(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Pick Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: pick_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), // Background = (0,0,0)
+                    store: wgpu::StoreOp::Store,
+                },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: pick_depth,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            ..Default::default()
+        }))
+    }
 }
