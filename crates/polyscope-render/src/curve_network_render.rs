@@ -54,6 +54,16 @@ pub struct CurveNetworkRenderData {
     pub num_nodes: u32,
     /// Number of edges.
     pub num_edges: u32,
+
+    // Tube rendering resources
+    /// Generated vertex buffer from compute shader (36 vertices per edge).
+    pub generated_vertex_buffer: Option<wgpu::Buffer>,
+    /// Buffer containing num_edges as uniform.
+    pub num_edges_buffer: Option<wgpu::Buffer>,
+    /// Bind group for tube compute shader.
+    pub compute_bind_group: Option<wgpu::BindGroup>,
+    /// Bind group for tube render shader.
+    pub tube_render_bind_group: Option<wgpu::BindGroup>,
 }
 
 impl CurveNetworkRenderData {
@@ -88,8 +98,8 @@ impl CurveNetworkRenderData {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
-        // Create node color buffer (default white)
-        let node_color_data: Vec<f32> = vec![1.0; node_positions.len() * 4];
+        // Create node color buffer (default zero - shader uses base color when zero)
+        let node_color_data: Vec<f32> = vec![0.0; node_positions.len() * 4];
         let node_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("curve network node colors"),
             contents: bytemuck::cast_slice(&node_color_data),
@@ -110,8 +120,8 @@ impl CurveNetworkRenderData {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
-        // Create edge color buffer (default white)
-        let edge_color_data: Vec<f32> = vec![1.0; edge_tail_inds.len() * 4];
+        // Create edge color buffer (default zero - shader uses base color when zero)
+        let edge_color_data: Vec<f32> = vec![0.0; edge_tail_inds.len() * 4];
         let edge_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("curve network edge colors"),
             contents: bytemuck::cast_slice(&edge_color_data),
@@ -174,7 +184,94 @@ impl CurveNetworkRenderData {
             bind_group,
             num_nodes,
             num_edges,
+            generated_vertex_buffer: None,
+            num_edges_buffer: None,
+            compute_bind_group: None,
+            tube_render_bind_group: None,
         }
+    }
+
+    /// Initializes tube rendering resources.
+    pub fn init_tube_resources(
+        &mut self,
+        device: &wgpu::Device,
+        compute_bind_group_layout: &wgpu::BindGroupLayout,
+        render_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+    ) {
+        // Create generated vertex buffer (36 vertices per edge, 32 bytes per vertex)
+        let vertex_buffer_size = (self.num_edges as usize * 36 * 32) as u64;
+        let generated_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Curve Network Generated Vertices"),
+            size: vertex_buffer_size.max(32), // Minimum size
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::VERTEX,
+            mapped_at_creation: false,
+        });
+
+        // Create num_edges uniform buffer
+        let num_edges_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Curve Network Num Edges"),
+            contents: bytemuck::cast_slice(&[self.num_edges]),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+
+        // Create compute bind group
+        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Curve Network Tube Compute Bind Group"),
+            layout: compute_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.edge_vertex_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: generated_vertex_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: num_edges_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        // Create render bind group
+        let tube_render_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Curve Network Tube Render Bind Group"),
+            layout: render_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.edge_vertex_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.edge_color_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        self.generated_vertex_buffer = Some(generated_vertex_buffer);
+        self.num_edges_buffer = Some(num_edges_buffer);
+        self.compute_bind_group = Some(compute_bind_group);
+        self.tube_render_bind_group = Some(tube_render_bind_group);
+    }
+
+    /// Returns whether tube resources are initialized.
+    pub fn has_tube_resources(&self) -> bool {
+        self.generated_vertex_buffer.is_some()
     }
 
     /// Updates the uniform buffer.
