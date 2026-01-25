@@ -87,8 +87,8 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
-    // Clip pixels below ground plane (reflected geometry should not poke through)
-    if (in.world_position.y < reflection.ground_height) {
+    // Clip pixels above ground plane (reflected geometry should not poke through)
+    if (in.world_position.y > reflection.ground_height) {
         discard;
     }
 
