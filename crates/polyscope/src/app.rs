@@ -398,7 +398,7 @@ impl App {
 
                 if structure.type_name() == "SurfaceMesh" {
                     if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                        mesh.update_gpu_buffers(&engine.queue);
+                        mesh.update_gpu_buffers(&engine.queue, &engine.color_maps);
                     }
                 }
 
@@ -698,7 +698,7 @@ impl App {
                                         }
                                     } else if type_name == "SurfaceMesh" {
                                         if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                            mesh.update_gpu_buffers(&engine.queue);
+                                            mesh.update_gpu_buffers(&engine.queue, &engine.color_maps);
                                         }
                                     }
                                 }

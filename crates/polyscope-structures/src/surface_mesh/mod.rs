@@ -7,7 +7,7 @@ use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{MeshUniforms, SurfaceMeshRenderData};
+use polyscope_render::{ColorMapRegistry, MeshUniforms, SurfaceMeshRenderData};
 use std::ops::Range;
 
 /// Shading style for surface mesh rendering.
@@ -571,6 +571,48 @@ impl SurfaceMesh {
         None
     }
 
+    /// Returns the currently active face scalar quantity, if any.
+    pub fn active_face_scalar_quantity(&self) -> Option<&MeshFaceScalarQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
+                if let Some(sq) = q.as_any().downcast_ref::<MeshFaceScalarQuantity>() {
+                    return Some(sq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active vertex color quantity, if any.
+    pub fn active_vertex_color_quantity(&self) -> Option<&MeshVertexColorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Color {
+                if let Some(cq) = q.as_any().downcast_ref::<MeshVertexColorQuantity>() {
+                    return Some(cq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active face color quantity, if any.
+    pub fn active_face_color_quantity(&self) -> Option<&MeshFaceColorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Color {
+                if let Some(cq) = q.as_any().downcast_ref::<MeshFaceColorQuantity>() {
+                    return Some(cq);
+                }
+            }
+        }
+        None
+    }
+
     /// Adds a face scalar quantity to this mesh.
     pub fn add_face_scalar_quantity(
         &mut self,
@@ -641,7 +683,7 @@ impl SurfaceMesh {
     }
 
     /// Updates GPU buffers with current mesh settings.
-    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
+    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue, color_maps: &ColorMapRegistry) {
         let Some(render_data) = &self.render_data else {
             return;
         };
@@ -675,14 +717,32 @@ impl SurfaceMesh {
         };
         render_data.update_uniforms(queue, &uniforms);
 
-        // Apply vertex scalar quantity colors if enabled
-        // TODO: Need ColorMapRegistry to compute colors - this will be passed in from app.rs
-        // if let Some(sq) = self.active_vertex_scalar_quantity() {
-        //     if let Some(colormap) = color_maps.get(sq.colormap_name()) {
-        //         let colors = sq.compute_colors(colormap);
-        //         render_data.update_vertex_colors(queue, &colors);
-        //     }
-        // }
+        // Apply quantity colors with priority:
+        // vertex color > face color > vertex scalar > face scalar > surface color
+        if let Some(cq) = self.active_vertex_color_quantity() {
+            // Direct vertex color quantity
+            render_data.update_colors(queue, cq.colors(), &self.triangulation);
+        } else if let Some(cq) = self.active_face_color_quantity() {
+            // Face color expanded to vertices
+            let colors = cq.compute_vertex_colors(&self.faces, self.vertices.len());
+            render_data.update_colors(queue, &colors, &self.triangulation);
+        } else if let Some(sq) = self.active_vertex_scalar_quantity() {
+            // Vertex scalar mapped through colormap
+            if let Some(colormap) = color_maps.get(sq.colormap_name()) {
+                let colors = sq.compute_colors(colormap);
+                render_data.update_colors(queue, &colors, &self.triangulation);
+            }
+        } else if let Some(sq) = self.active_face_scalar_quantity() {
+            // Face scalar mapped through colormap and expanded to vertices
+            if let Some(colormap) = color_maps.get(sq.colormap_name()) {
+                let colors =
+                    sq.compute_vertex_colors(&self.faces, self.vertices.len(), colormap);
+                render_data.update_colors(queue, &colors, &self.triangulation);
+            }
+        } else {
+            // No quantity enabled - clear colors so shader uses surface_color
+            render_data.clear_colors(queue);
+        }
     }
 }
 

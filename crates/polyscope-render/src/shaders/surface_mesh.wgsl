@@ -114,20 +114,37 @@ fn fs_main(
         base_color = in.vertex_color.rgb;
     }
 
-    // Calculate normal for lighting
-    // For flat shading, we could use face normal computed from derivatives,
-    // but since we have per-vertex normals, we use them for smooth shading
-    var normal = normalize(in.world_normal);
+    // Calculate normal for lighting based on shade_style
+    var normal: vec3<f32>;
+
+    if (mesh_uniforms.shade_style == 0u) {
+        // Smooth shading: use interpolated vertex normals
+        normal = normalize(in.world_normal);
+    } else {
+        // Flat/TriFlat shading: compute face normal from screen-space derivatives
+        let dpdx_pos = dpdx(in.world_position);
+        let dpdy_pos = dpdy(in.world_position);
+        normal = normalize(cross(dpdx_pos, dpdy_pos));
+
+        // Ensure the flat normal points toward the camera for front faces
+        // The cross product direction depends on screen-space winding, so we
+        // use the view direction to ensure consistent orientation
+        let view_dir = normalize(camera.camera_pos - in.world_position);
+        if (dot(normal, view_dir) < 0.0) {
+            normal = -normal;
+        }
+    }
 
     // Flip normal for backfaces
     if (!front_facing) {
         normal = -normal;
     }
 
-    // Apply lighting: ambient (0.3) + diffuse (0.7 * max(dot(N, L), 0))
+    // Apply lighting: higher ambient (0.5) for brightness from all directions
+    // plus diffuse contribution from a directional light
     let light_dir = normalize(vec3<f32>(0.3, 0.5, 1.0));
-    let ambient = 0.3;
-    let diffuse = 0.7 * max(dot(normal, light_dir), 0.0);
+    let ambient = 0.5;
+    let diffuse = 0.5 * max(dot(normal, light_dir), 0.0);
     let lighting = ambient + diffuse;
 
     var color = base_color * lighting;

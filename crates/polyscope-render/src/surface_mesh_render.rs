@@ -260,10 +260,29 @@ impl SurfaceMeshRenderData {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[*uniforms]));
     }
 
-    /// Updates the per-vertex color buffer.
-    pub fn update_colors(&self, queue: &wgpu::Queue, colors: &[Vec3]) {
-        let color_data: Vec<f32> = colors.iter().flat_map(|c| [c.x, c.y, c.z, 1.0]).collect();
-        queue.write_buffer(&self.color_buffer, 0, bytemuck::cast_slice(&color_data));
+    /// Updates the per-vertex color buffer with per-original-vertex colors.
+    /// This expands the colors to match the per-triangle-vertex buffer layout.
+    pub fn update_colors(
+        &self,
+        queue: &wgpu::Queue,
+        colors: &[Vec3],
+        triangles: &[[u32; 3]],
+    ) {
+        // Expand per-vertex colors to per-triangle-vertex
+        let mut expanded_colors: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
+        for tri in triangles {
+            for &vi in tri {
+                let c = colors[vi as usize];
+                expanded_colors.extend_from_slice(&[c.x, c.y, c.z, 1.0]);
+            }
+        }
+        queue.write_buffer(&self.color_buffer, 0, bytemuck::cast_slice(&expanded_colors));
+    }
+
+    /// Clears the color buffer (sets all colors to zero, which means use surface_color).
+    pub fn clear_colors(&self, queue: &wgpu::Queue) {
+        let zero_colors: Vec<f32> = vec![0.0; self.num_indices as usize * 4];
+        queue.write_buffer(&self.color_buffer, 0, bytemuck::cast_slice(&zero_colors));
     }
 }
 
