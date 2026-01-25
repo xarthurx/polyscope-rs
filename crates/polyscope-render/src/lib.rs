@@ -18,6 +18,7 @@ pub mod pick;
 pub mod point_cloud_render;
 pub mod screenshot;
 pub mod shader;
+pub mod shadow_map;
 pub mod surface_mesh_render;
 pub mod tone_mapping;
 pub mod vector_render;
@@ -34,6 +35,7 @@ pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use screenshot::{save_image, save_to_buffer, ScreenshotError, ScreenshotOptions};
 pub use shader::{ShaderBuilder, ShaderProgram};
 pub use surface_mesh_render::{MeshUniforms, SurfaceMeshRenderData};
+pub use shadow_map::{LightUniforms, ShadowMapPass, SHADOW_MAP_SIZE};
 pub use tone_mapping::{ToneMapPass, ToneMapUniforms};
 pub use vector_render::{VectorRenderData, VectorUniforms};
 
