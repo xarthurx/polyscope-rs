@@ -1,5 +1,6 @@
 // Ground plane shader using vertices at infinity
 // Matches the original C++ Polyscope implementation
+// Extended with shadow map sampling support
 
 struct CameraUniforms {
     view: mat4x4<f32>,
@@ -18,14 +19,66 @@ struct GroundUniforms {
     length_scale: f32,        // Scene length scale for tiling
     camera_height: f32,       // Camera height for fade calculation
     up_sign: f32,             // +1 or -1 depending on up direction
+    shadow_darkness: f32,     // Shadow darkness (0.0 = no shadow, 1.0 = full black)
+    shadow_mode: u32,         // 0=none, 1=shadow_only, 2=tile_with_shadow
+    _padding: vec2<f32>,
+}
+
+struct LightUniforms {
+    view_proj: mat4x4<f32>,
+    light_dir: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(0) @binding(1) var<uniform> ground: GroundUniforms;
+@group(0) @binding(2) var<uniform> light: LightUniforms;
+@group(0) @binding(3) var shadow_map: texture_depth_2d;
+@group(0) @binding(4) var shadow_sampler: sampler_comparison;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) pos_world_homog: vec4<f32>,
+}
+
+// Shadow calculation function using PCF
+fn calculate_shadow(world_pos: vec3<f32>) -> f32 {
+    // Transform to light space
+    let light_space_pos = light.view_proj * vec4<f32>(world_pos, 1.0);
+    let proj_coords = light_space_pos.xyz / light_space_pos.w;
+
+    // Check if outside shadow map bounds
+    if (proj_coords.x < -1.0 || proj_coords.x > 1.0 ||
+        proj_coords.y < -1.0 || proj_coords.y > 1.0 ||
+        proj_coords.z < 0.0 || proj_coords.z > 1.0) {
+        return 0.0; // No shadow outside light frustum
+    }
+
+    // Convert from NDC [-1,1] to texture coords [0,1]
+    let shadow_uv = vec2<f32>(
+        proj_coords.x * 0.5 + 0.5,
+        -proj_coords.y * 0.5 + 0.5  // Flip Y for texture
+    );
+
+    // Current depth from light's perspective
+    let current_depth = proj_coords.z;
+
+    // PCF shadow sampling (3x3)
+    var shadow = 0.0;
+    let texel_size = 1.0 / 2048.0; // Shadow map resolution
+
+    for (var x = -1; x <= 1; x++) {
+        for (var y = -1; y <= 1; y++) {
+            let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
+            shadow += textureSampleCompare(
+                shadow_map,
+                shadow_sampler,
+                shadow_uv + offset,
+                current_depth - 0.005 // Bias to prevent shadow acne
+            );
+        }
+    }
+
+    return shadow / 9.0;
 }
 
 // Ground plane geometry: center vertex + 4 vertices at infinity
@@ -81,6 +134,42 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         dot(ground.basis_y.xyz, scaled_coord)
     );
 
+    // Calculate shadow if shadow mode is enabled
+    var shadow_factor = 1.0;
+    if (ground.shadow_mode > 0u) {
+        let shadow = calculate_shadow(world_pos);
+        // shadow is 1.0 where lit, 0.0 where in shadow
+        // We want shadow_factor to be 1.0 where lit, (1.0 - darkness) where shadowed
+        shadow_factor = mix(1.0 - ground.shadow_darkness, 1.0, shadow);
+    }
+
+    // Shadow-only mode: just draw the shadow as a transparent overlay
+    if (ground.shadow_mode == 1u) {
+        // Calculate fade
+        let dist_from_center = length(coord_2d);
+        let dist_fade = 1.0 - smoothstep(8.0, 8.5, dist_from_center);
+        let height_diff = ground.up_sign * (ground.camera_height - ground.height) / ground.length_scale;
+        let below_fade = smoothstep(0.0, 0.1, height_diff);
+        let fade_factor = min(dist_fade, below_fade);
+
+        if (fade_factor <= 0.0) {
+            discard;
+        }
+
+        // In shadow-only mode, calculate how much shadow to show
+        let shadow = calculate_shadow(world_pos);
+        let shadow_amount = (1.0 - shadow) * ground.shadow_darkness * fade_factor;
+
+        if (shadow_amount < 0.01) {
+            discard;
+        }
+
+        // Draw shadow as semi-transparent black
+        return vec4<f32>(0.0, 0.0, 0.0, shadow_amount);
+    }
+
+    // Tile mode: draw the full ground plane with optional shadows
+
     // Checker stripe pattern (subtle lines between tiles)
     let mod_dist = min(
         min(fract(coord_2d.x), fract(coord_2d.y)),
@@ -109,8 +198,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let n_dot_h = max(dot(normal_camera, half_vec), 0.0);
     let specular = 0.25 * pow(n_dot_h, 12.0);
 
-    // Apply lighting
-    var lit_color = ground_color * diffuse + vec3<f32>(1.0, 1.0, 1.0) * specular;
+    // Apply lighting and shadow
+    var lit_color = ground_color * diffuse * shadow_factor + vec3<f32>(1.0, 1.0, 1.0) * specular * shadow_factor;
 
     // Fade off far away (at ~8 length scales from center)
     let dist_from_center = length(coord_2d);
