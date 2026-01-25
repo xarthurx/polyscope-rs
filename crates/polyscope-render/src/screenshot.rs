@@ -18,11 +18,11 @@ impl Default for ScreenshotOptions {
     }
 }
 
-/// Saves raw RGBA pixel data to an image file.
+/// Saves raw BGRA pixel data to an image file.
 ///
 /// # Arguments
 /// * `filename` - Output filename (supports .png, .jpg, .jpeg)
-/// * `data` - Raw RGBA pixel data (4 bytes per pixel)
+/// * `data` - Raw BGRA pixel data (4 bytes per pixel, as from wgpu Bgra8UnormSrgb format)
 /// * `width` - Image width in pixels
 /// * `height` - Image height in pixels
 ///
@@ -41,12 +41,16 @@ pub fn save_image(
         .map(|e| e.to_lowercase())
         .unwrap_or_default();
 
-    // Create image buffer from raw data
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, data.to_vec())
-        .ok_or(ScreenshotError::InvalidImageData)?;
+    // Convert BGRA to RGBA (wgpu surface format is Bgra8UnormSrgb)
+    let mut rgba_data = data.to_vec();
+    for chunk in rgba_data.chunks_exact_mut(4) {
+        chunk.swap(0, 2); // Swap B and R
+    }
 
-    // Flip vertically (GPU buffers are typically bottom-up)
-    let img = image::imageops::flip_vertical(&img);
+    // Create image buffer from converted RGBA data
+    // Note: wgpu uses top-left origin, so no vertical flip needed
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, rgba_data)
+        .ok_or(ScreenshotError::InvalidImageData)?;
 
     match extension.as_str() {
         "png" => {
@@ -65,21 +69,25 @@ pub fn save_image(
     Ok(())
 }
 
-/// Saves raw RGBA pixel data to a PNG buffer in memory.
+/// Saves raw BGRA pixel data to a PNG buffer in memory.
 ///
 /// # Arguments
-/// * `data` - Raw RGBA pixel data (4 bytes per pixel)
+/// * `data` - Raw BGRA pixel data (4 bytes per pixel, as from wgpu Bgra8UnormSrgb format)
 /// * `width` - Image width in pixels
 /// * `height` - Image height in pixels
 ///
 /// # Returns
 /// PNG-encoded image data as a byte vector.
 pub fn save_to_buffer(data: &[u8], width: u32, height: u32) -> Result<Vec<u8>, ScreenshotError> {
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, data.to_vec())
-        .ok_or(ScreenshotError::InvalidImageData)?;
+    // Convert BGRA to RGBA
+    let mut rgba_data = data.to_vec();
+    for chunk in rgba_data.chunks_exact_mut(4) {
+        chunk.swap(0, 2); // Swap B and R
+    }
 
-    // Flip vertically
-    let img = image::imageops::flip_vertical(&img);
+    // Note: wgpu uses top-left origin, so no vertical flip needed
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, rgba_data)
+        .ok_or(ScreenshotError::InvalidImageData)?;
 
     let mut buffer = std::io::Cursor::new(Vec::new());
     img.write_to(&mut buffer, image::ImageFormat::Png)?;
