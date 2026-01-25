@@ -105,11 +105,6 @@ impl App {
         }
     }
 
-    /// Requests a screenshot to be saved to the specified file.
-    pub fn request_screenshot(&mut self, filename: String) {
-        self.screenshot_pending = Some(filename);
-    }
-
     /// Requests a screenshot with an auto-generated filename.
     pub fn request_auto_screenshot(&mut self) {
         let filename = format!("screenshot_{:04}.png", self.screenshot_counter);
@@ -517,9 +512,19 @@ impl App {
 
         let mut camera_changed = false;
         let mut scene_extents_changed = false;
+        let mut screenshot_requested = false;
 
         polyscope_ui::build_left_panel(&egui.context, |ui| {
-            polyscope_ui::build_controls_section(ui, &mut bg_color);
+            let view_action = polyscope_ui::build_controls_section(ui, &mut bg_color);
+            match view_action {
+                polyscope_ui::ViewAction::Screenshot => {
+                    screenshot_requested = true;
+                }
+                polyscope_ui::ViewAction::ResetView => {
+                    // TODO: Reset camera view
+                }
+                polyscope_ui::ViewAction::None => {}
+            }
 
             // Camera settings panel
             if polyscope_ui::build_camera_settings_section(ui, &mut self.camera_settings) {
@@ -776,6 +781,13 @@ impl App {
         // Apply scene extents settings if changed
         if scene_extents_changed {
             crate::set_auto_compute_extents(self.scene_extents.auto_compute);
+        }
+
+        // Queue screenshot request from UI button (will be processed after render)
+        if screenshot_requested {
+            let filename = format!("screenshot_{:04}.png", self.screenshot_counter);
+            self.screenshot_counter += 1;
+            self.screenshot_pending = Some(filename);
         }
 
         // End egui frame
@@ -1184,8 +1196,18 @@ impl App {
         engine.queue.submit(std::iter::once(encoder.finish()));
         output.present();
 
-        // Handle screenshot if pending
+        // Handle screenshot if pending (local request from F12 key)
         if let Some(filename) = self.screenshot_pending.take() {
+            self.capture_screenshot(filename);
+        }
+
+        // Handle screenshot request from public API (screenshot() / screenshot_to_file())
+        if let Some(request) = crate::take_screenshot_request() {
+            let filename = request.filename.unwrap_or_else(|| {
+                let name = format!("screenshot_{:04}.png", self.screenshot_counter);
+                self.screenshot_counter += 1;
+                name
+            });
             self.capture_screenshot(filename);
         }
     }

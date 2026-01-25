@@ -262,6 +262,17 @@ pub enum GizmoAction {
     ResetTransform,
 }
 
+/// Actions that can be triggered from the view/controls UI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ViewAction {
+    /// No action.
+    None,
+    /// Reset view requested.
+    ResetView,
+    /// Screenshot requested.
+    Screenshot,
+}
+
 /// Builds the gizmo/transform section.
 /// Returns an action if one was triggered.
 pub fn build_gizmo_section(
@@ -633,7 +644,10 @@ pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
 }
 
 /// Builds the polyscope controls section.
-pub fn build_controls_section(ui: &mut Ui, background_color: &mut [f32; 3]) {
+/// Returns an action if any button was clicked.
+pub fn build_controls_section(ui: &mut Ui, background_color: &mut [f32; 3]) -> ViewAction {
+    let mut action = ViewAction::None;
+
     CollapsingHeader::new("View")
         .default_open(false)
         .show(ui, |ui| {
@@ -642,10 +656,19 @@ pub fn build_controls_section(ui: &mut Ui, background_color: &mut [f32; 3]) {
                 ui.color_edit_button_rgb(background_color);
             });
 
-            if ui.button("Reset View").clicked() {
-                // TODO: Reset camera
-            }
+            ui.horizontal(|ui| {
+                if ui.button("Reset View").clicked() {
+                    action = ViewAction::ResetView;
+                }
+                if ui.button("Screenshot").clicked() {
+                    action = ViewAction::Screenshot;
+                }
+            });
+
+            ui.label("Tip: Press F12 for quick screenshot");
         });
+
+    action
 }
 
 /// Builds the camera settings section.
