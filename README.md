@@ -8,7 +8,7 @@ A Rust-native 3D visualization library for geometric data, inspired by [Polyscop
 
 polyscope-rs is a viewer and user interface for 3D data such as meshes and point clouds. It allows you to register your data and quickly generate informative visualizations, either programmatically or via a dynamic GUI.
 
-This is a Rust reimplementation of the original C++ [Polyscope](https://github.com/nmwsharp/polyscope) library, using modern Rust graphics libraries (wgpu, winit, dear-imgui-rs).
+This is a Rust reimplementation of the original C++ [Polyscope](https://github.com/nmwsharp/polyscope) library, using modern Rust graphics libraries (wgpu, winit, egui).
 
 ## Disclaimer
 
@@ -119,7 +119,7 @@ For a detailed comparison of the architecture and API differences between polysc
 - `polyscope` - Main crate with public API
 - `polyscope-core` - Core traits and state management
 - `polyscope-render` - wgpu rendering backend
-- `polyscope-ui` - dear-imgui UI integration
+- `polyscope-ui` - egui UI integration
 - `polyscope-structures` - Structure implementations
 
 ## Technology Stack
@@ -127,7 +127,7 @@ For a detailed comparison of the architecture and API differences between polysc
 | Component | Library | C++ Polyscope Equivalent |
 |-----------|---------|-------------------------|
 | Rendering | [wgpu](https://wgpu.rs) | OpenGL |
-| UI | [dear-imgui-rs](https://github.com/Latias94/dear-imgui-rs) | Dear ImGui (C++) |
+| UI | [egui](https://github.com/emilk/egui) | Dear ImGui (C++) |
 | Math | [glam](https://github.com/bitshifter/glam-rs) | GLM |
 | Windowing | [winit](https://github.com/rust-windowing/winit) | GLFW |
 | Shaders | WGSL | GLSL |
