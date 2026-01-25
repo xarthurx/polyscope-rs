@@ -370,11 +370,13 @@ impl App {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::Tile => 1u32,
             GroundPlaneMode::ShadowOnly => 2u32,
+            GroundPlaneMode::TileReflection => 3u32,
         };
         let mut gp_height = self.ground_plane.height;
         let mut gp_height_is_relative = self.ground_plane.height_is_relative;
         let mut gp_shadow_blur_iters = self.ground_plane.shadow_blur_iters;
         let mut gp_shadow_darkness = self.ground_plane.shadow_darkness;
+        let mut gp_reflection_intensity = self.ground_plane.reflection_intensity;
 
         // Sync camera settings from engine
         self.camera_settings = crate::camera_to_settings(&engine.camera);
@@ -457,6 +459,7 @@ impl App {
                 &mut gp_height_is_relative,
                 &mut gp_shadow_blur_iters,
                 &mut gp_shadow_darkness,
+                &mut gp_reflection_intensity,
             );
 
             // Collect structure info
@@ -613,12 +616,14 @@ impl App {
         self.ground_plane.mode = match gp_mode {
             0 => GroundPlaneMode::None,
             1 => GroundPlaneMode::Tile,
-            _ => GroundPlaneMode::ShadowOnly,
+            2 => GroundPlaneMode::ShadowOnly,
+            _ => GroundPlaneMode::TileReflection,
         };
         self.ground_plane.height = gp_height;
         self.ground_plane.height_is_relative = gp_height_is_relative;
         self.ground_plane.shadow_blur_iters = gp_shadow_blur_iters;
         self.ground_plane.shadow_darkness = gp_shadow_darkness;
+        self.ground_plane.reflection_intensity = gp_reflection_intensity;
 
         // Apply camera settings if changed
         if camera_changed {
@@ -664,14 +669,18 @@ impl App {
                 label: Some("render encoder"),
             });
 
-        // Update tone mapping uniforms and check if tone mapping is available
-        let tone_mapping_enabled = self.tone_mapping_settings.enabled && engine.hdr_view().is_some();
-        if tone_mapping_enabled {
+        // HDR texture is always available for scene rendering
+        // Update tone mapping uniforms - use passthrough values if disabled
+        let hdr_view = engine.hdr_view().expect("HDR texture should always be available");
+        if self.tone_mapping_settings.enabled {
             engine.update_tone_mapping(
                 self.tone_mapping_settings.exposure,
                 self.tone_mapping_settings.white_level,
                 self.tone_mapping_settings.gamma,
             );
+        } else {
+            // Passthrough values: no exposure adjustment, linear transfer
+            engine.update_tone_mapping(0.0, 1.0, 1.0);
         }
 
         // Store background color for use in render passes
@@ -690,17 +699,14 @@ impl App {
         let gp_shadow_mode = match self.ground_plane.mode {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::ShadowOnly => 1u32,
-            GroundPlaneMode::Tile => 2u32, // Tile mode with shadows
+            GroundPlaneMode::Tile => 2u32,
+            GroundPlaneMode::TileReflection => 2u32, // TileReflection also uses tile mode with shadows
         };
 
-        // Main render pass - render scene to HDR or directly to surface
+        // Main render pass - always render scene to HDR texture
         {
-            // Get the appropriate render target
-            let scene_view = if tone_mapping_enabled {
-                engine.hdr_view().unwrap()
-            } else {
-                &view
-            };
+            // All scene content renders to HDR texture for consistent format
+            let scene_view = hdr_view;
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("main render pass"),
@@ -853,13 +859,7 @@ impl App {
             }
         }  // End of main render pass scope
 
-        // Apply tone mapping pass if enabled (before ground plane and UI)
-        if tone_mapping_enabled {
-            engine.render_tone_mapping(&mut encoder, &view);
-        }
-
-        // Render ground plane (after tone mapping, directly to surface)
-        // Ground plane is rendered without tone mapping for simplicity
+        // Render ground plane to HDR texture (before tone mapping)
         let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
             let center = ctx.center();
             (
@@ -869,6 +869,7 @@ impl App {
             )
         });
 
+        // Ground plane renders to HDR internally (surface_view passed for fallback)
         engine.render_ground_plane(
             &mut encoder,
             &view,
@@ -881,7 +882,10 @@ impl App {
             gp_shadow_mode,
         );
 
-        // Render egui on top
+        // Apply tone mapping from HDR to surface (always runs, uses passthrough if disabled)
+        engine.render_tone_mapping(&mut encoder, &view);
+
+        // Render egui on top (directly to surface, after tone mapping)
         let screen_descriptor = ScreenDescriptor {
             size_in_pixels: [engine.width, engine.height],
             pixels_per_point: window.scale_factor() as f32,
@@ -1086,6 +1090,7 @@ impl App {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::ShadowOnly => 1u32,
             GroundPlaneMode::Tile => 2u32,
+            GroundPlaneMode::TileReflection => 2u32,
         };
         engine.render_ground_plane(
             &mut encoder,
@@ -1198,6 +1203,11 @@ impl ApplicationHandler for App {
             .as_ref()
             .is_some_and(|e| e.context.is_using_pointer());
 
+        // Check if mouse is in the left UI panel area (approximately 305px wide + margin)
+        // Only block events here, not in the 3D viewport
+        const LEFT_PANEL_WIDTH: f64 = 320.0;
+        let mouse_in_ui_panel = self.mouse_pos.0 <= LEFT_PANEL_WIDTH;
+
         match event {
             WindowEvent::CloseRequested => {
                 self.close_requested = true;
@@ -1247,18 +1257,27 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                // Skip if egui consumed this event (clicking on UI widgets)
-                if egui_consumed {
+                // For UI panel clicks, let egui handle it exclusively
+                if mouse_in_ui_panel && egui_consumed {
                     return;
                 }
+
+                // For 3D viewport clicks, we handle picking ourselves
+                // (even if egui "consumed" due to gizmo overlay)
 
                 // Threshold for distinguishing click from drag (in pixels)
                 const DRAG_THRESHOLD: f64 = 5.0;
 
                 match (button, state) {
                     (MouseButton::Left, ElementState::Released) => {
-                        // Check if this was a click (not a drag)
-                        if self.drag_distance < DRAG_THRESHOLD {
+                        // Skip if egui is actively using pointer (gizmo being dragged)
+                        if egui_using_pointer {
+                            self.last_click_pos = None;
+                            return;
+                        }
+
+                        // Check if this was a click (not a drag) in the 3D viewport
+                        if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
                             if let Some(engine) = &self.engine {
                                 let click_screen = glam::Vec2::new(
                                     self.mouse_pos.0 as f32,
@@ -1297,8 +1316,8 @@ impl ApplicationHandler for App {
                         self.last_click_pos = None;
                     }
                     (MouseButton::Right, ElementState::Released) => {
-                        // Right-click (not drag) clears selection (matching C++ Polyscope)
-                        if self.drag_distance < DRAG_THRESHOLD {
+                        // Right-click (not drag) in 3D viewport clears selection
+                        if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
                             self.selection = None;
                             self.selection_info = polyscope_ui::SelectionInfo::default();
                             crate::deselect_structure();
@@ -1308,8 +1327,8 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
-                // Skip if egui consumed this event
-                if egui_consumed {
+                // Skip if in UI panel and egui consumed
+                if mouse_in_ui_panel && egui_consumed {
                     return;
                 }
 

@@ -1235,11 +1235,12 @@ pub fn build_slice_planes_section(
 /// Builds the ground plane settings section.
 pub fn build_ground_plane_section(
     ui: &mut Ui,
-    mode: &mut u32, // 0=None, 1=Tile, 2=ShadowOnly
+    mode: &mut u32, // 0=None, 1=Tile, 2=ShadowOnly, 3=TileReflection
     height: &mut f32,
     height_is_relative: &mut bool,
     shadow_blur_iters: &mut u32,
     shadow_darkness: &mut f32,
+    reflection_intensity: &mut f32,
 ) -> bool {
     let mut changed = false;
 
@@ -1252,6 +1253,7 @@ pub fn build_ground_plane_section(
                     0 => "None",
                     1 => "Tile",
                     2 => "Shadow Only",
+                    3 => "Tile + Reflection",
                     _ => "Unknown",
                 })
                 .show_ui(ui, |ui| {
@@ -1262,6 +1264,9 @@ pub fn build_ground_plane_section(
                         changed = true;
                     }
                     if ui.selectable_value(mode, 2, "Shadow Only").changed() {
+                        changed = true;
+                    }
+                    if ui.selectable_value(mode, 3, "Tile + Reflection").changed() {
                         changed = true;
                     }
                 });
@@ -1306,6 +1311,22 @@ pub fn build_ground_plane_section(
                         changed = true;
                     }
                 });
+
+                // Reflection settings (only for mode 3 - TileReflection)
+                if *mode == 3 {
+                    ui.separator();
+                    ui.label("Reflection Settings:");
+
+                    ui.horizontal(|ui| {
+                        ui.label("Intensity:");
+                        if ui
+                            .add(Slider::new(reflection_intensity, 0.0..=1.0))
+                            .changed()
+                        {
+                            changed = true;
+                        }
+                    });
+                }
             }
         });
 
