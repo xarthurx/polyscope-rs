@@ -163,6 +163,7 @@ pub fn build_curve_network_ui(
     radius: &mut f32,
     radius_is_relative: &mut bool,
     color: &mut [f32; 3],
+    render_mode: &mut u32,
 ) -> bool {
     let mut changed = false;
 
@@ -179,11 +180,26 @@ pub fn build_curve_network_ui(
         }
     });
 
+    // Render mode
+    egui::ComboBox::from_label("Render")
+        .selected_text(match *render_mode {
+            0 => "Lines",
+            _ => "Tubes",
+        })
+        .show_ui(ui, |ui| {
+            if ui.selectable_value(render_mode, 0, "Lines").changed() {
+                changed = true;
+            }
+            if ui.selectable_value(render_mode, 1, "Tubes").changed() {
+                changed = true;
+            }
+        });
+
     // Radius
     ui.horizontal(|ui| {
         ui.label("Radius:");
         if ui
-            .add(egui::DragValue::new(radius).speed(0.001).range(0.001..=0.5))
+            .add(egui::DragValue::new(radius).speed(0.001).range(0.001..=10.0))
             .changed()
         {
             changed = true;
