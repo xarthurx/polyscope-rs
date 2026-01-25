@@ -570,7 +570,7 @@ pub fn build_groups_section(
             // Add new group controls
             ui.horizontal(|ui| {
                 ui.label("New group:");
-                ui.text_edit_singleline(new_group_name);
+                ui.add_sized([80.0, 18.0], egui::TextEdit::singleline(new_group_name));
                 if ui.button("Create").clicked() && !new_group_name.is_empty() {
                     action = GroupsAction::Create(new_group_name.clone());
                 }
@@ -1209,7 +1209,7 @@ pub fn build_slice_planes_section(
             // Add new plane controls
             ui.horizontal(|ui| {
                 ui.label("New plane:");
-                ui.text_edit_singleline(new_plane_name);
+                ui.add_sized([80.0, 18.0], egui::TextEdit::singleline(new_plane_name));
                 if ui.button("Add").clicked() && !new_plane_name.is_empty() {
                     action = SlicePlanesAction::Add(new_plane_name.clone());
                 }
