@@ -17,6 +17,7 @@ pub mod materials;
 pub mod pick;
 pub mod point_cloud_render;
 pub mod reflection;
+pub mod reflection_pass;
 pub mod screenshot;
 pub mod shader;
 pub mod shadow_map;
@@ -37,6 +38,7 @@ pub use screenshot::{save_image, save_to_buffer, ScreenshotError, ScreenshotOpti
 pub use shader::{ShaderBuilder, ShaderProgram};
 pub use surface_mesh_render::{MeshUniforms, SurfaceMeshRenderData};
 pub use reflection::{ground_reflection_matrix, reflection_matrix};
+pub use reflection_pass::{ReflectionPass, ReflectionUniforms};
 pub use shadow_map::{LightUniforms, ShadowMapPass, SHADOW_MAP_SIZE};
 pub use tone_mapping::{ToneMapPass, ToneMapUniforms};
 pub use vector_render::{VectorRenderData, VectorUniforms};
