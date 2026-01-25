@@ -682,6 +682,32 @@ impl SurfaceMesh {
         self.render_data.as_ref()
     }
 
+    /// Initializes shadow rendering resources.
+    ///
+    /// Creates the bind group needed to render this mesh in the shadow pass.
+    pub fn init_shadow_resources(
+        &mut self,
+        device: &wgpu::Device,
+        shadow_bind_group_layout: &wgpu::BindGroupLayout,
+        light_buffer: &wgpu::Buffer,
+    ) {
+        if let Some(render_data) = &mut self.render_data {
+            render_data.init_shadow_resources(device, shadow_bind_group_layout, light_buffer);
+        }
+    }
+
+    /// Returns the shadow bind group if initialized.
+    pub fn shadow_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.render_data.as_ref()?.shadow_bind_group.as_ref()
+    }
+
+    /// Returns whether shadow resources are initialized.
+    pub fn has_shadow_resources(&self) -> bool {
+        self.render_data
+            .as_ref()
+            .map_or(false, |rd| rd.has_shadow_resources())
+    }
+
     /// Updates GPU buffers with current mesh settings.
     pub fn update_gpu_buffers(&self, queue: &wgpu::Queue, color_maps: &ColorMapRegistry) {
         let Some(render_data) = &self.render_data else {
