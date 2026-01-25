@@ -114,3 +114,167 @@ The original C++ Polyscope uses Dear ImGui, and there is a Rust binding (`dear-i
 | Web | No | WebGPU (future) |
 
 The wgpu backend provides better future-proofing, especially for macOS (where OpenGL is deprecated) and web deployment.
+
+---
+
+## Feature Comparison
+
+### Structures
+
+| Structure | C++ Polyscope | polyscope-rs | Notes |
+|-----------|--------------|--------------|-------|
+| Point Cloud | ✅ Full | ✅ Full | Complete feature parity |
+| Surface Mesh | ✅ Full | ✅ Basic | Triangles supported, polygons basic |
+| Curve Network | ✅ Full | ✅ Full | Line, loop, segments variants |
+| Volume Mesh | ✅ Full | ✅ Basic | Tet/hex cells, no cuts |
+| Volume Grid | ✅ Full | ✅ Basic | Node/cell scalars, basic isosurface |
+| Camera View | ✅ Full | ✅ Full | Frustum visualization |
+| Floating Quantities | ✅ Full | ❌ Not yet | Screen-space quantities |
+
+### Quantities
+
+| Quantity Type | C++ Polyscope | polyscope-rs |
+|---------------|--------------|--------------|
+| Scalar | ✅ | ✅ |
+| Vector | ✅ | ✅ |
+| Color (RGB) | ✅ | ✅ |
+| Color (RGBA) | ✅ | ⚠️ RGB only |
+| Parameterization | ✅ | ❌ |
+| Intrinsic Vector | ✅ | ❌ |
+| One Form | ✅ | ❌ |
+
+### Scene Features
+
+| Feature | C++ Polyscope | polyscope-rs |
+|---------|--------------|--------------|
+| Ground Plane | ✅ | ✅ |
+| Ground Shadows | ✅ | ✅ |
+| Ground Reflections | ✅ | ✅ |
+| Tone Mapping | ✅ | ✅ |
+| SSAO | ✅ | ❌ |
+| Slice Planes | ✅ | ✅ (max 4) |
+| Groups | ✅ | ✅ |
+| Gizmos | ✅ | ✅ |
+| Picking | ✅ | ✅ |
+| Screenshots | ✅ | ✅ |
+
+### Materials & Color Maps
+
+All 8 built-in materials (Clay, Wax, Candy, Flat, Mud, Ceramic, Jade, Normal) and 10+ color maps (Viridis, Blues, Reds, Coolwarm, etc.) are implemented with equivalent behavior.
+
+---
+
+## API Differences
+
+### Initialization
+
+**C++ Polyscope:**
+```cpp
+#include "polyscope/polyscope.h"
+
+int main() {
+    polyscope::init();
+    // ... register structures ...
+    polyscope::show();
+    return 0;
+}
+```
+
+**polyscope-rs:**
+```rust
+use polyscope::*;
+
+fn main() -> Result<()> {
+    init()?;
+    // ... register structures ...
+    show();
+    Ok(())
+}
+```
+
+### Registering Structures
+
+**C++ Polyscope:**
+```cpp
+std::vector<glm::vec3> points = { ... };
+polyscope::PointCloud* pc = polyscope::registerPointCloud("my points", points);
+pc->addScalarQuantity("height", heights);
+```
+
+**polyscope-rs:**
+```rust
+let points = vec![Vec3::new(0.0, 0.0, 0.0), ...];
+let pc = register_point_cloud("my points", points);
+pc.add_scalar_quantity("height", heights);
+```
+
+### Accessing Structures
+
+**C++ Polyscope:**
+```cpp
+polyscope::PointCloud* pc = polyscope::getPointCloud("my points");
+if (pc != nullptr) {
+    pc->setPointRadius(0.01);
+}
+```
+
+**polyscope-rs:**
+```rust
+// Option 1: Get handle
+if let Some(pc) = get_point_cloud("my points") {
+    // Use handle methods
+}
+
+// Option 2: Closure-based access
+with_point_cloud("my points", |pc| {
+    pc.set_point_radius(0.01);
+});
+```
+
+---
+
+## Framework Replacements
+
+| C++ Library | Purpose | Rust Replacement |
+|-------------|---------|------------------|
+| OpenGL | Graphics API | wgpu |
+| GLFW | Windowing | winit |
+| GLM | Math | glam |
+| Dear ImGui (C++) | UI | dear-imgui-rs |
+| stb_image | Image loading | image |
+| nlohmann/json | JSON | serde_json |
+| happly | PLY loading | (custom) |
+| CMake | Build | Cargo |
+
+---
+
+## Migration Tips
+
+### From C++ to Rust
+
+1. **Pointers to Handles**: C++ uses raw pointers; Rust uses handle structs with methods
+2. **Error Handling**: C++ uses exceptions; Rust uses `Result<T, E>`
+3. **Vector Types**: GLM types → glam types (`glm::vec3` → `Vec3`)
+4. **Memory Management**: Manual in C++; automatic in Rust
+5. **Closures**: Use `with_*` functions for mutable access to structures
+
+### Common Gotchas
+
+1. **Face Format**: polyscope-rs uses `UVec3` for triangles; C++ uses nested vectors
+2. **Initialization**: polyscope-rs returns `Result`, so use `?` or `unwrap()`
+3. **Thread Safety**: polyscope-rs uses `RwLock` for global state
+4. **Shader Language**: GLSL → WGSL syntax differences
+
+---
+
+## Missing Features (Planned)
+
+The following C++ Polyscope features are not yet implemented but planned:
+
+1. **Floating Quantities** - Screen-space data visualization
+2. **SSAO** - Screen Space Ambient Occlusion
+3. **Parameterization Quantities** - UV coordinates visualization
+4. **Intrinsic Vectors** - Tangent-space vector visualization
+5. **One-Form Quantities** - Differential form visualization
+6. **Slice Plane Capping** - Fill exposed faces when slicing
+7. **Full Polygon Mesh Support** - Arbitrary polygons (not just triangles)

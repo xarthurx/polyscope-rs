@@ -43,7 +43,7 @@ This is a Rust reimplementation of the original C++ [Polyscope](https://github.c
 - Parameterization quantities
 - Full polygon mesh support
 
-See [DIFFERENCES.md](DIFFERENCES.md) for a detailed comparison with C++ Polyscope.
+See [docs/architecture-differences.md](docs/architecture-differences.md) for a detailed comparison with C++ Polyscope.
 
 ## Features
 
@@ -100,7 +100,7 @@ polyscope-rs uses a paradigm of **structures** and **quantities**:
 - A **structure** is a geometric object in the scene (point cloud, mesh, etc.)
 - A **quantity** is data associated with a structure (scalar field, vector field, colors)
 
-For a detailed comparison of the architecture and API differences between polyscope-rs and C++ Polyscope, see [DIFFERENCES.md](DIFFERENCES.md).
+For a detailed comparison of the architecture and API differences between polyscope-rs and C++ Polyscope, see [docs/architecture-differences.md](docs/architecture-differences.md).
 
 ## Crate Structure
 
@@ -125,7 +125,7 @@ For a detailed comparison of the architecture and API differences between polysc
 
 For developers familiar with the C++ version or considering migration, see:
 
-- [DIFFERENCES.md](DIFFERENCES.md) - Detailed feature comparison and API differences
+- [docs/architecture-differences.md](docs/architecture-differences.md) - Detailed feature comparison and API differences
 
 ### Key Differences
 
