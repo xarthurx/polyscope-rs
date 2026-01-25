@@ -2,10 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Response Style
-
-Every response to the user must start with "Master,"
-
 ## Project Overview
 
 polyscope-rs is a Rust-native 3D visualization library for geometric data. It's a port/reimagining of the C++ [Polyscope](https://polyscope.run) library, targeting the Rust ecosystem.
