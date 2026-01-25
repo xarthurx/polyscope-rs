@@ -27,3 +27,5 @@ Thumbs.db
 
 # Git worktrees
 .worktrees/
+.env
+.mcp.json

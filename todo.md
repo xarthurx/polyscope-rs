@@ -11,6 +11,27 @@
   - Projects sample points from structures to screen space
   - Checks if click position is near any projected point (20px threshold)
   - Selects structure if clicked on it, deselects if clicked on empty space
+- [x] Fix event handling to allow deselection in 3D viewport
+  - Replaced egui's CentralPanel with Area for gizmo overlay
+  - Area uses `interactable(false)` to allow clicks to pass through
+  - Camera control disabled when gizmo is being manipulated (using `is_using_pointer()`)
+- [x] Rewrite mouse event handling for robustness
+  - Physical button state tracked separately from egui event consumption
+  - Prevents mouse state from getting "stuck" when egui intercepts events
+  - Added proper modifier key tracking (Shift) for pan mode
+  - Added drag distance accumulation for click vs drag detection
+  - Fixed: Mouse position check to differentiate UI panel vs 3D viewport
+  - Fixed: Only block events in UI panel, allow 3D viewport picking even with gizmo visible
+  - Fixed: Check `is_using_pointer()` to skip picking when gizmo is being dragged
+
+## Mouse Controls (matching C++ Polyscope)
+
+- **Left drag** (no modifiers): Rotate/orbit camera
+- **Shift + Left drag**: Pan camera
+- **Right drag**: Pan camera
+- **Scroll wheel**: Zoom
+- **Left click** (no drag): Select structure at click position
+- **Right click** (no drag): Clear selection/deselect
 
 ## Future Work: Full GPU Picking (for more accurate picking)
 
