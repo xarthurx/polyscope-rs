@@ -217,7 +217,7 @@ impl Camera {
                 // For orthographic, adjust the scale (smaller = zoom in, larger = zoom out)
                 // delta > 0 means zoom in (scroll up), so decrease scale
                 // Use a proportional factor based on current scale for consistent feel
-                let zoom_factor = 1.0 - delta * 0.2;
+                let zoom_factor = 1.0 - delta * 0.4;
                 self.ortho_scale = (self.ortho_scale * zoom_factor).clamp(0.01, 1000.0);
             }
         }
