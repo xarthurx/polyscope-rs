@@ -101,6 +101,8 @@ pub struct RenderEngine {
     tone_map_pass: Option<ToneMapPass>,
     /// Shadow map pass for ground plane shadows.
     shadow_map_pass: Option<ShadowMapPass>,
+    /// Reflection pass for ground plane reflections.
+    reflection_pass: Option<crate::reflection_pass::ReflectionPass>,
 }
 
 impl RenderEngine {
@@ -258,7 +260,7 @@ impl RenderEngine {
                     module: &ground_plane_shader,
                     entry_point: Some("fs_main"),
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: surface_config.format,
+                        format: wgpu::TextureFormat::Rgba16Float, // HDR format for scene rendering
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -312,6 +314,7 @@ impl RenderEngine {
             hdr_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
+            reflection_pass: None,
         };
 
         engine.init_point_pipeline();
@@ -319,6 +322,7 @@ impl RenderEngine {
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
         engine.init_tone_mapping();
+        engine.init_reflection_pass();
 
         Ok(engine)
     }
@@ -462,7 +466,7 @@ impl RenderEngine {
                     module: &ground_plane_shader,
                     entry_point: Some("fs_main"),
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: surface_config.format,
+                        format: wgpu::TextureFormat::Rgba16Float, // HDR format for scene rendering
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -516,6 +520,7 @@ impl RenderEngine {
             hdr_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
+            reflection_pass: None,
         };
 
         engine.init_point_pipeline();
@@ -523,6 +528,7 @@ impl RenderEngine {
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
         engine.init_tone_mapping();
+        engine.init_reflection_pass();
 
         Ok(engine)
     }
@@ -662,7 +668,7 @@ impl RenderEngine {
                     module: &shader,
                     entry_point: Some("fs_main"),
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: self.surface_config.format,
+                        format: wgpu::TextureFormat::Rgba16Float, // HDR format for scene rendering
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -815,7 +821,7 @@ impl RenderEngine {
                     module: &shader,
                     entry_point: Some("fs_main"),
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: self.surface_config.format,
+                        format: wgpu::TextureFormat::Rgba16Float, // HDR format for scene rendering
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -978,7 +984,7 @@ impl RenderEngine {
                     module: &shader,
                     entry_point: Some("fs_main"),
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: self.surface_config.format,
+                        format: wgpu::TextureFormat::Rgba16Float, // HDR format for scene rendering
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -1123,7 +1129,7 @@ impl RenderEngine {
                     module: &shader,
                     entry_point: Some("fs_main"),
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: self.surface_config.format,
+                        format: wgpu::TextureFormat::Rgba16Float, // HDR format for scene rendering
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -1169,7 +1175,7 @@ impl RenderEngine {
     pub fn render_ground_plane(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
+        surface_view: &wgpu::TextureView,
         enabled: bool,
         scene_center: [f32; 3],
         scene_min_y: f32,
@@ -1181,6 +1187,9 @@ impl RenderEngine {
         if !enabled {
             return;
         }
+
+        // Always use HDR texture for ground plane rendering (pipelines use HDR format)
+        let view = self.hdr_view.as_ref().unwrap_or(surface_view);
 
         // Initialize render data if needed
         if self.ground_plane_render_data.is_none() {
@@ -1435,6 +1444,28 @@ impl RenderEngine {
         if let (Some(tone_map), Some(hdr_view)) = (&self.tone_map_pass, &self.hdr_view) {
             let bind_group = tone_map.create_bind_group(&self.device, hdr_view);
             tone_map.render(encoder, output_view, &bind_group);
+        }
+    }
+
+    /// Initializes reflection pass resources.
+    fn init_reflection_pass(&mut self) {
+        self.reflection_pass = Some(crate::reflection_pass::ReflectionPass::new(&self.device));
+    }
+
+    /// Returns the reflection pass.
+    pub fn reflection_pass(&self) -> Option<&crate::reflection_pass::ReflectionPass> {
+        self.reflection_pass.as_ref()
+    }
+
+    /// Updates reflection uniforms.
+    pub fn update_reflection(
+        &self,
+        reflection_matrix: glam::Mat4,
+        intensity: f32,
+        ground_height: f32,
+    ) {
+        if let Some(reflection) = &self.reflection_pass {
+            reflection.update_uniforms(&self.queue, reflection_matrix, intensity, ground_height);
         }
     }
 }
