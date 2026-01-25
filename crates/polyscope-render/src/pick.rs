@@ -72,6 +72,28 @@ pub fn decode_pick_id(r: u8, g: u8, b: u8) -> (u16, u16) {
     (structure_id, element_id)
 }
 
+/// GPU uniforms for pick rendering.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct PickUniforms {
+    /// The structure ID to encode in pick colors.
+    pub structure_id: u32,
+    /// Point radius for sphere impostor rendering.
+    pub point_radius: f32,
+    /// Padding to align to 16 bytes.
+    pub _padding: [f32; 2],
+}
+
+impl Default for PickUniforms {
+    fn default() -> Self {
+        Self {
+            structure_id: 0,
+            point_radius: 0.01,
+            _padding: [0.0; 2],
+        }
+    }
+}
+
 /// Encodes an index as a pick color.
 ///
 /// Returns [R, G, B] where:

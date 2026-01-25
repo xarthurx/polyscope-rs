@@ -126,6 +126,10 @@ pub struct RenderEngine {
     pick_staging_buffer: Option<wgpu::Buffer>,
     /// Current size of pick buffers (for resize detection).
     pick_buffer_size: (u32, u32),
+    /// Pick pipeline for point clouds.
+    point_pick_pipeline: Option<wgpu::RenderPipeline>,
+    /// Pick bind group layout (shared across pick pipelines).
+    pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
 }
 
 impl RenderEngine {
@@ -347,6 +351,8 @@ impl RenderEngine {
             pick_depth_view: None,
             pick_staging_buffer: None,
             pick_buffer_size: (0, 0),
+            point_pick_pipeline: None,
+            pick_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
@@ -355,6 +361,7 @@ impl RenderEngine {
         engine.create_curve_network_edge_pipeline();
         engine.init_tone_mapping();
         engine.init_reflection_pass();
+        engine.init_pick_pipeline();
 
         Ok(engine)
     }
@@ -562,6 +569,8 @@ impl RenderEngine {
             pick_depth_view: None,
             pick_staging_buffer: None,
             pick_buffer_size: (0, 0),
+            point_pick_pipeline: None,
+            pick_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
@@ -570,6 +579,7 @@ impl RenderEngine {
         engine.create_curve_network_edge_pipeline();
         engine.init_tone_mapping();
         engine.init_reflection_pass();
+        engine.init_pick_pipeline();
 
         Ok(engine)
     }
@@ -1607,5 +1617,120 @@ impl RenderEngine {
         self.pick_depth_view = Some(pick_depth_view);
         self.pick_staging_buffer = Some(pick_staging_buffer);
         self.pick_buffer_size = (width, height);
+    }
+
+    /// Initializes the pick pipeline for point clouds.
+    fn init_pick_pipeline(&mut self) {
+        let shader_source = include_str!("shaders/pick.wgsl");
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Pick Shader"),
+                source: wgpu::ShaderSource::Wgsl(shader_source.into()),
+            });
+
+        // Pick bind group layout: camera, pick uniforms, positions
+        let bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Pick Bind Group Layout"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Pick uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Position storage buffer
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Pick Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("PointCloud Pick Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        blend: None, // No blending for pick buffer
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24Plus,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.point_pick_pipeline = Some(pipeline);
+        self.pick_bind_group_layout = Some(bind_group_layout);
+    }
+
+    /// Gets the pick bind group layout.
+    pub fn pick_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.pick_bind_group_layout
+            .as_ref()
+            .expect("pick pipeline not initialized")
+    }
+
+    /// Gets the point cloud pick pipeline.
+    pub fn point_pick_pipeline(&self) -> &wgpu::RenderPipeline {
+        self.point_pick_pipeline
+            .as_ref()
+            .expect("pick pipeline not initialized")
     }
 }

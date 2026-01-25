@@ -1,8 +1,9 @@
 // Pick buffer shader - renders elements with unique colors encoding their ID
 //
 // This shader is used for element selection. Each element (point, face, etc.)
-// is rendered with a unique color that encodes its index. When the user clicks,
-// we read the pixel at that position and decode the color to find what was clicked.
+// is rendered with a unique color that encodes its structure ID and element index.
+// When the user clicks, we read the pixel at that position and decode the color
+// to find which structure and element was clicked.
 
 struct CameraUniforms {
     view: mat4x4<f32>,
@@ -14,7 +15,7 @@ struct CameraUniforms {
 }
 
 struct PickUniforms {
-    base_index: u32,
+    structure_id: u32,
     point_radius: f32,
     _padding: vec2<f32>,
 }
@@ -41,11 +42,13 @@ const QUAD_VERTICES: array<vec2<f32>, 6> = array<vec2<f32>, 6>(
     vec2<f32>(-1.0,  1.0),
 );
 
-// Convert an index to an RGB color (normalized to [0, 1])
-fn index_to_color(index: u32) -> vec3<f32> {
-    let r = f32((index >> 16u) & 0xFFu) / 255.0;
-    let g = f32((index >> 8u) & 0xFFu) / 255.0;
-    let b = f32(index & 0xFFu) / 255.0;
+// Encode structure_id (12 bits) and element_id (12 bits) into RGB
+fn encode_pick_id(structure_id: u32, element_id: u32) -> vec3<f32> {
+    let s = structure_id & 0xFFFu;
+    let e = element_id & 0xFFFu;
+    let r = f32(s >> 4u) / 255.0;
+    let g = f32(((s & 0xFu) << 4u) | (e >> 8u)) / 255.0;
+    let b = f32(e & 0xFFu) / 255.0;
     return vec3<f32>(r, g, b);
 }
 
@@ -71,8 +74,8 @@ fn vs_main(
     // Project to clip space
     out.clip_position = camera.proj * vec4<f32>(billboard_pos_view, 1.0);
 
-    // Encode the pick color from base_index + instance_index
-    out.pick_color = index_to_color(pick_uniforms.base_index + instance_index);
+    // Encode the pick color from structure_id and instance_index (element index)
+    out.pick_color = encode_pick_id(pick_uniforms.structure_id, instance_index);
 
     // Pass through for ray-sphere intersection
     out.sphere_center_view = view_pos;
