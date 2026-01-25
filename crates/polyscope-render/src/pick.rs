@@ -51,6 +51,27 @@ pub fn color_to_index(r: u8, g: u8, b: u8) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
 }
 
+/// Encodes a structure ID and element ID into RGB pick color.
+///
+/// Uses 12 bits for structure ID (max 4096) and 12 bits for element ID (max 4096).
+/// Layout: R[7:0] = struct[11:4], G[7:4] = struct[3:0], G[3:0] = elem[11:8], B[7:0] = elem[7:0]
+pub fn encode_pick_id(structure_id: u16, element_id: u16) -> [u8; 3] {
+    let s = structure_id & 0xFFF; // 12 bits max
+    let e = element_id & 0xFFF; // 12 bits max
+    [
+        (s >> 4) as u8,                        // R: struct bits 11-4
+        (((s & 0xF) << 4) | (e >> 8)) as u8,   // G: struct bits 3-0 + elem bits 11-8
+        (e & 0xFF) as u8,                      // B: elem bits 7-0
+    ]
+}
+
+/// Decodes RGB pick color back to structure ID and element ID.
+pub fn decode_pick_id(r: u8, g: u8, b: u8) -> (u16, u16) {
+    let structure_id = ((r as u16) << 4) | ((g as u16) >> 4);
+    let element_id = (((g & 0xF) as u16) << 8) | (b as u16);
+    (structure_id, element_id)
+}
+
 /// Encodes an index as a pick color.
 ///
 /// Returns [R, G, B] where:
@@ -123,5 +144,37 @@ mod tests {
         let element = PickElementType::Face;
         let copied = element;
         assert_eq!(element, copied);
+    }
+
+    #[test]
+    fn test_encode_decode_pick_id_roundtrip() {
+        // Test various combinations
+        let cases = [
+            (1, 0),
+            (1, 1),
+            (0xFFF, 0xFFF), // max values
+            (123, 456),
+            (4095, 4095),
+        ];
+        for (struct_id, elem_id) in cases {
+            let encoded = encode_pick_id(struct_id, elem_id);
+            let (decoded_struct, decoded_elem) = decode_pick_id(encoded[0], encoded[1], encoded[2]);
+            assert_eq!(
+                decoded_struct, struct_id,
+                "struct_id mismatch for ({}, {})",
+                struct_id, elem_id
+            );
+            assert_eq!(
+                decoded_elem, elem_id,
+                "elem_id mismatch for ({}, {})",
+                struct_id, elem_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_encode_pick_id_background() {
+        let encoded = encode_pick_id(0, 0);
+        assert_eq!(encoded, [0, 0, 0], "Background should encode to black");
     }
 }
