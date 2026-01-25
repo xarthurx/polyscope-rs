@@ -12,6 +12,8 @@ pub enum GroundPlaneMode {
     Tile,
     /// Shadow only (no visible ground plane, just shadows).
     ShadowOnly,
+    /// Tiled ground plane with reflections.
+    TileReflection,
 }
 
 /// Ground plane configuration.
@@ -27,6 +29,8 @@ pub struct GroundPlaneConfig {
     pub shadow_blur_iters: u32,
     /// Shadow darkness (0.0 = no shadow, 1.0 = full black).
     pub shadow_darkness: f32,
+    /// Reflection intensity (0.0 = none, 1.0 = full mirror).
+    pub reflection_intensity: f32,
 }
 
 impl Default for GroundPlaneConfig {
@@ -37,6 +41,7 @@ impl Default for GroundPlaneConfig {
             height_is_relative: true,
             shadow_blur_iters: 2,
             shadow_darkness: 0.4,
+            reflection_intensity: 0.25,
         }
     }
 }
@@ -67,11 +72,13 @@ mod tests {
             height_is_relative: false,
             shadow_blur_iters: 3,
             shadow_darkness: 0.6,
+            reflection_intensity: 0.5,
         };
         assert_eq!(config.mode, GroundPlaneMode::Tile);
         assert_eq!(config.height, -1.5);
         assert!(!config.height_is_relative);
         assert_eq!(config.shadow_blur_iters, 3);
         assert_eq!(config.shadow_darkness, 0.6);
+        assert_eq!(config.reflection_intensity, 0.5);
     }
 }
