@@ -1964,6 +1964,92 @@ impl RenderEngine {
         }
     }
 
+    /// Renders the ground plane to the stencil buffer for reflection masking.
+    ///
+    /// This should be called before rendering reflected geometry.
+    /// The stencil buffer will have value 1 where the ground plane is visible.
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_stencil_pass(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        color_view: &wgpu::TextureView,
+        ground_height: f32,
+        scene_center: [f32; 3],
+        length_scale: f32,
+    ) {
+        let Some(pipeline) = &self.ground_stencil_pipeline else {
+            return;
+        };
+
+        // Initialize render data if needed
+        if self.ground_plane_render_data.is_none() {
+            if let Some(ref shadow_pass) = self.shadow_map_pass {
+                self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
+                    &self.device,
+                    &self.ground_plane_bind_group_layout,
+                    &self.camera_buffer,
+                    shadow_pass.light_buffer(),
+                    shadow_pass.depth_view(),
+                    shadow_pass.comparison_sampler(),
+                ));
+            }
+        }
+
+        let Some(render_data) = &self.ground_plane_render_data else {
+            return;
+        };
+
+        // Check if camera is in orthographic mode
+        let is_orthographic =
+            self.camera.projection_mode == crate::camera::ProjectionMode::Orthographic;
+        let camera_height = self.camera.position.y;
+
+        // Update ground uniforms for stencil pass
+        render_data.update(
+            &self.queue,
+            scene_center,
+            scene_center[1] - length_scale * 0.5, // scene_min_y estimate
+            length_scale,
+            camera_height,
+            Some(ground_height),
+            0.0,  // shadow_darkness (unused in stencil)
+            0,    // shadow_mode (unused in stencil)
+            is_orthographic,
+        );
+
+        let view = self.hdr_view.as_ref().unwrap_or(color_view);
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Stencil Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load, // Don't clear color
+                    store: wgpu::StoreOp::Store,
+                },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Load, // Keep existing depth
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(0), // Clear stencil to 0
+                    store: wgpu::StoreOp::Store,
+                }),
+            }),
+            ..Default::default()
+        });
+
+        render_pass.set_pipeline(pipeline);
+        render_pass.set_bind_group(0, render_data.bind_group(), &[]);
+        render_pass.set_stencil_reference(1); // Write 1 to stencil
+        render_pass.draw(0..12, 0..1); // 4 triangles = 12 vertices
+    }
+
     /// Creates a screenshot texture for capturing frames.
     ///
     /// Returns a texture view (HDR format) that can be used as a render target.
