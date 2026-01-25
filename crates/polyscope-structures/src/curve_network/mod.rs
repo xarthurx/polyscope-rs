@@ -305,6 +305,7 @@ impl CurveNetwork {
         let mut color = [self.color.x, self.color.y, self.color.z];
         let mut radius = self.radius;
         let mut radius_is_relative = self.radius_is_relative;
+        let mut render_mode = self.render_mode;
 
         if polyscope_ui::build_curve_network_ui(
             ui,
@@ -313,10 +314,12 @@ impl CurveNetwork {
             &mut radius,
             &mut radius_is_relative,
             &mut color,
+            &mut render_mode,
         ) {
             self.color = Vec3::new(color[0], color[1], color[2]);
             self.radius = radius;
             self.radius_is_relative = radius_is_relative;
+            self.render_mode = render_mode;
         }
 
         // Show quantities
