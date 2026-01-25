@@ -13,7 +13,7 @@ use winit::{
 };
 
 use polyscope_core::{GroundPlaneConfig, GroundPlaneMode};
-use polyscope_render::{PickResult, RenderEngine};
+use polyscope_render::{reflection, PickResult, RenderEngine};
 use polyscope_structures::{
     CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh,
 };
@@ -1162,6 +1162,86 @@ impl App {
                 ctx.length_scale,
             )
         });
+
+        // Reflection pass (only for TileReflection mode)
+        if self.ground_plane.mode == GroundPlaneMode::TileReflection {
+            // Compute ground height
+            let ground_height = if self.ground_plane.height_is_relative {
+                scene_min_y - length_scale * 0.05
+            } else {
+                self.ground_plane.height
+            };
+
+            // Update reflection uniforms
+            let reflection_matrix = reflection::ground_reflection_matrix(ground_height);
+            engine.update_reflection(
+                reflection_matrix,
+                self.ground_plane.reflection_intensity,
+                ground_height,
+            );
+
+            // 1. Render stencil pass (mark ground plane region)
+            engine.render_stencil_pass(
+                &mut encoder,
+                &view,
+                ground_height,
+                scene_center,
+                length_scale,
+            );
+
+            // 2. Render reflected meshes
+            {
+                let hdr_view = engine.hdr_texture_view().unwrap_or(&view);
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Reflected Geometry Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: hdr_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                        depth_slice: None,
+                    })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: engine.depth_view(),
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Load, // Keep stencil from previous pass
+                            store: wgpu::StoreOp::Store,
+                        }),
+                    }),
+                    ..Default::default()
+                });
+
+                // Render each visible surface mesh reflected
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                if let Some(mesh_data) = mesh.render_data() {
+                                    if let Some(bind_group) =
+                                        engine.create_reflected_mesh_bind_group(mesh_data)
+                                    {
+                                        engine.render_reflected_mesh(
+                                            &mut render_pass,
+                                            &bind_group,
+                                            mesh_data.vertex_count(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
 
         // Ground plane renders to HDR internally (surface_view passed for fallback)
         engine.render_ground_plane(
