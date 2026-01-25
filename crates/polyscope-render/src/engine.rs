@@ -112,6 +112,20 @@ pub struct RenderEngine {
     structure_id_reverse: HashMap<u16, (String, String)>,
     /// Next available structure ID (0 is reserved for background).
     next_structure_id: u16,
+
+    // Pick system - GPU resources
+    /// Pick color texture for element selection.
+    pick_texture: Option<wgpu::Texture>,
+    /// Pick color texture view.
+    pick_texture_view: Option<wgpu::TextureView>,
+    /// Pick depth texture.
+    pick_depth_texture: Option<wgpu::Texture>,
+    /// Pick depth texture view.
+    pick_depth_view: Option<wgpu::TextureView>,
+    /// Staging buffer for pick pixel readback.
+    pick_staging_buffer: Option<wgpu::Buffer>,
+    /// Current size of pick buffers (for resize detection).
+    pick_buffer_size: (u32, u32),
 }
 
 impl RenderEngine {
@@ -327,6 +341,12 @@ impl RenderEngine {
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
+            pick_texture: None,
+            pick_texture_view: None,
+            pick_depth_texture: None,
+            pick_depth_view: None,
+            pick_staging_buffer: None,
+            pick_buffer_size: (0, 0),
         };
 
         engine.init_point_pipeline();
@@ -536,6 +556,12 @@ impl RenderEngine {
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
+            pick_texture: None,
+            pick_texture_view: None,
+            pick_depth_texture: None,
+            pick_depth_view: None,
+            pick_staging_buffer: None,
+            pick_buffer_size: (0, 0),
         };
 
         engine.init_point_pipeline();
@@ -1518,5 +1544,68 @@ impl RenderEngine {
     pub fn get_structure_id(&self, type_name: &str, name: &str) -> Option<u16> {
         let key = (type_name.to_string(), name.to_string());
         self.structure_id_map.get(&key).copied()
+    }
+
+    // ========== Pick System - GPU Resources ==========
+
+    /// Creates or recreates pick buffer textures to match viewport size.
+    pub fn init_pick_buffers(&mut self, width: u32, height: u32) {
+        // Skip if size unchanged
+        if self.pick_buffer_size == (width, height) && self.pick_texture.is_some() {
+            return;
+        }
+
+        let device = &self.device;
+
+        // Create pick color texture (Rgba8Unorm for exact values)
+        let pick_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Pick Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let pick_texture_view = pick_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Create pick depth texture
+        let pick_depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Pick Depth Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth24Plus,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        let pick_depth_view =
+            pick_depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Create staging buffer for single pixel readback (4 bytes RGBA)
+        // Buffer size must be aligned to COPY_BYTES_PER_ROW_ALIGNMENT (256)
+        let pick_staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Pick Staging Buffer"),
+            size: 256, // Minimum aligned size, we only read 4 bytes
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        self.pick_texture = Some(pick_texture);
+        self.pick_texture_view = Some(pick_texture_view);
+        self.pick_depth_texture = Some(pick_depth_texture);
+        self.pick_depth_view = Some(pick_depth_view);
+        self.pick_staging_buffer = Some(pick_staging_buffer);
+        self.pick_buffer_size = (width, height);
     }
 }
