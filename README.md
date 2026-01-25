@@ -14,9 +14,11 @@ This is a Rust reimplementation of the original C++ [Polyscope](https://github.c
 
 This project is an experiment in **AI-driven software development**. It is built on the belief that next-generation programming will largely depend on AI, rather than humans writing code line-by-line.
 
-I am a **C++**, **Python**, and **C#** developer. While I understand [Rust](https://www.rust-lang.org/) syntax, I have never developed a project with it. However, I use [Polyscope](https://polyscope.run) in various projects, have contributed PRs to the [original C++ library](https://github.com/nmwsharp/polyscope), and am well-versed in its architecture.
+I am a **C++**, **Python**, and **C#** developer. While I understand [Rust](https://www.rust-lang.org/) syntax, I have never developed a project with it. However, I use [Polyscope](https://polyscope.run) in various projects, have contributed PRs to the original C++ library, and know its architecture.
 
 This project validates my hypothesis that languages with **informative compiler feedback** (Rust > C++) work better with AI-assisted development.
+
+**Note:** This project is in an **early phase** and requires more testing. **Use at your own risk.** Contributions are welcome!
 
 Recommendations and thoughts are welcome in the [Discussions](https://github.com/xarthurx/polyscope-rs/discussions) section.
 
