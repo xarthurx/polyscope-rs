@@ -9,6 +9,7 @@ use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
 use crate::ground_plane::GroundPlaneRenderData;
 use crate::materials::MaterialRegistry;
+use crate::shadow_map::ShadowMapPass;
 use crate::tone_mapping::ToneMapPass;
 
 /// Camera uniforms for GPU.
@@ -98,6 +99,8 @@ pub struct RenderEngine {
     hdr_view: Option<wgpu::TextureView>,
     /// Tone mapping post-processing pass.
     tone_map_pass: Option<ToneMapPass>,
+    /// Shadow map pass for ground plane shadows.
+    shadow_map_pass: Option<ShadowMapPass>,
 }
 
 impl RenderEngine {
@@ -164,7 +167,10 @@ impl RenderEngine {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        // Ground plane bind group layout
+        // Create shadow map pass first (needed for bind group)
+        let shadow_map_pass = ShadowMapPass::new(&device);
+
+        // Ground plane bind group layout (includes shadow bindings)
         let ground_plane_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Ground Plane Bind Group Layout"),
@@ -189,6 +195,35 @@ impl RenderEngine {
                             has_dynamic_offset: false,
                             min_binding_size: None,
                         },
+                        count: None,
+                    },
+                    // Light uniforms
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    // Shadow map texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Depth,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    // Shadow comparison sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
                         count: None,
                     },
                 ],
@@ -276,6 +311,7 @@ impl RenderEngine {
             hdr_texture: None,
             hdr_view: None,
             tone_map_pass: None,
+            shadow_map_pass: Some(shadow_map_pass),
         };
 
         engine.init_point_pipeline();
@@ -335,7 +371,10 @@ impl RenderEngine {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        // Ground plane bind group layout
+        // Create shadow map pass first (needed for bind group)
+        let shadow_map_pass = ShadowMapPass::new(&device);
+
+        // Ground plane bind group layout (includes shadow bindings)
         let ground_plane_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Ground Plane Bind Group Layout"),
@@ -360,6 +399,35 @@ impl RenderEngine {
                             has_dynamic_offset: false,
                             min_binding_size: None,
                         },
+                        count: None,
+                    },
+                    // Light uniforms
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    // Shadow map texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Depth,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    // Shadow comparison sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
                         count: None,
                     },
                 ],
@@ -447,6 +515,7 @@ impl RenderEngine {
             hdr_texture: None,
             hdr_view: None,
             tone_map_pass: None,
+            shadow_map_pass: Some(shadow_map_pass),
         };
 
         engine.init_point_pipeline();
@@ -654,6 +723,11 @@ impl RenderEngine {
     /// Gets the camera buffer.
     pub fn camera_buffer(&self) -> &wgpu::Buffer {
         &self.camera_buffer
+    }
+
+    /// Gets the shadow map pass (if initialized).
+    pub fn shadow_map_pass(&self) -> Option<&ShadowMapPass> {
+        self.shadow_map_pass.as_ref()
     }
 
     /// Initializes the vector arrow render pipeline.
@@ -1110,11 +1184,16 @@ impl RenderEngine {
 
         // Initialize render data if needed
         if self.ground_plane_render_data.is_none() {
-            self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
-                &self.device,
-                &self.ground_plane_bind_group_layout,
-                &self.camera_buffer,
-            ));
+            if let Some(ref shadow_pass) = self.shadow_map_pass {
+                self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
+                    &self.device,
+                    &self.ground_plane_bind_group_layout,
+                    &self.camera_buffer,
+                    shadow_pass.light_buffer(),
+                    shadow_pass.depth_view(),
+                    shadow_pass.comparison_sampler(),
+                ));
+            }
         }
 
         // Get camera height

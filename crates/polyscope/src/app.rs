@@ -373,6 +373,8 @@ impl App {
         };
         let mut gp_height = self.ground_plane.height;
         let mut gp_height_is_relative = self.ground_plane.height_is_relative;
+        let mut gp_shadow_blur_iters = self.ground_plane.shadow_blur_iters;
+        let mut gp_shadow_darkness = self.ground_plane.shadow_darkness;
 
         // Sync camera settings from engine
         self.camera_settings = crate::camera_to_settings(&engine.camera);
@@ -453,6 +455,8 @@ impl App {
                 &mut gp_mode,
                 &mut gp_height,
                 &mut gp_height_is_relative,
+                &mut gp_shadow_blur_iters,
+                &mut gp_shadow_darkness,
             );
 
             // Collect structure info
@@ -613,6 +617,8 @@ impl App {
         };
         self.ground_plane.height = gp_height;
         self.ground_plane.height_is_relative = gp_height_is_relative;
+        self.ground_plane.shadow_blur_iters = gp_shadow_blur_iters;
+        self.ground_plane.shadow_darkness = gp_shadow_darkness;
 
         // Apply camera settings if changed
         if camera_changed {
@@ -674,11 +680,17 @@ impl App {
         let bg_b = self.background_color.z as f64;
 
         // Store ground plane settings for later use
-        let gp_enabled = self.ground_plane.mode == GroundPlaneMode::Tile;
+        let gp_enabled = self.ground_plane.mode != GroundPlaneMode::None;
         let gp_height_override = if self.ground_plane.height_is_relative {
             None
         } else {
             Some(self.ground_plane.height)
+        };
+        // Shadow mode: 0=none (disabled), 1=shadow_only, 2=tile_with_shadow
+        let gp_shadow_mode = match self.ground_plane.mode {
+            GroundPlaneMode::None => 0u32,
+            GroundPlaneMode::ShadowOnly => 1u32,
+            GroundPlaneMode::Tile => 2u32, // Tile mode with shadows
         };
 
         // Main render pass - render scene to HDR or directly to surface
@@ -865,6 +877,8 @@ impl App {
             scene_min_y,
             length_scale,
             gp_height_override,
+            self.ground_plane.shadow_darkness,
+            gp_shadow_mode,
         );
 
         // Render egui on top
@@ -1068,14 +1082,21 @@ impl App {
         } else {
             Some(self.ground_plane.height)
         };
+        let screenshot_gp_shadow_mode = match self.ground_plane.mode {
+            GroundPlaneMode::None => 0u32,
+            GroundPlaneMode::ShadowOnly => 1u32,
+            GroundPlaneMode::Tile => 2u32,
+        };
         engine.render_ground_plane(
             &mut encoder,
             &screenshot_view,
-            self.ground_plane.mode == GroundPlaneMode::Tile,
+            self.ground_plane.mode != GroundPlaneMode::None,
             scene_center,
             scene_min_y,
             length_scale,
             height_override,
+            self.ground_plane.shadow_darkness,
+            screenshot_gp_shadow_mode,
         );
 
         engine.queue.submit(std::iter::once(encoder.finish()));

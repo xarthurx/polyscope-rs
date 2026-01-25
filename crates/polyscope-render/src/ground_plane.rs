@@ -57,10 +57,21 @@ pub struct GroundPlaneRenderData {
 
 impl GroundPlaneRenderData {
     /// Creates new ground plane render data.
+    ///
+    /// # Arguments
+    /// * `device` - The wgpu device
+    /// * `bind_group_layout` - The bind group layout
+    /// * `camera_buffer` - The camera uniform buffer
+    /// * `light_buffer` - The light uniform buffer (from ShadowMapPass)
+    /// * `shadow_depth_view` - The shadow map depth texture view
+    /// * `shadow_sampler` - The shadow comparison sampler
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
+        light_buffer: &wgpu::Buffer,
+        shadow_depth_view: &wgpu::TextureView,
+        shadow_sampler: &wgpu::Sampler,
     ) -> Self {
         let uniforms = GroundPlaneUniforms::default();
 
@@ -81,6 +92,18 @@ impl GroundPlaneRenderData {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: light_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(shadow_depth_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Sampler(shadow_sampler),
                 },
             ],
         });
