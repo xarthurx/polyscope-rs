@@ -42,6 +42,34 @@ Uses geometry shader to generate cylinder + cone geometry from line segments, th
 ### polyscope-rs Approach
 Uses instanced rendering with a precomputed arrow mesh template, transformed per-instance by position and vector direction.
 
+## GPU Picking
+
+### C++ Polyscope Approach
+Uses OpenGL's pick buffer with unique color IDs per element, read back via `glReadPixels`.
+
+### polyscope-rs Approach
+Uses a similar GPU pick buffer approach with wgpu:
+1. **Pick Buffer**: Offscreen RGBA8Unorm texture at viewport resolution
+2. **Encoding**: 12-bit structure ID + 12-bit element ID packed into RGB (24 bits)
+3. **Readback**: Single pixel copied to staging buffer via `copy_texture_to_buffer`
+4. **Async Mapping**: `buffer.map_async()` for CPU access
+
+**Features:**
+- Pixel-perfect element-level picking (point #42, face #127)
+- Proper depth testing for overlapping structures
+- Pick pass only runs on click (not every frame)
+- Structure ID assignment via registry
+
+**Encoding scheme:**
+```
+R[7:0] = struct_id[11:4]
+G[7:4] = struct_id[3:0]
+G[3:0] = elem_id[11:8]
+B[7:0] = elem_id[7:0]
+```
+
+Supports up to 4,096 structures and 4,096 elements per structure.
+
 ## Shader Composition
 
 ### C++ Polyscope Approach
@@ -155,7 +183,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Slice Planes | ✅ | ✅ (max 4) |
 | Groups | ✅ | ✅ |
 | Gizmos | ✅ | ✅ |
-| Picking | ✅ | ✅ |
+| Picking | ✅ | ✅ | GPU-based, element-level |
 | Screenshots | ✅ | ✅ |
 
 ### Materials & Color Maps

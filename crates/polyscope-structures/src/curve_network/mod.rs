@@ -11,6 +11,7 @@ use polyscope_render::{ColorMapRegistry, CurveNetworkRenderData, CurveNetworkUni
 pub use quantities::*;
 
 /// A curve network structure (nodes connected by edges).
+#[allow(dead_code)]
 pub struct CurveNetwork {
     name: String,
 

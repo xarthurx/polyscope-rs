@@ -1315,7 +1315,7 @@ impl ApplicationHandler for App {
 
                 // Accumulate drag distance
                 if self.left_mouse_down || self.right_mouse_down {
-                    self.drag_distance += (delta_x.abs() + delta_y.abs());
+                    self.drag_distance += delta_x.abs() + delta_y.abs();
                 }
 
                 // Camera control: only if egui isn't using the pointer

@@ -195,12 +195,23 @@ impl Camera {
         self.target += offset;
     }
 
-    /// Zooms the camera (moves toward/away from target).
+    /// Zooms the camera (moves toward/away from target for perspective,
+    /// adjusts ortho_scale for orthographic).
     pub fn zoom(&mut self, delta: f32) {
-        let direction = self.forward();
-        let distance = (self.position - self.target).length();
-        let new_distance = (distance - delta).max(0.1);
-        self.position = self.target - direction * new_distance;
+        match self.projection_mode {
+            ProjectionMode::Perspective => {
+                let direction = self.forward();
+                let distance = (self.position - self.target).length();
+                let new_distance = (distance - delta).max(0.1);
+                self.position = self.target - direction * new_distance;
+            }
+            ProjectionMode::Orthographic => {
+                // For orthographic, adjust the scale (smaller = zoom in, larger = zoom out)
+                // delta > 0 means zoom in (scroll up), so decrease scale
+                let zoom_factor = 1.0 - delta * 0.1;
+                self.ortho_scale = (self.ortho_scale * zoom_factor).clamp(0.01, 1000.0);
+            }
+        }
     }
 
     /// Resets the camera to look at the given bounding box.
@@ -336,5 +347,32 @@ mod tests {
         camera.set_up_direction(AxisDirection::PosZ);
         assert_eq!(camera.up, Vec3::Z);
         assert_eq!(camera.up_direction, AxisDirection::PosZ);
+    }
+
+    #[test]
+    fn test_zoom_perspective() {
+        let mut camera = Camera::new(1.0);
+        camera.projection_mode = ProjectionMode::Perspective;
+        camera.position = Vec3::new(0.0, 0.0, 5.0);
+        camera.target = Vec3::ZERO;
+
+        let initial_distance = camera.position.distance(camera.target);
+        camera.zoom(1.0); // Zoom in
+        let new_distance = camera.position.distance(camera.target);
+
+        assert!(new_distance < initial_distance, "Perspective zoom in should decrease distance");
+    }
+
+    #[test]
+    fn test_zoom_orthographic() {
+        let mut camera = Camera::new(1.0);
+        camera.projection_mode = ProjectionMode::Orthographic;
+        camera.ortho_scale = 5.0;
+
+        let initial_scale = camera.ortho_scale;
+        camera.zoom(1.0); // Zoom in (positive delta)
+        let new_scale = camera.ortho_scale;
+
+        assert!(new_scale < initial_scale, "Orthographic zoom in should decrease scale");
     }
 }

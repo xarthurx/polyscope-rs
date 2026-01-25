@@ -42,6 +42,7 @@ impl Default for BlurUniforms {
 }
 
 /// Shadow map render resources.
+#[allow(dead_code)]
 pub struct ShadowMapPass {
     /// Shadow map depth texture.
     depth_texture: wgpu::Texture,
