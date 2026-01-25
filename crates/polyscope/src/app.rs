@@ -1408,6 +1408,9 @@ impl App {
             screenshot_gp_shadow_mode,
         );
 
+        // Apply tone mapping from HDR to final screenshot texture
+        engine.apply_screenshot_tone_mapping(&mut encoder);
+
         engine.queue.submit(std::iter::once(encoder.finish()));
 
         // Capture the screenshot

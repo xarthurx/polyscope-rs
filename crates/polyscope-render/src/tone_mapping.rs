@@ -206,4 +206,17 @@ impl ToneMapPass {
         render_pass.set_bind_group(0, bind_group, &[]);
         render_pass.draw(0..3, 0..1); // Fullscreen triangle
     }
+
+    /// Renders tone mapping from input HDR texture to output texture.
+    /// Convenience method that creates a bind group and renders in one call.
+    pub fn render_to_target(
+        &self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        input_view: &wgpu::TextureView,
+        output_view: &wgpu::TextureView,
+    ) {
+        let bind_group = self.create_bind_group(device, input_view);
+        self.render(encoder, output_view, &bind_group);
+    }
 }
