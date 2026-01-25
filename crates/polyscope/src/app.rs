@@ -1389,12 +1389,21 @@ impl ApplicationHandler for App {
                                 if let Some((type_name, name, element_index)) = picked {
                                     // Something was clicked - select it
                                     self.selected_element_index = Some(element_index);
+
+                                    // Determine element type based on structure type
+                                    let element_type = match type_name.as_str() {
+                                        "PointCloud" => polyscope_render::PickElementType::Point,
+                                        "SurfaceMesh" => polyscope_render::PickElementType::Face,
+                                        "CurveNetwork" => polyscope_render::PickElementType::Edge,
+                                        _ => polyscope_render::PickElementType::None,
+                                    };
+
                                     self.selection = Some(PickResult {
                                         hit: true,
                                         structure_type: type_name.clone(),
                                         structure_name: name.clone(),
                                         element_index: element_index as u64,
-                                        element_type: polyscope_render::PickElementType::None,
+                                        element_type,
                                         screen_pos: click_screen,
                                         depth: 0.5,
                                     });

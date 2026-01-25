@@ -1,7 +1,7 @@
 //! Selection/pick results panel.
 
 use egui::{Context, SidePanel, Ui};
-use polyscope_render::PickResult;
+use polyscope_render::{PickElementType, PickResult};
 
 /// Builds the selection panel on the right side.
 /// Only shows if there is an active selection.
@@ -27,7 +27,16 @@ pub fn build_selection_panel(
                 "{}: {}",
                 selection.structure_type, selection.structure_name
             ));
-            ui.label(format!("Element #{}", selection.element_index));
+
+            // Show element type and index
+            let element_type_str = match selection.element_type {
+                PickElementType::None => "Element",
+                PickElementType::Point => "Point",
+                PickElementType::Vertex => "Vertex",
+                PickElementType::Face => "Face",
+                PickElementType::Edge => "Edge",
+            };
+            ui.label(format!("{} #{}", element_type_str, selection.element_index));
 
             ui.separator();
             build_structure_pick_ui(ui);
