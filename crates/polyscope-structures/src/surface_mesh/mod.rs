@@ -743,6 +743,9 @@ impl SurfaceMesh {
         };
         render_data.update_uniforms(queue, &uniforms);
 
+        // Update shadow model buffer if initialized
+        render_data.update_shadow_model(queue, model_matrix);
+
         // Apply quantity colors with priority:
         // vertex color > face color > vertex scalar > face scalar > surface color
         if let Some(cq) = self.active_vertex_color_quantity() {

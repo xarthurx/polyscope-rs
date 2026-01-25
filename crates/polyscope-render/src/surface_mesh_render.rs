@@ -370,6 +370,19 @@ impl SurfaceMeshRenderData {
     pub fn num_vertices(&self) -> u32 {
         self.num_indices // Same as expanded triangle vertex count
     }
+
+    /// Updates the shadow model uniform buffer with the current transform.
+    ///
+    /// This should be called whenever the mesh's transform changes to ensure
+    /// shadows are rendered at the correct position.
+    pub fn update_shadow_model(&self, queue: &wgpu::Queue, model_matrix: [[f32; 4]; 4]) {
+        if let Some(buffer) = &self.shadow_model_buffer {
+            let uniforms = ShadowModelUniforms {
+                model: model_matrix,
+            };
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        }
+    }
 }
 
 #[cfg(test)]
