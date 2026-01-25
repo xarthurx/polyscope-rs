@@ -141,11 +141,16 @@ impl GroundPlaneRenderData {
         shadow_mode: u32,
         is_orthographic: bool,
     ) {
-        // Compute ground height
+        // Compute ground height as offset from center
+        // The shader computes: center + up_direction * height
+        // So height should be relative to center, not absolute Y coordinate
+        let center_y = scene_center[1];
         let height = height_override.unwrap_or_else(|| {
             // Place below the scene's minimum Y coordinate
             // Use 5% of length_scale as offset to avoid intersection with model
-            scene_min_y - length_scale * 0.05
+            // height = (target_y - center_y), where target_y = scene_min_y - offset
+            let target_y = scene_min_y - length_scale * 0.05;
+            target_y - center_y
         });
 
         let uniforms = GroundPlaneUniforms {
