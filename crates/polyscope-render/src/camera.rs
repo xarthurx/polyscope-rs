@@ -142,13 +142,21 @@ impl Camera {
             ProjectionMode::Orthographic => {
                 let half_height = self.ortho_scale;
                 let half_width = half_height * self.aspect_ratio;
+                // For orthographic, we need a much larger depth range to avoid clipping.
+                // The camera may be far from the scene, but we want to see everything
+                // around the target point. Use a symmetric range centered on the
+                // camera-to-target distance.
+                let dist = (self.position - self.target).length();
+                // Near plane should be negative relative to target to see objects
+                // between camera and target. We use a large range to avoid clipping.
+                let ortho_depth = (dist + self.far).max(self.ortho_scale * 100.0);
                 Mat4::orthographic_rh(
                     -half_width,
                     half_width,
                     -half_height,
                     half_height,
-                    self.near,
-                    self.far,
+                    -ortho_depth,  // Negative near to see behind focus point
+                    ortho_depth,
                 )
             }
         }
