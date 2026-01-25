@@ -44,7 +44,7 @@ polyscope-rs/
 ├── crates/
 │   ├── polyscope-core/       # Core traits, registry, state management
 │   ├── polyscope-render/     # wgpu rendering backend
-│   ├── polyscope-ui/         # dear-imgui UI integration
+│   ├── polyscope-ui/         # egui UI integration
 │   ├── polyscope-structures/ # Structure implementations (mesh, points, etc.)
 │   └── polyscope/            # Main crate, re-exports all sub-crates
 ├── examples/
@@ -74,19 +74,19 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 
 ### Structures (polyscope-structures)
 
-- `PointCloud` - Point set with scalar/vector/color quantities
-- `SurfaceMesh` - Triangle mesh with vertex/face quantities
-- `CurveNetwork` - Edge network with node/edge quantities
-- `VolumeMesh` - Tet/hex mesh
-- `VolumeGrid` - Regular 3D grid with node/cell quantities
-- `CameraView` - Camera frustum visualization
+- `PointCloud` - Point set with scalar/vector/color quantities (full feature parity)
+- `SurfaceMesh` - Triangle mesh with vertex/face quantities (triangles full, polygons basic)
+- `CurveNetwork` - Edge network with node/edge quantities (full, tube rendering via compute shaders)
+- `VolumeMesh` - Tet/hex mesh (basic, no cuts)
+- `VolumeGrid` - Regular 3D grid with node/cell quantities (basic isosurface)
+- `CameraView` - Camera frustum visualization (full)
 
 ## Technology Stack
 
 | Component | Library |
 |-----------|---------|
 | Rendering | wgpu |
-| UI | dear-imgui-rs |
+| UI | egui (pure Rust, no native dependencies) |
 | Math | glam |
 | Windowing | winit |
 | Serialization | serde + serde_json |
@@ -110,11 +110,16 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 
 ### Shader Development
 
-Shaders are written in WGSL (WebGPU Shading Language). Key shaders needed:
-- Point sphere impostor
+Shaders are written in WGSL (WebGPU Shading Language). Implemented shaders:
+- Point sphere impostor (instanced rendering, no geometry shaders)
 - Mesh surface (flat/smooth shading)
-- Vector arrows
+- Vector arrows (instanced with precomputed mesh template)
 - Ground plane with shadows
+- Curve network (line mode + tube mode via compute shaders)
+- GPU picking (point, mesh, curve)
+- Tone mapping
+- Shadow map + blur
+- Ground reflection (infrastructure only, not integrated)
 
 ## Reference
 
