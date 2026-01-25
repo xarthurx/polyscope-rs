@@ -1235,9 +1235,11 @@ pub fn build_slice_planes_section(
 /// Builds the ground plane settings section.
 pub fn build_ground_plane_section(
     ui: &mut Ui,
-    mode: &mut u32, // 0=None, 1=Tile
+    mode: &mut u32, // 0=None, 1=Tile, 2=ShadowOnly
     height: &mut f32,
     height_is_relative: &mut bool,
+    shadow_blur_iters: &mut u32,
+    shadow_darkness: &mut f32,
 ) -> bool {
     let mut changed = false;
 
@@ -1248,13 +1250,18 @@ pub fn build_ground_plane_section(
             egui::ComboBox::from_label("Mode")
                 .selected_text(match *mode {
                     0 => "None",
-                    _ => "Tile",
+                    1 => "Tile",
+                    2 => "Shadow Only",
+                    _ => "Unknown",
                 })
                 .show_ui(ui, |ui| {
                     if ui.selectable_value(mode, 0, "None").changed() {
                         changed = true;
                     }
                     if ui.selectable_value(mode, 1, "Tile").changed() {
+                        changed = true;
+                    }
+                    if ui.selectable_value(mode, 2, "Shadow Only").changed() {
                         changed = true;
                     }
                 });
@@ -1275,6 +1282,30 @@ pub fn build_ground_plane_section(
                         }
                     });
                 }
+
+                // Shadow settings
+                ui.separator();
+                ui.label("Shadow Settings:");
+
+                ui.horizontal(|ui| {
+                    ui.label("Blur iterations:");
+                    if ui
+                        .add(Slider::new(shadow_blur_iters, 0..=5))
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Darkness:");
+                    if ui
+                        .add(Slider::new(shadow_darkness, 0.0..=1.0))
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
             }
         });
 
