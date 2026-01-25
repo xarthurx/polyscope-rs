@@ -143,8 +143,9 @@ impl GroundPlaneRenderData {
     ) {
         // Compute ground height
         let height = height_override.unwrap_or_else(|| {
-            // Place slightly below scene (like original Polyscope)
-            scene_min_y - length_scale * 0.01
+            // Place below the scene's minimum Y coordinate
+            // Use 5% of length_scale as offset to avoid intersection with model
+            scene_min_y - length_scale * 0.05
         });
 
         let uniforms = GroundPlaneUniforms {
