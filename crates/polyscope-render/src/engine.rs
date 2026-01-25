@@ -2326,6 +2326,82 @@ impl RenderEngine {
         }
     }
 
+    /// Creates a bind group for reflected mesh rendering.
+    pub fn create_reflected_mesh_bind_group(
+        &self,
+        mesh_render_data: &crate::surface_mesh_render::SurfaceMeshRenderData,
+    ) -> Option<wgpu::BindGroup> {
+        let layout = self.reflected_mesh_bind_group_layout.as_ref()?;
+
+        Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Reflected Mesh Bind Group"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: mesh_render_data.uniform_buffer().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: mesh_render_data.position_buffer().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: mesh_render_data.normal_buffer().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: mesh_render_data.barycentric_buffer().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: mesh_render_data.color_buffer().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: mesh_render_data.edge_is_real_buffer().as_entire_binding(),
+                },
+            ],
+        }))
+    }
+
+    /// Renders a single reflected mesh.
+    ///
+    /// Call this for each visible surface mesh after render_stencil_pass.
+    pub fn render_reflected_mesh(
+        &self,
+        render_pass: &mut wgpu::RenderPass,
+        mesh_bind_group: &wgpu::BindGroup,
+        vertex_count: u32,
+    ) {
+        let Some(pipeline) = &self.reflected_mesh_pipeline else {
+            return;
+        };
+        let Some(reflection) = &self.reflection_pass else {
+            return;
+        };
+
+        render_pass.set_pipeline(pipeline);
+        render_pass.set_bind_group(0, mesh_bind_group, &[]);
+        render_pass.set_bind_group(1, reflection.bind_group(), &[]);
+        render_pass.set_stencil_reference(1); // Test against stencil value 1
+        render_pass.draw(0..vertex_count, 0..1);
+    }
+
+    /// Returns the depth texture view.
+    pub fn depth_view(&self) -> &wgpu::TextureView {
+        &self.depth_view
+    }
+
+    /// Returns the HDR texture view if available.
+    pub fn hdr_texture_view(&self) -> Option<&wgpu::TextureView> {
+        self.hdr_view.as_ref()
+    }
+
     // ========== Pick System - Structure ID Management ==========
 
     /// Assigns a unique pick ID to a structure. Returns the assigned ID.

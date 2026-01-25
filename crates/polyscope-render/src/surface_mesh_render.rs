@@ -383,6 +383,43 @@ impl SurfaceMeshRenderData {
             queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[uniforms]));
         }
     }
+
+    // Buffer getters for reflection rendering
+
+    /// Returns the uniform buffer.
+    pub fn uniform_buffer(&self) -> &wgpu::Buffer {
+        &self.uniform_buffer
+    }
+
+    /// Returns the position buffer.
+    pub fn position_buffer(&self) -> &wgpu::Buffer {
+        &self.vertex_buffer
+    }
+
+    /// Returns the normal buffer.
+    pub fn normal_buffer(&self) -> &wgpu::Buffer {
+        &self.normal_buffer
+    }
+
+    /// Returns the barycentric buffer.
+    pub fn barycentric_buffer(&self) -> &wgpu::Buffer {
+        &self.barycentric_buffer
+    }
+
+    /// Returns the color buffer.
+    pub fn color_buffer(&self) -> &wgpu::Buffer {
+        &self.color_buffer
+    }
+
+    /// Returns the edge is real buffer.
+    pub fn edge_is_real_buffer(&self) -> &wgpu::Buffer {
+        &self.edge_is_real_buffer
+    }
+
+    /// Returns the number of vertices (for non-indexed drawing).
+    pub fn vertex_count(&self) -> u32 {
+        self.num_indices
+    }
 }
 
 #[cfg(test)]
