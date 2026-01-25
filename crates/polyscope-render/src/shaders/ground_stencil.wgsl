@@ -21,7 +21,8 @@ struct GroundUniforms {
     up_sign: f32,
     shadow_darkness: f32,
     shadow_mode: u32,
-    _padding: vec2<f32>,
+    is_orthographic: u32,
+    _padding: f32,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -32,7 +33,7 @@ struct VertexOutput {
     @location(0) pos_world_homog: vec4<f32>,
 }
 
-// Same vertex shader as ground plane (infinite plane geometry)
+// Same vertex shader as ground plane (handles both perspective and orthographic)
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;
@@ -42,14 +43,29 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     let vert_idx = vertex_index % 3u;
 
     // Center vertex at ground height
-    let center = vec4<f32>(ground.basis_z.xyz * ground.height, 1.0);
+    let center = vec4<f32>(ground.center.xyz + ground.basis_z.xyz * ground.height, 1.0);
 
-    // Four corner vertices at infinity (w=0)
+    // For orthographic mode, use large finite vertices instead of infinite
+    let ortho_scale = ground.length_scale * 100.0;
+
+    // Four corner vertices
     var corners: array<vec4<f32>, 4>;
-    corners[0] = vec4<f32>( ground.basis_x.xyz + ground.basis_y.xyz, 0.0);
-    corners[1] = vec4<f32>(-ground.basis_x.xyz + ground.basis_y.xyz, 0.0);
-    corners[2] = vec4<f32>(-ground.basis_x.xyz - ground.basis_y.xyz, 0.0);
-    corners[3] = vec4<f32>( ground.basis_x.xyz - ground.basis_y.xyz, 0.0);
+    if (ground.is_orthographic == 1u) {
+        // Orthographic: use large finite vertices (w=1)
+        let offset_x = ground.basis_x.xyz * ortho_scale;
+        let offset_y = ground.basis_y.xyz * ortho_scale;
+        let base = ground.center.xyz + ground.basis_z.xyz * ground.height;
+        corners[0] = vec4<f32>(base + offset_x + offset_y, 1.0);
+        corners[1] = vec4<f32>(base - offset_x + offset_y, 1.0);
+        corners[2] = vec4<f32>(base - offset_x - offset_y, 1.0);
+        corners[3] = vec4<f32>(base + offset_x - offset_y, 1.0);
+    } else {
+        // Perspective: use vertices at infinity (w=0)
+        corners[0] = vec4<f32>( ground.basis_x.xyz + ground.basis_y.xyz, 0.0);
+        corners[1] = vec4<f32>(-ground.basis_x.xyz + ground.basis_y.xyz, 0.0);
+        corners[2] = vec4<f32>(-ground.basis_x.xyz - ground.basis_y.xyz, 0.0);
+        corners[3] = vec4<f32>( ground.basis_x.xyz - ground.basis_y.xyz, 0.0);
+    }
 
     // Select vertices for this triangle
     var world_pos: vec4<f32>;
@@ -61,8 +77,11 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
         world_pos = corners[tri_idx];
     }
 
-    // Adjust position by ground height
-    let adjusted_pos = world_pos + vec4<f32>(ground.basis_z.xyz, 0.0) * ground.height * world_pos.w;
+    // Adjust position by ground height (only for infinite vertices with w=0)
+    var adjusted_pos = world_pos;
+    if (world_pos.w == 0.0) {
+        adjusted_pos = world_pos + vec4<f32>(ground.basis_z.xyz, 0.0) * ground.height;
+    }
 
     out.position = camera.view_proj * adjusted_pos;
     out.pos_world_homog = adjusted_pos;

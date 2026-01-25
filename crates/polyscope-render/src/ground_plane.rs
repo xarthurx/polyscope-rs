@@ -27,8 +27,10 @@ pub struct GroundPlaneUniforms {
     pub shadow_darkness: f32,
     /// Shadow mode: 0=none, 1=shadow_only, 2=tile_with_shadow
     pub shadow_mode: u32,
+    /// Whether camera is in orthographic mode (0=perspective, 1=orthographic)
+    pub is_orthographic: u32,
     /// Padding to align to 16 bytes
-    pub _padding: [f32; 2],
+    pub _padding: f32,
 }
 
 impl Default for GroundPlaneUniforms {
@@ -44,7 +46,8 @@ impl Default for GroundPlaneUniforms {
             up_sign: 1.0,
             shadow_darkness: 0.4,
             shadow_mode: 0, // No shadows by default
-            _padding: [0.0, 0.0],
+            is_orthographic: 0,
+            _padding: 0.0,
         }
     }
 }
@@ -125,6 +128,7 @@ impl GroundPlaneRenderData {
     /// * `height_override` - Optional manual height override
     /// * `shadow_darkness` - Shadow darkness (0.0 = no shadow, 1.0 = full black)
     /// * `shadow_mode` - Shadow mode: 0=none, 1=shadow_only, 2=tile_with_shadow
+    /// * `is_orthographic` - Whether camera is in orthographic mode
     pub fn update(
         &self,
         queue: &wgpu::Queue,
@@ -135,6 +139,7 @@ impl GroundPlaneRenderData {
         height_override: Option<f32>,
         shadow_darkness: f32,
         shadow_mode: u32,
+        is_orthographic: bool,
     ) {
         // Compute ground height
         let height = height_override.unwrap_or_else(|| {
@@ -154,7 +159,8 @@ impl GroundPlaneRenderData {
             up_sign: 1.0, // Y is up, so positive
             shadow_darkness,
             shadow_mode,
-            _padding: [0.0, 0.0],
+            is_orthographic: if is_orthographic { 1 } else { 0 },
+            _padding: 0.0,
         };
 
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));

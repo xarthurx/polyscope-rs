@@ -1223,6 +1223,7 @@ impl RenderEngine {
     /// * `height_override` - Optional manual height (None = auto below scene)
     /// * `shadow_darkness` - Shadow darkness (0.0 = no shadow, 1.0 = full black)
     /// * `shadow_mode` - Shadow mode: 0=none, 1=shadow_only, 2=tile_with_shadow
+    #[allow(clippy::too_many_arguments)]
     pub fn render_ground_plane(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -1235,6 +1236,8 @@ impl RenderEngine {
         shadow_darkness: f32,
         shadow_mode: u32,
     ) {
+        // Check if camera is in orthographic mode
+        let is_orthographic = self.camera.projection_mode == crate::camera::ProjectionMode::Orthographic;
         if !enabled {
             return;
         }
@@ -1269,6 +1272,7 @@ impl RenderEngine {
                 height_override,
                 shadow_darkness,
                 shadow_mode,
+                is_orthographic,
             );
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
