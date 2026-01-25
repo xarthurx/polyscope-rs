@@ -42,25 +42,29 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     let tri_idx = vertex_index / 3u;
     let vert_idx = vertex_index % 3u;
 
-    // Center vertex at ground height
-    let center = vec4<f32>(ground.center.xyz + ground.basis_z.xyz * ground.height, 1.0);
-
     // For orthographic mode, use large finite vertices instead of infinite
     let ortho_scale = ground.length_scale * 100.0;
 
-    // Four corner vertices
+    var center: vec4<f32>;
     var corners: array<vec4<f32>, 4>;
+
     if (ground.is_orthographic == 1u) {
-        // Orthographic: use large finite vertices (w=1)
+        // Orthographic: use finite vertices centered on ground.center
+        let base = ground.center.xyz + ground.basis_z.xyz * ground.height;
+        center = vec4<f32>(base, 1.0);
+
         let offset_x = ground.basis_x.xyz * ortho_scale;
         let offset_y = ground.basis_y.xyz * ortho_scale;
-        let base = ground.center.xyz + ground.basis_z.xyz * ground.height;
         corners[0] = vec4<f32>(base + offset_x + offset_y, 1.0);
         corners[1] = vec4<f32>(base - offset_x + offset_y, 1.0);
         corners[2] = vec4<f32>(base - offset_x - offset_y, 1.0);
         corners[3] = vec4<f32>(base + offset_x - offset_y, 1.0);
     } else {
-        // Perspective: use vertices at infinity (w=0)
+        // Perspective: use original infinite vertex technique
+        // Center at ground height (relative to origin, not ground.center)
+        center = vec4<f32>(ground.basis_z.xyz * ground.height, 1.0);
+
+        // Corners at infinity (w=0)
         corners[0] = vec4<f32>( ground.basis_x.xyz + ground.basis_y.xyz, 0.0);
         corners[1] = vec4<f32>(-ground.basis_x.xyz + ground.basis_y.xyz, 0.0);
         corners[2] = vec4<f32>(-ground.basis_x.xyz - ground.basis_y.xyz, 0.0);
