@@ -886,7 +886,7 @@ impl App {
         {
             // Compute light matrix from scene bounds
             let (scene_center, scene_radius) = crate::with_context(|ctx| {
-                (ctx.center(), ctx.length_scale * 2.0)
+                (ctx.center(), ctx.length_scale * 5.0)
             });
             let light_dir = glam::Vec3::new(0.5, -1.0, 0.3).normalize();
             let light_matrix = polyscope_render::ShadowMapPass::compute_light_matrix(
