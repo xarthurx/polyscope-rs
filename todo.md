@@ -33,18 +33,54 @@
 - **Left click** (no drag): Select structure at click position
 - **Right click** (no drag): Clear selection/deselect
 
-## Future Work: Full GPU Picking (for more accurate picking)
+## Next: GPU Picking (Element-level)
 
-The current screen-space picking is an approximation. For pixel-perfect picking:
+Replace screen-space approximation with pixel-perfect GPU picking. Returns exact element clicked (point #42, face #123, etc.).
 
-- [ ] Create pick buffer texture in RenderEngine
-- [ ] Create pick render pipeline for each structure type
-- [ ] Render structures to pick buffer with unique color IDs
-- [ ] Read back pixel at click position using staging buffer
-- [ ] Decode color to determine clicked structure/element
-- [ ] Add pick shaders for SurfaceMesh, CurveNetwork, etc.
+### Phase 1: Pick Buffer Infrastructure
+- [ ] Create pick buffer texture (RGBA8, same size as viewport) in RenderEngine
+- [ ] Create pick depth texture for proper occlusion
+- [ ] Add staging buffer for GPU→CPU readback
+- [ ] Add `pick_at(x, y)` method that reads single pixel from staging buffer
 
-## Current Limitations
+### Phase 2: Structure ID Encoding
+- [ ] Design encoding scheme: structure_id (12 bits) + element_id (12 bits) = 24 bits RGB
+- [ ] Create structure registry that assigns unique IDs to each structure
+- [ ] Update PickResult to include both structure and element info
+
+### Phase 3: Pick Shaders
+- [ ] Update existing `pick.wgsl` for PointCloud (already exists, needs integration)
+- [ ] Create `pick_mesh.wgsl` for SurfaceMesh (render faces with encoded face index)
+- [ ] Create `pick_curve.wgsl` for CurveNetwork (render edges with encoded edge index)
+- [ ] Create `pick_volume.wgsl` for VolumeMesh (render cells with encoded cell index)
+
+### Phase 4: Pick Pipelines
+- [ ] Create pick pipeline for PointCloud using pick.wgsl
+- [ ] Create pick pipeline for SurfaceMesh
+- [ ] Create pick pipeline for CurveNetwork
+- [ ] Create pick pipeline for VolumeMesh
+- [ ] Create pick pipeline for VolumeGrid
+- [ ] Create pick pipeline for CameraView
+
+### Phase 5: Integration
+- [ ] Add `render_pick_pass()` method to RenderEngine
+- [ ] Call pick pass on click (not every frame)
+- [ ] Replace `pick_structure_at_screen_pos()` in app.rs with GPU picking
+- [ ] Update selection UI to show element info (type, index)
+
+### Phase 6: Testing
+- [ ] Test picking accuracy with overlapping structures
+- [ ] Test picking with transformed structures (model matrix)
+- [ ] Test picking at viewport edges
+- [ ] Test picking with slice planes active
+
+## Future Work: Hover Highlighting (Option 3)
+After GPU picking is complete, can add:
+- [ ] Hover glow effect (pick every frame on mouse move)
+- [ ] Selection outline shader
+- [ ] Element info panel showing data values
+
+## Current Limitations (to be removed after GPU picking)
 - **Sparse point clouds**: Clicks between points may not register because we only sample up to 100 points. For very sparse point clouds, you may need to click directly on a visible point.
 - **Accuracy**: Screen-space picking uses a 20px threshold, which may select unintended structures if they are close together in screen space.
 - **Performance**: For structures with many elements, sampling is limited to 100 points for efficiency.

@@ -10,6 +10,16 @@ polyscope-rs is a viewer and user interface for 3D data such as meshes and point
 
 This is a Rust reimplementation of the original C++ [Polyscope](https://github.com/nmwsharp/polyscope) library, using modern Rust graphics libraries (wgpu, winit, dear-imgui-rs).
 
+## Disclaimer
+
+This project is an experiment in AI-driven software development. It is built on the belief that next-generation programming will largely depend on AI, rather than humans writing code line-by-line.
+
+I am a C++, Python, and C# developer. While I understand Rust syntax, I have never developed a project with it. However, I use Polyscope in various projects, have contributed PRs to the original C++ library, and am well-versed in its architecture.
+
+This project validates my hypothesis that languages with informative compiler feedback (Rust > C++) work better with AI-assisted development.
+
+Recommendations and thoughts are welcome in the GitHub Discussions section of this repository.
+
 ## Project Status
 
 **Current Version:** 0.1.x (Alpha)
