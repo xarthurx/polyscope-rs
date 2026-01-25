@@ -40,6 +40,8 @@ pub struct App {
     // Selection state
     selection: Option<PickResult>,
     last_click_pos: Option<(f64, f64)>,
+    // GPU picking - selected element index (from GPU pick)
+    selected_element_index: Option<u32>,
     // Ground plane settings
     ground_plane: GroundPlaneConfig,
     // Screenshot state
@@ -82,6 +84,7 @@ impl App {
             drag_distance: 0.0,
             selection: None,
             last_click_pos: None,
+            selected_element_index: None,
             ground_plane: GroundPlaneConfig::default(),
             screenshot_pending: None,
             screenshot_counter: 0,
@@ -117,11 +120,33 @@ impl App {
         self.background_color = color;
     }
 
+    /// Performs GPU-based picking to find which structure and element is at the given screen position.
+    ///
+    /// Uses the GPU pick buffer to determine the exact structure and element at the click position.
+    /// Returns (type_name, name, element_index) or None if clicking on empty space.
+    fn gpu_pick_at(&self, x: u32, y: u32) -> Option<(String, String, u32)> {
+        let engine = self.engine.as_ref()?;
+
+        // Read pick buffer
+        let (struct_id, elem_id) = engine.pick_at(x, y)?;
+
+        // Background check (struct_id 0 means nothing was hit)
+        if struct_id == 0 {
+            return None;
+        }
+
+        // Look up structure info from ID
+        let (type_name, name) = engine.lookup_structure_id(struct_id)?;
+        Some((type_name.to_string(), name.to_string(), elem_id as u32))
+    }
+
     /// Performs screen-space picking to find which structure (if any) is at the given screen position.
     ///
     /// Projects sample points from each structure to screen space and checks if the click
     /// is within a threshold distance. Returns the (type_name, name) of the clicked structure,
     /// or None if clicking on empty space.
+    ///
+    /// NOTE: This is the fallback method. GPU picking (gpu_pick_at) is preferred when available.
     fn pick_structure_at_screen_pos(
         &self,
         click_pos: glam::Vec2,
@@ -1143,9 +1168,12 @@ impl ApplicationHandler for App {
         );
 
         // Create render engine
-        let engine = RenderEngine::new_windowed(window.clone())
+        let mut engine = RenderEngine::new_windowed(window.clone())
             .block_on()
             .expect("failed to create render engine");
+
+        // Initialize GPU picking system
+        engine.init_pick_buffers(engine.width, engine.height);
 
         // Create egui integration
         let egui = EguiIntegration::new(&engine.device, engine.surface_config.format, &window);
@@ -1215,6 +1243,8 @@ impl ApplicationHandler for App {
             WindowEvent::Resized(size) => {
                 if let Some(engine) = &mut self.engine {
                     engine.resize(size.width, size.height);
+                    // Resize pick buffers to match
+                    engine.init_pick_buffers(size.width, size.height);
                 }
             }
             WindowEvent::RedrawRequested => {
@@ -1284,21 +1314,31 @@ impl ApplicationHandler for App {
                                     self.mouse_pos.1 as f32,
                                 );
 
-                                // Perform screen-space picking
-                                let picked = self.pick_structure_at_screen_pos(
-                                    click_screen,
-                                    engine.width,
-                                    engine.height,
-                                    &engine.camera,
+                                // Try GPU picking first (pixel-perfect when pick pass is rendered)
+                                let gpu_picked = self.gpu_pick_at(
+                                    self.mouse_pos.0 as u32,
+                                    self.mouse_pos.1 as u32,
                                 );
 
-                                if let Some((type_name, name)) = picked {
+                                // Fall back to screen-space picking if GPU pick misses
+                                let picked = gpu_picked.or_else(|| {
+                                    self.pick_structure_at_screen_pos(
+                                        click_screen,
+                                        engine.width,
+                                        engine.height,
+                                        &engine.camera,
+                                    )
+                                    .map(|(t, n)| (t, n, 0u32))
+                                });
+
+                                if let Some((type_name, name, element_index)) = picked {
                                     // Something was clicked - select it
+                                    self.selected_element_index = Some(element_index);
                                     self.selection = Some(PickResult {
                                         hit: true,
                                         structure_type: type_name.clone(),
                                         structure_name: name.clone(),
-                                        element_index: 0,
+                                        element_index: element_index as u64,
                                         element_type: polyscope_render::PickElementType::None,
                                         screen_pos: click_screen,
                                         depth: 0.5,
@@ -1308,6 +1348,7 @@ impl ApplicationHandler for App {
                                 } else {
                                     // Nothing was clicked - deselect
                                     self.selection = None;
+                                    self.selected_element_index = None;
                                     self.selection_info = polyscope_ui::SelectionInfo::default();
                                     crate::deselect_structure();
                                 }
@@ -1319,6 +1360,7 @@ impl ApplicationHandler for App {
                         // Right-click (not drag) in 3D viewport clears selection
                         if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
                             self.selection = None;
+                            self.selected_element_index = None;
                             self.selection_info = polyscope_ui::SelectionInfo::default();
                             crate::deselect_structure();
                         }
