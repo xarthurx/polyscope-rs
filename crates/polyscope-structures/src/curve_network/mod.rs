@@ -34,6 +34,8 @@ pub struct CurveNetwork {
     radius: f32,
     radius_is_relative: bool,
     material: String,
+    /// Render mode: 0 = line, 1 = tube (cylinder)
+    render_mode: u32,
 
     // Variable radius
     node_radius_quantity_name: Option<String>,
@@ -65,6 +67,7 @@ impl CurveNetwork {
             radius: 0.005,
             radius_is_relative: true,
             material: "default".to_string(),
+            render_mode: 0, // Default to line rendering
             node_radius_quantity_name: None,
             edge_radius_quantity_name: None,
             node_radius_autoscale: true,
@@ -176,6 +179,17 @@ impl CurveNetwork {
     /// Sets the material name.
     pub fn set_material(&mut self, material: impl Into<String>) -> &mut Self {
         self.material = material.into();
+        self
+    }
+
+    /// Gets the render mode (0 = line, 1 = tube).
+    pub fn render_mode(&self) -> u32 {
+        self.render_mode
+    }
+
+    /// Sets the render mode (0 = line, 1 = tube).
+    pub fn set_render_mode(&mut self, mode: u32) -> &mut Self {
+        self.render_mode = mode.min(1); // Clamp to valid values
         self
     }
 
@@ -358,6 +372,24 @@ impl CurveNetwork {
         self.render_data.as_ref()
     }
 
+    /// Initializes tube rendering resources.
+    pub fn init_tube_resources(
+        &mut self,
+        device: &wgpu::Device,
+        compute_bind_group_layout: &wgpu::BindGroupLayout,
+        render_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+    ) {
+        if let Some(render_data) = &mut self.render_data {
+            render_data.init_tube_resources(
+                device,
+                compute_bind_group_layout,
+                render_bind_group_layout,
+                camera_buffer,
+            );
+        }
+    }
+
     /// Updates GPU buffers based on current state.
     pub fn update_gpu_buffers(&self, queue: &wgpu::Queue, color_maps: &ColorMapRegistry) {
         let Some(render_data) = &self.render_data else {
@@ -368,7 +400,7 @@ impl CurveNetwork {
             color: [self.color.x, self.color.y, self.color.z, 1.0],
             radius: self.radius,
             radius_is_relative: if self.radius_is_relative { 1 } else { 0 },
-            render_mode: 0, // Line mode
+            render_mode: self.render_mode,
             _padding: 0.0,
         };
 
