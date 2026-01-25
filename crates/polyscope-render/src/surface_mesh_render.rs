@@ -35,6 +35,28 @@ pub struct MeshUniforms {
     pub backface_color: [f32; 4],
 }
 
+/// Model uniforms for shadow rendering.
+/// Only contains the model matrix (64 bytes) - matches shadow_map.wgsl ModelUniforms.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct ShadowModelUniforms {
+    /// Model transform matrix.
+    pub model: [[f32; 4]; 4],
+}
+
+impl Default for ShadowModelUniforms {
+    fn default() -> Self {
+        Self {
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+        }
+    }
+}
+
 impl Default for MeshUniforms {
     fn default() -> Self {
         Self {
@@ -82,6 +104,10 @@ pub struct SurfaceMeshRenderData {
     pub num_triangles: u32,
     /// Number of indices (num_triangles * 3).
     pub num_indices: u32,
+    /// Shadow pass bind group (for rendering to shadow map).
+    pub shadow_bind_group: Option<wgpu::BindGroup>,
+    /// Shadow model uniform buffer (contains only model matrix).
+    pub shadow_model_buffer: Option<wgpu::Buffer>,
 }
 
 impl SurfaceMeshRenderData {
@@ -252,6 +278,8 @@ impl SurfaceMeshRenderData {
             bind_group,
             num_triangles,
             num_indices,
+            shadow_bind_group: None,
+            shadow_model_buffer: None,
         }
     }
 
@@ -283,6 +311,64 @@ impl SurfaceMeshRenderData {
     pub fn clear_colors(&self, queue: &wgpu::Queue) {
         let zero_colors: Vec<f32> = vec![0.0; self.num_indices as usize * 4];
         queue.write_buffer(&self.color_buffer, 0, bytemuck::cast_slice(&zero_colors));
+    }
+
+    /// Initializes shadow rendering resources.
+    ///
+    /// Creates the bind group and model buffer needed for the shadow pass.
+    /// The shadow pass renders this mesh from the light's perspective to create
+    /// shadows on the ground plane.
+    pub fn init_shadow_resources(
+        &mut self,
+        device: &wgpu::Device,
+        shadow_bind_group_layout: &wgpu::BindGroupLayout,
+        light_buffer: &wgpu::Buffer,
+    ) {
+        // Create model uniform buffer for shadow pass
+        let shadow_model_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Shadow Model Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[ShadowModelUniforms::default()]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        // Create bind group matching shadow_map.wgsl:
+        // binding 0: light uniforms (view_proj, light_dir)
+        // binding 1: model uniforms (model matrix)
+        // binding 2: vertex positions (storage buffer)
+        let shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Surface Mesh Shadow Bind Group"),
+            layout: shadow_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: light_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: shadow_model_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.vertex_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        self.shadow_model_buffer = Some(shadow_model_buffer);
+        self.shadow_bind_group = Some(shadow_bind_group);
+    }
+
+    /// Returns whether shadow resources have been initialized.
+    pub fn has_shadow_resources(&self) -> bool {
+        self.shadow_bind_group.is_some()
+    }
+
+    /// Returns the number of vertices for shadow pass rendering.
+    ///
+    /// The shadow pass uses non-indexed drawing with storage buffers,
+    /// so this returns the number of expanded triangle vertices.
+    pub fn num_vertices(&self) -> u32 {
+        self.num_indices // Same as expanded triangle vertex count
     }
 }
 
