@@ -22,7 +22,7 @@ struct GroundUniforms {
     shadow_darkness: f32,     // Shadow darkness (0.0 = no shadow, 1.0 = full black)
     shadow_mode: u32,         // 0=none, 1=shadow_only, 2=tile_with_shadow
     is_orthographic: u32,     // 0=perspective, 1=orthographic
-    _padding: f32,
+    reflection_intensity: f32, // Reflection intensity (0=opaque, 1=mirror)
 }
 
 struct LightUniforms {
@@ -236,7 +236,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
+    // When reflection is enabled, reduce ground plane opacity to let reflection show through
+    // reflection_intensity=0 -> full opacity, reflection_intensity=1 -> very transparent
+    let reflection_transparency = 1.0 - ground.reflection_intensity * 0.7;
+    let final_alpha = fade_factor * reflection_transparency;
+
     // Premultiplied alpha output
-    lit_color *= fade_factor;
-    return vec4<f32>(lit_color, fade_factor);
+    lit_color *= final_alpha;
+    return vec4<f32>(lit_color, final_alpha);
 }

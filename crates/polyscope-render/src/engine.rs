@@ -1884,6 +1884,7 @@ impl RenderEngine {
     /// * `height_override` - Optional manual height (None = auto below scene)
     /// * `shadow_darkness` - Shadow darkness (0.0 = no shadow, 1.0 = full black)
     /// * `shadow_mode` - Shadow mode: 0=none, 1=shadow_only, 2=tile_with_shadow
+    /// * `reflection_intensity` - Reflection intensity (0.0 = opaque, affects transparency)
     #[allow(clippy::too_many_arguments)]
     pub fn render_ground_plane(
         &mut self,
@@ -1896,6 +1897,7 @@ impl RenderEngine {
         height_override: Option<f32>,
         shadow_darkness: f32,
         shadow_mode: u32,
+        reflection_intensity: f32,
     ) {
         // Check if camera is in orthographic mode
         let is_orthographic = self.camera.projection_mode == crate::camera::ProjectionMode::Orthographic;
@@ -1934,6 +1936,7 @@ impl RenderEngine {
                 shadow_darkness,
                 shadow_mode,
                 is_orthographic,
+                reflection_intensity,
             );
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -2013,9 +2016,10 @@ impl RenderEngine {
             length_scale,
             camera_height,
             Some(ground_height),
-            0.0,  // shadow_darkness (unused in stencil)
-            0,    // shadow_mode (unused in stencil)
+            0.0, // shadow_darkness (unused in stencil)
+            0,   // shadow_mode (unused in stencil)
             is_orthographic,
+            0.0, // reflection_intensity (unused in stencil)
         );
 
         let view = self.hdr_view.as_ref().unwrap_or(color_view);

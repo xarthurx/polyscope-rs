@@ -1244,6 +1244,11 @@ impl App {
         }
 
         // Ground plane renders to HDR internally (surface_view passed for fallback)
+        let gp_reflection_intensity = if self.ground_plane.mode == GroundPlaneMode::TileReflection {
+            self.ground_plane.reflection_intensity
+        } else {
+            0.0
+        };
         engine.render_ground_plane(
             &mut encoder,
             &view,
@@ -1254,6 +1259,7 @@ impl App {
             gp_height_override,
             self.ground_plane.shadow_darkness,
             gp_shadow_mode,
+            gp_reflection_intensity,
         );
 
         // Apply tone mapping from HDR to surface (always runs, uses passthrough if disabled)
@@ -1476,6 +1482,11 @@ impl App {
             GroundPlaneMode::Tile => 2u32,
             GroundPlaneMode::TileReflection => 2u32,
         };
+        let screenshot_reflection_intensity = if self.ground_plane.mode == GroundPlaneMode::TileReflection {
+            self.ground_plane.reflection_intensity
+        } else {
+            0.0
+        };
         engine.render_ground_plane(
             &mut encoder,
             &screenshot_view,
@@ -1486,6 +1497,7 @@ impl App {
             height_override,
             self.ground_plane.shadow_darkness,
             screenshot_gp_shadow_mode,
+            screenshot_reflection_intensity,
         );
 
         // Apply tone mapping from HDR to final screenshot texture

@@ -29,8 +29,8 @@ pub struct GroundPlaneUniforms {
     pub shadow_mode: u32,
     /// Whether camera is in orthographic mode (0=perspective, 1=orthographic)
     pub is_orthographic: u32,
-    /// Padding to align to 16 bytes
-    pub _padding: f32,
+    /// Reflection intensity (0.0 = no reflection/opaque ground, 1.0 = mirror)
+    pub reflection_intensity: f32,
 }
 
 impl Default for GroundPlaneUniforms {
@@ -47,7 +47,7 @@ impl Default for GroundPlaneUniforms {
             shadow_darkness: 0.4,
             shadow_mode: 0, // No shadows by default
             is_orthographic: 0,
-            _padding: 0.0,
+            reflection_intensity: 0.0, // No reflection by default
         }
     }
 }
@@ -129,6 +129,8 @@ impl GroundPlaneRenderData {
     /// * `shadow_darkness` - Shadow darkness (0.0 = no shadow, 1.0 = full black)
     /// * `shadow_mode` - Shadow mode: 0=none, 1=shadow_only, 2=tile_with_shadow
     /// * `is_orthographic` - Whether camera is in orthographic mode
+    /// * `reflection_intensity` - Reflection intensity (0.0 = opaque, 1.0 = mirror)
+    #[allow(clippy::too_many_arguments)]
     pub fn update(
         &self,
         queue: &wgpu::Queue,
@@ -140,6 +142,7 @@ impl GroundPlaneRenderData {
         shadow_darkness: f32,
         shadow_mode: u32,
         is_orthographic: bool,
+        reflection_intensity: f32,
     ) {
         // Compute ground height as offset from center
         // The shader computes: center + up_direction * height
@@ -166,7 +169,7 @@ impl GroundPlaneRenderData {
             shadow_darkness,
             shadow_mode,
             is_orthographic: if is_orthographic { 1 } else { 0 },
-            _padding: 0.0,
+            reflection_intensity,
         };
 
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
