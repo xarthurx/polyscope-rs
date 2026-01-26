@@ -724,10 +724,23 @@ impl VolumeMesh {
         self
     }
 
+    /// Returns the active vertex color quantity, if any.
+    fn active_vertex_color_quantity(&self) -> Option<&VolumeMeshVertexColorQuantity> {
+        for q in &self.quantities {
+            if q.is_enabled() {
+                if let Some(vcq) = q.as_any().downcast_ref::<VolumeMeshVertexColorQuantity>() {
+                    return Some(vcq);
+                }
+            }
+        }
+        None
+    }
+
     /// Generates mesh geometry for the cross-section created by a slice plane.
     ///
     /// This computes the intersection of all cells with the plane and triangulates
-    /// the resulting polygons for rendering.
+    /// the resulting polygons for rendering. If a vertex color quantity is enabled,
+    /// colors are interpolated at slice points.
     ///
     /// # Arguments
     /// * `plane_origin` - A point on the slice plane
@@ -743,6 +756,9 @@ impl VolumeMesh {
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
         let mut colors = Vec::new();
+
+        // Get active vertex color quantity for interpolation (if any)
+        let vertex_colors = self.active_vertex_color_quantity().map(|q| q.colors());
 
         for (cell_idx, cell) in self.cells.iter().enumerate() {
             let cell_type = self.cell_type(cell_idx);
@@ -766,6 +782,23 @@ impl VolumeMesh {
             };
 
             if slice.has_intersection() {
+                // Compute interpolated colors for each slice vertex
+                let slice_colors: Vec<Vec3> = if let Some(vc) = vertex_colors {
+                    slice
+                        .interpolation
+                        .iter()
+                        .map(|&(a, b, t)| {
+                            // Map local cell indices to global vertex indices
+                            let va_idx = cell[a as usize] as usize;
+                            let vb_idx = cell[b as usize] as usize;
+                            // Interpolate colors
+                            vc[va_idx].lerp(vc[vb_idx], t)
+                        })
+                        .collect()
+                } else {
+                    vec![self.interior_color; slice.vertices.len()]
+                };
+
                 // Triangulate the polygon (fan from first vertex)
                 for i in 1..slice.vertices.len() - 1 {
                     vertices.push(slice.vertices[0]);
@@ -777,10 +810,10 @@ impl VolumeMesh {
                     normals.push(plane_normal);
                     normals.push(plane_normal);
 
-                    // Color from interior_color
-                    colors.push(self.interior_color);
-                    colors.push(self.interior_color);
-                    colors.push(self.interior_color);
+                    // Interpolated colors (or interior_color if no quantity)
+                    colors.push(slice_colors[0]);
+                    colors.push(slice_colors[i]);
+                    colors.push(slice_colors[i + 1]);
                 }
             }
         }
