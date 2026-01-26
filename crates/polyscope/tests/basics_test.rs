@@ -90,6 +90,28 @@ fn test_basics() {
         );
     }
 
+    // Test 6: Volume mesh with quantities
+    {
+        // Create a small tet mesh (two tets sharing a face)
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+            Vec3::new(0.5, 0.5, -1.0),
+        ];
+        let tets = vec![[0, 1, 2, 3], [0, 2, 1, 4]];
+
+        let vm = register_tet_mesh("test_vol", vertices, tets);
+
+        // Add quantities
+        vm.add_vertex_scalar_quantity("temperature", vec![0.0, 0.25, 0.5, 0.75, 1.0]);
+        vm.add_cell_scalar_quantity("pressure", vec![1.0, 2.0]);
+
+        assert!(get_volume_mesh("test_vol").is_some());
+        assert!(get_volume_mesh("nonexistent").is_none());
+    }
+
     // Shutdown
     shutdown();
 }

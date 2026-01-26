@@ -909,6 +909,60 @@ impl VolumeMeshHandle {
         });
         self
     }
+
+    /// Adds a vertex scalar quantity.
+    pub fn add_vertex_scalar_quantity(&self, name: impl Into<String>, values: Vec<f32>) -> &Self {
+        let name = name.into();
+        with_volume_mesh(&self.name, |vm| {
+            vm.add_vertex_scalar_quantity(name, values);
+        });
+        self
+    }
+
+    /// Adds a cell scalar quantity.
+    pub fn add_cell_scalar_quantity(&self, name: impl Into<String>, values: Vec<f32>) -> &Self {
+        let name = name.into();
+        with_volume_mesh(&self.name, |vm| {
+            vm.add_cell_scalar_quantity(name, values);
+        });
+        self
+    }
+
+    /// Adds a vertex color quantity.
+    pub fn add_vertex_color_quantity(&self, name: impl Into<String>, colors: Vec<Vec3>) -> &Self {
+        let name = name.into();
+        with_volume_mesh(&self.name, |vm| {
+            vm.add_vertex_color_quantity(name, colors);
+        });
+        self
+    }
+
+    /// Adds a cell color quantity.
+    pub fn add_cell_color_quantity(&self, name: impl Into<String>, colors: Vec<Vec3>) -> &Self {
+        let name = name.into();
+        with_volume_mesh(&self.name, |vm| {
+            vm.add_cell_color_quantity(name, colors);
+        });
+        self
+    }
+
+    /// Adds a vertex vector quantity.
+    pub fn add_vertex_vector_quantity(&self, name: impl Into<String>, vectors: Vec<Vec3>) -> &Self {
+        let name = name.into();
+        with_volume_mesh(&self.name, |vm| {
+            vm.add_vertex_vector_quantity(name, vectors);
+        });
+        self
+    }
+
+    /// Adds a cell vector quantity.
+    pub fn add_cell_vector_quantity(&self, name: impl Into<String>, vectors: Vec<Vec3>) -> &Self {
+        let name = name.into();
+        with_volume_mesh(&self.name, |vm| {
+            vm.add_cell_vector_quantity(name, vectors);
+        });
+        self
+    }
 }
 
 /// Executes a closure with mutable access to a registered volume mesh.
