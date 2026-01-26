@@ -278,6 +278,9 @@ impl App {
 
         // Initialize GPU resources for any uninitialized point clouds and vector quantities
         crate::with_context_mut(|ctx| {
+            // Collect slice plane data before the loop to avoid borrow conflicts
+            let slice_planes: Vec<_> = ctx.slice_planes().cloned().collect();
+
             for structure in ctx.registry.iter_mut() {
                 if structure.type_name() == "PointCloud" {
                     let structure_name = structure.name().to_string();
@@ -409,6 +412,21 @@ impl App {
                                 engine.mesh_bind_group_layout(),
                                 engine.camera_buffer(),
                             );
+                        }
+
+                        // Update slice render data for enabled slice planes
+                        for plane in &slice_planes {
+                            if plane.is_enabled() {
+                                vm.update_slice_render_data(
+                                    &engine.device,
+                                    &engine.queue,
+                                    engine.mesh_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    plane.origin(),
+                                    plane.normal(),
+                                );
+                                break; // Only handle first enabled plane for now
+                            }
                         }
                     }
                 }
@@ -1221,6 +1239,7 @@ impl App {
                     }
                     if structure.type_name() == "VolumeMesh" {
                         if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                            // Render exterior faces
                             if let Some(render_data) = vm.render_data() {
                                 render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                 render_pass.set_index_buffer(
@@ -1228,6 +1247,14 @@ impl App {
                                     wgpu::IndexFormat::Uint32,
                                 );
                                 render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
+                            }
+
+                            // Render slice cap geometry
+                            if let Some(slice_data) = vm.slice_render_data() {
+                                if !slice_data.is_empty() {
+                                    render_pass.set_bind_group(0, slice_data.bind_group(), &[]);
+                                    render_pass.draw(0..slice_data.num_indices(), 0..1);
+                                }
                             }
                         }
                     }

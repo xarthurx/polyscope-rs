@@ -57,7 +57,7 @@ use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{MeshUniforms, SurfaceMeshRenderData};
+use polyscope_render::{MeshUniforms, SliceMeshRenderData, SurfaceMeshRenderData};
 
 /// Cell type for volume meshes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +92,11 @@ pub struct VolumeMesh {
 
     // GPU resources (renders exterior faces)
     render_data: Option<SurfaceMeshRenderData>,
+
+    // Slice mesh GPU resources (renders cross-section caps)
+    slice_render_data: Option<SliceMeshRenderData>,
+    /// Cached slice plane parameters for invalidation (origin, normal)
+    slice_plane_cache: Option<(Vec3, Vec3)>,
 }
 
 impl VolumeMesh {
@@ -118,6 +123,8 @@ impl VolumeMesh {
             edge_color: Vec3::ZERO,
             edge_width: 0.0,
             render_data: None,
+            slice_render_data: None,
+            slice_plane_cache: None,
         }
     }
 
@@ -505,6 +512,78 @@ impl VolumeMesh {
         }
     }
 
+    /// Updates or creates slice mesh render data for a given slice plane.
+    ///
+    /// Returns `true` if the slice intersects this volume mesh.
+    pub fn update_slice_render_data(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        plane_origin: Vec3,
+        plane_normal: Vec3,
+    ) -> bool {
+        // Check if cache is still valid
+        let cache_valid = self.slice_plane_cache.map_or(false, |(o, n)| {
+            (o - plane_origin).length_squared() < 1e-10 && (n - plane_normal).length_squared() < 1e-10
+        });
+
+        if cache_valid && self.slice_render_data.is_some() {
+            return !self.slice_render_data.as_ref().unwrap().is_empty();
+        }
+
+        // Generate new slice geometry
+        if let Some(slice_data) = self.generate_slice_geometry(plane_origin, plane_normal) {
+            if let Some(ref mut rd) = self.slice_render_data {
+                // Update existing render data
+                rd.update(
+                    device,
+                    queue,
+                    bind_group_layout,
+                    camera_buffer,
+                    &slice_data.vertices,
+                    &slice_data.normals,
+                    &slice_data.colors,
+                );
+            } else {
+                // Create new render data
+                self.slice_render_data = Some(SliceMeshRenderData::new(
+                    device,
+                    bind_group_layout,
+                    camera_buffer,
+                    &slice_data.vertices,
+                    &slice_data.normals,
+                    &slice_data.colors,
+                ));
+            }
+
+            // Update uniforms with interior color
+            if let Some(ref rd) = self.slice_render_data {
+                rd.update_uniforms(queue, self.interior_color);
+            }
+
+            self.slice_plane_cache = Some((plane_origin, plane_normal));
+            true
+        } else {
+            // No intersection
+            self.slice_render_data = None;
+            self.slice_plane_cache = None;
+            false
+        }
+    }
+
+    /// Returns the slice render data if available.
+    pub fn slice_render_data(&self) -> Option<&SliceMeshRenderData> {
+        self.slice_render_data.as_ref()
+    }
+
+    /// Clears the slice render data cache.
+    pub fn clear_slice_render_data(&mut self) {
+        self.slice_render_data = None;
+        self.slice_plane_cache = None;
+    }
+
     /// Builds the egui UI for this volume mesh.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
         // Info
@@ -817,6 +896,8 @@ impl Structure for VolumeMesh {
 
     fn refresh(&mut self) {
         self.render_data = None;
+        self.slice_render_data = None;
+        self.slice_plane_cache = None;
         for quantity in &mut self.quantities {
             quantity.refresh();
         }
