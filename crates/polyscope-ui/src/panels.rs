@@ -81,9 +81,9 @@ impl Default for AppearanceSettings {
             max_fps: 60,
             ssao_enabled: false,
             ssao_radius: 0.5,
-            ssao_intensity: 1.0,
+            ssao_intensity: 1.5,
             ssao_bias: 0.025,
-            ssao_sample_count: 16,
+            ssao_sample_count: 32,
         }
     }
 }

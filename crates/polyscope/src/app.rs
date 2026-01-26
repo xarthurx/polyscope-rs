@@ -1151,12 +1151,13 @@ impl App {
                         depth_slice: None,
                     }),
                     // Normal output (G-buffer for SSAO)
+                    // Alpha=0 marks "no geometry" so SSAO skips ground plane/background
                     Some(wgpu::RenderPassColorAttachment {
                         view: normal_view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.5, g: 0.5, b: 1.0, a: 1.0, // Default normal pointing up
+                                r: 0.5, g: 0.5, b: 1.0, a: 0.0, // a=0 means no valid geometry
                             }),
                             store: wgpu::StoreOp::Store,
                         },

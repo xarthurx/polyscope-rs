@@ -22,9 +22,9 @@ impl Default for SsaoConfig {
         Self {
             enabled: false,
             radius: 0.5,
-            intensity: 1.0,
+            intensity: 1.5, // Slightly higher for more visible effect
             bias: 0.025,
-            sample_count: 16,
+            sample_count: 32, // Higher quality by default
         }
     }
 }
