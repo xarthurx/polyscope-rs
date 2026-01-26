@@ -131,6 +131,8 @@ pub struct SlicePlaneSettings {
     pub color: [f32; 3],
     /// Transparency (0.0 = transparent, 1.0 = opaque).
     pub transparency: f32,
+    /// Size of the plane visualization (half-extent in each direction).
+    pub plane_size: f32,
     /// Whether this plane is currently selected for gizmo manipulation.
     pub is_selected: bool,
 }
@@ -146,6 +148,7 @@ impl Default for SlicePlaneSettings {
             draw_widget: true,
             color: [0.5, 0.5, 0.5],
             transparency: 0.3,
+            plane_size: 0.1,
             is_selected: false,
         }
     }
@@ -251,10 +254,8 @@ pub enum GroupsAction {
 /// Gizmo settings for UI.
 #[derive(Debug, Clone)]
 pub struct GizmoSettings {
-    /// Gizmo mode (0=Translate, 1=Rotate, 2=Scale).
-    pub mode: u32,
-    /// Coordinate space (0=World, 1=Local).
-    pub space: u32,
+    /// Use local coordinate space (true) or world space (false).
+    pub local_space: bool,
     /// Whether gizmo is visible.
     pub visible: bool,
     /// Translation snap value (0 = disabled).
@@ -268,8 +269,7 @@ pub struct GizmoSettings {
 impl Default for GizmoSettings {
     fn default() -> Self {
         Self {
-            mode: 0,  // Translate
-            space: 0, // World
+            local_space: false, // World space by default
             visible: true,
             snap_translate: 0.0,
             snap_rotate: 0.0,
@@ -360,35 +360,15 @@ pub fn build_gizmo_section(
 
             ui.separator();
 
-            // Gizmo mode
-            ui.label("Mode:");
-            ui.horizontal(|ui| {
-                if ui
-                    .selectable_label(settings.mode == 0, "Translate")
-                    .clicked()
-                {
-                    settings.mode = 0;
-                    action = GizmoAction::SettingsChanged;
-                }
-                if ui.selectable_label(settings.mode == 1, "Rotate").clicked() {
-                    settings.mode = 1;
-                    action = GizmoAction::SettingsChanged;
-                }
-                if ui.selectable_label(settings.mode == 2, "Scale").clicked() {
-                    settings.mode = 2;
-                    action = GizmoAction::SettingsChanged;
-                }
-            });
-
             // Gizmo space
-            ui.label("Space:");
             ui.horizontal(|ui| {
-                if ui.selectable_label(settings.space == 0, "World").clicked() {
-                    settings.space = 0;
+                ui.label("Space:");
+                if ui.selectable_label(!settings.local_space, "World").clicked() {
+                    settings.local_space = false;
                     action = GizmoAction::SettingsChanged;
                 }
-                if ui.selectable_label(settings.space == 1, "Local").clicked() {
-                    settings.space = 1;
+                if ui.selectable_label(settings.local_space, "Local").clicked() {
+                    settings.local_space = true;
                     action = GizmoAction::SettingsChanged;
                 }
             });
@@ -1287,21 +1267,21 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
         });
     }
 
-    // Color
+    // Plane size
     ui.horizontal(|ui| {
-        ui.label("Color:");
-        if ui.color_edit_button_rgb(&mut settings.color).changed() {
+        ui.label("Plane size:");
+        if ui
+            .add(Slider::new(&mut settings.plane_size, 0.01..=1.0).logarithmic(true))
+            .changed()
+        {
             changed = true;
         }
     });
 
-    // Transparency
+    // Color
     ui.horizontal(|ui| {
-        ui.label("Opacity:");
-        if ui
-            .add(Slider::new(&mut settings.transparency, 0.0..=1.0))
-            .changed()
-        {
+        ui.label("Color:");
+        if ui.color_edit_button_rgb(&mut settings.color).changed() {
             changed = true;
         }
     });
@@ -1485,9 +1465,9 @@ pub fn build_structure_tree<F>(
                 return;
             }
 
-            // Group by type
-            let mut by_type: std::collections::HashMap<&str, Vec<(&str, bool)>> =
-                std::collections::HashMap::new();
+            // Group by type using BTreeMap for stable, sorted ordering
+            let mut by_type: std::collections::BTreeMap<&str, Vec<(&str, bool)>> =
+                std::collections::BTreeMap::new();
             for (type_name, name, enabled) in structures {
                 by_type
                     .entry(type_name.as_str())
@@ -1496,11 +1476,15 @@ pub fn build_structure_tree<F>(
             }
 
             for (type_name, instances) in &by_type {
+                // Sort instances by name for stable ordering
+                let mut sorted_instances: Vec<_> = instances.iter().collect();
+                sorted_instances.sort_by_key(|(name, _)| *name);
+
                 let header = format!("{} ({})", type_name, instances.len());
                 CollapsingHeader::new(header)
                     .default_open(instances.len() <= 8)
                     .show(ui, |ui| {
-                        for (name, enabled) in instances {
+                        for (name, enabled) in sorted_instances {
                             let mut enabled_mut = *enabled;
                             ui.horizontal(|ui| {
                                 if ui.checkbox(&mut enabled_mut, "").changed() {
@@ -1535,9 +1519,9 @@ pub fn build_structure_tree_with_ui<F, U>(
                 return;
             }
 
-            // Group by type
-            let mut by_type: std::collections::HashMap<&str, Vec<(&str, bool)>> =
-                std::collections::HashMap::new();
+            // Group by type using BTreeMap for stable, sorted ordering
+            let mut by_type: std::collections::BTreeMap<&str, Vec<(&str, bool)>> =
+                std::collections::BTreeMap::new();
             for (type_name, name, enabled) in structures {
                 by_type
                     .entry(type_name.as_str())
@@ -1546,11 +1530,15 @@ pub fn build_structure_tree_with_ui<F, U>(
             }
 
             for (type_name, instances) in &by_type {
+                // Sort instances by name for stable ordering
+                let mut sorted_instances: Vec<_> = instances.iter().collect();
+                sorted_instances.sort_by_key(|(name, _)| *name);
+
                 let header = format!("{} ({})", type_name, instances.len());
                 CollapsingHeader::new(header)
                     .default_open(instances.len() <= 8)
                     .show(ui, |ui| {
-                        for (name, enabled) in instances {
+                        for (name, enabled) in sorted_instances {
                             let mut enabled_mut = *enabled;
 
                             // Use a collapsing header for each structure to show its UI

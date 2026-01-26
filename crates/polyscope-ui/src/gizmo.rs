@@ -1,4 +1,6 @@
 //! Visual 3D gizmo integration using transform-gizmo-egui.
+//!
+//! Shows all gizmo modes (translate, rotate, scale) simultaneously.
 
 use egui::Ui;
 use glam::{DMat4, Mat4, Quat, Vec3};
@@ -28,6 +30,7 @@ impl TransformGizmo {
 
     /// Draws the gizmo and handles interaction.
     ///
+    /// Shows all modes (translate, rotate, scale) simultaneously.
     /// Returns the updated transform if the gizmo was manipulated.
     ///
     /// # Arguments
@@ -35,8 +38,7 @@ impl TransformGizmo {
     /// * `view_matrix` - Camera view matrix
     /// * `projection_matrix` - Camera projection matrix
     /// * `model_matrix` - Current transform of the object
-    /// * `mode` - Gizmo mode (0=Translate, 1=Rotate, 2=Scale)
-    /// * `space` - Coordinate space (0=World, 1=Local)
+    /// * `local_space` - If true, use local coordinates; if false, use world coordinates
     /// * `viewport` - Viewport rect
     pub fn interact(
         &mut self,
@@ -44,31 +46,13 @@ impl TransformGizmo {
         view_matrix: Mat4,
         projection_matrix: Mat4,
         model_matrix: Mat4,
-        mode: u32,
-        space: u32,
+        local_space: bool,
         viewport: egui::Rect,
     ) -> Option<Mat4> {
-        // Get modes based on user selection
-        let modes = match mode {
-            0 => {
-                GizmoMode::TranslateX
-                    | GizmoMode::TranslateY
-                    | GizmoMode::TranslateZ
-                    | GizmoMode::TranslateXY
-                    | GizmoMode::TranslateXZ
-                    | GizmoMode::TranslateYZ
-            }
-            1 => GizmoMode::RotateX | GizmoMode::RotateY | GizmoMode::RotateZ,
-            2 => {
-                GizmoMode::ScaleX | GizmoMode::ScaleY | GizmoMode::ScaleZ | GizmoMode::ScaleUniform
-            }
-            _ => GizmoMode::TranslateX | GizmoMode::TranslateY | GizmoMode::TranslateZ,
-        };
-
-        let orientation = match space {
-            0 => GizmoOrientation::Global,
-            1 => GizmoOrientation::Local,
-            _ => GizmoOrientation::Global,
+        let orientation = if local_space {
+            GizmoOrientation::Local
+        } else {
+            GizmoOrientation::Global
         };
 
         // Convert glam Mat4 (f32) to DMat4 (f64) for transform-gizmo
@@ -106,7 +90,7 @@ impl TransformGizmo {
             view_matrix: view_mint,
             projection_matrix: proj_mint,
             viewport,
-            modes,
+            modes: GizmoMode::all(),
             mode_override: None,
             orientation,
             pivot_point: TransformPivotPoint::MedianPoint,

@@ -21,8 +21,10 @@ pub struct PlaneRenderUniforms {
     pub transparency: f32,
     /// Length scale for grid sizing.
     pub length_scale: f32,
+    /// Size of the plane visualization (half-extent in each direction).
+    pub plane_size: f32,
     /// Padding for alignment.
-    pub _padding: [f32; 2],
+    pub _padding: f32,
 }
 
 impl Default for PlaneRenderUniforms {
@@ -33,7 +35,8 @@ impl Default for PlaneRenderUniforms {
             grid_color: [0.3, 0.3, 0.3, 1.0],
             transparency: 0.3,
             length_scale: 1.0,
-            _padding: [0.0; 2],
+            plane_size: 0.1,
+            _padding: 0.0,
         }
     }
 }
@@ -41,7 +44,7 @@ impl Default for PlaneRenderUniforms {
 /// Computes the transform matrix for a slice plane.
 ///
 /// The plane lies in X=0 in local space, with Y and Z as tangent directions.
-/// The transform positions and orients the infinite plane in world space.
+/// The transform positions and orients the plane quad in world space.
 fn compute_plane_transform(origin: Vec3, normal: Vec3) -> Mat4 {
     // Build orthonormal basis for the plane
     // The normal becomes the local X axis (plane is at X=0)
@@ -131,7 +134,8 @@ impl SlicePlaneRenderData {
             grid_color: [color.x * 0.6, color.y * 0.6, color.z * 0.6, 1.0],
             transparency: plane.transparency(),
             length_scale,
-            _padding: [0.0; 2],
+            plane_size: plane.plane_size(),
+            _padding: 0.0,
         };
 
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
@@ -144,7 +148,7 @@ impl SlicePlaneRenderData {
 
     /// Draws the slice plane visualization.
     ///
-    /// Draws 12 vertices (4 triangles) forming an infinite plane.
+    /// Draws 12 vertices (4 triangles) forming a double-sided bounded quad.
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.draw(0..12, 0..1);
@@ -242,8 +246,8 @@ pub fn create_slice_plane_pipeline(
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: depth_format,
-            depth_write_enabled: false, // Don't write depth for transparent surface
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_write_enabled: true, // Write depth so scene geometry can occlude the plane
+            depth_compare: wgpu::CompareFunction::Always, // Always render (depth buffer is clear)
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),

@@ -2219,6 +2219,109 @@ impl RenderEngine {
         }
     }
 
+    /// Renders slice plane visualizations with clearing.
+    ///
+    /// Clears the HDR texture and depth buffer first, then renders slice planes.
+    /// This should be called BEFORE rendering scene geometry so that geometry
+    /// can properly occlude the slice planes.
+    pub fn render_slice_planes_with_clear(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        planes: &[polyscope_core::slice_plane::SlicePlane],
+        length_scale: f32,
+        clear_color: [f32; 3],
+    ) {
+        // Use HDR texture if available
+        let Some(view) = &self.hdr_view else {
+            return;
+        };
+
+        // Ensure we have enough render data for all planes
+        while self.slice_plane_render_data.len() < planes.len() {
+            let data = SlicePlaneRenderData::new(
+                &self.device,
+                &self.slice_plane_vis_bind_group_layout,
+                &self.camera_buffer,
+            );
+            self.slice_plane_render_data.push(data);
+        }
+
+        // Check if any planes need to be rendered
+        let has_visible_planes = planes.iter().any(|p| p.is_enabled() && p.draw_plane());
+
+        // First pass: clear the buffers
+        {
+            let _clear_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Slice Plane Clear Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: clear_color[0] as f64,
+                            g: clear_color[1] as f64,
+                            b: clear_color[2] as f64,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+            // Pass ends here, clearing is done
+        }
+
+        // Only render planes if there are visible ones
+        if !has_visible_planes {
+            return;
+        }
+
+        // Render each enabled plane that should be drawn
+        for (i, plane) in planes.iter().enumerate() {
+            if !plane.is_enabled() || !plane.draw_plane() {
+                continue;
+            }
+
+            // Update uniforms for this plane
+            self.slice_plane_render_data[i].update(&self.queue, plane, length_scale);
+
+            // Begin render pass for this plane (loads existing content)
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Slice Plane Visualization Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+
+            render_pass.set_pipeline(&self.slice_plane_vis_pipeline);
+            self.slice_plane_render_data[i].draw(&mut render_pass);
+        }
+    }
+
     /// Renders the ground plane to the stencil buffer for reflection masking.
     ///
     /// This should be called before rendering reflected geometry.

@@ -27,6 +27,8 @@ pub struct SlicePlane {
     color: Vec3,
     /// Transparency of the plane visualization (0.0 = transparent, 1.0 = opaque).
     transparency: f32,
+    /// Size of the plane visualization (half-extent in each direction).
+    plane_size: f32,
 }
 
 impl SlicePlane {
@@ -43,6 +45,7 @@ impl SlicePlane {
             draw_widget: true,
             color: Vec3::new(0.5, 0.5, 0.5),
             transparency: 0.3,
+            plane_size: 0.1,
         }
     }
 
@@ -57,6 +60,7 @@ impl SlicePlane {
             draw_widget: true,
             color: Vec3::new(0.5, 0.5, 0.5),
             transparency: 0.3,
+            plane_size: 0.1,
         }
     }
 
@@ -139,6 +143,16 @@ impl SlicePlane {
     /// Sets the transparency of the plane visualization.
     pub fn set_transparency(&mut self, transparency: f32) {
         self.transparency = transparency.clamp(0.0, 1.0);
+    }
+
+    /// Returns the size of the plane visualization (half-extent in each direction).
+    pub fn plane_size(&self) -> f32 {
+        self.plane_size
+    }
+
+    /// Sets the size of the plane visualization (half-extent in each direction).
+    pub fn set_plane_size(&mut self, size: f32) {
+        self.plane_size = size.max(0.001);
     }
 
     /// Returns the signed distance from a point to the plane.

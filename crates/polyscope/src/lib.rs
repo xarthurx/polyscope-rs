@@ -1425,6 +1425,25 @@ impl SlicePlaneHandle {
                 .unwrap_or(0.3)
         })
     }
+
+    /// Sets the size of the plane visualization (half-extent in each direction).
+    pub fn set_plane_size(&self, size: f32) -> &Self {
+        with_context_mut(|ctx| {
+            if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
+                plane.set_plane_size(size);
+            }
+        });
+        self
+    }
+
+    /// Gets the size of the plane visualization (half-extent in each direction).
+    pub fn plane_size(&self) -> f32 {
+        with_context(|ctx| {
+            ctx.get_slice_plane(&self.name)
+                .map(|p| p.plane_size())
+                .unwrap_or(0.1)
+        })
+    }
 }
 
 // ============================================================================
@@ -1742,6 +1761,7 @@ pub fn get_slice_plane_settings() -> Vec<polyscope_ui::SlicePlaneSettings> {
                 draw_widget: plane.draw_widget(),
                 color: plane.color().to_array(),
                 transparency: plane.transparency(),
+                plane_size: plane.plane_size(),
                 is_selected: selected == Some(plane.name()),
             })
             .collect()
@@ -1759,6 +1779,7 @@ pub fn apply_slice_plane_settings(settings: &polyscope_ui::SlicePlaneSettings) {
             plane.set_draw_widget(settings.draw_widget);
             plane.set_color(Vec3::from_array(settings.color));
             plane.set_transparency(settings.transparency);
+            plane.set_plane_size(settings.plane_size);
         }
     });
 }
@@ -1932,15 +1953,7 @@ pub fn get_gizmo_settings() -> polyscope_ui::GizmoSettings {
     with_context(|ctx| {
         let gizmo = ctx.gizmo();
         polyscope_ui::GizmoSettings {
-            mode: match gizmo.mode {
-                GizmoMode::Translate => 0,
-                GizmoMode::Rotate => 1,
-                GizmoMode::Scale => 2,
-            },
-            space: match gizmo.space {
-                GizmoSpace::World => 0,
-                GizmoSpace::Local => 1,
-            },
+            local_space: matches!(gizmo.space, GizmoSpace::Local),
             visible: gizmo.visible,
             snap_translate: gizmo.snap_translate,
             snap_rotate: gizmo.snap_rotate,
@@ -1953,14 +1966,10 @@ pub fn get_gizmo_settings() -> polyscope_ui::GizmoSettings {
 pub fn apply_gizmo_settings(settings: &polyscope_ui::GizmoSettings) {
     with_context_mut(|ctx| {
         let gizmo = ctx.gizmo_mut();
-        gizmo.mode = match settings.mode {
-            0 => GizmoMode::Translate,
-            1 => GizmoMode::Rotate,
-            _ => GizmoMode::Scale,
-        };
-        gizmo.space = match settings.space {
-            0 => GizmoSpace::World,
-            _ => GizmoSpace::Local,
+        gizmo.space = if settings.local_space {
+            GizmoSpace::Local
+        } else {
+            GizmoSpace::World
         };
         gizmo.visible = settings.visible;
         gizmo.snap_translate = settings.snap_translate;
@@ -2475,6 +2484,7 @@ mod tests {
             draw_widget: true,
             color: [1.0, 0.0, 0.0],
             transparency: 0.8,
+            plane_size: 0.2,
             is_selected: false,
         };
 
@@ -2610,7 +2620,6 @@ mod tests {
         setup();
 
         // Set known values
-        set_gizmo_mode(GizmoMode::Rotate);
         set_gizmo_space(GizmoSpace::Local);
         set_gizmo_visible(false);
         set_gizmo_snap_translate(0.5);
@@ -2618,8 +2627,7 @@ mod tests {
         set_gizmo_snap_scale(0.1);
 
         let settings = get_gizmo_settings();
-        assert_eq!(settings.mode, 1); // Rotate
-        assert_eq!(settings.space, 1); // Local
+        assert!(settings.local_space); // Local
         assert!(!settings.visible);
         assert!((settings.snap_translate - 0.5).abs() < 0.001);
         assert!((settings.snap_rotate - 15.0).abs() < 0.001);
@@ -2631,8 +2639,7 @@ mod tests {
         setup();
 
         let settings = polyscope_ui::GizmoSettings {
-            mode: 2,  // Scale
-            space: 0, // World
+            local_space: false, // World
             visible: true,
             snap_translate: 1.0,
             snap_rotate: 45.0,
@@ -2641,7 +2648,6 @@ mod tests {
 
         apply_gizmo_settings(&settings);
 
-        assert_eq!(get_gizmo_mode(), GizmoMode::Scale);
         assert_eq!(get_gizmo_space(), GizmoSpace::World);
         assert!(is_gizmo_visible());
     }

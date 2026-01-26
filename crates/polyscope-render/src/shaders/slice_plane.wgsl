@@ -1,5 +1,5 @@
 // Slice plane visualization shader
-// Renders an infinite plane with a grid pattern
+// Renders a bounded plane quad with a grid pattern (double-sided)
 
 struct CameraUniforms {
     view: mat4x4<f32>,
@@ -16,7 +16,8 @@ struct PlaneUniforms {
     grid_color: vec4<f32>,
     transparency: f32,
     length_scale: f32,
-    _padding: vec2<f32>,
+    plane_size: f32,         // Half-extent of the plane quad
+    _padding: f32,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -28,46 +29,51 @@ struct VertexOutput {
     @location(1) plane_uv: vec2<f32>,
 }
 
-// Use points at infinity technique like C++ polyscope
+// Bounded quad geometry - double-sided (12 vertices total)
 // Plane lies in X=0 in local space, with Y and Z as tangent directions
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
-    // Plane geometry using homogeneous coordinates
-    // 4 triangles forming a quad with vertices at infinity
-    // Each triangle has one vertex at origin and two at infinity
-    var positions = array<vec4<f32>, 12>(
-        vec4<f32>(0.0, 0.0, 0.0, 1.0), vec4<f32>(0.0, 1.0, 0.0, 0.0), vec4<f32>(0.0, 0.0, 1.0, 0.0),
-        vec4<f32>(0.0, 0.0, 0.0, 1.0), vec4<f32>(0.0, 0.0, -1.0, 0.0), vec4<f32>(0.0, 1.0, 0.0, 0.0),
-        vec4<f32>(0.0, 0.0, 0.0, 1.0), vec4<f32>(0.0, -1.0, 0.0, 0.0), vec4<f32>(0.0, 0.0, -1.0, 0.0),
-        vec4<f32>(0.0, 0.0, 0.0, 1.0), vec4<f32>(0.0, 0.0, 1.0, 0.0), vec4<f32>(0.0, -1.0, 0.0, 0.0),
+    let size = plane.plane_size;
+
+    // 12 vertices forming 4 triangles (2 quads - front and back)
+    // First 6: front face (CCW when viewed from +X)
+    // Last 6: back face (CCW when viewed from -X)
+    var positions = array<vec3<f32>, 12>(
+        // Front face
+        vec3<f32>(0.0, -size, -size), // bottom-left
+        vec3<f32>(0.0,  size, -size), // top-left
+        vec3<f32>(0.0,  size,  size), // top-right
+        vec3<f32>(0.0, -size, -size), // bottom-left
+        vec3<f32>(0.0,  size,  size), // top-right
+        vec3<f32>(0.0, -size,  size), // bottom-right
+        // Back face (reversed winding)
+        vec3<f32>(0.0, -size, -size), // bottom-left
+        vec3<f32>(0.0,  size,  size), // top-right
+        vec3<f32>(0.0,  size, -size), // top-left
+        vec3<f32>(0.0, -size, -size), // bottom-left
+        vec3<f32>(0.0, -size,  size), // bottom-right
+        vec3<f32>(0.0,  size,  size), // top-right
     );
 
-    let pos = positions[vertex_index];
-    let world_pos = plane.transform * pos;
+    let local_pos = positions[vertex_index];
+    let world_pos = plane.transform * vec4<f32>(local_pos, 1.0);
 
     var out: VertexOutput;
     out.clip_position = camera.view_proj * world_pos;
+    out.world_position = world_pos.xyz;
 
-    // Compute world position (for non-infinite vertices)
-    if (world_pos.w > 0.001) {
-        out.world_position = world_pos.xyz / world_pos.w;
-    } else {
-        out.world_position = world_pos.xyz * 1000.0; // Large value for infinite vertices
-    }
-
-    // Compute UV coordinates in plane's local space
-    // Extract tangent vectors from transform matrix
-    let tangent_y = (plane.transform * vec4<f32>(0.0, 1.0, 0.0, 0.0)).xyz;
-    let tangent_z = (plane.transform * vec4<f32>(0.0, 0.0, 1.0, 0.0)).xyz;
-    out.plane_uv = vec2<f32>(dot(out.world_position, tangent_y), dot(out.world_position, tangent_z));
+    // Compute UV coordinates based on local Y and Z positions
+    out.plane_uv = vec2<f32>(local_pos.y, local_pos.z);
 
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Grid pattern
+    // Grid pattern based on world-space coordinates
     let grid_size = plane.length_scale * 0.1;
+
+    // Use UV coordinates for grid (they're in local plane space)
     let uv = in.plane_uv / grid_size;
 
     // Compute grid lines using screen-space derivatives
@@ -78,5 +84,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Mix base color with grid color
     let color = mix(plane.color.rgb, plane.grid_color.rgb, grid_factor * 0.5);
 
-    return vec4<f32>(color, plane.transparency);
+    // Fixed opacity of 0.7
+    return vec4<f32>(color, 0.7);
 }

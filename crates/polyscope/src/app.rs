@@ -755,8 +755,7 @@ impl App {
                         view_matrix,
                         projection_matrix,
                         current_transform,
-                        self.gizmo_settings.mode,
-                        self.gizmo_settings.space,
+                        self.gizmo_settings.local_space,
                         full_window_viewport,
                     ) {
                         // Decompose the new transform (positioned at centroid)
@@ -826,9 +825,6 @@ impl App {
         }
 
         if self.gizmo_settings.visible && self.slice_plane_selection.has_selection {
-            // Restrict to Translate (0) and Rotate (1) modes for slice planes
-            let slice_plane_gizmo_mode = self.gizmo_settings.mode.min(1);
-
             let current_transform = polyscope_ui::TransformGizmo::compose_transform(
                 glam::Vec3::from(self.slice_plane_selection.origin),
                 glam::Vec3::from(self.slice_plane_selection.rotation_degrees),
@@ -850,8 +846,7 @@ impl App {
                         view_matrix,
                         projection_matrix,
                         current_transform,
-                        slice_plane_gizmo_mode,
-                        self.gizmo_settings.space,
+                        self.gizmo_settings.local_space,
                         full_window_viewport,
                     ) {
                         let (new_origin, rotation, _scale) =
@@ -960,7 +955,6 @@ impl App {
         // Get SSAO settings from global options
         let ssao_enabled =
             polyscope_core::with_context(|ctx| ctx.options.ssao.enabled);
-        let hdr_view = engine.hdr_view().expect("HDR texture should always be available");
         if self.tone_mapping_settings.enabled {
             engine.update_tone_mapping(
                 self.tone_mapping_settings.exposure,
@@ -1069,7 +1063,21 @@ impl App {
             }
         }
 
+        // Render slice plane visualizations FIRST (before scene geometry)
+        // This allows scene geometry to properly occlude the slice planes
+        let (slice_planes, length_scale_for_planes) = crate::with_context(|ctx| {
+            (ctx.slice_planes().cloned().collect::<Vec<_>>(), ctx.length_scale)
+        });
+        engine.render_slice_planes_with_clear(
+            &mut encoder,
+            &slice_planes,
+            length_scale_for_planes,
+            [bg_r as f32, bg_g as f32, bg_b as f32],
+        );
+
         // Main render pass - always render scene to HDR texture
+        // Get fresh reference to hdr_view after slice plane rendering
+        let hdr_view = engine.hdr_view().expect("HDR texture should always be available");
         {
             // All scene content renders to HDR texture for consistent format
             let scene_view = hdr_view;
@@ -1080,12 +1088,7 @@ impl App {
                     view: scene_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: bg_r,
-                            g: bg_g,
-                            b: bg_b,
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Load, // Load slice plane content
                         store: wgpu::StoreOp::Store,
                     },
                     depth_slice: None,
@@ -1093,7 +1096,7 @@ impl App {
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &engine.depth_view,
                     depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
+                        load: wgpu::LoadOp::Load, // Load slice plane depth
                         store: wgpu::StoreOp::Store,
                     }),
                     stencil_ops: None,
@@ -1344,12 +1347,6 @@ impl App {
                 }
             });
         }
-
-        // Render slice plane visualizations (semi-transparent grids)
-        let (slice_planes, length_scale_for_planes) = crate::with_context(|ctx| {
-            (ctx.slice_planes().cloned().collect::<Vec<_>>(), ctx.length_scale)
-        });
-        engine.render_slice_planes(&mut encoder, &slice_planes, length_scale_for_planes);
 
         // Render ground plane to HDR texture (before tone mapping)
         let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
