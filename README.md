@@ -163,7 +163,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-This project is inspired by the original [Polyscope](https://github.com/nmwsharp/polyscope) C++ library by Nicholas Sharp.
+This project is inspired by the original [Polyscope](https://github.com/nmwsharp/polyscope) C++ library by [Nicholas Sharp](https://nmwsharp.com).
 
 ## Contributing
 
