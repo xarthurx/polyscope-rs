@@ -1,4 +1,45 @@
 //! Volume mesh structure for tetrahedral and hexahedral meshes.
+//!
+//! # Overview
+//!
+//! `VolumeMesh` supports both tetrahedral (4 vertices) and hexahedral (8 vertices)
+//! cells. Mixed meshes are supported by using 8-index cells where unused indices
+//! are set to `u32::MAX`.
+//!
+//! # Interior/Exterior Faces
+//!
+//! Only exterior faces (not shared between cells) are rendered. This is determined
+//! by hashing sorted face vertex indices and counting occurrences.
+//!
+//! # Quantities
+//!
+//! Supported quantities:
+//! - `VolumeMeshVertexScalarQuantity` - scalar per vertex
+//! - `VolumeMeshCellScalarQuantity` - scalar per cell
+//! - `VolumeMeshVertexColorQuantity` - RGB color per vertex
+//! - `VolumeMeshCellColorQuantity` - RGB color per cell
+//! - `VolumeMeshVertexVectorQuantity` - vector per vertex
+//! - `VolumeMeshCellVectorQuantity` - vector per cell
+//!
+//! # Example
+//!
+//! ```rust,ignore
+//! use glam::Vec3;
+//! use polyscope_structures::VolumeMesh;
+//!
+//! // Create a single tetrahedron
+//! let vertices = vec![
+//!     Vec3::new(0.0, 0.0, 0.0),
+//!     Vec3::new(1.0, 0.0, 0.0),
+//!     Vec3::new(0.5, 1.0, 0.0),
+//!     Vec3::new(0.5, 0.5, 1.0),
+//! ];
+//! let tets = vec![[0, 1, 2, 3]];
+//! let mut mesh = VolumeMesh::new_tet_mesh("my_tet", vertices, tets);
+//!
+//! // Add a scalar quantity
+//! mesh.add_vertex_scalar_quantity("temperature", vec![0.0, 0.5, 1.0, 0.25]);
+//! ```
 
 mod scalar_quantity;
 mod color_quantity;
