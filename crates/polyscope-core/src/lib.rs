@@ -15,6 +15,7 @@ pub mod pick;
 pub mod quantity;
 pub mod registry;
 pub mod slice_plane;
+pub mod ssao;
 pub mod state;
 pub mod structure;
 pub mod tone_mapping;
@@ -29,6 +30,7 @@ pub use quantity::{Quantity, QuantityKind};
 pub use registry::Registry;
 pub use slice_plane::{SlicePlane, SlicePlaneUniforms, MAX_SLICE_PLANES};
 pub use state::{with_context, with_context_mut, Context};
+pub use ssao::SsaoConfig;
 pub use structure::{HasQuantities, Structure};
 pub use tone_mapping::ToneMappingConfig;
 

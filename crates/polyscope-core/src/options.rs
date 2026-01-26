@@ -3,6 +3,8 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
+use crate::SsaoConfig;
+
 /// Global configuration options for polyscope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Options {
@@ -38,6 +40,9 @@ pub struct Options {
 
     /// Maximum frames per second (0 = unlimited).
     pub max_fps: u32,
+
+    /// SSAO configuration.
+    pub ssao: SsaoConfig,
 }
 
 impl Default for Options {
@@ -54,6 +59,7 @@ impl Default for Options {
             transparency_mode: TransparencyMode::Simple,
             ssaa_factor: 1,
             max_fps: 60,
+            ssao: SsaoConfig::default(),
         }
     }
 }
