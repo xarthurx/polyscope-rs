@@ -171,52 +171,71 @@ impl VolumeMesh {
         self
     }
 
+    /// Computes face counts for interior/exterior detection.
+    fn compute_face_counts(&self) -> HashMap<[u32; 4], usize> {
+        let mut face_counts: HashMap<[u32; 4], usize> = HashMap::new();
+
+        for cell in &self.cells {
+            if cell[4] == u32::MAX {
+                // Tetrahedron
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    *face_counts.entry(key).or_insert(0) += 1;
+                }
+            } else {
+                // Hexahedron - each quad face uses same 4 vertices
+                for quad in HEX_FACE_STENCIL {
+                    // Get the 4 unique vertices of this quad face
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]]; // The fourth vertex
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    *face_counts.entry(key).or_insert(0) += 1;
+                }
+            }
+        }
+
+        face_counts
+    }
+
     /// Generates triangulated exterior faces for rendering.
     fn generate_render_geometry(&self) -> (Vec<Vec3>, Vec<[u32; 3]>) {
-        // For simplicity, render all faces (not detecting interior faces)
-        // In a full implementation, we'd detect shared faces between cells
+        let face_counts = self.compute_face_counts();
         let mut positions = Vec::new();
         let mut faces = Vec::new();
 
         for cell in &self.cells {
             if cell[4] == u32::MAX {
-                // Tetrahedron - 4 triangular faces
-                // Face 0: 0,2,1
-                // Face 1: 0,1,3
-                // Face 2: 0,3,2
-                // Face 3: 1,2,3
-                let tet_faces = [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]];
-                for [a, b, c] in tet_faces {
-                    let base_idx = positions.len() as u32;
-                    positions.push(self.vertices[cell[a] as usize]);
-                    positions.push(self.vertices[cell[b] as usize]);
-                    positions.push(self.vertices[cell[c] as usize]);
-                    faces.push([base_idx, base_idx + 1, base_idx + 2]);
-                }
-            } else {
-                // Hexahedron - 6 quadrilateral faces (2 triangles each)
-                // Using VTK ordering (6/7 may be swapped from standard)
-                let hex_faces = [
-                    // Bottom face (z=0): 0,1,2,3
-                    [[2, 1, 0], [2, 0, 3]],
-                    // Front face (y=0): 0,1,5,4
-                    [[4, 0, 1], [4, 1, 5]],
-                    // Right face (x=1): 1,2,6,5
-                    [[5, 1, 2], [5, 2, 6]],
-                    // Back face (y=1): 3,7,6,2
-                    [[6, 2, 3], [6, 3, 7]],
-                    // Left face (x=0): 0,4,7,3
-                    [[7, 3, 0], [7, 0, 4]],
-                    // Top face (z=1): 4,5,6,7
-                    [[7, 4, 5], [7, 5, 6]],
-                ];
-                for quad in hex_faces {
-                    for [a, b, c] in quad {
+                // Tetrahedron
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    if face_counts[&key] == 1 {
+                        // Exterior face
                         let base_idx = positions.len() as u32;
                         positions.push(self.vertices[cell[a] as usize]);
                         positions.push(self.vertices[cell[b] as usize]);
                         positions.push(self.vertices[cell[c] as usize]);
                         faces.push([base_idx, base_idx + 1, base_idx + 2]);
+                    }
+                }
+            } else {
+                // Hexahedron
+                for quad in HEX_FACE_STENCIL {
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]];
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    if face_counts[&key] == 1 {
+                        // Exterior face - emit both triangles
+                        for [a, b, c] in quad {
+                            let base_idx = positions.len() as u32;
+                            positions.push(self.vertices[cell[a] as usize]);
+                            positions.push(self.vertices[cell[b] as usize]);
+                            positions.push(self.vertices[cell[c] as usize]);
+                            faces.push([base_idx, base_idx + 1, base_idx + 2]);
+                        }
                     }
                 }
             }
@@ -439,9 +458,92 @@ impl HasQuantities for VolumeMesh {
     }
 }
 
+use std::collections::HashMap;
+
+/// Generates a canonical (sorted) face key for hashing.
+/// For triangular faces, the fourth element is u32::MAX.
+fn canonical_face_key(v0: u32, v1: u32, v2: u32, v3: Option<u32>) -> [u32; 4] {
+    let mut key = [v0, v1, v2, v3.unwrap_or(u32::MAX)];
+    key.sort();
+    key
+}
+
+/// Face stencil for tetrahedra: 4 triangular faces
+const TET_FACE_STENCIL: [[usize; 3]; 4] = [
+    [0, 2, 1],
+    [0, 1, 3],
+    [0, 3, 2],
+    [1, 2, 3],
+];
+
+/// Face stencil for hexahedra: 6 quad faces (each as 2 triangles sharing diagonal)
+const HEX_FACE_STENCIL: [[[usize; 3]; 2]; 6] = [
+    [[2, 1, 0], [2, 0, 3]], // Bottom
+    [[4, 0, 1], [4, 1, 5]], // Front
+    [[5, 1, 2], [5, 2, 6]], // Right
+    [[7, 3, 0], [7, 0, 4]], // Left
+    [[6, 2, 3], [6, 3, 7]], // Back
+    [[7, 4, 5], [7, 5, 6]], // Top
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_interior_face_detection() {
+        // Two tets sharing a face
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),  // 0
+            Vec3::new(1.0, 0.0, 0.0),  // 1
+            Vec3::new(0.5, 1.0, 0.0),  // 2
+            Vec3::new(0.5, 0.5, 1.0),  // 3 - apex of first tet
+            Vec3::new(0.5, 0.5, -1.0), // 4 - apex of second tet
+        ];
+        // Two tets sharing face [0,1,2]
+        let tets = vec![[0, 1, 2, 3], [0, 2, 1, 4]];
+        let mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
+
+        // Should have 6 exterior faces (4 per tet - 1 shared = 3 per tet * 2 = 6)
+        // Not 8 faces (4 per tet * 2 = 8)
+        let (_, faces) = mesh.generate_render_geometry();
+        assert_eq!(faces.len(), 6, "Should only render exterior faces");
+    }
+
+    #[test]
+    fn test_single_tet_all_exterior() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let tets = vec![[0, 1, 2, 3]];
+        let mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
+
+        let (_, faces) = mesh.generate_render_geometry();
+        assert_eq!(faces.len(), 4, "Single tet should have 4 exterior faces");
+    }
+
+    #[test]
+    fn test_single_hex_all_exterior() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(1.0, 1.0, 1.0),
+            Vec3::new(0.0, 1.0, 1.0),
+        ];
+        let hexes = vec![[0, 1, 2, 3, 4, 5, 6, 7]];
+        let mesh = VolumeMesh::new_hex_mesh("test", vertices, hexes);
+
+        let (_, faces) = mesh.generate_render_geometry();
+        // 6 quad faces * 2 triangles each = 12 triangles
+        assert_eq!(faces.len(), 12, "Single hex should have 12 triangles (6 quads)");
+    }
 
     #[test]
     fn test_tet_mesh_creation() {
