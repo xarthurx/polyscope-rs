@@ -56,6 +56,8 @@ pub struct RenderEngine {
     pub depth_texture: wgpu::Texture,
     /// Depth texture view.
     pub depth_view: wgpu::TextureView,
+    /// Depth-only texture view (for SSAO sampling, excludes stencil aspect).
+    depth_only_view: wgpu::TextureView,
     /// Material registry.
     pub materials: MaterialRegistry,
     /// Color map registry.
@@ -222,7 +224,8 @@ impl RenderEngine {
         };
         surface.configure(&device, &surface_config);
 
-        let (depth_texture, depth_view) = Self::create_depth_texture(&device, width, height);
+        let (depth_texture, depth_view, depth_only_view) =
+            Self::create_depth_texture(&device, width, height);
 
         let camera = Camera::new(width as f32 / height as f32);
 
@@ -354,6 +357,7 @@ impl RenderEngine {
             surface_config,
             depth_texture,
             depth_view,
+            depth_only_view,
             materials: MaterialRegistry::new(),
             color_maps: ColorMapRegistry::new(),
             camera,
@@ -462,7 +466,8 @@ impl RenderEngine {
             desired_maximum_frame_latency: 2,
         };
 
-        let (depth_texture, depth_view) = Self::create_depth_texture(&device, width, height);
+        let (depth_texture, depth_view, depth_only_view) =
+            Self::create_depth_texture(&device, width, height);
 
         let camera = Camera::new(width as f32 / height as f32);
 
@@ -594,6 +599,7 @@ impl RenderEngine {
             surface_config,
             depth_texture,
             depth_view,
+            depth_only_view,
             materials: MaterialRegistry::new(),
             color_maps: ColorMapRegistry::new(),
             camera,
@@ -679,9 +685,11 @@ impl RenderEngine {
             surface.configure(&self.device, &self.surface_config);
         }
 
-        let (depth_texture, depth_view) = Self::create_depth_texture(&self.device, width, height);
+        let (depth_texture, depth_view, depth_only_view) =
+            Self::create_depth_texture(&self.device, width, height);
         self.depth_texture = depth_texture;
         self.depth_view = depth_view;
+        self.depth_only_view = depth_only_view;
 
         // Recreate HDR texture for tone mapping
         self.create_hdr_texture();
@@ -702,7 +710,7 @@ impl RenderEngine {
         device: &wgpu::Device,
         width: u32,
         height: u32,
-    ) -> (wgpu::Texture, wgpu::TextureView) {
+    ) -> (wgpu::Texture, wgpu::TextureView, wgpu::TextureView) {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("depth texture"),
             size: wgpu::Extent3d {
@@ -720,7 +728,14 @@ impl RenderEngine {
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        (texture, view)
+        // Create depth-only view for SSAO (excludes stencil aspect)
+        let depth_only_view = texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("depth only view"),
+            aspect: wgpu::TextureAspect::DepthOnly,
+            ..Default::default()
+        });
+
+        (texture, view, depth_only_view)
     }
 
     /// Initializes the point cloud render pipeline.
@@ -2483,9 +2498,10 @@ impl RenderEngine {
         config: &polyscope_core::SsaoConfig,
     ) -> bool {
         // Check if all required resources are available
+        // Use depth_only_view for SSAO (excludes stencil aspect)
         let (ssao_pass, depth_view, normal_view, noise_view, output_view) = match (
             &self.ssao_pass,
-            Some(&self.depth_view),
+            Some(&self.depth_only_view),
             self.normal_view.as_ref(),
             self.ssao_noise_view.as_ref(),
             self.ssao_output_view.as_ref(),

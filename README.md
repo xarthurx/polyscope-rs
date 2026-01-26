@@ -26,7 +26,7 @@ Recommendations and thoughts are welcome in the [Discussions](https://github.com
 
 **Current Version:** 0.1.x (Alpha)
 
-**Feature Parity:** ~70% of C++ Polyscope 2.x
+**Feature Parity:** ~80% of C++ Polyscope 2.x
 
 ### What's Working
 
@@ -45,13 +45,14 @@ Recommendations and thoughts are welcome in the [Discussions](https://github.com
 | Groups | ✅ Hierarchical |
 | Gizmos | ✅ Translate/Rotate/Scale |
 | Tone Mapping | ✅ HDR pipeline |
+| SSAO | ✅ Ambient occlusion |
 | Screenshots | ✅ PNG export |
 | Picking | ✅ Structure/Element |
 
 ### What's In Progress
 
 - Transparency rendering
-- SSAO (Screen Space Ambient Occlusion)
+- Ground reflections
 - Parameterization quantities
 - Full polygon mesh support
 
@@ -168,7 +169,7 @@ This project is inspired by the original [Polyscope](https://github.com/nmwsharp
 Contributions are welcome! Key areas where help is needed:
 
 - Completing quantity types (parameterization, intrinsic vectors)
-- Adding SSAO support
+- Ground reflections integration
 - Improving transparency handling
 - Documentation and examples
 - Testing on different platforms
