@@ -35,6 +35,9 @@ pub struct Context {
     /// Currently selected structure (type_name, name) for gizmo operations.
     pub selected_structure: Option<(String, String)>,
 
+    /// Currently selected slice plane for gizmo operations.
+    pub selected_slice_plane: Option<String>,
+
     /// Global options.
     pub options: Options,
 
@@ -55,6 +58,7 @@ impl Default for Context {
             slice_planes: HashMap::new(),
             gizmo_config: GizmoConfig::default(),
             selected_structure: None,
+            selected_slice_plane: None,
             options: Options::default(),
             length_scale: 1.0,
             bounding_box: (Vec3::ZERO, Vec3::ONE),
@@ -217,7 +221,9 @@ impl Context {
     // ========================================================================
 
     /// Selects a structure for gizmo manipulation.
+    /// This deselects any selected slice plane (mutual exclusion).
     pub fn select_structure(&mut self, type_name: &str, name: &str) {
+        self.selected_slice_plane = None; // Mutual exclusion
         self.selected_structure = Some((type_name.to_string(), name.to_string()));
     }
 
@@ -236,6 +242,28 @@ impl Context {
     /// Returns whether a structure is selected.
     pub fn has_selection(&self) -> bool {
         self.selected_structure.is_some()
+    }
+
+    /// Selects a slice plane for gizmo manipulation.
+    /// This deselects any selected structure (mutual exclusion).
+    pub fn select_slice_plane(&mut self, name: &str) {
+        self.selected_structure = None; // Mutual exclusion
+        self.selected_slice_plane = Some(name.to_string());
+    }
+
+    /// Deselects the current slice plane.
+    pub fn deselect_slice_plane(&mut self) {
+        self.selected_slice_plane = None;
+    }
+
+    /// Returns the currently selected slice plane name, if any.
+    pub fn selected_slice_plane(&self) -> Option<&str> {
+        self.selected_slice_plane.as_deref()
+    }
+
+    /// Returns whether a slice plane is selected.
+    pub fn has_slice_plane_selection(&self) -> bool {
+        self.selected_slice_plane.is_some()
     }
 
     /// Returns the gizmo configuration.
@@ -337,6 +365,8 @@ pub fn shutdown_context() {
             ctx.registry.clear();
             ctx.groups.clear();
             ctx.slice_planes.clear();
+            ctx.selected_structure = None;
+            ctx.selected_slice_plane = None;
         }
     }
 }

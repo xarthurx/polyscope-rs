@@ -70,7 +70,8 @@ pub use polyscope_render::{
 // Re-export UI types
 pub use polyscope_ui::{
     AppearanceSettings, CameraSettings, GizmoAction, GizmoSettings, GroupSettings, GroupsAction,
-    SceneExtents, SelectionInfo, SlicePlaneSettings, SlicePlanesAction, ViewAction,
+    SceneExtents, SelectionInfo, SlicePlaneGizmoAction, SlicePlaneSelectionInfo,
+    SlicePlaneSettings, SlicePlanesAction, ViewAction,
 };
 
 // Re-export structures
@@ -1729,6 +1730,7 @@ pub fn set_auto_compute_extents(auto: bool) {
 /// Gets all slice planes as UI settings.
 pub fn get_slice_plane_settings() -> Vec<polyscope_ui::SlicePlaneSettings> {
     with_context(|ctx| {
+        let selected = ctx.selected_slice_plane();
         ctx.slice_planes
             .values()
             .map(|plane| polyscope_ui::SlicePlaneSettings {
@@ -1740,6 +1742,7 @@ pub fn get_slice_plane_settings() -> Vec<polyscope_ui::SlicePlaneSettings> {
                 draw_widget: plane.draw_widget(),
                 color: plane.color().to_array(),
                 transparency: plane.transparency(),
+                is_selected: selected == Some(plane.name()),
             })
             .collect()
     })
@@ -1785,6 +1788,74 @@ pub fn handle_slice_plane_action(
             }
         }
     }
+}
+
+// ============================================================================
+// Slice Plane Gizmo Functions
+// ============================================================================
+
+/// Gets slice plane selection info for gizmo rendering.
+pub fn get_slice_plane_selection_info() -> polyscope_ui::SlicePlaneSelectionInfo {
+    with_context(|ctx| {
+        if let Some(name) = ctx.selected_slice_plane() {
+            if let Some(plane) = ctx.get_slice_plane(name) {
+                let transform = plane.to_transform();
+                let (_, rotation, _) = transform.to_scale_rotation_translation();
+                let euler = rotation.to_euler(glam::EulerRot::XYZ);
+
+                polyscope_ui::SlicePlaneSelectionInfo {
+                    has_selection: true,
+                    name: name.to_string(),
+                    origin: plane.origin().to_array(),
+                    rotation_degrees: [
+                        euler.0.to_degrees(),
+                        euler.1.to_degrees(),
+                        euler.2.to_degrees(),
+                    ],
+                }
+            } else {
+                polyscope_ui::SlicePlaneSelectionInfo::default()
+            }
+        } else {
+            polyscope_ui::SlicePlaneSelectionInfo::default()
+        }
+    })
+}
+
+/// Selects a slice plane for gizmo manipulation.
+pub fn select_slice_plane_for_gizmo(name: &str) {
+    with_context_mut(|ctx| {
+        ctx.select_slice_plane(name);
+    });
+}
+
+/// Deselects the current slice plane from gizmo.
+pub fn deselect_slice_plane_gizmo() {
+    with_context_mut(|ctx| {
+        ctx.deselect_slice_plane();
+    });
+}
+
+/// Applies gizmo transform to the selected slice plane.
+pub fn apply_slice_plane_gizmo_transform(origin: [f32; 3], rotation_degrees: [f32; 3]) {
+    with_context_mut(|ctx| {
+        if let Some(name) = ctx.selected_slice_plane.clone() {
+            if let Some(plane) = ctx.get_slice_plane_mut(&name) {
+                // Reconstruct transform from origin + rotation
+                let rotation = glam::Quat::from_euler(
+                    glam::EulerRot::XYZ,
+                    rotation_degrees[0].to_radians(),
+                    rotation_degrees[1].to_radians(),
+                    rotation_degrees[2].to_radians(),
+                );
+                let transform = glam::Mat4::from_rotation_translation(
+                    rotation,
+                    Vec3::from_array(origin),
+                );
+                plane.set_from_transform(transform);
+            }
+        }
+    });
 }
 
 // ============================================================================
@@ -2278,6 +2349,54 @@ mod tests {
     }
 
     #[test]
+    fn test_slice_plane_gizmo_selection() {
+        setup();
+        let name = unique_name("slice_gizmo");
+        add_slice_plane(&name);
+
+        // Initially no slice plane selected
+        let info = get_slice_plane_selection_info();
+        assert!(!info.has_selection);
+
+        // Select slice plane
+        select_slice_plane_for_gizmo(&name);
+        let info = get_slice_plane_selection_info();
+        assert!(info.has_selection);
+        assert_eq!(info.name, name);
+
+        // Deselect slice plane
+        deselect_slice_plane_gizmo();
+        let info = get_slice_plane_selection_info();
+        assert!(!info.has_selection);
+    }
+
+    #[test]
+    fn test_slice_plane_structure_mutual_exclusion() {
+        setup();
+        let pc_name = unique_name("mutual_pc");
+        let plane_name = unique_name("mutual_plane");
+
+        register_point_cloud(&pc_name, vec![Vec3::ZERO]);
+        add_slice_plane(&plane_name);
+
+        // Select structure
+        select_structure("PointCloud", &pc_name);
+        assert!(has_selection());
+
+        // Select slice plane - should deselect structure
+        select_slice_plane_for_gizmo(&plane_name);
+        assert!(!has_selection()); // Structure should be deselected
+        let info = get_slice_plane_selection_info();
+        assert!(info.has_selection);
+
+        // Select structure again - should deselect slice plane
+        select_structure("PointCloud", &pc_name);
+        assert!(has_selection());
+        let info = get_slice_plane_selection_info();
+        assert!(!info.has_selection); // Slice plane should be deselected
+    }
+
+    #[test]
     fn test_gizmo_mode() {
         setup();
         set_gizmo_mode(GizmoMode::Translate);
@@ -2356,6 +2475,7 @@ mod tests {
             draw_widget: true,
             color: [1.0, 0.0, 0.0],
             transparency: 0.8,
+            is_selected: false,
         };
 
         // Apply settings

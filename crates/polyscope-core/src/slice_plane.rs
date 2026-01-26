@@ -3,7 +3,7 @@
 //! Slice planes allow visualizing the interior of 3D geometry by
 //! discarding fragments on one side of the plane.
 
-use glam::Vec3;
+use glam::{Mat4, Vec3, Vec4};
 
 /// A slice plane that can cut through geometry.
 ///
@@ -157,6 +157,47 @@ impl SlicePlane {
     pub fn project(&self, point: Vec3) -> Vec3 {
         point - self.signed_distance(point) * self.normal
     }
+
+    // ========================================================================
+    // Transform Methods for Gizmo Manipulation
+    // ========================================================================
+
+    /// Computes a transform matrix for gizmo manipulation.
+    ///
+    /// The plane normal becomes the local X axis, with Y and Z axes
+    /// forming an orthonormal basis in the plane.
+    pub fn to_transform(&self) -> Mat4 {
+        let x_axis = self.normal.normalize();
+
+        // Choose an "up" direction that's not parallel to the normal
+        let up = if x_axis.dot(Vec3::Y).abs() < 0.99 {
+            Vec3::Y
+        } else {
+            Vec3::Z
+        };
+
+        // Build orthonormal basis
+        let y_axis = up.cross(x_axis).normalize();
+        let z_axis = x_axis.cross(y_axis).normalize();
+
+        Mat4::from_cols(
+            Vec4::new(x_axis.x, x_axis.y, x_axis.z, 0.0),
+            Vec4::new(y_axis.x, y_axis.y, y_axis.z, 0.0),
+            Vec4::new(z_axis.x, z_axis.y, z_axis.z, 0.0),
+            Vec4::new(self.origin.x, self.origin.y, self.origin.z, 1.0),
+        )
+    }
+
+    /// Updates origin and normal from a transform matrix.
+    ///
+    /// Extracts position from column 3 (translation), and normal from
+    /// column 0 (x-axis in local space).
+    pub fn set_from_transform(&mut self, transform: Mat4) {
+        // Extract origin from translation column
+        self.origin = transform.w_axis.truncate();
+        // Extract normal from first column (x-axis in local space)
+        self.normal = transform.x_axis.truncate().normalize();
+    }
 }
 
 impl Default for SlicePlane {
@@ -272,5 +313,34 @@ mod tests {
         assert_eq!(uniforms.origin, [1.0, 2.0, 3.0]);
         assert_eq!(uniforms.normal, [0.0, 0.0, 1.0]);
         assert_eq!(uniforms.enabled, 1.0);
+    }
+
+    #[test]
+    fn test_to_transform() {
+        let plane = SlicePlane::with_pose("test", Vec3::new(1.0, 2.0, 3.0), Vec3::X);
+        let transform = plane.to_transform();
+
+        // Check that origin is in the translation column
+        let extracted_origin = transform.w_axis.truncate();
+        assert!((extracted_origin - Vec3::new(1.0, 2.0, 3.0)).length() < 1e-6);
+
+        // Check that normal is the x-axis
+        let extracted_normal = transform.x_axis.truncate().normalize();
+        assert!((extracted_normal - Vec3::X).length() < 1e-6);
+    }
+
+    #[test]
+    fn test_transform_roundtrip() {
+        let original = SlicePlane::with_pose("test", Vec3::new(1.0, 2.0, 3.0), Vec3::new(1.0, 1.0, 0.0));
+        let transform = original.to_transform();
+
+        let mut restored = SlicePlane::new("test2");
+        restored.set_from_transform(transform);
+
+        // Origin should match
+        assert!((restored.origin() - original.origin()).length() < 1e-6);
+
+        // Normal should match (normalized)
+        assert!((restored.normal() - original.normal().normalize()).length() < 1e-6);
     }
 }

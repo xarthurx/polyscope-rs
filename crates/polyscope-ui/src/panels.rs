@@ -131,6 +131,8 @@ pub struct SlicePlaneSettings {
     pub color: [f32; 3],
     /// Transparency (0.0 = transparent, 1.0 = opaque).
     pub transparency: f32,
+    /// Whether this plane is currently selected for gizmo manipulation.
+    pub is_selected: bool,
 }
 
 impl Default for SlicePlaneSettings {
@@ -144,6 +146,7 @@ impl Default for SlicePlaneSettings {
             draw_widget: true,
             color: [0.5, 0.5, 0.5],
             transparency: 0.3,
+            is_selected: false,
         }
     }
 }
@@ -155,6 +158,38 @@ impl SlicePlaneSettings {
             name: name.into(),
             ..Default::default()
         }
+    }
+}
+
+/// Selection info for slice plane gizmo manipulation.
+#[derive(Debug, Clone, Default)]
+pub struct SlicePlaneSelectionInfo {
+    /// Whether a slice plane is selected.
+    pub has_selection: bool,
+    /// Name of the selected slice plane.
+    pub name: String,
+    /// Current origin position.
+    pub origin: [f32; 3],
+    /// Current rotation as Euler angles (degrees).
+    pub rotation_degrees: [f32; 3],
+}
+
+/// Actions specific to slice plane gizmo manipulation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SlicePlaneGizmoAction {
+    /// No action.
+    None,
+    /// Slice plane selection changed.
+    SelectionChanged,
+    /// Transform was updated via gizmo.
+    TransformChanged,
+    /// Deselect the slice plane.
+    Deselect,
+}
+
+impl Default for SlicePlaneGizmoAction {
+    fn default() -> Self {
+        Self::None
     }
 }
 
@@ -1236,6 +1271,21 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
             changed = true;
         }
     });
+
+    // Gizmo control button (only show when draw_widget is enabled)
+    if settings.draw_widget && settings.enabled {
+        ui.horizontal(|ui| {
+            let button_text = if settings.is_selected {
+                "Editing (click to deselect)"
+            } else {
+                "Edit with Gizmo"
+            };
+            if ui.button(button_text).clicked() {
+                settings.is_selected = !settings.is_selected;
+                changed = true;
+            }
+        });
+    }
 
     // Color
     ui.horizontal(|ui| {

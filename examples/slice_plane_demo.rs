@@ -5,6 +5,11 @@
 //! - Point cloud (random points)
 //! - Volume mesh (tetrahedral cube)
 //!
+//! Features:
+//! - Fragment-level slicing for all structure types
+//! - Interactive gizmo control for plane positioning
+//! - Cross-section capping for volume meshes with color interpolation
+//!
 //! Run with: cargo run --example slice_plane_demo
 
 use glam::Vec3;
@@ -179,13 +184,15 @@ fn main() {
         .set_normal(Vec3::new(0.0, 1.0, 0.2).normalize())
         .set_color(Vec3::new(0.9, 0.8, 0.3))
         .set_transparency(0.4)
-        .set_draw_plane(true);
+        .set_draw_plane(true)
+        .set_draw_widget(true); // Enable gizmo interaction
 
     println!();
     println!("Controls:");
     println!("- Use the UI panel on the left to adjust slice plane parameters");
+    println!("- Click 'Edit with Gizmo' button to enable interactive manipulation");
+    println!("- Use Translate mode to move the plane, Rotate mode to change its orientation");
     println!("- Toggle 'draw_plane' to show/hide the slice plane visualization");
-    println!("- Adjust origin and normal to move/rotate the slice");
     println!("- The tet_cube shows cross-section capping with interpolated colors");
     println!();
 

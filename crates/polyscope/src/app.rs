@@ -63,6 +63,8 @@ pub struct App {
     // Gizmo UI state
     gizmo_settings: polyscope_ui::GizmoSettings,
     selection_info: polyscope_ui::SelectionInfo,
+    // Slice plane gizmo state
+    slice_plane_selection: polyscope_ui::SlicePlaneSelectionInfo,
     // Visual gizmo
     transform_gizmo: polyscope_ui::TransformGizmo,
     // Tone mapping settings
@@ -100,6 +102,7 @@ impl App {
             new_group_name: String::new(),
             gizmo_settings: crate::get_gizmo_settings(),
             selection_info: polyscope_ui::SelectionInfo::default(),
+            slice_plane_selection: polyscope_ui::SlicePlaneSelectionInfo::default(),
             transform_gizmo: polyscope_ui::TransformGizmo::new(),
             tone_mapping_settings: polyscope_ui::ToneMappingSettings::default(),
             camera_fitted: false,
@@ -707,33 +710,30 @@ impl App {
             }
         }
 
-        // Render transform gizmo if visible and something is selected
+        // Common gizmo setup - check if pointer is over UI panel
+        const LEFT_PANEL_WIDTH: f32 = 320.0;
+        let pointer_over_ui = egui.context.input(|i| {
+            i.pointer.hover_pos().map_or(false, |pos| pos.x <= LEFT_PANEL_WIDTH)
+        });
+
+        // Get camera matrices from engine - MUST match what's used for 3D rendering
+        let view_matrix = engine.camera.view_matrix();
+        let projection_matrix = engine.camera.projection_matrix();
+
+        // Common viewport for gizmo rendering
+        let full_window_viewport = egui::Rect::from_min_size(
+            egui::Pos2::ZERO,
+            egui::Vec2::new(engine.width as f32, engine.height as f32),
+        );
+
+        // Render transform gizmo if visible and a structure is selected
         if self.gizmo_settings.visible && self.selection_info.has_selection {
-            // Check if pointer is over the left UI panel - skip gizmo interaction to prevent
-            // interfering with panel widgets (causes blinking/flickering otherwise)
-            const LEFT_PANEL_WIDTH: f32 = 320.0;
-            let pointer_over_ui = egui.context.input(|i| {
-                i.pointer.hover_pos().map_or(false, |pos| pos.x <= LEFT_PANEL_WIDTH)
-            });
-
-            // Get camera matrices from engine - MUST match what's used for 3D rendering
-            let view_matrix = engine.camera.view_matrix();
-            let projection_matrix = engine.camera.projection_matrix();
-
             // Use centroid for gizmo position (so it appears at the center of the geometry)
             // but keep the rotation and scale from the actual transform
             let current_transform = polyscope_ui::TransformGizmo::compose_transform(
                 glam::Vec3::from(self.selection_info.centroid),
                 glam::Vec3::from(self.selection_info.rotation_degrees),
                 glam::Vec3::from(self.selection_info.scale),
-            );
-
-            // Use full window viewport to match 3D rendering projection
-            // The 3D scene is rendered with full window aspect ratio, so the gizmo
-            // must use the same viewport for correct alignment
-            let full_window_viewport = egui::Rect::from_min_size(
-                egui::Pos2::ZERO,
-                egui::Vec2::new(engine.width as f32, engine.height as f32),
             );
 
             // Use Area instead of CentralPanel to avoid consuming all mouse events
@@ -799,6 +799,89 @@ impl App {
                                 }
                             }
                         });
+                    }
+                });
+        }
+
+        // Render slice plane gizmo if a slice plane is selected
+        // Check if any slice plane is selected via UI
+        self.slice_plane_selection = crate::get_slice_plane_selection_info();
+
+        // Also sync selection from UI settings
+        for settings in &self.slice_plane_settings {
+            if settings.is_selected && settings.enabled && settings.draw_widget {
+                if !self.slice_plane_selection.has_selection
+                    || self.slice_plane_selection.name != settings.name
+                {
+                    crate::select_slice_plane_for_gizmo(&settings.name);
+                    self.slice_plane_selection = crate::get_slice_plane_selection_info();
+                }
+            } else if !settings.is_selected
+                && self.slice_plane_selection.has_selection
+                && self.slice_plane_selection.name == settings.name
+            {
+                crate::deselect_slice_plane_gizmo();
+                self.slice_plane_selection = crate::get_slice_plane_selection_info();
+            }
+        }
+
+        if self.gizmo_settings.visible && self.slice_plane_selection.has_selection {
+            // Restrict to Translate (0) and Rotate (1) modes for slice planes
+            let slice_plane_gizmo_mode = self.gizmo_settings.mode.min(1);
+
+            let current_transform = polyscope_ui::TransformGizmo::compose_transform(
+                glam::Vec3::from(self.slice_plane_selection.origin),
+                glam::Vec3::from(self.slice_plane_selection.rotation_degrees),
+                glam::Vec3::ONE, // No scale for slice planes
+            );
+
+            egui::Area::new(egui::Id::new("slice_plane_gizmo_overlay"))
+                .fixed_pos(egui::Pos2::ZERO)
+                .interactable(false)
+                .show(&egui.context, |ui| {
+                    ui.set_clip_rect(full_window_viewport);
+
+                    if pointer_over_ui {
+                        return;
+                    }
+
+                    if let Some(new_transform) = self.transform_gizmo.interact(
+                        ui,
+                        view_matrix,
+                        projection_matrix,
+                        current_transform,
+                        slice_plane_gizmo_mode,
+                        self.gizmo_settings.space,
+                        full_window_viewport,
+                    ) {
+                        let (new_origin, rotation, _scale) =
+                            polyscope_ui::TransformGizmo::decompose_transform(new_transform);
+
+                        self.slice_plane_selection.origin = new_origin.into();
+                        self.slice_plane_selection.rotation_degrees = rotation.into();
+
+                        // Apply to selected slice plane
+                        crate::apply_slice_plane_gizmo_transform(
+                            self.slice_plane_selection.origin,
+                            self.slice_plane_selection.rotation_degrees,
+                        );
+
+                        // Update UI settings to reflect new position
+                        for settings in &mut self.slice_plane_settings {
+                            if settings.name == self.slice_plane_selection.name {
+                                settings.origin = self.slice_plane_selection.origin;
+                                // Normal is derived from transform, update it
+                                let rotation = glam::Quat::from_euler(
+                                    glam::EulerRot::XYZ,
+                                    self.slice_plane_selection.rotation_degrees[0].to_radians(),
+                                    self.slice_plane_selection.rotation_degrees[1].to_radians(),
+                                    self.slice_plane_selection.rotation_degrees[2].to_radians(),
+                                );
+                                let normal = rotation * glam::Vec3::X;
+                                settings.normal = normal.to_array();
+                                break;
+                            }
+                        }
                     }
                 });
         }
