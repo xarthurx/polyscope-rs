@@ -418,18 +418,26 @@ impl App {
 
                 if structure.type_name() == "VolumeMesh" {
                     if let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>() {
-                        // Find first enabled slice plane
-                        let enabled_plane = slice_planes.iter().find(|p| p.is_enabled());
+                        let mut enabled_planes: Vec<(String, Vec3, Vec3)> = slice_planes
+                            .iter()
+                            .filter(|p| p.is_enabled())
+                            .map(|p| (p.name().to_string(), p.origin(), p.normal()))
+                            .collect();
+                        enabled_planes.sort_by(|a, b| a.0.cmp(&b.0));
 
-                        if let Some(plane) = enabled_plane {
+                        let plane_params: Vec<(Vec3, Vec3)> = enabled_planes
+                            .iter()
+                            .map(|(_, origin, normal)| (*origin, *normal))
+                            .collect();
+
+                        if !plane_params.is_empty() {
                             // Use cell culling: regenerate geometry with only visible cells
-                            // (cells whose centroid is on the positive side of the plane)
+                            // (cells whose centroid is on the positive side of all enabled planes)
                             vm.update_render_data_with_culling(
                                 &engine.device,
                                 engine.mesh_bind_group_layout(),
                                 engine.camera_buffer(),
-                                plane.origin(),
-                                plane.normal(),
+                                &plane_params,
                             );
                         } else if vm.is_culled() {
                             // Was culled but no slice plane is active now - reset to show all cells
@@ -1365,6 +1373,9 @@ impl App {
             render_pass.set_pipeline(pipeline);
             render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
+            // Check transparency mode: 2 = WeightedBlended (OIT)
+            let use_oit = self.appearance_settings.transparency_mode == 2;
+
             crate::with_context(|ctx| {
                 for structure in ctx.registry.iter() {
                     if !structure.is_enabled() {
@@ -1372,6 +1383,10 @@ impl App {
                     }
                     if structure.type_name() == "SurfaceMesh" {
                         if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                            // In OIT mode, skip transparent meshes in this pass
+                            if use_oit && mesh.transparency() > 0.001 {
+                                continue;
+                            }
                             if let Some(render_data) = mesh.render_data() {
                                 render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                 render_pass.set_index_buffer(
@@ -1399,6 +1414,128 @@ impl App {
                     }
                 }
             });
+        }
+
+        // OIT (Order-Independent Transparency) pass for transparent surface meshes
+        if self.appearance_settings.transparency_mode == 2 {
+            // Check if there are any transparent meshes to render
+            let has_transparent_meshes = crate::with_context(|ctx| {
+                ctx.registry.iter().any(|s| {
+                    if !s.is_enabled() || s.type_name() != "SurfaceMesh" {
+                        return false;
+                    }
+                    if let Some(mesh) = s.as_any().downcast_ref::<SurfaceMesh>() {
+                        mesh.transparency() > 0.001
+                    } else {
+                        false
+                    }
+                })
+            });
+
+            if has_transparent_meshes {
+                // Ensure OIT resources are initialized
+                engine.ensure_oit_textures();
+                engine.ensure_oit_pass();
+                engine.ensure_mesh_oit_pipeline();
+
+                let oit_accum_view = engine.oit_accum_view().unwrap();
+                let oit_reveal_view = engine.oit_reveal_view().unwrap();
+                let oit_pipeline = engine.mesh_oit_pipeline().unwrap();
+
+                // OIT Accumulation Pass
+                {
+                    let mut oit_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("OIT Accumulation Pass"),
+                        color_attachments: &[
+                            // Accumulation buffer (clear to black/zero)
+                            Some(wgpu::RenderPassColorAttachment {
+                                view: oit_accum_view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                                depth_slice: None,
+                            }),
+                            // Reveal buffer (clear to 1.0 = fully transparent)
+                            Some(wgpu::RenderPassColorAttachment {
+                                view: oit_reveal_view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                                depth_slice: None,
+                            }),
+                        ],
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: &engine.depth_view,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Load, // Keep opaque depth
+                                store: wgpu::StoreOp::Store,
+                            }),
+                            stencil_ops: None,
+                        }),
+                        ..Default::default()
+                    });
+
+                    oit_pass.set_pipeline(oit_pipeline);
+                    oit_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
+
+                    // Render only transparent meshes
+                    crate::with_context(|ctx| {
+                        for structure in ctx.registry.iter() {
+                            if !structure.is_enabled() {
+                                continue;
+                            }
+                            if structure.type_name() == "SurfaceMesh" {
+                                if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                    // Only render transparent meshes in OIT pass
+                                    if mesh.transparency() <= 0.001 {
+                                        continue;
+                                    }
+                                    if let Some(render_data) = mesh.render_data() {
+                                        oit_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        oit_pass.set_index_buffer(
+                                            render_data.index_buffer.slice(..),
+                                            wgpu::IndexFormat::Uint32,
+                                        );
+                                        oit_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // OIT Composite Pass - blend transparent result over opaque scene
+                {
+                    let hdr_view = engine.hdr_view().expect("HDR view should be available");
+                    let oit_composite = engine.oit_composite_pass().unwrap();
+                    let oit_bind_group = oit_composite.create_bind_group(
+                        &engine.device,
+                        oit_accum_view,
+                        oit_reveal_view,
+                    );
+
+                    let mut composite_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("OIT Composite Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: hdr_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load, // Keep opaque content
+                                store: wgpu::StoreOp::Store,
+                            },
+                            depth_slice: None,
+                        })],
+                        depth_stencil_attachment: None,
+                        ..Default::default()
+                    });
+
+                    oit_composite.draw(&mut composite_pass, &oit_bind_group);
+                }
+            }
         }
 
         // Render ground plane to HDR texture (before tone mapping)

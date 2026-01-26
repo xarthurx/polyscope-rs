@@ -151,6 +151,8 @@ pub struct RenderEngine {
     oit_reveal_view: Option<wgpu::TextureView>,
     /// OIT composite pass.
     oit_composite_pass: Option<crate::oit_pass::OitCompositePass>,
+    /// Surface mesh OIT accumulation pipeline.
+    mesh_oit_pipeline: Option<wgpu::RenderPipeline>,
     /// Tone mapping post-processing pass.
     tone_map_pass: Option<ToneMapPass>,
     /// Shadow map pass for ground plane shadows.
@@ -470,6 +472,7 @@ impl RenderEngine {
             oit_reveal_texture: None,
             oit_reveal_view: None,
             oit_composite_pass: None,
+            mesh_oit_pipeline: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -765,6 +768,7 @@ impl RenderEngine {
             oit_reveal_texture: None,
             oit_reveal_view: None,
             oit_composite_pass: None,
+            mesh_oit_pipeline: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -2743,6 +2747,118 @@ impl RenderEngine {
     /// Returns the OIT composite pass, if initialized.
     pub fn oit_composite_pass(&self) -> Option<&crate::oit_pass::OitCompositePass> {
         self.oit_composite_pass.as_ref()
+    }
+
+    /// Returns the surface mesh OIT pipeline, if initialized.
+    pub fn mesh_oit_pipeline(&self) -> Option<&wgpu::RenderPipeline> {
+        self.mesh_oit_pipeline.as_ref()
+    }
+
+    /// Creates the surface mesh OIT accumulation pipeline.
+    /// This pipeline outputs to OIT accumulation and reveal buffers.
+    fn create_mesh_oit_pipeline(&mut self) {
+        // Ensure the regular mesh pipeline is created first (for bind group layout)
+        if self.mesh_bind_group_layout.is_none() {
+            self.create_mesh_pipeline();
+        }
+
+        let shader_source = include_str!("shaders/surface_mesh_oit.wgsl");
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("surface mesh OIT shader"),
+                source: wgpu::ShaderSource::Wgsl(shader_source.into()),
+            });
+
+        // Reuse the same bind group layout as the regular mesh pipeline
+        let bind_group_layout = self.mesh_bind_group_layout.as_ref().unwrap();
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("mesh OIT pipeline layout"),
+                bind_group_layouts: &[bind_group_layout, &self.slice_plane_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("surface mesh OIT pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[
+                        // Accumulation buffer (RGBA16Float) - additive blending
+                        Some(wgpu::ColorTargetState {
+                            format: wgpu::TextureFormat::Rgba16Float,
+                            blend: Some(wgpu::BlendState {
+                                color: wgpu::BlendComponent {
+                                    src_factor: wgpu::BlendFactor::One,
+                                    dst_factor: wgpu::BlendFactor::One,
+                                    operation: wgpu::BlendOperation::Add,
+                                },
+                                alpha: wgpu::BlendComponent {
+                                    src_factor: wgpu::BlendFactor::One,
+                                    dst_factor: wgpu::BlendFactor::One,
+                                    operation: wgpu::BlendOperation::Add,
+                                },
+                            }),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        }),
+                        // Reveal buffer (R8Unorm) - multiplicative blending for transmittance
+                        Some(wgpu::ColorTargetState {
+                            format: wgpu::TextureFormat::R8Unorm,
+                            blend: Some(wgpu::BlendState {
+                                color: wgpu::BlendComponent {
+                                    src_factor: wgpu::BlendFactor::Zero,
+                                    dst_factor: wgpu::BlendFactor::OneMinusSrc,
+                                    operation: wgpu::BlendOperation::Add,
+                                },
+                                alpha: wgpu::BlendComponent::REPLACE,
+                            }),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        }),
+                    ],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None, // Culling handled in shader
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                // OIT does NOT write to depth buffer, but still reads it
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24PlusStencil8,
+                    depth_write_enabled: false, // Important: don't write depth for transparency
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.mesh_oit_pipeline = Some(pipeline);
+    }
+
+    /// Ensures the mesh OIT pipeline is created.
+    pub fn ensure_mesh_oit_pipeline(&mut self) {
+        if self.mesh_oit_pipeline.is_none() {
+            self.create_mesh_oit_pipeline();
+        }
     }
 
     /// Creates the HDR intermediate texture for tone mapping.

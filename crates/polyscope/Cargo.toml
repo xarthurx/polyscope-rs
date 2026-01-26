@@ -52,5 +52,9 @@ path = "../../examples/volume_mesh_demo.rs"
 name = "slice_plane_demo"
 path = "../../examples/slice_plane_demo.rs"
 
+[[example]]
+name = "transparency_demo"
+path = "../../examples/transparency_demo.rs"
+
 [lints]
 workspace = true
