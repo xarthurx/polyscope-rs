@@ -1902,15 +1902,20 @@ pub fn apply_gizmo_settings(settings: &polyscope_ui::GizmoSettings) {
 pub fn get_selection_info() -> polyscope_ui::SelectionInfo {
     with_context(|ctx| {
         if let Some((type_name, name)) = ctx.selected_structure() {
-            // Get transform from selected structure
-            let transform = ctx
+            // Get transform and bounding box from selected structure
+            let (transform, bbox) = ctx
                 .registry
                 .get(type_name, name)
-                .map(|s| s.transform())
-                .unwrap_or(Mat4::IDENTITY);
+                .map(|s| (s.transform(), s.bounding_box()))
+                .unwrap_or((Mat4::IDENTITY, None));
 
             let t = Transform::from_matrix(transform);
             let euler = t.euler_angles_degrees();
+
+            // Compute centroid from bounding box (world space)
+            let centroid = bbox
+                .map(|(min, max)| (min + max) * 0.5)
+                .unwrap_or(t.translation);
 
             polyscope_ui::SelectionInfo {
                 has_selection: true,
@@ -1919,6 +1924,7 @@ pub fn get_selection_info() -> polyscope_ui::SelectionInfo {
                 translation: t.translation.to_array(),
                 rotation_degrees: euler.to_array(),
                 scale: t.scale.to_array(),
+                centroid: centroid.to_array(),
             }
         } else {
             polyscope_ui::SelectionInfo::default()
@@ -2560,6 +2566,7 @@ mod tests {
             translation: [1.0, 2.0, 3.0],
             rotation_degrees: [0.0, 0.0, 0.0],
             scale: [1.0, 1.0, 1.0],
+            centroid: [1.0, 2.0, 3.0],
         };
 
         apply_selection_transform(&selection);

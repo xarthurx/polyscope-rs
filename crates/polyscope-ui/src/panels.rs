@@ -258,6 +258,8 @@ pub struct SelectionInfo {
     pub rotation_degrees: [f32; 3],
     /// Transform scale.
     pub scale: [f32; 3],
+    /// Bounding box centroid (world space) - used for gizmo positioning.
+    pub centroid: [f32; 3],
 }
 
 /// Actions that can be triggered from the gizmo UI.

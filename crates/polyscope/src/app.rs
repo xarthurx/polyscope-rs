@@ -694,9 +694,10 @@ impl App {
             let view_matrix = engine.camera.view_matrix();
             let projection_matrix = engine.camera.projection_matrix();
 
-            // Get current transform as matrix
+            // Use centroid for gizmo position (so it appears at the center of the geometry)
+            // but keep the rotation and scale from the actual transform
             let current_transform = polyscope_ui::TransformGizmo::compose_transform(
-                glam::Vec3::from(self.selection_info.translation),
+                glam::Vec3::from(self.selection_info.centroid),
                 glam::Vec3::from(self.selection_info.rotation_degrees),
                 glam::Vec3::from(self.selection_info.scale),
             );
@@ -732,10 +733,20 @@ impl App {
                         self.gizmo_settings.space,
                         full_window_viewport,
                     ) {
-                        // Decompose and update selection info
-                        let (translation, rotation, scale) =
+                        // Decompose the new transform (positioned at centroid)
+                        let (new_centroid, rotation, scale) =
                             polyscope_ui::TransformGizmo::decompose_transform(new_transform);
-                        self.selection_info.translation = translation.into();
+
+                        // Compute delta from old centroid to new centroid
+                        let old_centroid = glam::Vec3::from(self.selection_info.centroid);
+                        let delta = new_centroid - old_centroid;
+
+                        // Apply delta to actual translation and update centroid
+                        let old_translation = glam::Vec3::from(self.selection_info.translation);
+                        let new_translation = old_translation + delta;
+
+                        self.selection_info.translation = new_translation.into();
+                        self.selection_info.centroid = new_centroid.into();
                         self.selection_info.rotation_degrees = rotation.into();
                         self.selection_info.scale = scale.into();
 
