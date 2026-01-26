@@ -1,0 +1,178 @@
+// SSAO (Screen Space Ambient Occlusion) shader
+// Samples depth buffer in hemisphere around each pixel to estimate occlusion
+
+struct SsaoUniforms {
+    // Projection matrix for depth reconstruction
+    proj: mat4x4<f32>,
+    inv_proj: mat4x4<f32>,
+    // SSAO parameters
+    radius: f32,
+    bias: f32,
+    intensity: f32,
+    sample_count: u32,
+    // Screen dimensions for noise tiling
+    screen_width: f32,
+    screen_height: f32,
+    _padding: vec2<f32>,
+}
+
+// Hemisphere sample kernel (precomputed, oriented along +Z)
+// These are positions in tangent space to sample around each pixel
+const KERNEL_SIZE: u32 = 64u;
+var<private> kernel: array<vec3<f32>, 64> = array<vec3<f32>, 64>(
+    vec3<f32>(0.04977, -0.04471, 0.04996),
+    vec3<f32>(0.01457, 0.01653, 0.00224),
+    vec3<f32>(-0.04065, -0.01937, 0.03193),
+    vec3<f32>(0.01378, -0.09158, 0.04092),
+    vec3<f32>(0.05599, 0.05979, 0.05766),
+    vec3<f32>(0.09227, 0.04428, 0.01545),
+    vec3<f32>(-0.00204, -0.05828, 0.14464),
+    vec3<f32>(-0.00033, -0.00019, 0.00037),
+    vec3<f32>(0.05004, -0.04665, 0.02538),
+    vec3<f32>(-0.03886, 0.09849, 0.00118),
+    vec3<f32>(-0.00184, -0.01569, 0.00531),
+    vec3<f32>(-0.08395, -0.01566, 0.04852),
+    vec3<f32>(-0.00880, -0.00226, 0.00454),
+    vec3<f32>(-0.08089, -0.08662, 0.03873),
+    vec3<f32>(-0.00307, 0.00372, 0.00100),
+    vec3<f32>(-0.01425, 0.08400, 0.08076),
+    vec3<f32>(0.0, 0.0, 0.1),
+    vec3<f32>(0.1, 0.0, 0.1),
+    vec3<f32>(0.0, 0.1, 0.1),
+    vec3<f32>(-0.1, 0.0, 0.1),
+    vec3<f32>(0.0, -0.1, 0.1),
+    vec3<f32>(0.07, 0.07, 0.1),
+    vec3<f32>(-0.07, 0.07, 0.1),
+    vec3<f32>(0.07, -0.07, 0.1),
+    vec3<f32>(-0.07, -0.07, 0.1),
+    vec3<f32>(0.0, 0.0, 0.2),
+    vec3<f32>(0.14, 0.0, 0.14),
+    vec3<f32>(0.0, 0.14, 0.14),
+    vec3<f32>(-0.14, 0.0, 0.14),
+    vec3<f32>(0.0, -0.14, 0.14),
+    vec3<f32>(0.1, 0.1, 0.14),
+    vec3<f32>(-0.1, 0.1, 0.14),
+    vec3<f32>(0.1, -0.1, 0.14),
+    vec3<f32>(-0.1, -0.1, 0.14),
+    vec3<f32>(0.0, 0.0, 0.3),
+    vec3<f32>(0.2, 0.0, 0.2),
+    vec3<f32>(0.0, 0.2, 0.2),
+    vec3<f32>(-0.2, 0.0, 0.2),
+    vec3<f32>(0.0, -0.2, 0.2),
+    vec3<f32>(0.14, 0.14, 0.2),
+    vec3<f32>(-0.14, 0.14, 0.2),
+    vec3<f32>(0.14, -0.14, 0.2),
+    vec3<f32>(-0.14, -0.14, 0.2),
+    vec3<f32>(0.0, 0.0, 0.4),
+    vec3<f32>(0.25, 0.0, 0.25),
+    vec3<f32>(0.0, 0.25, 0.25),
+    vec3<f32>(-0.25, 0.0, 0.25),
+    vec3<f32>(0.0, -0.25, 0.25),
+    vec3<f32>(0.18, 0.18, 0.25),
+    vec3<f32>(-0.18, 0.18, 0.25),
+    vec3<f32>(0.18, -0.18, 0.25),
+    vec3<f32>(-0.18, -0.18, 0.25),
+    vec3<f32>(0.0, 0.0, 0.5),
+    vec3<f32>(0.3, 0.0, 0.3),
+    vec3<f32>(0.0, 0.3, 0.3),
+    vec3<f32>(-0.3, 0.0, 0.3),
+    vec3<f32>(0.0, -0.3, 0.3),
+    vec3<f32>(0.2, 0.2, 0.3),
+    vec3<f32>(-0.2, 0.2, 0.3),
+    vec3<f32>(0.2, -0.2, 0.3),
+    vec3<f32>(-0.2, -0.2, 0.3),
+    vec3<f32>(0.35, 0.0, 0.35),
+    vec3<f32>(0.0, 0.35, 0.35),
+    vec3<f32>(-0.35, 0.0, 0.35),
+);
+
+@group(0) @binding(0) var depth_texture: texture_depth_2d;
+@group(0) @binding(1) var normal_texture: texture_2d<f32>;
+@group(0) @binding(2) var noise_texture: texture_2d<f32>;
+@group(0) @binding(3) var tex_sampler: sampler;
+@group(0) @binding(4) var<uniform> uniforms: SsaoUniforms;
+
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+}
+
+// Fullscreen triangle
+@vertex
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+    var out: VertexOutput;
+    let x = f32((vertex_index & 1u) << 2u) - 1.0;
+    let y = f32((vertex_index & 2u) << 1u) - 1.0;
+    out.position = vec4<f32>(x, y, 0.0, 1.0);
+    out.uv = vec2<f32>((x + 1.0) * 0.5, (1.0 - y) * 0.5);
+    return out;
+}
+
+// Reconstruct view-space position from depth and UV
+fn view_pos_from_depth(uv: vec2<f32>, depth: f32) -> vec3<f32> {
+    // Convert UV to clip space
+    let clip = vec4<f32>(uv * 2.0 - 1.0, depth, 1.0);
+    // Unproject to view space
+    let view = uniforms.inv_proj * clip;
+    return view.xyz / view.w;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let texel_size = vec2<f32>(1.0 / uniforms.screen_width, 1.0 / uniforms.screen_height);
+
+    // Sample depth and normal
+    let depth = textureSample(depth_texture, tex_sampler, in.uv);
+    if (depth >= 1.0) {
+        // Sky/background - no occlusion
+        return vec4<f32>(1.0);
+    }
+
+    let normal_sample = textureSample(normal_texture, tex_sampler, in.uv);
+    let normal = normalize(normal_sample.xyz * 2.0 - 1.0); // Decode from [0,1] to [-1,1]
+
+    // Reconstruct view-space position
+    let frag_pos = view_pos_from_depth(in.uv, depth);
+
+    // Sample noise for random rotation (tile across screen)
+    let noise_scale = vec2<f32>(uniforms.screen_width / 4.0, uniforms.screen_height / 4.0);
+    let noise_uv = in.uv * noise_scale;
+    let random_vec = textureSample(noise_texture, tex_sampler, noise_uv).xyz * 2.0 - 1.0;
+
+    // Create TBN matrix to orient hemisphere along normal
+    let tangent = normalize(random_vec - normal * dot(random_vec, normal));
+    let bitangent = cross(normal, tangent);
+    let tbn = mat3x3<f32>(tangent, bitangent, normal);
+
+    // Accumulate occlusion
+    var occlusion = 0.0;
+    let sample_count = min(uniforms.sample_count, KERNEL_SIZE);
+
+    for (var i = 0u; i < sample_count; i++) {
+        // Get sample position in view space
+        let sample_dir = tbn * kernel[i];
+        let sample_pos = frag_pos + sample_dir * uniforms.radius;
+
+        // Project sample to screen space
+        let offset = uniforms.proj * vec4<f32>(sample_pos, 1.0);
+        let offset_uv = (offset.xy / offset.w) * 0.5 + 0.5;
+
+        // Sample depth at this position
+        let sample_depth = textureSample(depth_texture, tex_sampler, vec2<f32>(offset_uv.x, 1.0 - offset_uv.y));
+        let sample_view_pos = view_pos_from_depth(vec2<f32>(offset_uv.x, 1.0 - offset_uv.y), sample_depth);
+
+        // Range check and accumulate
+        let range_check = smoothstep(0.0, 1.0, uniforms.radius / abs(frag_pos.z - sample_view_pos.z));
+        if (sample_view_pos.z >= sample_pos.z + uniforms.bias) {
+            occlusion += range_check;
+        }
+    }
+
+    // Average and invert
+    occlusion = 1.0 - (occlusion / f32(sample_count));
+
+    // Apply intensity
+    occlusion = pow(occlusion, uniforms.intensity);
+
+    return vec4<f32>(occlusion, occlusion, occlusion, 1.0);
+}
