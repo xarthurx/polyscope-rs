@@ -17,14 +17,12 @@ pub struct PlaneRenderUniforms {
     pub color: [f32; 4],
     /// Color of the grid lines.
     pub grid_color: [f32; 4],
-    /// Transparency (0.0 = transparent, 1.0 = opaque).
-    pub transparency: f32,
     /// Length scale for grid sizing.
     pub length_scale: f32,
     /// Size of the plane visualization (half-extent in each direction).
     pub plane_size: f32,
     /// Padding for alignment.
-    pub _padding: f32,
+    pub _padding: [f32; 2],
 }
 
 impl Default for PlaneRenderUniforms {
@@ -33,10 +31,9 @@ impl Default for PlaneRenderUniforms {
             transform: Mat4::IDENTITY.to_cols_array_2d(),
             color: [0.5, 0.5, 0.5, 1.0],
             grid_color: [0.3, 0.3, 0.3, 1.0],
-            transparency: 0.3,
             length_scale: 1.0,
             plane_size: 0.1,
-            _padding: 0.0,
+            _padding: [0.0; 2],
         }
     }
 }
@@ -132,10 +129,9 @@ impl SlicePlaneRenderData {
             transform: transform.to_cols_array_2d(),
             color: [color.x, color.y, color.z, 1.0],
             grid_color: [color.x * 0.6, color.y * 0.6, color.z * 0.6, 1.0],
-            transparency: plane.transparency(),
             length_scale,
             plane_size: plane.plane_size(),
-            _padding: 0.0,
+            _padding: [0.0; 2],
         };
 
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
@@ -148,10 +144,11 @@ impl SlicePlaneRenderData {
 
     /// Draws the slice plane visualization.
     ///
-    /// Draws 12 vertices (4 triangles) forming a double-sided bounded quad.
+    /// Draws 6 vertices (2 triangles) forming a quad. Both sides are rendered
+    /// because the pipeline has cull_mode: None.
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_bind_group(0, &self.bind_group, &[]);
-        render_pass.draw(0..12, 0..1);
+        render_pass.draw(0..6, 0..1);
     }
 }
 

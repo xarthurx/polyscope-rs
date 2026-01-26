@@ -14,10 +14,9 @@ struct PlaneUniforms {
     transform: mat4x4<f32>,  // Plane's object transform
     color: vec4<f32>,
     grid_color: vec4<f32>,
-    transparency: f32,
     length_scale: f32,
     plane_size: f32,         // Half-extent of the plane quad
-    _padding: f32,
+    _padding: vec2<f32>,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -29,30 +28,20 @@ struct VertexOutput {
     @location(1) plane_uv: vec2<f32>,
 }
 
-// Bounded quad geometry - double-sided (12 vertices total)
+// Bounded quad geometry (6 vertices, cull_mode: None renders both sides)
 // Plane lies in X=0 in local space, with Y and Z as tangent directions
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     let size = plane.plane_size;
 
-    // 12 vertices forming 4 triangles (2 quads - front and back)
-    // First 6: front face (CCW when viewed from +X)
-    // Last 6: back face (CCW when viewed from -X)
-    var positions = array<vec3<f32>, 12>(
-        // Front face
+    // 6 vertices forming 2 triangles (single quad)
+    var positions = array<vec3<f32>, 6>(
         vec3<f32>(0.0, -size, -size), // bottom-left
         vec3<f32>(0.0,  size, -size), // top-left
         vec3<f32>(0.0,  size,  size), // top-right
         vec3<f32>(0.0, -size, -size), // bottom-left
         vec3<f32>(0.0,  size,  size), // top-right
         vec3<f32>(0.0, -size,  size), // bottom-right
-        // Back face (reversed winding)
-        vec3<f32>(0.0, -size, -size), // bottom-left
-        vec3<f32>(0.0,  size,  size), // top-right
-        vec3<f32>(0.0,  size, -size), // top-left
-        vec3<f32>(0.0, -size, -size), // bottom-left
-        vec3<f32>(0.0, -size,  size), // bottom-right
-        vec3<f32>(0.0,  size,  size), // top-right
     );
 
     let local_pos = positions[vertex_index];
@@ -61,8 +50,6 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;
     out.clip_position = camera.view_proj * world_pos;
     out.world_position = world_pos.xyz;
-
-    // Compute UV coordinates based on local Y and Z positions
     out.plane_uv = vec2<f32>(local_pos.y, local_pos.z);
 
     return out;

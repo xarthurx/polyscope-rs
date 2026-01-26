@@ -759,19 +759,22 @@ impl App {
                         full_window_viewport,
                     ) {
                         // Decompose the new transform (positioned at centroid)
-                        let (new_centroid, rotation, scale) =
+                        let (new_pos, rotation, scale) =
                             polyscope_ui::TransformGizmo::decompose_transform(new_transform);
 
-                        // Compute delta from old centroid to new centroid
                         let old_centroid = glam::Vec3::from(self.selection_info.centroid);
-                        let delta = new_centroid - old_centroid;
+                        let delta = new_pos - old_centroid;
 
-                        // Apply delta to actual translation and update centroid
-                        let old_translation = glam::Vec3::from(self.selection_info.translation);
-                        let new_translation = old_translation + delta;
+                        // Only update centroid/translation if there was significant movement
+                        // This prevents drift from floating-point errors during rotation/scale
+                        const TRANSLATION_THRESHOLD: f32 = 0.001;
+                        if delta.length() > TRANSLATION_THRESHOLD {
+                            let old_translation = glam::Vec3::from(self.selection_info.translation);
+                            self.selection_info.translation = (old_translation + delta).into();
+                            self.selection_info.centroid = new_pos.into();
+                        }
 
-                        self.selection_info.translation = new_translation.into();
-                        self.selection_info.centroid = new_centroid.into();
+                        // Always update rotation and scale
                         self.selection_info.rotation_degrees = rotation.into();
                         self.selection_info.scale = scale.into();
 
