@@ -1223,7 +1223,7 @@ impl App {
         if self.ground_plane.mode == GroundPlaneMode::TileReflection {
             // Compute ground height
             let ground_height = if self.ground_plane.height_is_relative {
-                scene_min_y - length_scale * 0.05
+                scene_min_y - length_scale * 0.001
             } else {
                 self.ground_plane.height
             };

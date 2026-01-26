@@ -149,10 +149,10 @@ impl GroundPlaneRenderData {
         // So height should be relative to center, not absolute Y coordinate
         let center_y = scene_center[1];
         let height = height_override.unwrap_or_else(|| {
-            // Place below the scene's minimum Y coordinate
-            // Use 5% of length_scale as offset to avoid intersection with model
+            // Place at the scene's minimum Y coordinate
+            // Use a tiny offset (0.1% of length_scale) to avoid z-fighting
             // height = (target_y - center_y), where target_y = scene_min_y - offset
-            let target_y = scene_min_y - length_scale * 0.05;
+            let target_y = scene_min_y - length_scale * 0.001;
             target_y - center_y
         });
 
