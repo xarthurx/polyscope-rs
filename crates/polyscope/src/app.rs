@@ -758,25 +758,58 @@ impl App {
                         self.gizmo_settings.local_space,
                         full_window_viewport,
                     ) {
-                        // Decompose the new transform (positioned at centroid)
-                        let (new_pos, rotation, scale) =
+                        // Decompose the new transform from gizmo
+                        let (new_gizmo_pos, new_rotation_deg, new_scale) =
                             polyscope_ui::TransformGizmo::decompose_transform(new_transform);
 
-                        let old_centroid = glam::Vec3::from(self.selection_info.centroid);
-                        let delta = new_pos - old_centroid;
+                        // Get old values
+                        let old_translation = glam::Vec3::from(self.selection_info.translation);
+                        let old_rotation_deg = glam::Vec3::from(self.selection_info.rotation_degrees);
+                        let old_scale = glam::Vec3::from(self.selection_info.scale);
+                        let world_centroid = glam::Vec3::from(self.selection_info.centroid);
 
-                        // Only update centroid/translation if there was significant movement
-                        // This prevents drift from floating-point errors during rotation/scale
-                        const TRANSLATION_THRESHOLD: f32 = 0.001;
-                        if delta.length() > TRANSLATION_THRESHOLD {
-                            let old_translation = glam::Vec3::from(self.selection_info.translation);
-                            self.selection_info.translation = (old_translation + delta).into();
-                            self.selection_info.centroid = new_pos.into();
-                        }
+                        // Compute local centroid (center of geometry in object space)
+                        // world_centroid = translation + rotation * (local_centroid * scale)
+                        // local_centroid = inverse(rotation) * (world_centroid - translation) / scale
+                        let old_rotation = glam::Quat::from_euler(
+                            glam::EulerRot::XYZ,
+                            old_rotation_deg.x.to_radians(),
+                            old_rotation_deg.y.to_radians(),
+                            old_rotation_deg.z.to_radians(),
+                        );
+                        let local_centroid = old_rotation.inverse() * (world_centroid - old_translation) / old_scale;
 
-                        // Always update rotation and scale
-                        self.selection_info.rotation_degrees = rotation.into();
-                        self.selection_info.scale = scale.into();
+                        // Convert new rotation to quaternion
+                        let new_rotation = glam::Quat::from_euler(
+                            glam::EulerRot::XYZ,
+                            new_rotation_deg.x.to_radians(),
+                            new_rotation_deg.y.to_radians(),
+                            new_rotation_deg.z.to_radians(),
+                        );
+
+                        // Compute new translation to keep world_centroid fixed during rotation/scale
+                        // For pure rotation/scale: new_translation = world_centroid - new_rotation * (local_centroid * new_scale)
+                        // For translation: the gizmo moves, so we use the new gizmo position as the new world_centroid
+
+                        // Check if the gizmo position changed (user translated)
+                        let gizmo_moved = (new_gizmo_pos - world_centroid).length() > 0.0001;
+
+                        let (new_translation, new_centroid) = if gizmo_moved {
+                            // User translated: new world_centroid = new_gizmo_pos
+                            let new_world_centroid = new_gizmo_pos;
+                            let new_trans = new_world_centroid - new_rotation * (local_centroid * new_scale);
+                            (new_trans, new_world_centroid)
+                        } else {
+                            // User rotated/scaled only: keep world_centroid fixed
+                            let new_trans = world_centroid - new_rotation * (local_centroid * new_scale);
+                            (new_trans, world_centroid)
+                        };
+
+                        // Update selection info
+                        self.selection_info.translation = new_translation.into();
+                        self.selection_info.centroid = new_centroid.into();
+                        self.selection_info.rotation_degrees = new_rotation_deg.into();
+                        self.selection_info.scale = new_scale.into();
 
                         // Apply to selected structure
                         crate::handle_gizmo_action(
