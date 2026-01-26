@@ -149,6 +149,7 @@ impl App {
     /// or None if clicking on empty space.
     ///
     /// NOTE: This is the fallback method. GPU picking (gpu_pick_at) is preferred when available.
+    #[allow(dead_code)]
     fn pick_structure_at_screen_pos(
         &self,
         click_pos: glam::Vec2,
@@ -161,7 +162,7 @@ impl App {
         let half_height = screen_height as f32 / 2.0;
 
         // Threshold distance in pixels for considering a click "on" a structure
-        let pick_threshold = 20.0_f32;
+        let pick_threshold = 12.0_f32;
         let mut best_match: Option<(String, String, f32)> = None;
 
         crate::with_context(|ctx| {
@@ -170,8 +171,59 @@ impl App {
                     continue;
                 }
 
+                // Point clouds have GPU picking; skip them in the fallback to avoid sticky picks.
+                if structure.type_name() == "PointCloud" {
+                    continue;
+                }
+
                 let model = structure.transform();
                 let mvp = view_proj * model;
+
+                // Gate by screen-space bounding box when available to avoid overly permissive picks.
+                if let Some((min, max)) = structure.bounding_box() {
+                    let corners = [
+                        Vec3::new(min.x, min.y, min.z),
+                        Vec3::new(min.x, min.y, max.z),
+                        Vec3::new(min.x, max.y, min.z),
+                        Vec3::new(min.x, max.y, max.z),
+                        Vec3::new(max.x, min.y, min.z),
+                        Vec3::new(max.x, min.y, max.z),
+                        Vec3::new(max.x, max.y, min.z),
+                        Vec3::new(max.x, max.y, max.z),
+                    ];
+
+                    let mut min_x = f32::INFINITY;
+                    let mut max_x = f32::NEG_INFINITY;
+                    let mut min_y = f32::INFINITY;
+                    let mut max_y = f32::NEG_INFINITY;
+                    let mut any_valid = false;
+
+                    for corner in corners {
+                        let clip = mvp * glam::Vec4::new(corner.x, corner.y, corner.z, 1.0);
+                        if clip.w <= 0.0 {
+                            continue;
+                        }
+                        let ndc = clip.truncate() / clip.w;
+                        let screen_x = (ndc.x + 1.0) * half_width;
+                        let screen_y = (1.0 - ndc.y) * half_height;
+                        min_x = min_x.min(screen_x);
+                        max_x = max_x.max(screen_x);
+                        min_y = min_y.min(screen_y);
+                        max_y = max_y.max(screen_y);
+                        any_valid = true;
+                    }
+
+                    if any_valid {
+                        let pad = pick_threshold;
+                        if click_pos.x < min_x - pad
+                            || click_pos.x > max_x + pad
+                            || click_pos.y < min_y - pad
+                            || click_pos.y > max_y + pad
+                        {
+                            continue;
+                        }
+                    }
+                }
 
                 // Get sample points based on structure type
                 let sample_points: Vec<Vec3> = if structure.type_name() == "PointCloud" {
@@ -248,14 +300,13 @@ impl App {
         best_match.map(|(type_name, name, _)| (type_name, name))
     }
 
-    /// Tests whether a click intersects a visible slice plane quad.
-    fn pick_slice_plane_at_screen_pos(
+    fn screen_ray(
         &self,
         click_pos: glam::Vec2,
         screen_width: u32,
         screen_height: u32,
         camera: &polyscope_render::Camera,
-    ) -> Option<String> {
+    ) -> Option<(Vec3, Vec3)> {
         if screen_width == 0 || screen_height == 0 {
             return None;
         }
@@ -265,8 +316,7 @@ impl App {
         let ndc_x = (click_pos.x / half_width) - 1.0;
         let ndc_y = 1.0 - (click_pos.y / half_height);
 
-        let view_proj = camera.view_projection_matrix();
-        let inv_view_proj = view_proj.inverse();
+        let inv_view_proj = camera.view_projection_matrix().inverse();
 
         // wgpu-style NDC depth [0, 1]
         let near = inv_view_proj * glam::Vec4::new(ndc_x, ndc_y, 0.0, 1.0);
@@ -276,15 +326,19 @@ impl App {
             return None;
         }
 
-        let ray_origin = (near.truncate() / near.w);
-        let ray_far = (far.truncate() / far.w);
+        let ray_origin = near.truncate() / near.w;
+        let ray_far = far.truncate() / far.w;
         let ray_dir = (ray_far - ray_origin).normalize_or_zero();
         if ray_dir.length_squared() < 1e-12 {
             return None;
         }
 
-        let mut best_hit: Option<(String, f32)> = None;
+        Some((ray_origin, ray_dir))
+    }
 
+    /// Tests whether a ray intersects a visible slice plane quad.
+    fn pick_slice_plane_at_ray(&self, ray_origin: Vec3, ray_dir: Vec3) -> Option<(String, f32)> {
+        let mut best_hit: Option<(String, f32)> = None;
         crate::with_context(|ctx| {
             for plane in ctx.slice_planes() {
                 if !plane.is_enabled() || !plane.draw_plane() {
@@ -315,9 +369,8 @@ impl App {
                 let size = plane.plane_size();
 
                 if y.abs() <= size && z.abs() <= size {
-                    let is_better = best_hit
-                        .as_ref()
-                        .map_or(true, |(_, best_t)| t < *best_t);
+                    let is_better =
+                        best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
                     if is_better {
                         best_hit = Some((plane.name().to_string(), t));
                     }
@@ -325,7 +378,163 @@ impl App {
             }
         });
 
-        best_hit.map(|(name, _)| name)
+        best_hit
+    }
+
+    fn ray_intersect_triangle(
+        &self,
+        ray_origin: Vec3,
+        ray_dir: Vec3,
+        v0: Vec3,
+        v1: Vec3,
+        v2: Vec3,
+    ) -> Option<f32> {
+        let eps = 1e-6;
+        let edge1 = v1 - v0;
+        let edge2 = v2 - v0;
+        let h = ray_dir.cross(edge2);
+        let a = edge1.dot(h);
+        if a.abs() < eps {
+            return None;
+        }
+        let f = 1.0 / a;
+        let s = ray_origin - v0;
+        let u = f * s.dot(h);
+        if u < 0.0 || u > 1.0 {
+            return None;
+        }
+        let q = s.cross(edge1);
+        let v = f * ray_dir.dot(q);
+        if v < 0.0 || u + v > 1.0 {
+            return None;
+        }
+        let t = f * edge2.dot(q);
+        if t > eps {
+            Some(t)
+        } else {
+            None
+        }
+    }
+
+    fn pick_structure_at_ray(
+        &self,
+        ray_origin: Vec3,
+        ray_dir: Vec3,
+        plane_params: &[(Vec3, Vec3)],
+    ) -> Option<(String, String, f32)> {
+        let mut best_hit: Option<(String, String, f32)> = None;
+
+        crate::with_context(|ctx| {
+            for structure in ctx.registry.iter() {
+                if !structure.is_enabled() {
+                    continue;
+                }
+
+                match structure.type_name() {
+                    "SurfaceMesh" => {
+                        let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() else {
+                            continue;
+                        };
+                        let model = structure.transform();
+                        let mut world_verts = Vec::with_capacity(mesh.vertices().len());
+                        for v in mesh.vertices() {
+                            world_verts.push((model * v.extend(1.0)).truncate());
+                        }
+
+                        let mut hit_t: Option<f32> = None;
+                        for tri in mesh.triangulation() {
+                            let v0 = world_verts[tri[0] as usize];
+                            let v1 = world_verts[tri[1] as usize];
+                            let v2 = world_verts[tri[2] as usize];
+                            if let Some(t) = self.ray_intersect_triangle(ray_origin, ray_dir, v0, v1, v2) {
+                                hit_t = Some(hit_t.map_or(t, |best| best.min(t)));
+                            }
+                        }
+
+                        if let Some(t) = hit_t {
+                            let is_better = best_hit
+                                .as_ref()
+                                .map_or(true, |(_, _, best_t)| t < *best_t);
+                            if is_better {
+                                best_hit =
+                                    Some((structure.type_name().to_string(), structure.name().to_string(), t));
+                            }
+                        }
+                    }
+                    "VolumeMesh" => {
+                        let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() else {
+                            continue;
+                        };
+                        let model = structure.transform();
+                        let (positions, faces) = vm.pick_triangles(plane_params);
+                        if positions.is_empty() || faces.is_empty() {
+                            continue;
+                        }
+                        let mut world_positions = Vec::with_capacity(positions.len());
+                        for v in positions {
+                            world_positions.push((model * v.extend(1.0)).truncate());
+                        }
+
+                        let mut hit_t: Option<f32> = None;
+                        for tri in faces {
+                            let v0 = world_positions[tri[0] as usize];
+                            let v1 = world_positions[tri[1] as usize];
+                            let v2 = world_positions[tri[2] as usize];
+                            if let Some(t) = self.ray_intersect_triangle(ray_origin, ray_dir, v0, v1, v2) {
+                                hit_t = Some(hit_t.map_or(t, |best| best.min(t)));
+                            }
+                        }
+
+                        if let Some(t) = hit_t {
+                            let is_better = best_hit
+                                .as_ref()
+                                .map_or(true, |(_, _, best_t)| t < *best_t);
+                            if is_better {
+                                best_hit =
+                                    Some((structure.type_name().to_string(), structure.name().to_string(), t));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        best_hit
+    }
+
+    fn pick_point_cloud_at_ray(
+        &self,
+        ray_origin: Vec3,
+        ray_dir: Vec3,
+        name: &str,
+        element_index: u32,
+    ) -> Option<f32> {
+        crate::with_context(|ctx| {
+            let structure = ctx.registry.get("PointCloud", name)?;
+            let pc = structure.as_any().downcast_ref::<PointCloud>()?;
+            let points = pc.points();
+            let idx = element_index as usize;
+            if idx >= points.len() {
+                return None;
+            }
+            let model = structure.transform();
+            let world_point = (model * points[idx].extend(1.0)).truncate();
+            let t = (world_point - ray_origin).dot(ray_dir);
+            if t < 0.0 {
+                return None;
+            }
+            let closest = ray_origin + ray_dir * t;
+            let dist = (world_point - closest).length();
+            let radius_world = model
+                .transform_vector3(Vec3::new(pc.point_radius(), 0.0, 0.0))
+                .length();
+            if dist <= radius_world.max(1e-4) * 1.5 {
+                Some(t)
+            } else {
+                None
+            }
+        })
     }
 
     fn select_slice_plane_by_name(&mut self, name: &str) {
@@ -2183,100 +2392,175 @@ impl ApplicationHandler for App {
 
                 match (button, state) {
                     (MouseButton::Left, ElementState::Released) => {
-                        // Skip if egui is actively using pointer (gizmo being dragged)
-                        if egui_using_pointer {
+                        // DEBUG: Log click event
+                        log::debug!(
+                            "[CLICK DEBUG] Left mouse released at ({:.1}, {:.1}), drag_distance={:.2}, mouse_in_ui_panel={}, egui_using_pointer={}, egui_consumed={}",
+                            self.mouse_pos.0, self.mouse_pos.1, self.drag_distance, mouse_in_ui_panel, egui_using_pointer, egui_consumed
+                        );
+
+                        // Skip if egui is actively using pointer AND this was a drag (gizmo being dragged)
+                        // But allow clicks through - egui_using_pointer can be true even for simple clicks
+                        // when gizmo is visible, so we only skip if it was actually a drag operation
+                        if egui_using_pointer && self.drag_distance >= DRAG_THRESHOLD {
+                            log::debug!("[CLICK DEBUG] EARLY RETURN: egui was dragging (drag_distance={:.2})", self.drag_distance);
                             self.last_click_pos = None;
                             return;
                         }
 
                         // Check if this was a click (not a drag) in the 3D viewport
                         if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
+                            log::debug!("[CLICK DEBUG] Processing click in 3D viewport");
                             if let Some(engine) = &self.engine {
                                 let click_screen = glam::Vec2::new(
                                     self.mouse_pos.0 as f32,
                                     self.mouse_pos.1 as f32,
                                 );
 
-                                let plane_hit = self.pick_slice_plane_at_screen_pos(
+                                let ray = self.screen_ray(
                                     click_screen,
                                     engine.width,
                                     engine.height,
                                     &engine.camera,
                                 );
-
-                                if let Some(plane_name) = plane_hit {
-                                    // Select the slice plane and clear structure selection
+                                let Some((ray_origin, ray_dir)) = ray else {
+                                    log::debug!("[CLICK DEBUG] No ray - deselecting");
                                     self.selection = None;
                                     self.selected_element_index = None;
                                     self.selection_info = polyscope_ui::SelectionInfo::default();
                                     crate::deselect_structure();
-                                    self.select_slice_plane_by_name(&plane_name);
+                                    self.deselect_slice_plane_selection();
                                     self.last_click_pos = None;
                                     return;
-                                }
+                                };
 
-                                // Try GPU picking first (pixel-perfect when pick pass is rendered)
-                                let gpu_picked = self.gpu_pick_at(
-                                    self.mouse_pos.0 as u32,
-                                    self.mouse_pos.1 as u32,
-                                );
+                                let plane_hit = self.pick_slice_plane_at_ray(ray_origin, ray_dir);
+                                log::debug!("[CLICK DEBUG] plane_hit: {:?}", plane_hit);
 
-                                // Fall back to screen-space picking if GPU pick misses
-                                let picked = gpu_picked.or_else(|| {
-                                    self.pick_structure_at_screen_pos(
-                                        click_screen,
-                                        engine.width,
-                                        engine.height,
-                                        &engine.camera,
-                                    )
-                                    .map(|(t, n)| (t, n, 0u32))
+                                let plane_params = crate::with_context(|ctx| {
+                                    let mut enabled_planes: Vec<(String, Vec3, Vec3)> = ctx
+                                        .slice_planes()
+                                        .filter(|p| p.is_enabled())
+                                        .map(|p| (p.name().to_string(), p.origin(), p.normal()))
+                                        .collect();
+                                    enabled_planes.sort_by(|a, b| a.0.cmp(&b.0));
+                                    enabled_planes
+                                        .into_iter()
+                                        .map(|(_, origin, normal)| (origin, normal))
+                                        .collect::<Vec<_>>()
                                 });
 
-                                if let Some((type_name, name, element_index)) = picked {
-                                    // Something was clicked - select it
-                                    self.selected_element_index = Some(element_index);
-                                    self.deselect_slice_plane_selection();
+                                let structure_hit =
+                                    self.pick_structure_at_ray(ray_origin, ray_dir, &plane_params);
+                                log::debug!("[CLICK DEBUG] structure_hit: {:?}", structure_hit);
 
-                                    // Determine element type based on structure type
-                                    let element_type = match type_name.as_str() {
-                                        "PointCloud" => polyscope_render::PickElementType::Point,
-                                        "SurfaceMesh" => polyscope_render::PickElementType::Face,
-                                        "CurveNetwork" => polyscope_render::PickElementType::Edge,
-                                        _ => polyscope_render::PickElementType::None,
-                                    };
+                                // GPU picking for point clouds, refined with ray distance
+                                let gpu_picked = self
+                                    .gpu_pick_at(self.mouse_pos.0 as u32, self.mouse_pos.1 as u32);
+                                log::debug!("[CLICK DEBUG] gpu_picked: {:?}", gpu_picked);
+                                let point_hit = gpu_picked.and_then(|(type_name, name, idx)| {
+                                    if type_name == "PointCloud" {
+                                        self.pick_point_cloud_at_ray(ray_origin, ray_dir, &name, idx)
+                                            .map(|t| (name, idx, t))
+                                    } else {
+                                        None
+                                    }
+                                });
+                                log::debug!("[CLICK DEBUG] point_hit: {:?}", point_hit);
 
-                                    self.selection = Some(PickResult {
-                                        hit: true,
-                                        structure_type: type_name.clone(),
-                                        structure_name: name.clone(),
-                                        element_index: element_index as u64,
-                                        element_type,
-                                        screen_pos: click_screen,
-                                        depth: 0.5,
-                                    });
-                                    crate::select_structure(&type_name, &name);
-                                    self.selection_info = crate::get_selection_info();
-                                } else {
-                                    // Nothing was clicked - deselect
-                                    self.selection = None;
-                                    self.selected_element_index = None;
-                                    self.selection_info = polyscope_ui::SelectionInfo::default();
-                                    crate::deselect_structure();
-                                    self.deselect_slice_plane_selection();
+                                enum ClickHit {
+                                    Plane(String),
+                                    Structure { type_name: String, name: String, element_index: u32 },
+                                }
+
+                                let mut best_hit: Option<(ClickHit, f32)> = None;
+
+                                if let Some((name, t)) = plane_hit {
+                                    best_hit = Some((ClickHit::Plane(name), t));
+                                }
+
+                                if let Some((type_name, name, t)) = structure_hit {
+                                    let is_better =
+                                        best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                    if is_better {
+                                        best_hit = Some((
+                                            ClickHit::Structure {
+                                                type_name,
+                                                name,
+                                                element_index: 0,
+                                            },
+                                            t,
+                                        ));
+                                    }
+                                }
+
+                                if let Some((name, idx, t)) = point_hit {
+                                    let is_better =
+                                        best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                    if is_better {
+                                        best_hit = Some((
+                                            ClickHit::Structure {
+                                                type_name: "PointCloud".to_string(),
+                                                name,
+                                                element_index: idx,
+                                            },
+                                            t,
+                                        ));
+                                    }
+                                }
+
+                                match &best_hit {
+                                    Some((ClickHit::Plane(plane_name), t)) => {
+                                        log::debug!("[CLICK DEBUG] Hit plane '{}' at t={}", plane_name, t);
+                                        // Select the slice plane and clear structure selection
+                                        self.selection = None;
+                                        self.selected_element_index = None;
+                                        self.selection_info = polyscope_ui::SelectionInfo::default();
+                                        crate::deselect_structure();
+                                        self.select_slice_plane_by_name(plane_name);
+                                    }
+                                    Some((ClickHit::Structure { type_name, name, element_index }, t)) => {
+                                        log::debug!("[CLICK DEBUG] Hit structure '{}::{}' element {} at t={}", type_name, name, element_index, t);
+                                        self.selected_element_index = Some(*element_index);
+                                        self.deselect_slice_plane_selection();
+
+                                        let element_type = match type_name.as_str() {
+                                            "PointCloud" => polyscope_render::PickElementType::Point,
+                                            "SurfaceMesh" => polyscope_render::PickElementType::Face,
+                                            "CurveNetwork" => polyscope_render::PickElementType::Edge,
+                                            "VolumeMesh" => polyscope_render::PickElementType::Face,
+                                            _ => polyscope_render::PickElementType::None,
+                                        };
+
+                                        self.selection = Some(PickResult {
+                                            hit: true,
+                                            structure_type: type_name.clone(),
+                                            structure_name: name.clone(),
+                                            element_index: *element_index as u64,
+                                            element_type,
+                                            screen_pos: click_screen,
+                                            depth: 0.5,
+                                        });
+                                        crate::select_structure(type_name, name);
+                                        self.selection_info = crate::get_selection_info();
+                                    }
+                                    None => {
+                                        log::debug!("[CLICK DEBUG] No hit - DESELECTING");
+                                        // Nothing was clicked - deselect
+                                        self.selection = None;
+                                        self.selected_element_index = None;
+                                        self.selection_info = polyscope_ui::SelectionInfo::default();
+                                        crate::deselect_structure();
+                                        self.deselect_slice_plane_selection();
+                                    }
                                 }
                             }
+                        } else {
+                            log::debug!(
+                                "[CLICK DEBUG] SKIPPED: mouse_in_ui_panel={} or drag_distance={:.2} >= {}",
+                                mouse_in_ui_panel, self.drag_distance, DRAG_THRESHOLD
+                            );
                         }
                         self.last_click_pos = None;
-                    }
-                    (MouseButton::Right, ElementState::Released) => {
-                        // Right-click (not drag) in 3D viewport clears selection
-                        if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
-                            self.selection = None;
-                            self.selected_element_index = None;
-                            self.selection_info = polyscope_ui::SelectionInfo::default();
-                            crate::deselect_structure();
-                            self.deselect_slice_plane_selection();
-                        }
                     }
                     _ => {}
                 }

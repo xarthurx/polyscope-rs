@@ -701,6 +701,16 @@ impl VolumeMesh {
         self.render_data.as_ref()
     }
 
+    /// Generates triangulated exterior faces for picking.
+    /// Uses current slice plane culling if provided.
+    pub fn pick_triangles(&self, planes: &[(Vec3, Vec3)]) -> (Vec<Vec3>, Vec<[u32; 3]>) {
+        if planes.is_empty() {
+            self.generate_render_geometry()
+        } else {
+            self.generate_render_geometry_with_culling(planes)
+        }
+    }
+
     /// Updates GPU buffers.
     pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
         if let Some(ref rd) = self.render_data {
