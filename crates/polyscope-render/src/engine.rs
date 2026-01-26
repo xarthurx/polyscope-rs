@@ -2667,6 +2667,65 @@ impl RenderEngine {
         self.ssao_output_view = Some(ssao_output_view);
     }
 
+    /// Ensures OIT (Order-Independent Transparency) textures exist and match viewport size.
+    pub fn ensure_oit_textures(&mut self) {
+        let needs_create = self.oit_accum_texture.is_none()
+            || self.oit_accum_texture.as_ref().map(|t| t.width()) != Some(self.width)
+            || self.oit_accum_texture.as_ref().map(|t| t.height()) != Some(self.height);
+
+        if !needs_create {
+            return;
+        }
+
+        // Accumulation texture: RGBA16Float for weighted color accumulation
+        let accum_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("OIT Accumulation Texture"),
+            size: wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        self.oit_accum_view =
+            Some(accum_texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        self.oit_accum_texture = Some(accum_texture);
+
+        // Reveal texture: R8Unorm for transmittance product
+        let reveal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("OIT Reveal Texture"),
+            size: wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        self.oit_reveal_view =
+            Some(reveal_texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        self.oit_reveal_texture = Some(reveal_texture);
+    }
+
+    /// Returns the OIT accumulation texture view, if initialized.
+    pub fn oit_accum_view(&self) -> Option<&wgpu::TextureView> {
+        self.oit_accum_view.as_ref()
+    }
+
+    /// Returns the OIT reveal texture view, if initialized.
+    pub fn oit_reveal_view(&self) -> Option<&wgpu::TextureView> {
+        self.oit_reveal_view.as_ref()
+    }
+
     /// Creates the HDR intermediate texture for tone mapping.
     fn create_hdr_texture(&mut self) {
         let hdr_texture = self.device.create_texture(&wgpu::TextureDescriptor {
