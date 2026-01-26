@@ -46,6 +46,11 @@ struct VertexOutput {
     @location(4) edge_real: vec3<f32>,
 }
 
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @location(1) normal: vec4<f32>,
+}
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
@@ -78,7 +83,7 @@ fn vs_main(
 fn fs_main(
     in: VertexOutput,
     @builtin(front_facing) front_facing: bool,
-) -> @location(0) vec4<f32> {
+) -> FragmentOutput {
     // Handle backface culling: if policy==3 and !front_facing, discard
     if (mesh_uniforms.backface_policy == 3u && !front_facing) {
         discard;
@@ -179,5 +184,11 @@ fn fs_main(
     // transparency of 1.0 means fully transparent (alpha = 0.0)
     let alpha = 1.0 - mesh_uniforms.transparency;
 
-    return vec4<f32>(color, alpha);
+    // Compute view-space normal for SSAO
+    let view_normal = (camera.view * vec4<f32>(normal, 0.0)).xyz;
+
+    var out: FragmentOutput;
+    out.color = vec4<f32>(color, alpha);
+    out.normal = vec4<f32>(view_normal * 0.5 + 0.5, 1.0); // Encode to [0,1] range
+    return out;
 }
