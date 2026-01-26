@@ -1,4 +1,52 @@
 //! Volume mesh structure for tetrahedral and hexahedral meshes.
+//!
+//! # Overview
+//!
+//! `VolumeMesh` supports both tetrahedral (4 vertices) and hexahedral (8 vertices)
+//! cells. Mixed meshes are supported by using 8-index cells where unused indices
+//! are set to `u32::MAX`.
+//!
+//! # Interior/Exterior Faces
+//!
+//! Only exterior faces (not shared between cells) are rendered. This is determined
+//! by hashing sorted face vertex indices and counting occurrences.
+//!
+//! # Quantities
+//!
+//! Supported quantities:
+//! - `VolumeMeshVertexScalarQuantity` - scalar per vertex
+//! - `VolumeMeshCellScalarQuantity` - scalar per cell
+//! - `VolumeMeshVertexColorQuantity` - RGB color per vertex
+//! - `VolumeMeshCellColorQuantity` - RGB color per cell
+//! - `VolumeMeshVertexVectorQuantity` - vector per vertex
+//! - `VolumeMeshCellVectorQuantity` - vector per cell
+//!
+//! # Example
+//!
+//! ```rust,ignore
+//! use glam::Vec3;
+//! use polyscope_structures::VolumeMesh;
+//!
+//! // Create a single tetrahedron
+//! let vertices = vec![
+//!     Vec3::new(0.0, 0.0, 0.0),
+//!     Vec3::new(1.0, 0.0, 0.0),
+//!     Vec3::new(0.5, 1.0, 0.0),
+//!     Vec3::new(0.5, 0.5, 1.0),
+//! ];
+//! let tets = vec![[0, 1, 2, 3]];
+//! let mut mesh = VolumeMesh::new_tet_mesh("my_tet", vertices, tets);
+//!
+//! // Add a scalar quantity
+//! mesh.add_vertex_scalar_quantity("temperature", vec![0.0, 0.5, 1.0, 0.25]);
+//! ```
+
+mod scalar_quantity;
+mod color_quantity;
+mod vector_quantity;
+pub use scalar_quantity::*;
+pub use color_quantity::*;
+pub use vector_quantity::*;
 
 use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
@@ -171,47 +219,78 @@ impl VolumeMesh {
         self
     }
 
+    /// Decomposes all cells into tetrahedra.
+    /// Tets pass through unchanged, hexes are decomposed into 5 tets.
+    pub fn decompose_to_tets(&self) -> Vec<[u32; 4]> {
+        let mut tets = Vec::new();
+
+        for cell in &self.cells {
+            if cell[4] == u32::MAX {
+                // Already a tet
+                tets.push([cell[0], cell[1], cell[2], cell[3]]);
+            } else {
+                // Hex - decompose using diagonal pattern (5 tets)
+                for tet_local in HEX_TO_TET_PATTERN.iter() {
+                    let tet = [
+                        cell[tet_local[0]],
+                        cell[tet_local[1]],
+                        cell[tet_local[2]],
+                        cell[tet_local[3]],
+                    ];
+                    tets.push(tet);
+                }
+            }
+        }
+
+        tets
+    }
+
+    /// Returns the number of tetrahedra (including decomposed hexes).
+    pub fn num_tets(&self) -> usize {
+        self.decompose_to_tets().len()
+    }
+
+    /// Computes face counts for interior/exterior detection.
+    fn compute_face_counts(&self) -> HashMap<[u32; 4], usize> {
+        let mut face_counts: HashMap<[u32; 4], usize> = HashMap::new();
+
+        for cell in &self.cells {
+            if cell[4] == u32::MAX {
+                // Tetrahedron
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    *face_counts.entry(key).or_insert(0) += 1;
+                }
+            } else {
+                // Hexahedron - each quad face uses same 4 vertices
+                for quad in HEX_FACE_STENCIL {
+                    // Get the 4 unique vertices of this quad face
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]]; // The fourth vertex
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    *face_counts.entry(key).or_insert(0) += 1;
+                }
+            }
+        }
+
+        face_counts
+    }
+
     /// Generates triangulated exterior faces for rendering.
     fn generate_render_geometry(&self) -> (Vec<Vec3>, Vec<[u32; 3]>) {
-        // For simplicity, render all faces (not detecting interior faces)
-        // In a full implementation, we'd detect shared faces between cells
+        let face_counts = self.compute_face_counts();
         let mut positions = Vec::new();
         let mut faces = Vec::new();
 
         for cell in &self.cells {
             if cell[4] == u32::MAX {
-                // Tetrahedron - 4 triangular faces
-                // Face 0: 0,2,1
-                // Face 1: 0,1,3
-                // Face 2: 0,3,2
-                // Face 3: 1,2,3
-                let tet_faces = [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]];
-                for [a, b, c] in tet_faces {
-                    let base_idx = positions.len() as u32;
-                    positions.push(self.vertices[cell[a] as usize]);
-                    positions.push(self.vertices[cell[b] as usize]);
-                    positions.push(self.vertices[cell[c] as usize]);
-                    faces.push([base_idx, base_idx + 1, base_idx + 2]);
-                }
-            } else {
-                // Hexahedron - 6 quadrilateral faces (2 triangles each)
-                // Using VTK ordering (6/7 may be swapped from standard)
-                let hex_faces = [
-                    // Bottom face (z=0): 0,1,2,3
-                    [[2, 1, 0], [2, 0, 3]],
-                    // Front face (y=0): 0,1,5,4
-                    [[4, 0, 1], [4, 1, 5]],
-                    // Right face (x=1): 1,2,6,5
-                    [[5, 1, 2], [5, 2, 6]],
-                    // Back face (y=1): 3,7,6,2
-                    [[6, 2, 3], [6, 3, 7]],
-                    // Left face (x=0): 0,4,7,3
-                    [[7, 3, 0], [7, 0, 4]],
-                    // Top face (z=1): 4,5,6,7
-                    [[7, 4, 5], [7, 5, 6]],
-                ];
-                for quad in hex_faces {
-                    for [a, b, c] in quad {
+                // Tetrahedron
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    if face_counts[&key] == 1 {
+                        // Exterior face
                         let base_idx = positions.len() as u32;
                         positions.push(self.vertices[cell[a] as usize]);
                         positions.push(self.vertices[cell[b] as usize]);
@@ -219,10 +298,142 @@ impl VolumeMesh {
                         faces.push([base_idx, base_idx + 1, base_idx + 2]);
                     }
                 }
+            } else {
+                // Hexahedron
+                for quad in HEX_FACE_STENCIL {
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]];
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    if face_counts[&key] == 1 {
+                        // Exterior face - emit both triangles
+                        for [a, b, c] in quad {
+                            let base_idx = positions.len() as u32;
+                            positions.push(self.vertices[cell[a] as usize]);
+                            positions.push(self.vertices[cell[b] as usize]);
+                            positions.push(self.vertices[cell[c] as usize]);
+                            faces.push([base_idx, base_idx + 1, base_idx + 2]);
+                        }
+                    }
+                }
             }
         }
 
         (positions, faces)
+    }
+
+    /// Generates render geometry including any enabled quantity data.
+    pub fn generate_render_geometry_with_quantities(&self) -> VolumeMeshRenderGeometry {
+        let face_counts = self.compute_face_counts();
+        let mut positions = Vec::new();
+        let mut faces = Vec::new();
+        let mut vertex_indices = Vec::new(); // Track original vertex indices
+        let mut cell_indices = Vec::new();   // Track which cell each face belongs to
+
+        // First pass: generate geometry and track indices
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
+            if cell[4] == u32::MAX {
+                // Tetrahedron
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    if face_counts[&key] == 1 {
+                        let base_idx = positions.len() as u32;
+                        positions.push(self.vertices[cell[a] as usize]);
+                        positions.push(self.vertices[cell[b] as usize]);
+                        positions.push(self.vertices[cell[c] as usize]);
+                        vertex_indices.push(cell[a] as usize);
+                        vertex_indices.push(cell[b] as usize);
+                        vertex_indices.push(cell[c] as usize);
+                        cell_indices.push(cell_idx);
+                        cell_indices.push(cell_idx);
+                        cell_indices.push(cell_idx);
+                        faces.push([base_idx, base_idx + 1, base_idx + 2]);
+                    }
+                }
+            } else {
+                // Hexahedron
+                for quad in HEX_FACE_STENCIL {
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]];
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    if face_counts[&key] == 1 {
+                        for [a, b, c] in quad {
+                            let base_idx = positions.len() as u32;
+                            positions.push(self.vertices[cell[a] as usize]);
+                            positions.push(self.vertices[cell[b] as usize]);
+                            positions.push(self.vertices[cell[c] as usize]);
+                            vertex_indices.push(cell[a] as usize);
+                            vertex_indices.push(cell[b] as usize);
+                            vertex_indices.push(cell[c] as usize);
+                            cell_indices.push(cell_idx);
+                            cell_indices.push(cell_idx);
+                            cell_indices.push(cell_idx);
+                            faces.push([base_idx, base_idx + 1, base_idx + 2]);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Compute normals
+        let mut normals = vec![Vec3::ZERO; positions.len()];
+        for [a, b, c] in &faces {
+            let p0 = positions[*a as usize];
+            let p1 = positions[*b as usize];
+            let p2 = positions[*c as usize];
+            let normal = (p1 - p0).cross(p2 - p0).normalize_or_zero();
+            normals[*a as usize] = normal;
+            normals[*b as usize] = normal;
+            normals[*c as usize] = normal;
+        }
+
+        // Find enabled scalar quantity
+        let mut vertex_values = None;
+        let mut vertex_colors = None;
+
+        for q in &self.quantities {
+            if q.is_enabled() {
+                if let Some(scalar) = q.as_any().downcast_ref::<VolumeMeshVertexScalarQuantity>() {
+                    let values: Vec<f32> = vertex_indices.iter()
+                        .map(|&idx| scalar.values().get(idx).copied().unwrap_or(0.0))
+                        .collect();
+                    vertex_values = Some(values);
+                    break;
+                }
+                if let Some(color) = q.as_any().downcast_ref::<VolumeMeshVertexColorQuantity>() {
+                    let colors: Vec<Vec3> = vertex_indices.iter()
+                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec3::ONE))
+                        .collect();
+                    vertex_colors = Some(colors);
+                    break;
+                }
+                if let Some(scalar) = q.as_any().downcast_ref::<VolumeMeshCellScalarQuantity>() {
+                    let values: Vec<f32> = cell_indices.iter()
+                        .map(|&idx| scalar.values().get(idx).copied().unwrap_or(0.0))
+                        .collect();
+                    vertex_values = Some(values);
+                    break;
+                }
+                if let Some(color) = q.as_any().downcast_ref::<VolumeMeshCellColorQuantity>() {
+                    let colors: Vec<Vec3> = cell_indices.iter()
+                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec3::ONE))
+                        .collect();
+                    vertex_colors = Some(colors);
+                    break;
+                }
+            }
+        }
+
+        VolumeMeshRenderGeometry {
+            positions,
+            faces,
+            normals,
+            vertex_values,
+            vertex_colors,
+        }
     }
 
     /// Initializes GPU render data.
@@ -332,6 +543,102 @@ impl VolumeMesh {
             }
         });
     }
+
+    /// Adds a vertex scalar quantity.
+    pub fn add_vertex_scalar_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshVertexScalarQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            values,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a cell scalar quantity.
+    pub fn add_cell_scalar_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshCellScalarQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            values,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex color quantity.
+    pub fn add_vertex_color_quantity(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec3>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshVertexColorQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            colors,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a cell color quantity.
+    pub fn add_cell_color_quantity(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec3>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshCellColorQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            colors,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex vector quantity.
+    pub fn add_vertex_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec3>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshVertexVectorQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            vectors,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a cell vector quantity.
+    pub fn add_cell_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec3>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshCellVectorQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            vectors,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
 }
 
 impl Structure for VolumeMesh {
@@ -439,9 +746,125 @@ impl HasQuantities for VolumeMesh {
     }
 }
 
+use std::collections::HashMap;
+
+/// Generates a canonical (sorted) face key for hashing.
+/// For triangular faces, the fourth element is u32::MAX.
+fn canonical_face_key(v0: u32, v1: u32, v2: u32, v3: Option<u32>) -> [u32; 4] {
+    let mut key = [v0, v1, v2, v3.unwrap_or(u32::MAX)];
+    key.sort();
+    key
+}
+
+/// Face stencil for tetrahedra: 4 triangular faces
+const TET_FACE_STENCIL: [[usize; 3]; 4] = [
+    [0, 2, 1],
+    [0, 1, 3],
+    [0, 3, 2],
+    [1, 2, 3],
+];
+
+/// Face stencil for hexahedra: 6 quad faces (each as 2 triangles sharing diagonal)
+const HEX_FACE_STENCIL: [[[usize; 3]; 2]; 6] = [
+    [[2, 1, 0], [2, 0, 3]], // Bottom
+    [[4, 0, 1], [4, 1, 5]], // Front
+    [[5, 1, 2], [5, 2, 6]], // Right
+    [[7, 3, 0], [7, 0, 4]], // Left
+    [[6, 2, 3], [6, 3, 7]], // Back
+    [[7, 4, 5], [7, 5, 6]], // Top
+];
+
+/// Render geometry data with optional quantity values.
+pub struct VolumeMeshRenderGeometry {
+    pub positions: Vec<Vec3>,
+    pub faces: Vec<[u32; 3]>,
+    pub normals: Vec<Vec3>,
+    /// Per-vertex scalar values for color mapping (from enabled vertex scalar quantity).
+    pub vertex_values: Option<Vec<f32>>,
+    /// Per-vertex colors (from enabled vertex color quantity).
+    pub vertex_colors: Option<Vec<Vec3>>,
+}
+
+/// Rotation map for hex vertices to place vertex 0 in canonical position.
+#[allow(dead_code)]
+const HEX_ROTATION_MAP: [[usize; 8]; 8] = [
+    [0, 1, 2, 3, 4, 5, 6, 7],
+    [1, 0, 4, 5, 2, 3, 7, 6],
+    [2, 1, 5, 6, 3, 0, 4, 7],
+    [3, 0, 1, 2, 7, 4, 5, 6],
+    [4, 0, 3, 7, 5, 1, 2, 6],
+    [5, 1, 0, 4, 6, 2, 3, 7],
+    [6, 2, 1, 5, 7, 3, 0, 4],
+    [7, 3, 2, 6, 4, 0, 1, 5],
+];
+
+/// Diagonal decomposition patterns (5 tets).
+const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
+    [0, 1, 2, 5],
+    [0, 2, 7, 5],
+    [0, 2, 3, 7],
+    [0, 5, 7, 4],
+    [2, 7, 5, 6],
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_interior_face_detection() {
+        // Two tets sharing a face
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),  // 0
+            Vec3::new(1.0, 0.0, 0.0),  // 1
+            Vec3::new(0.5, 1.0, 0.0),  // 2
+            Vec3::new(0.5, 0.5, 1.0),  // 3 - apex of first tet
+            Vec3::new(0.5, 0.5, -1.0), // 4 - apex of second tet
+        ];
+        // Two tets sharing face [0,1,2]
+        let tets = vec![[0, 1, 2, 3], [0, 2, 1, 4]];
+        let mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
+
+        // Should have 6 exterior faces (4 per tet - 1 shared = 3 per tet * 2 = 6)
+        // Not 8 faces (4 per tet * 2 = 8)
+        let (_, faces) = mesh.generate_render_geometry();
+        assert_eq!(faces.len(), 6, "Should only render exterior faces");
+    }
+
+    #[test]
+    fn test_single_tet_all_exterior() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let tets = vec![[0, 1, 2, 3]];
+        let mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
+
+        let (_, faces) = mesh.generate_render_geometry();
+        assert_eq!(faces.len(), 4, "Single tet should have 4 exterior faces");
+    }
+
+    #[test]
+    fn test_single_hex_all_exterior() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(1.0, 1.0, 1.0),
+            Vec3::new(0.0, 1.0, 1.0),
+        ];
+        let hexes = vec![[0, 1, 2, 3, 4, 5, 6, 7]];
+        let mesh = VolumeMesh::new_hex_mesh("test", vertices, hexes);
+
+        let (_, faces) = mesh.generate_render_geometry();
+        // 6 quad faces * 2 triangles each = 12 triangles
+        assert_eq!(faces.len(), 12, "Single hex should have 12 triangles (6 quads)");
+    }
 
     #[test]
     fn test_tet_mesh_creation() {
@@ -477,5 +900,76 @@ mod tests {
         assert_eq!(mesh.num_vertices(), 8);
         assert_eq!(mesh.num_cells(), 1);
         assert_eq!(mesh.cell_type(0), VolumeCellType::Hex);
+    }
+
+    #[test]
+    fn test_hex_to_tet_decomposition() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(1.0, 1.0, 1.0),
+            Vec3::new(0.0, 1.0, 1.0),
+        ];
+        let hexes = vec![[0, 1, 2, 3, 4, 5, 6, 7]];
+        let mesh = VolumeMesh::new_hex_mesh("test", vertices, hexes);
+
+        let tets = mesh.decompose_to_tets();
+        // A hex is decomposed into 5 tets
+        assert_eq!(tets.len(), 5);
+
+        // Each tet should have 4 vertices
+        for tet in &tets {
+            assert!(tet[0] < 8);
+            assert!(tet[1] < 8);
+            assert!(tet[2] < 8);
+            assert!(tet[3] < 8);
+        }
+    }
+
+    #[test]
+    fn test_tet_mesh_decomposition() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let tets = vec![[0, 1, 2, 3]];
+        let mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
+
+        // Tet mesh should decompose to itself
+        let decomposed = mesh.decompose_to_tets();
+        assert_eq!(decomposed.len(), 1);
+        assert_eq!(decomposed[0], [0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_quantity_aware_geometry_generation() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let tets = vec![[0, 1, 2, 3]];
+        let mut mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
+
+        // Add vertex scalar quantity
+        mesh.add_vertex_scalar_quantity("temp", vec![0.0, 0.5, 1.0, 0.25]);
+
+        // Get the quantity and enable it
+        if let Some(q) = mesh.get_quantity_mut("temp") {
+            q.set_enabled(true);
+        }
+
+        // Generate geometry should include scalar values for color mapping
+        let render_data = mesh.generate_render_geometry_with_quantities();
+        assert!(render_data.vertex_values.is_some());
+        assert_eq!(render_data.vertex_values.as_ref().unwrap().len(),
+                   render_data.positions.len());
     }
 }
