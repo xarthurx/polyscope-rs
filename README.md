@@ -1,5 +1,7 @@
 # polyscope-rs
 
+![polyscope-rs](docs/images/title_bunny.png)
+
 A Rust-native 3D visualization library for geometric data, inspired by [Polyscope](https://polyscope.run).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
