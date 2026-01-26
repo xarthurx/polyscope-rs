@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 use wgpu::util::DeviceExt;
 
+use polyscope_core::slice_plane::{SlicePlaneUniforms, MAX_SLICE_PLANES};
+
 use crate::camera::Camera;
 use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
@@ -74,6 +76,12 @@ pub struct RenderEngine {
     pub point_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Camera uniform buffer.
     pub camera_buffer: wgpu::Buffer,
+    /// Slice plane uniform buffer.
+    pub slice_plane_buffer: wgpu::Buffer,
+    /// Slice plane bind group layout (shared by all structure shaders).
+    pub slice_plane_bind_group_layout: wgpu::BindGroupLayout,
+    /// Slice plane bind group (updated each frame).
+    pub slice_plane_bind_group: wgpu::BindGroup,
     /// Vector arrow render pipeline.
     pub vector_pipeline: Option<wgpu::RenderPipeline>,
     /// Vector bind group layout.
@@ -235,6 +243,38 @@ impl RenderEngine {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        // Create slice plane buffer and bind group
+        let slice_planes_data = [SlicePlaneUniforms::default(); MAX_SLICE_PLANES];
+        let slice_plane_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Slice Plane Buffer"),
+            contents: bytemuck::cast_slice(&slice_planes_data),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let slice_plane_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Slice Plane Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let slice_plane_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Slice Plane Bind Group"),
+            layout: &slice_plane_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: slice_plane_buffer.as_entire_binding(),
+            }],
+        });
+
         // Create shadow map pass first (needed for bind group)
         let shadow_map_pass = ShadowMapPass::new(&device);
 
@@ -366,6 +406,9 @@ impl RenderEngine {
             point_pipeline: None,
             point_bind_group_layout: None,
             camera_buffer,
+            slice_plane_buffer,
+            slice_plane_bind_group_layout,
+            slice_plane_bind_group,
             vector_pipeline: None,
             vector_bind_group_layout: None,
             mesh_pipeline: None,
@@ -475,6 +518,38 @@ impl RenderEngine {
             label: Some("camera uniforms"),
             contents: bytemuck::cast_slice(&[CameraUniforms::default()]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        // Create slice plane buffer and bind group
+        let slice_planes_data = [SlicePlaneUniforms::default(); MAX_SLICE_PLANES];
+        let slice_plane_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Slice Plane Buffer"),
+            contents: bytemuck::cast_slice(&slice_planes_data),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let slice_plane_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Slice Plane Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let slice_plane_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Slice Plane Bind Group"),
+            layout: &slice_plane_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: slice_plane_buffer.as_entire_binding(),
+            }],
         });
 
         // Create shadow map pass first (needed for bind group)
@@ -608,6 +683,9 @@ impl RenderEngine {
             point_pipeline: None,
             point_bind_group_layout: None,
             camera_buffer,
+            slice_plane_buffer,
+            slice_plane_bind_group_layout,
+            slice_plane_bind_group,
             vector_pipeline: None,
             vector_bind_group_layout: None,
             mesh_pipeline: None,
