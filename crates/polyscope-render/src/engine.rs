@@ -141,6 +141,14 @@ pub struct RenderEngine {
     ssao_output_texture: Option<wgpu::Texture>,
     /// SSAO output texture view.
     ssao_output_view: Option<wgpu::TextureView>,
+    /// OIT accumulation texture (RGBA16Float) - stores weighted color sum.
+    oit_accum_texture: Option<wgpu::Texture>,
+    /// OIT accumulation texture view.
+    oit_accum_view: Option<wgpu::TextureView>,
+    /// OIT reveal texture (R8Unorm) - stores transmittance product.
+    oit_reveal_texture: Option<wgpu::Texture>,
+    /// OIT reveal texture view.
+    oit_reveal_view: Option<wgpu::TextureView>,
     /// Tone mapping post-processing pass.
     tone_map_pass: Option<ToneMapPass>,
     /// Shadow map pass for ground plane shadows.
@@ -455,6 +463,10 @@ impl RenderEngine {
             ssao_pass: None,
             ssao_output_texture: None,
             ssao_output_view: None,
+            oit_accum_texture: None,
+            oit_accum_view: None,
+            oit_reveal_texture: None,
+            oit_reveal_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -745,6 +757,10 @@ impl RenderEngine {
             ssao_pass: None,
             ssao_output_texture: None,
             ssao_output_view: None,
+            oit_accum_texture: None,
+            oit_accum_view: None,
+            oit_reveal_texture: None,
+            oit_reveal_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
