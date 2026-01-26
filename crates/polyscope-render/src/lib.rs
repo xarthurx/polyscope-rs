@@ -21,6 +21,7 @@ pub mod reflection_pass;
 pub mod screenshot;
 pub mod shader;
 pub mod shadow_map;
+pub mod slice_plane_render;
 pub mod ssao_pass;
 pub mod surface_mesh_render;
 pub mod tone_mapping;
@@ -47,6 +48,10 @@ pub use shadow_map::{LightUniforms, ShadowMapPass, SHADOW_MAP_SIZE};
 pub use ssao_pass::{SsaoPass, SsaoUniforms};
 pub use tone_mapping::{ToneMapPass, ToneMapUniforms};
 pub use vector_render::{VectorRenderData, VectorUniforms};
+pub use slice_plane_render::{
+    create_slice_plane_bind_group_layout, create_slice_plane_pipeline, PlaneRenderUniforms,
+    SlicePlaneRenderData,
+};
 
 /// Render context passed to structures during drawing.
 pub struct RenderContext<'a> {
