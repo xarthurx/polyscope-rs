@@ -178,6 +178,37 @@ impl VolumeMesh {
         self
     }
 
+    /// Decomposes all cells into tetrahedra.
+    /// Tets pass through unchanged, hexes are decomposed into 5 tets.
+    pub fn decompose_to_tets(&self) -> Vec<[u32; 4]> {
+        let mut tets = Vec::new();
+
+        for cell in &self.cells {
+            if cell[4] == u32::MAX {
+                // Already a tet
+                tets.push([cell[0], cell[1], cell[2], cell[3]]);
+            } else {
+                // Hex - decompose using diagonal pattern (5 tets)
+                for tet_local in HEX_TO_TET_PATTERN.iter() {
+                    let tet = [
+                        cell[tet_local[0]],
+                        cell[tet_local[1]],
+                        cell[tet_local[2]],
+                        cell[tet_local[3]],
+                    ];
+                    tets.push(tet);
+                }
+            }
+        }
+
+        tets
+    }
+
+    /// Returns the number of tetrahedra (including decomposed hexes).
+    pub fn num_tets(&self) -> usize {
+        self.decompose_to_tets().len()
+    }
+
     /// Computes face counts for interior/exterior detection.
     fn compute_face_counts(&self) -> HashMap<[u32; 4], usize> {
         let mut face_counts: HashMap<[u32; 4], usize> = HashMap::new();
@@ -713,6 +744,28 @@ pub struct VolumeMeshRenderGeometry {
     pub vertex_colors: Option<Vec<Vec3>>,
 }
 
+/// Rotation map for hex vertices to place vertex 0 in canonical position.
+#[allow(dead_code)]
+const HEX_ROTATION_MAP: [[usize; 8]; 8] = [
+    [0, 1, 2, 3, 4, 5, 6, 7],
+    [1, 0, 4, 5, 2, 3, 7, 6],
+    [2, 1, 5, 6, 3, 0, 4, 7],
+    [3, 0, 1, 2, 7, 4, 5, 6],
+    [4, 0, 3, 7, 5, 1, 2, 6],
+    [5, 1, 0, 4, 6, 2, 3, 7],
+    [6, 2, 1, 5, 7, 3, 0, 4],
+    [7, 3, 2, 6, 4, 0, 1, 5],
+];
+
+/// Diagonal decomposition patterns (5 tets).
+const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
+    [0, 1, 2, 5],
+    [0, 2, 7, 5],
+    [0, 2, 3, 7],
+    [0, 5, 7, 4],
+    [2, 7, 5, 6],
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -806,6 +859,51 @@ mod tests {
         assert_eq!(mesh.num_vertices(), 8);
         assert_eq!(mesh.num_cells(), 1);
         assert_eq!(mesh.cell_type(0), VolumeCellType::Hex);
+    }
+
+    #[test]
+    fn test_hex_to_tet_decomposition() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(1.0, 1.0, 1.0),
+            Vec3::new(0.0, 1.0, 1.0),
+        ];
+        let hexes = vec![[0, 1, 2, 3, 4, 5, 6, 7]];
+        let mesh = VolumeMesh::new_hex_mesh("test", vertices, hexes);
+
+        let tets = mesh.decompose_to_tets();
+        // A hex is decomposed into 5 tets
+        assert_eq!(tets.len(), 5);
+
+        // Each tet should have 4 vertices
+        for tet in &tets {
+            assert!(tet[0] < 8);
+            assert!(tet[1] < 8);
+            assert!(tet[2] < 8);
+            assert!(tet[3] < 8);
+        }
+    }
+
+    #[test]
+    fn test_tet_mesh_decomposition() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let tets = vec![[0, 1, 2, 3]];
+        let mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
+
+        // Tet mesh should decompose to itself
+        let decomposed = mesh.decompose_to_tets();
+        assert_eq!(decomposed.len(), 1);
+        assert_eq!(decomposed[0], [0, 1, 2, 3]);
     }
 
     #[test]
