@@ -2,8 +2,10 @@
 
 mod scalar_quantity;
 mod color_quantity;
+mod vector_quantity;
 pub use scalar_quantity::*;
 pub use color_quantity::*;
+pub use vector_quantity::*;
 
 use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
@@ -416,6 +418,38 @@ impl VolumeMesh {
             name.clone(),
             self.name.clone(),
             colors,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex vector quantity.
+    pub fn add_vertex_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec3>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshVertexVectorQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            vectors,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a cell vector quantity.
+    pub fn add_cell_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec3>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshCellVectorQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            vectors,
         );
         self.add_quantity(Box::new(quantity));
         self
