@@ -1,5 +1,8 @@
 //! Volume mesh structure for tetrahedral and hexahedral meshes.
 
+mod scalar_quantity;
+pub use scalar_quantity::*;
+
 use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
@@ -350,6 +353,38 @@ impl VolumeMesh {
                 }
             }
         });
+    }
+
+    /// Adds a vertex scalar quantity.
+    pub fn add_vertex_scalar_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshVertexScalarQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            values,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a cell scalar quantity.
+    pub fn add_cell_scalar_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshCellScalarQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            values,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
     }
 }
 
