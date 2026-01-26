@@ -32,7 +32,7 @@ impl Default for PlaneRenderUniforms {
             color: [0.5, 0.5, 0.5, 1.0],
             grid_color: [0.3, 0.3, 0.3, 1.0],
             length_scale: 1.0,
-            plane_size: 0.1,
+            plane_size: 0.05,
             _padding: [0.0; 2],
         }
     }
@@ -244,7 +244,7 @@ pub fn create_slice_plane_pipeline(
         depth_stencil: Some(wgpu::DepthStencilState {
             format: depth_format,
             depth_write_enabled: true, // Write depth so scene geometry can occlude the plane
-            depth_compare: wgpu::CompareFunction::Always, // Always render (depth buffer is clear)
+            depth_compare: wgpu::CompareFunction::LessEqual, // Respect depth so nearer planes win
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),

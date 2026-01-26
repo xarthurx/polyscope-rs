@@ -148,7 +148,7 @@ impl Default for SlicePlaneSettings {
             draw_widget: true,
             color: [0.5, 0.5, 0.5],
             transparency: 0.3,
-            plane_size: 0.1,
+            plane_size: 0.05,
             is_selected: false,
         }
     }

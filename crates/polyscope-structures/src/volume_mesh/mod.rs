@@ -97,9 +97,9 @@ pub struct VolumeMesh {
     slice_render_data: Option<SliceMeshRenderData>,
     /// Cached slice plane parameters for invalidation (origin, normal)
     slice_plane_cache: Option<(Vec3, Vec3)>,
-    /// Cached cell culling plane parameters (origin, normal).
+    /// Cached cell culling plane parameters (origin, normal) for each enabled plane.
     /// When Some, indicates render_data shows culled geometry.
-    culling_plane_cache: Option<(Vec3, Vec3)>,
+    culling_plane_cache: Option<Vec<(Vec3, Vec3)>>,
 }
 
 impl VolumeMesh {
@@ -312,29 +312,35 @@ impl VolumeMesh {
         }
     }
 
-    /// Tests if a cell should be visible based on slice plane.
-    /// Returns true if the cell's centroid is on the "kept" side of the plane.
-    fn is_cell_visible(&self, cell: &[u32; 8], plane_origin: Vec3, plane_normal: Vec3) -> bool {
+    /// Tests if a cell should be visible based on slice planes.
+    /// Returns true if the cell's centroid is on the "kept" side of all planes.
+    fn is_cell_visible(&self, cell: &[u32; 8], planes: &[(Vec3, Vec3)]) -> bool {
+        if planes.is_empty() {
+            return true;
+        }
         let centroid = self.cell_centroid(cell);
-        let signed_dist = (centroid - plane_origin).dot(plane_normal);
-        // Keep cells on the positive side of the plane (same side as normal points)
-        signed_dist >= 0.0
+        let centroid_world = (self.transform * centroid.extend(1.0)).truncate();
+        for (plane_origin, plane_normal) in planes {
+            let signed_dist = (centroid_world - *plane_origin).dot(*plane_normal);
+            // Keep cells on the positive side of the plane (same side as normal points)
+            if signed_dist < 0.0 {
+                return false;
+            }
+        }
+        true
     }
 
     /// Computes face counts for interior/exterior detection, only for visible cells.
     fn compute_face_counts_with_culling(
         &self,
-        plane_origin: Option<Vec3>,
-        plane_normal: Option<Vec3>,
+        planes: &[(Vec3, Vec3)],
     ) -> HashMap<[u32; 4], usize> {
         let mut face_counts: HashMap<[u32; 4], usize> = HashMap::new();
 
         for cell in &self.cells {
-            // Skip cells culled by slice plane
-            if let (Some(origin), Some(normal)) = (plane_origin, plane_normal) {
-                if !self.is_cell_visible(cell, origin, normal) {
-                    continue;
-                }
+            // Skip cells culled by slice planes
+            if !self.is_cell_visible(cell, planes) {
+                continue;
             }
 
             if cell[4] == u32::MAX {
@@ -404,21 +410,20 @@ impl VolumeMesh {
         (positions, faces)
     }
 
-    /// Generates triangulated exterior faces with cell culling based on slice plane.
-    /// Only cells whose centroid is on the positive side of the plane are rendered.
+    /// Generates triangulated exterior faces with cell culling based on slice planes.
+    /// Only cells whose centroid is on the positive side of all planes are rendered.
     fn generate_render_geometry_with_culling(
         &self,
-        plane_origin: Vec3,
-        plane_normal: Vec3,
+        planes: &[(Vec3, Vec3)],
     ) -> (Vec<Vec3>, Vec<[u32; 3]>) {
         // Compute face counts only for visible cells
-        let face_counts = self.compute_face_counts_with_culling(Some(plane_origin), Some(plane_normal));
+        let face_counts = self.compute_face_counts_with_culling(planes);
         let mut positions = Vec::new();
         let mut faces = Vec::new();
 
         for cell in &self.cells {
-            // Skip cells culled by slice plane
-            if !self.is_cell_visible(cell, plane_origin, plane_normal) {
+            // Skip cells culled by slice planes
+            if !self.is_cell_visible(cell, planes) {
                 continue;
             }
 
@@ -614,21 +619,24 @@ impl VolumeMesh {
         self.render_data = Some(render_data);
     }
 
-    /// Reinitializes render data with cell culling based on slice plane.
-    /// Cells whose centroid is on the negative side of the plane are hidden.
+    /// Reinitializes render data with cell culling based on slice planes.
+    /// Cells whose centroid is on the negative side of any plane are hidden.
     /// Uses caching to avoid regenerating geometry every frame.
     pub fn update_render_data_with_culling(
         &mut self,
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
-        plane_origin: Vec3,
-        plane_normal: Vec3,
+        planes: &[(Vec3, Vec3)],
     ) {
         // Check if cache is still valid (plane hasn't moved)
-        let cache_valid = self.culling_plane_cache.map_or(false, |(o, n)| {
-            (o - plane_origin).length_squared() < 1e-10
-                && (n - plane_normal).length_squared() < 1e-10
+        let cache_valid = self.culling_plane_cache.as_ref().map_or(false, |cache| {
+            if cache.len() != planes.len() {
+                return false;
+            }
+            cache.iter().zip(planes.iter()).all(|((o, n), (po, pn))| {
+                (*o - *po).length_squared() < 1e-10 && (*n - *pn).length_squared() < 1e-10
+            })
         });
 
         if cache_valid && self.render_data.is_some() {
@@ -636,12 +644,11 @@ impl VolumeMesh {
             return;
         }
 
-        let (positions, triangles) =
-            self.generate_render_geometry_with_culling(plane_origin, plane_normal);
+        let (positions, triangles) = self.generate_render_geometry_with_culling(planes);
 
         if triangles.is_empty() {
             self.render_data = None;
-            self.culling_plane_cache = Some((plane_origin, plane_normal));
+            self.culling_plane_cache = Some(planes.to_vec());
             return;
         }
 
@@ -670,7 +677,7 @@ impl VolumeMesh {
         );
 
         self.render_data = Some(render_data);
-        self.culling_plane_cache = Some((plane_origin, plane_normal));
+        self.culling_plane_cache = Some(planes.to_vec());
     }
 
     /// Resets render data to show all cells (no culling).
@@ -1105,6 +1112,7 @@ impl Structure for VolumeMesh {
 
     fn set_transform(&mut self, transform: Mat4) {
         self.transform = transform;
+        self.culling_plane_cache = None;
     }
 
     fn is_enabled(&self) -> bool {

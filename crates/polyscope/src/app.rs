@@ -248,6 +248,110 @@ impl App {
         best_match.map(|(type_name, name, _)| (type_name, name))
     }
 
+    /// Tests whether a click intersects a visible slice plane quad.
+    fn pick_slice_plane_at_screen_pos(
+        &self,
+        click_pos: glam::Vec2,
+        screen_width: u32,
+        screen_height: u32,
+        camera: &polyscope_render::Camera,
+    ) -> Option<String> {
+        if screen_width == 0 || screen_height == 0 {
+            return None;
+        }
+
+        let half_width = screen_width as f32 / 2.0;
+        let half_height = screen_height as f32 / 2.0;
+        let ndc_x = (click_pos.x / half_width) - 1.0;
+        let ndc_y = 1.0 - (click_pos.y / half_height);
+
+        let view_proj = camera.view_projection_matrix();
+        let inv_view_proj = view_proj.inverse();
+
+        // wgpu-style NDC depth [0, 1]
+        let near = inv_view_proj * glam::Vec4::new(ndc_x, ndc_y, 0.0, 1.0);
+        let far = inv_view_proj * glam::Vec4::new(ndc_x, ndc_y, 1.0, 1.0);
+
+        if near.w.abs() < 1e-6 || far.w.abs() < 1e-6 {
+            return None;
+        }
+
+        let ray_origin = (near.truncate() / near.w);
+        let ray_far = (far.truncate() / far.w);
+        let ray_dir = (ray_far - ray_origin).normalize_or_zero();
+        if ray_dir.length_squared() < 1e-12 {
+            return None;
+        }
+
+        let mut best_hit: Option<(String, f32)> = None;
+
+        crate::with_context(|ctx| {
+            for plane in ctx.slice_planes() {
+                if !plane.is_enabled() || !plane.draw_plane() {
+                    continue;
+                }
+
+                let normal = plane.normal();
+                let denom = normal.dot(ray_dir);
+                if denom.abs() < 1e-6 {
+                    continue;
+                }
+
+                let t = (plane.origin() - ray_origin).dot(normal) / denom;
+                if t < 0.0 {
+                    continue;
+                }
+
+                let hit = ray_origin + ray_dir * t;
+
+                // Compute local plane axes (match visualization orientation)
+                let up = if normal.dot(Vec3::Y).abs() < 0.99 { Vec3::Y } else { Vec3::Z };
+                let y_axis = up.cross(normal).normalize();
+                let z_axis = normal.cross(y_axis).normalize();
+
+                let local = hit - plane.origin();
+                let y = local.dot(y_axis);
+                let z = local.dot(z_axis);
+                let size = plane.plane_size();
+
+                if y.abs() <= size && z.abs() <= size {
+                    let is_better = best_hit
+                        .as_ref()
+                        .map_or(true, |(_, best_t)| t < *best_t);
+                    if is_better {
+                        best_hit = Some((plane.name().to_string(), t));
+                    }
+                }
+            }
+        });
+
+        best_hit.map(|(name, _)| name)
+    }
+
+    fn select_slice_plane_by_name(&mut self, name: &str) {
+        let mut selected_settings: Option<polyscope_ui::SlicePlaneSettings> = None;
+        for settings in &mut self.slice_plane_settings {
+            if settings.name == name {
+                settings.is_selected = true;
+                settings.draw_widget = true;
+                selected_settings = Some(settings.clone());
+            } else {
+                settings.is_selected = false;
+            }
+        }
+        crate::select_slice_plane_for_gizmo(name);
+        if let Some(settings) = selected_settings {
+            crate::apply_slice_plane_settings(&settings);
+        }
+    }
+
+    fn deselect_slice_plane_selection(&mut self) {
+        for settings in &mut self.slice_plane_settings {
+            settings.is_selected = false;
+        }
+        crate::deselect_slice_plane_gizmo();
+    }
+
     /// Renders a single frame.
     fn render(&mut self) {
         let (Some(engine), Some(egui), Some(window)) =
@@ -2093,6 +2197,24 @@ impl ApplicationHandler for App {
                                     self.mouse_pos.1 as f32,
                                 );
 
+                                let plane_hit = self.pick_slice_plane_at_screen_pos(
+                                    click_screen,
+                                    engine.width,
+                                    engine.height,
+                                    &engine.camera,
+                                );
+
+                                if let Some(plane_name) = plane_hit {
+                                    // Select the slice plane and clear structure selection
+                                    self.selection = None;
+                                    self.selected_element_index = None;
+                                    self.selection_info = polyscope_ui::SelectionInfo::default();
+                                    crate::deselect_structure();
+                                    self.select_slice_plane_by_name(&plane_name);
+                                    self.last_click_pos = None;
+                                    return;
+                                }
+
                                 // Try GPU picking first (pixel-perfect when pick pass is rendered)
                                 let gpu_picked = self.gpu_pick_at(
                                     self.mouse_pos.0 as u32,
@@ -2113,6 +2235,7 @@ impl ApplicationHandler for App {
                                 if let Some((type_name, name, element_index)) = picked {
                                     // Something was clicked - select it
                                     self.selected_element_index = Some(element_index);
+                                    self.deselect_slice_plane_selection();
 
                                     // Determine element type based on structure type
                                     let element_type = match type_name.as_str() {
@@ -2139,6 +2262,7 @@ impl ApplicationHandler for App {
                                     self.selected_element_index = None;
                                     self.selection_info = polyscope_ui::SelectionInfo::default();
                                     crate::deselect_structure();
+                                    self.deselect_slice_plane_selection();
                                 }
                             }
                         }
@@ -2151,6 +2275,7 @@ impl ApplicationHandler for App {
                             self.selected_element_index = None;
                             self.selection_info = polyscope_ui::SelectionInfo::default();
                             crate::deselect_structure();
+                            self.deselect_slice_plane_selection();
                         }
                     }
                     _ => {}

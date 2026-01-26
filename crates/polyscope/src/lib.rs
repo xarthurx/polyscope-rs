@@ -1223,8 +1223,8 @@ pub fn add_slice_plane(name: impl Into<String>) -> SlicePlaneHandle {
         let center = (ctx.bounding_box.0 + ctx.bounding_box.1) * 0.5;
         let plane = ctx.add_slice_plane(&name);
         // Set plane_size to be visible relative to the scene
-        // Using length_scale * 0.5 gives a reasonably sized plane
-        plane.set_plane_size(length_scale * 0.5);
+        // Using length_scale * 0.25 gives a reasonably sized plane
+        plane.set_plane_size(length_scale * 0.25);
         // Position the plane at the scene center
         plane.set_origin(center);
     });

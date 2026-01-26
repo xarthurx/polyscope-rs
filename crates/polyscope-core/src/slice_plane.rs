@@ -45,7 +45,7 @@ impl SlicePlane {
             draw_widget: true,
             color: Vec3::new(0.5, 0.5, 0.5),
             transparency: 0.5,
-            plane_size: 0.1,
+            plane_size: 0.05,
         }
     }
 
@@ -60,7 +60,7 @@ impl SlicePlane {
             draw_widget: true,
             color: Vec3::new(0.5, 0.5, 0.5),
             transparency: 0.5,
-            plane_size: 0.1,
+            plane_size: 0.05,
         }
     }
 
