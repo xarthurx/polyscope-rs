@@ -110,6 +110,10 @@ pub struct RenderEngine {
     hdr_texture: Option<wgpu::Texture>,
     /// HDR texture view.
     hdr_view: Option<wgpu::TextureView>,
+    /// Normal G-buffer texture for SSAO.
+    normal_texture: Option<wgpu::Texture>,
+    /// Normal G-buffer texture view.
+    normal_view: Option<wgpu::TextureView>,
     /// Tone mapping post-processing pass.
     tone_map_pass: Option<ToneMapPass>,
     /// Shadow map pass for ground plane shadows.
@@ -367,6 +371,8 @@ impl RenderEngine {
             screenshot_hdr_view: None,
             hdr_texture: None,
             hdr_view: None,
+            normal_texture: None,
+            normal_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -600,6 +606,8 @@ impl RenderEngine {
             screenshot_hdr_view: None,
             hdr_texture: None,
             hdr_view: None,
+            normal_texture: None,
+            normal_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -657,6 +665,9 @@ impl RenderEngine {
 
         // Recreate HDR texture for tone mapping
         self.create_hdr_texture();
+
+        // Recreate normal G-buffer for SSAO
+        self.create_normal_texture();
 
         self.camera.set_aspect_ratio(width as f32 / height as f32);
     }
@@ -2255,6 +2266,7 @@ impl RenderEngine {
     fn init_tone_mapping(&mut self) {
         self.tone_map_pass = Some(ToneMapPass::new(&self.device, self.surface_config.format));
         self.create_hdr_texture();
+        self.create_normal_texture();
     }
 
     /// Creates the HDR intermediate texture for tone mapping.
@@ -2280,9 +2292,37 @@ impl RenderEngine {
         self.hdr_view = Some(hdr_view);
     }
 
+    /// Creates the normal G-buffer texture for SSAO.
+    fn create_normal_texture(&mut self) {
+        let normal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Normal G-Buffer"),
+            size: wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba16Float, // View-space normals (xyz) + unused (w)
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let normal_view = normal_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.normal_texture = Some(normal_texture);
+        self.normal_view = Some(normal_view);
+    }
+
     /// Returns the HDR texture view for rendering the scene.
     pub fn hdr_view(&self) -> Option<&wgpu::TextureView> {
         self.hdr_view.as_ref()
+    }
+
+    /// Returns the normal G-buffer view if available.
+    pub fn normal_view(&self) -> Option<&wgpu::TextureView> {
+        self.normal_view.as_ref()
     }
 
     /// Returns the tone map pass.
