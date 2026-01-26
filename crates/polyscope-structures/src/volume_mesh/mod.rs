@@ -1,7 +1,9 @@
 //! Volume mesh structure for tetrahedral and hexahedral meshes.
 
 mod scalar_quantity;
+mod color_quantity;
 pub use scalar_quantity::*;
+pub use color_quantity::*;
 
 use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
@@ -382,6 +384,38 @@ impl VolumeMesh {
             name.clone(),
             self.name.clone(),
             values,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex color quantity.
+    pub fn add_vertex_color_quantity(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec3>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshVertexColorQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            colors,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a cell color quantity.
+    pub fn add_cell_color_quantity(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec3>,
+    ) -> &mut Self {
+        let name = name.into();
+        let quantity = VolumeMeshCellColorQuantity::new(
+            name.clone(),
+            self.name.clone(),
+            colors,
         );
         self.add_quantity(Box::new(quantity));
         self
