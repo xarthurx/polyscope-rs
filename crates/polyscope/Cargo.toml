@@ -48,5 +48,9 @@ path = "../../examples/volume_grid_demo.rs"
 name = "volume_mesh_demo"
 path = "../../examples/volume_mesh_demo.rs"
 
+[[example]]
+name = "slice_plane_demo"
+path = "../../examples/slice_plane_demo.rs"
+
 [lints]
 workspace = true
