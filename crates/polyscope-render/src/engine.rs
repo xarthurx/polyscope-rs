@@ -1369,7 +1369,7 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("curve network edge pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout],
+                bind_group_layouts: &[&bind_group_layout, &self.slice_plane_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -1568,7 +1568,7 @@ impl RenderEngine {
             self.device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Curve Network Tube Render Pipeline Layout"),
-                    bind_group_layouts: &[&render_bind_group_layout],
+                    bind_group_layouts: &[&render_bind_group_layout, &self.slice_plane_bind_group_layout],
                     push_constant_ranges: &[],
                 });
 

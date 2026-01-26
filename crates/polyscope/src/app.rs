@@ -1053,6 +1053,7 @@ impl App {
             // Draw curve network edges (line mode) and camera views
             if let Some(pipeline) = &engine.curve_network_edge_pipeline {
                 render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
@@ -1096,6 +1097,7 @@ impl App {
             // Draw curve network tubes (tube mode)
             if let Some(pipeline) = &engine.curve_network_tube_pipeline {
                 render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
@@ -1521,6 +1523,7 @@ impl App {
             // Draw curve networks, camera views, and volume grids
             if let Some(pipeline) = &engine.curve_network_edge_pipeline {
                 render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {

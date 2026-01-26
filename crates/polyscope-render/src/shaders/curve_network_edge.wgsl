@@ -10,6 +10,18 @@ struct CameraUniforms {
     _padding: f32,
 }
 
+// Slice plane uniforms for fragment-level slicing
+struct SlicePlaneUniforms {
+    origin: vec3<f32>,
+    enabled: f32,
+    normal: vec3<f32>,
+    _padding: f32,
+}
+
+struct SlicePlanesArray {
+    planes: array<SlicePlaneUniforms, 4>,
+}
+
 struct CurveNetworkUniforms {
     color: vec4<f32>,         // Base color (RGBA)
     radius: f32,              // Line thickness (for future tube rendering)
@@ -24,6 +36,8 @@ struct CurveNetworkUniforms {
 @group(0) @binding(3) var<storage, read> node_colors: array<vec4<f32>>;
 @group(0) @binding(4) var<storage, read> edge_vertices: array<vec4<f32>>;
 @group(0) @binding(5) var<storage, read> edge_colors: array<vec4<f32>>;
+
+@group(1) @binding(0) var<uniform> slice_planes: SlicePlanesArray;
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
@@ -62,6 +76,17 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    // Slice plane culling
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let plane = slice_planes.planes[i];
+        if (plane.enabled > 0.5) {
+            let dist = dot(in.world_position - plane.origin, plane.normal);
+            if (dist < 0.0) {
+                discard;
+            }
+        }
+    }
+
     // Simple unlit color for lines
     // Lines don't have normals, so we can't do proper lighting
     // Just return the edge color with slight ambient darkening

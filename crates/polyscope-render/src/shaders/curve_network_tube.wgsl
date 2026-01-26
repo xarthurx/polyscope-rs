@@ -10,6 +10,18 @@ struct CameraUniforms {
     camera_pos: vec4<f32>,
 }
 
+// Slice plane uniforms for fragment-level slicing
+struct SlicePlaneUniforms {
+    origin: vec3<f32>,
+    enabled: f32,
+    normal: vec3<f32>,
+    _padding: f32,
+}
+
+struct SlicePlanesArray {
+    planes: array<SlicePlaneUniforms, 4>,
+}
+
 struct CurveNetworkUniforms {
     color: vec4<f32>,
     radius: f32,
@@ -22,6 +34,8 @@ struct CurveNetworkUniforms {
 @group(0) @binding(1) var<uniform> uniforms: CurveNetworkUniforms;
 @group(0) @binding(2) var<storage, read> edge_vertices: array<vec4<f32>>;
 @group(0) @binding(3) var<storage, read> edge_colors: array<vec4<f32>>;
+
+@group(1) @binding(0) var<uniform> slice_planes: SlicePlanesArray;
 
 struct VertexInput {
     @location(0) position: vec4<f32>,
@@ -137,6 +151,17 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     if (!ray_cylinder_intersect(ray_origin, ray_dir, tail, tip, radius,
                                  &t_hit, &hit_point, &hit_normal)) {
         discard;
+    }
+
+    // Slice plane culling - check the actual hit point
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let plane = slice_planes.planes[i];
+        if (plane.enabled > 0.5) {
+            let dist = dot(hit_point - plane.origin, plane.normal);
+            if (dist < 0.0) {
+                discard;
+            }
+        }
     }
 
     // Compute depth
