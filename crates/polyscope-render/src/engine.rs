@@ -882,7 +882,7 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("point pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout],
+                bind_group_layouts: &[&bind_group_layout, &self.slice_plane_bind_group_layout],
                 push_constant_ranges: &[],
             });
 

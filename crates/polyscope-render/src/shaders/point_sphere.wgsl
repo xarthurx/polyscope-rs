@@ -10,6 +10,18 @@ struct CameraUniforms {
     _padding: f32,
 }
 
+// Slice plane uniforms for fragment-level slicing
+struct SlicePlaneUniforms {
+    origin: vec3<f32>,
+    enabled: f32,
+    normal: vec3<f32>,
+    _padding: f32,
+}
+
+struct SlicePlanesArray {
+    planes: array<SlicePlaneUniforms, 4>,
+}
+
 struct PointUniforms {
     model: mat4x4<f32>,
     point_radius: f32,
@@ -23,12 +35,15 @@ struct PointUniforms {
 @group(0) @binding(2) var<storage, read> point_positions: array<vec3<f32>>;
 @group(0) @binding(3) var<storage, read> point_colors: array<vec3<f32>>;
 
+@group(1) @binding(0) var<uniform> slice_planes: SlicePlanesArray;
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) sphere_center_view: vec3<f32>,
     @location(1) quad_pos: vec2<f32>,  // [-1, 1] on billboard quad
     @location(2) point_color: vec3<f32>,
     @location(3) point_radius: f32,
+    @location(4) sphere_center_world: vec3<f32>,
 }
 
 // Billboard quad vertices (two triangles)
@@ -64,6 +79,7 @@ fn vs_main(
     // Project to clip space
     out.clip_position = camera.proj * vec4<f32>(billboard_pos_view, 1.0);
     out.sphere_center_view = view_pos;
+    out.sphere_center_world = world_pos;
     out.quad_pos = quad_pos;
     out.point_radius = radius;
 
@@ -79,6 +95,17 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    // Slice plane culling - check sphere center against planes
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let plane = slice_planes.planes[i];
+        if (plane.enabled > 0.5) {
+            let dist = dot(in.sphere_center_world - plane.origin, plane.normal);
+            if (dist < 0.0) {
+                discard;
+            }
+        }
+    }
+
     // Ray-sphere intersection in view space
     // Ray starts at fragment position on billboard, goes toward -Z (into screen)
     let ray_origin = vec3<f32>(

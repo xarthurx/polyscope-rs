@@ -1003,6 +1003,7 @@ impl App {
             // Draw point clouds
             if let Some(pipeline) = &engine.point_pipeline {
                 render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
