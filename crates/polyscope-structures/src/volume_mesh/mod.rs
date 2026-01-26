@@ -51,6 +51,8 @@ pub use color_quantity::*;
 pub use vector_quantity::*;
 pub use slice_geometry::{slice_tet, slice_hex, CellSliceResult};
 
+// Re-export SliceMeshData from this module
+
 use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
@@ -641,6 +643,104 @@ impl VolumeMesh {
         );
         self.add_quantity(Box::new(quantity));
         self
+    }
+
+    /// Generates mesh geometry for the cross-section created by a slice plane.
+    ///
+    /// This computes the intersection of all cells with the plane and triangulates
+    /// the resulting polygons for rendering.
+    ///
+    /// # Arguments
+    /// * `plane_origin` - A point on the slice plane
+    /// * `plane_normal` - The plane normal (points toward kept geometry)
+    ///
+    /// # Returns
+    /// `Some(SliceMeshData)` if the plane intersects the mesh, `None` otherwise.
+    pub fn generate_slice_geometry(
+        &self,
+        plane_origin: Vec3,
+        plane_normal: Vec3,
+    ) -> Option<SliceMeshData> {
+        let mut vertices = Vec::new();
+        let mut normals = Vec::new();
+        let mut colors = Vec::new();
+
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
+            let cell_type = self.cell_type(cell_idx);
+
+            let slice = match cell_type {
+                VolumeCellType::Tet => {
+                    slice_tet(
+                        self.vertices[cell[0] as usize],
+                        self.vertices[cell[1] as usize],
+                        self.vertices[cell[2] as usize],
+                        self.vertices[cell[3] as usize],
+                        plane_origin,
+                        plane_normal,
+                    )
+                }
+                VolumeCellType::Hex => {
+                    let hex_verts: [Vec3; 8] =
+                        std::array::from_fn(|i| self.vertices[cell[i] as usize]);
+                    slice_hex(hex_verts, plane_origin, plane_normal)
+                }
+            };
+
+            if slice.has_intersection() {
+                // Triangulate the polygon (fan from first vertex)
+                for i in 1..slice.vertices.len() - 1 {
+                    vertices.push(slice.vertices[0]);
+                    vertices.push(slice.vertices[i]);
+                    vertices.push(slice.vertices[i + 1]);
+
+                    // Normal is the slice plane normal
+                    normals.push(plane_normal);
+                    normals.push(plane_normal);
+                    normals.push(plane_normal);
+
+                    // Color from interior_color
+                    colors.push(self.interior_color);
+                    colors.push(self.interior_color);
+                    colors.push(self.interior_color);
+                }
+            }
+        }
+
+        if vertices.is_empty() {
+            return None;
+        }
+
+        Some(SliceMeshData {
+            vertices,
+            normals,
+            colors,
+        })
+    }
+}
+
+/// Data representing a slice mesh cross-section.
+///
+/// Contains triangulated geometry for rendering the cross-section
+/// created by a slice plane intersecting a volume mesh.
+#[derive(Debug, Clone)]
+pub struct SliceMeshData {
+    /// Vertex positions (3 per triangle)
+    pub vertices: Vec<Vec3>,
+    /// Vertex normals (3 per triangle, all pointing along plane normal)
+    pub normals: Vec<Vec3>,
+    /// Vertex colors (3 per triangle, from interior color or interpolated quantity)
+    pub colors: Vec<Vec3>,
+}
+
+impl SliceMeshData {
+    /// Returns the number of triangles in the slice mesh.
+    pub fn num_triangles(&self) -> usize {
+        self.vertices.len() / 3
+    }
+
+    /// Returns true if the slice mesh is empty.
+    pub fn is_empty(&self) -> bool {
+        self.vertices.is_empty()
     }
 }
 
