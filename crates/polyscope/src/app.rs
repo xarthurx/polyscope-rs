@@ -1014,42 +1014,8 @@ impl App {
                 });
             }
 
-            // Draw surface meshes and volume meshes
-            if let Some(pipeline) = &engine.mesh_pipeline {
-                render_pass.set_pipeline(pipeline);
-
-                crate::with_context(|ctx| {
-                    for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
-                            continue;
-                        }
-                        if structure.type_name() == "SurfaceMesh" {
-                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                if let Some(render_data) = mesh.render_data() {
-                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                    render_pass.set_index_buffer(
-                                        render_data.index_buffer.slice(..),
-                                        wgpu::IndexFormat::Uint32,
-                                    );
-                                    render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
-                                }
-                            }
-                        }
-                        if structure.type_name() == "VolumeMesh" {
-                            if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
-                                if let Some(render_data) = vm.render_data() {
-                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                    render_pass.set_index_buffer(
-                                        render_data.index_buffer.slice(..),
-                                        wgpu::IndexFormat::Uint32,
-                                    );
-                                    render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+            // Note: Surface meshes and volume meshes are rendered in a separate pass
+            // with MRT (multiple render targets) for SSAO normal output
 
             // Draw curve network edges (line mode) and camera views
             if let Some(pipeline) = &engine.curve_network_edge_pipeline {
@@ -1152,6 +1118,83 @@ impl App {
                 });
             }
         }  // End of main render pass scope
+
+        // Surface mesh render pass with MRT (HDR color + normal G-buffer for SSAO)
+        if let Some(pipeline) = &engine.mesh_pipeline {
+            let hdr_view = engine.hdr_view().expect("HDR view should be available");
+            let normal_view = engine.normal_view().expect("Normal view should be available");
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Surface Mesh Pass"),
+                color_attachments: &[
+                    // Color output (HDR)
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: hdr_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load, // Preserve existing content
+                            store: wgpu::StoreOp::Store,
+                        },
+                        depth_slice: None,
+                    }),
+                    // Normal output (G-buffer for SSAO)
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: normal_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.5, g: 0.5, b: 1.0, a: 1.0, // Default normal pointing up
+                            }),
+                            store: wgpu::StoreOp::Store,
+                        },
+                        depth_slice: None,
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &engine.depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load, // Preserve depth from main pass
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+
+            render_pass.set_pipeline(pipeline);
+
+            crate::with_context(|ctx| {
+                for structure in ctx.registry.iter() {
+                    if !structure.is_enabled() {
+                        continue;
+                    }
+                    if structure.type_name() == "SurfaceMesh" {
+                        if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                            if let Some(render_data) = mesh.render_data() {
+                                render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                render_pass.set_index_buffer(
+                                    render_data.index_buffer.slice(..),
+                                    wgpu::IndexFormat::Uint32,
+                                );
+                                render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
+                            }
+                        }
+                    }
+                    if structure.type_name() == "VolumeMesh" {
+                        if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                            if let Some(render_data) = vm.render_data() {
+                                render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                render_pass.set_index_buffer(
+                                    render_data.index_buffer.slice(..),
+                                    wgpu::IndexFormat::Uint32,
+                                );
+                                render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         // Render ground plane to HDR texture (before tone mapping)
         let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
