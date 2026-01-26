@@ -114,6 +114,10 @@ pub struct RenderEngine {
     normal_texture: Option<wgpu::Texture>,
     /// Normal G-buffer texture view.
     normal_view: Option<wgpu::TextureView>,
+    /// SSAO noise texture (4x4 random rotation vectors).
+    ssao_noise_texture: Option<wgpu::Texture>,
+    /// SSAO noise texture view.
+    ssao_noise_view: Option<wgpu::TextureView>,
     /// Tone mapping post-processing pass.
     tone_map_pass: Option<ToneMapPass>,
     /// Shadow map pass for ground plane shadows.
@@ -373,6 +377,8 @@ impl RenderEngine {
             hdr_view: None,
             normal_texture: None,
             normal_view: None,
+            ssao_noise_texture: None,
+            ssao_noise_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -608,6 +614,8 @@ impl RenderEngine {
             hdr_view: None,
             normal_texture: None,
             normal_view: None,
+            ssao_noise_texture: None,
+            ssao_noise_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -2276,6 +2284,7 @@ impl RenderEngine {
         self.tone_map_pass = Some(ToneMapPass::new(&self.device, self.surface_config.format));
         self.create_hdr_texture();
         self.create_normal_texture();
+        self.create_ssao_noise_texture();
     }
 
     /// Creates the HDR intermediate texture for tone mapping.
@@ -2324,6 +2333,67 @@ impl RenderEngine {
         self.normal_view = Some(normal_view);
     }
 
+    /// Creates the SSAO noise texture.
+    fn create_ssao_noise_texture(&mut self) {
+        use rand::Rng;
+
+        // Generate 4x4 random rotation vectors
+        let mut rng = rand::thread_rng();
+        let mut noise_data = Vec::with_capacity(4 * 4 * 4); // 4x4 pixels, RGBA8
+
+        for _ in 0..16 {
+            // Random rotation vector in tangent plane (z=0)
+            let angle: f32 = rng.gen_range(0.0..std::f32::consts::TAU);
+            let x = angle.cos();
+            let y = angle.sin();
+            // Store in [0,1] range
+            noise_data.push(((x * 0.5 + 0.5) * 255.0) as u8);
+            noise_data.push(((y * 0.5 + 0.5) * 255.0) as u8);
+            noise_data.push(0u8); // z = 0
+            noise_data.push(255u8); // w = 1
+        }
+
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("SSAO Noise Texture"),
+            size: wgpu::Extent3d {
+                width: 4,
+                height: 4,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &noise_data,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * 4),
+                rows_per_image: Some(4),
+            },
+            wgpu::Extent3d {
+                width: 4,
+                height: 4,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.ssao_noise_texture = Some(texture);
+        self.ssao_noise_view = Some(view);
+    }
+
     /// Returns the HDR texture view for rendering the scene.
     pub fn hdr_view(&self) -> Option<&wgpu::TextureView> {
         self.hdr_view.as_ref()
@@ -2332,6 +2402,11 @@ impl RenderEngine {
     /// Returns the normal G-buffer view if available.
     pub fn normal_view(&self) -> Option<&wgpu::TextureView> {
         self.normal_view.as_ref()
+    }
+
+    /// Returns the SSAO noise texture view if available.
+    pub fn ssao_noise_view(&self) -> Option<&wgpu::TextureView> {
+        self.ssao_noise_view.as_ref()
     }
 
     /// Returns the tone map pass.
