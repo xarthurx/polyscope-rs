@@ -73,7 +73,7 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 - `PointCloud` - Point set with scalar/vector/color quantities (full feature parity)
 - `SurfaceMesh` - Triangle mesh with vertex/face quantities (triangles full, polygons basic)
 - `CurveNetwork` - Edge network with node/edge quantities (full, tube rendering via compute shaders)
-- `VolumeMesh` - Tet/hex mesh (basic, no cuts)
+- `VolumeMesh` - Tet/hex mesh with slice plane capping (full)
 - `VolumeGrid` - Regular 3D grid with node/cell quantities (basic isosurface)
 - `CameraView` - Camera frustum visualization (full)
 
@@ -110,12 +110,14 @@ Shaders are written in WGSL (WebGPU Shading Language). Implemented shaders:
 - Point sphere impostor (instanced rendering, no geometry shaders)
 - Mesh surface (flat/smooth shading)
 - Vector arrows (instanced with precomputed mesh template)
-- Ground plane with shadows
+- Ground plane with shadows and reflections
 - Curve network (line mode + tube mode via compute shaders)
-- GPU picking (point, mesh, curve)
+- GPU picking (point, mesh, curve, volume)
 - Tone mapping
 - Shadow map + blur
-- Ground reflection (infrastructure only, not integrated)
+- SSAO (Screen-Space Ambient Occlusion)
+- Slice plane visualization (grid pattern)
+- Volume mesh slice capping
 
 ## Reference
 

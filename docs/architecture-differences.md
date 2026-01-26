@@ -182,7 +182,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Point Cloud | ✅ Full | ✅ Full | Complete feature parity |
 | Surface Mesh | ✅ Full | ✅ Basic | Triangles supported, polygons basic |
 | Curve Network | ✅ Full | ✅ Full | Line, loop, segments; tube rendering via compute shaders |
-| Volume Mesh | ✅ Full | ✅ Full | Tet/hex cells, quantities, interior face detection |
+| Volume Mesh | ✅ Full | ✅ Full | Tet/hex cells, quantities, interior face detection, slice capping |
 | Volume Grid | ✅ Full | ✅ Basic | Node/cell scalars, basic isosurface |
 | Camera View | ✅ Full | ✅ Full | Frustum visualization |
 | Floating Quantities | ✅ Full | ❌ Not yet | Screen-space quantities |
@@ -327,9 +327,9 @@ with_point_cloud("my points", |pc| {
 
 The following C++ Polyscope features are not yet implemented but planned:
 
-1. **Floating Quantities** - Screen-space data visualization
-2. **Parameterization Quantities** - UV coordinates visualization
-3. **Intrinsic Vectors** - Tangent-space vector visualization
-4. **One-Form Quantities** - Differential form visualization
-5. **Slice Plane Capping** - Fill exposed faces when slicing
+1. **Transparency Rendering** - Order-independent transparency for translucent surfaces
+2. **Floating Quantities** - Screen-space data visualization
+3. **Parameterization Quantities** - UV coordinates visualization
+4. **Intrinsic Vectors** - Tangent-space vector visualization
+5. **One-Form Quantities** - Differential form visualization
 6. **Full Polygon Mesh Support** - Arbitrary polygons (not just triangles)
