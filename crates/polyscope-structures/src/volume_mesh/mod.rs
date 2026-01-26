@@ -44,9 +44,12 @@
 mod scalar_quantity;
 mod color_quantity;
 mod vector_quantity;
+pub mod slice_geometry;
+
 pub use scalar_quantity::*;
 pub use color_quantity::*;
 pub use vector_quantity::*;
+pub use slice_geometry::{slice_tet, slice_hex, CellSliceResult};
 
 use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
