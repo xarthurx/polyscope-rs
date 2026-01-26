@@ -537,7 +537,16 @@ impl App {
             }
 
             // Appearance settings panel
-            polyscope_ui::build_appearance_section(ui, &mut self.appearance_settings);
+            if polyscope_ui::build_appearance_section(ui, &mut self.appearance_settings) {
+                // Sync SSAO settings to global options
+                polyscope_core::with_context_mut(|ctx| {
+                    ctx.options.ssao.enabled = self.appearance_settings.ssao_enabled;
+                    ctx.options.ssao.radius = self.appearance_settings.ssao_radius;
+                    ctx.options.ssao.intensity = self.appearance_settings.ssao_intensity;
+                    ctx.options.ssao.bias = self.appearance_settings.ssao_bias;
+                    ctx.options.ssao.sample_count = self.appearance_settings.ssao_sample_count;
+                });
+            }
 
             // Tone mapping settings panel
             polyscope_ui::panels::build_tone_mapping_section(ui, &mut self.tone_mapping_settings);
@@ -828,16 +837,20 @@ impl App {
 
         // HDR texture is always available for scene rendering
         // Update tone mapping uniforms - use passthrough values if disabled
+        // Get SSAO settings from global options
+        let ssao_enabled =
+            polyscope_core::with_context(|ctx| ctx.options.ssao.enabled);
         let hdr_view = engine.hdr_view().expect("HDR texture should always be available");
         if self.tone_mapping_settings.enabled {
             engine.update_tone_mapping(
                 self.tone_mapping_settings.exposure,
                 self.tone_mapping_settings.white_level,
                 self.tone_mapping_settings.gamma,
+                ssao_enabled,
             );
         } else {
             // Passthrough values: no exposure adjustment, linear transfer
-            engine.update_tone_mapping(0.0, 1.0, 1.0);
+            engine.update_tone_mapping(0.0, 1.0, 1.0, ssao_enabled);
         }
 
         // Store background color for use in render passes
@@ -1312,6 +1325,13 @@ impl App {
                 gp_shadow_mode,
                 0.0,
             );
+        }
+
+        // Render SSAO if enabled
+        if ssao_enabled {
+            polyscope_core::with_context(|ctx| {
+                engine.render_ssao(&mut encoder, &ctx.options.ssao);
+            });
         }
 
         // Apply tone mapping from HDR to surface (always runs, uses passthrough if disabled)

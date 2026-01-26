@@ -1,16 +1,17 @@
 // Tone mapping post-processing shader
-// Applies exposure, Reinhard tone mapping, and gamma correction
+// Applies exposure, Reinhard tone mapping, gamma correction, and optional SSAO
 
 struct ToneMapUniforms {
     exposure: f32,
     white_level: f32,
     gamma: f32,
-    _padding: f32,
+    ssao_enabled: u32, // 0 = disabled, 1 = enabled
 }
 
 @group(0) @binding(0) var input_texture: texture_2d<f32>;
 @group(0) @binding(1) var input_sampler: sampler;
 @group(0) @binding(2) var<uniform> uniforms: ToneMapUniforms;
+@group(0) @binding(3) var ssao_texture: texture_2d<f32>;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -53,6 +54,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Apply exposure
     var color = hdr_color.rgb * uniforms.exposure;
+
+    // Apply SSAO if enabled (multiply before tone mapping for correct darkening)
+    if (uniforms.ssao_enabled == 1u) {
+        let ssao = textureSample(ssao_texture, input_sampler, in.uv).r;
+        color = color * ssao;
+    }
 
     // Apply Reinhard tone mapping with white point
     color = reinhard_extended(color, uniforms.white_level);

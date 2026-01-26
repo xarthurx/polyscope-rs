@@ -9,7 +9,7 @@ pub struct ToneMapUniforms {
     pub exposure: f32,
     pub white_level: f32,
     pub gamma: f32,
-    pub _padding: f32,
+    pub ssao_enabled: u32, // 0 = disabled, 1 = enabled
 }
 
 impl Default for ToneMapUniforms {
@@ -18,7 +18,7 @@ impl Default for ToneMapUniforms {
             exposure: 1.0,
             white_level: 1.0,
             gamma: 2.2,
-            _padding: 0.0,
+            ssao_enabled: 0,
         }
     }
 }
@@ -64,6 +64,17 @@ impl ToneMapPass {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // SSAO texture
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
                     },
                     count: None,
                 },
@@ -144,12 +155,13 @@ impl ToneMapPass {
         exposure: f32,
         white_level: f32,
         gamma: f32,
+        ssao_enabled: bool,
     ) {
         let uniforms = ToneMapUniforms {
             exposure,
             white_level,
             gamma,
-            _padding: 0.0,
+            ssao_enabled: if ssao_enabled { 1 } else { 0 },
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
     }
@@ -159,6 +171,7 @@ impl ToneMapPass {
         &self,
         device: &wgpu::Device,
         input_view: &wgpu::TextureView,
+        ssao_view: &wgpu::TextureView,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Tone Map Bind Group"),
@@ -175,6 +188,10 @@ impl ToneMapPass {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: self.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(ssao_view),
                 },
             ],
         })
@@ -214,9 +231,10 @@ impl ToneMapPass {
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         input_view: &wgpu::TextureView,
+        ssao_view: &wgpu::TextureView,
         output_view: &wgpu::TextureView,
     ) {
-        let bind_group = self.create_bind_group(device, input_view);
+        let bind_group = self.create_bind_group(device, input_view, ssao_view);
         self.render(encoder, output_view, &bind_group);
     }
 }

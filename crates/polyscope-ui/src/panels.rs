@@ -61,6 +61,16 @@ pub struct AppearanceSettings {
     pub ssaa_factor: u32,
     /// Max FPS (0 = unlimited)
     pub max_fps: u32,
+    /// SSAO enabled
+    pub ssao_enabled: bool,
+    /// SSAO radius (world units)
+    pub ssao_radius: f32,
+    /// SSAO intensity
+    pub ssao_intensity: f32,
+    /// SSAO bias
+    pub ssao_bias: f32,
+    /// SSAO sample count
+    pub ssao_sample_count: u32,
 }
 
 impl Default for AppearanceSettings {
@@ -69,6 +79,11 @@ impl Default for AppearanceSettings {
             transparency_mode: 1, // Simple
             ssaa_factor: 1,
             max_fps: 60,
+            ssao_enabled: false,
+            ssao_radius: 0.5,
+            ssao_intensity: 1.0,
+            ssao_bias: 0.025,
+            ssao_sample_count: 16,
         }
     }
 }
@@ -963,6 +978,54 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
                     ui.label("(unlimited)");
                 }
             });
+
+            ui.separator();
+
+            // SSAO
+            if ui.checkbox(&mut settings.ssao_enabled, "SSAO").changed() {
+                changed = true;
+            }
+
+            if settings.ssao_enabled {
+                ui.horizontal(|ui| {
+                    ui.label("Radius:");
+                    if ui
+                        .add(Slider::new(&mut settings.ssao_radius, 0.01..=2.0))
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Intensity:");
+                    if ui
+                        .add(Slider::new(&mut settings.ssao_intensity, 0.1..=3.0))
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Bias:");
+                    if ui
+                        .add(Slider::new(&mut settings.ssao_bias, 0.001..=0.1))
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Samples:");
+                    let mut samples = settings.ssao_sample_count as i32;
+                    if ui.add(DragValue::new(&mut samples).range(4..=64)).changed() {
+                        settings.ssao_sample_count = samples.max(4) as u32;
+                        changed = true;
+                    }
+                });
+            }
         });
 
     changed

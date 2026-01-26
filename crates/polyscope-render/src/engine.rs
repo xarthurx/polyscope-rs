@@ -118,6 +118,12 @@ pub struct RenderEngine {
     ssao_noise_texture: Option<wgpu::Texture>,
     /// SSAO noise texture view.
     ssao_noise_view: Option<wgpu::TextureView>,
+    /// SSAO pass.
+    ssao_pass: Option<crate::ssao_pass::SsaoPass>,
+    /// SSAO output texture (blurred result).
+    ssao_output_texture: Option<wgpu::Texture>,
+    /// SSAO output texture view.
+    ssao_output_view: Option<wgpu::TextureView>,
     /// Tone mapping post-processing pass.
     tone_map_pass: Option<ToneMapPass>,
     /// Shadow map pass for ground plane shadows.
@@ -379,6 +385,9 @@ impl RenderEngine {
             normal_view: None,
             ssao_noise_texture: None,
             ssao_noise_view: None,
+            ssao_pass: None,
+            ssao_output_texture: None,
+            ssao_output_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -616,6 +625,9 @@ impl RenderEngine {
             normal_view: None,
             ssao_noise_texture: None,
             ssao_noise_view: None,
+            ssao_pass: None,
+            ssao_output_texture: None,
+            ssao_output_view: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -676,6 +688,12 @@ impl RenderEngine {
 
         // Recreate normal G-buffer for SSAO
         self.create_normal_texture();
+
+        // Resize SSAO pass and output texture
+        if let Some(ref mut ssao_pass) = self.ssao_pass {
+            ssao_pass.resize(&self.device, &self.queue, width, height);
+        }
+        self.create_ssao_output_texture();
 
         self.camera.set_aspect_ratio(width as f32 / height as f32);
     }
@@ -2165,14 +2183,20 @@ impl RenderEngine {
             return;
         };
 
-        let screenshot_view = screenshot_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let screenshot_view =
+            screenshot_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // Use the existing tone mapping pass
+        // For screenshots, we use the main SSAO output view if available
+        // (Note: SSAO effect depends on the main render resolution, not screenshot resolution)
         if let Some(tone_map_pass) = &self.tone_map_pass {
+            // Use SSAO output or fall back to HDR view (which is ignored when ssao_enabled=false)
+            let ssao_view = self.ssao_output_view.as_ref().unwrap_or(hdr_view);
             tone_map_pass.render_to_target(
                 &self.device,
                 encoder,
                 hdr_view,
+                ssao_view,
                 &screenshot_view,
             );
         }
@@ -2285,6 +2309,38 @@ impl RenderEngine {
         self.create_hdr_texture();
         self.create_normal_texture();
         self.create_ssao_noise_texture();
+        self.init_ssao_pass();
+    }
+
+    /// Initializes SSAO pass.
+    fn init_ssao_pass(&mut self) {
+        let ssao_pass = crate::ssao_pass::SsaoPass::new(&self.device, self.width, self.height);
+        self.ssao_pass = Some(ssao_pass);
+        self.create_ssao_output_texture();
+    }
+
+    /// Creates the SSAO output texture (blurred result).
+    fn create_ssao_output_texture(&mut self) {
+        let ssao_output_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("SSAO Output Texture"),
+            size: wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let ssao_output_view =
+            ssao_output_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.ssao_output_texture = Some(ssao_output_texture);
+        self.ssao_output_view = Some(ssao_output_view);
     }
 
     /// Creates the HDR intermediate texture for tone mapping.
@@ -2409,26 +2465,104 @@ impl RenderEngine {
         self.ssao_noise_view.as_ref()
     }
 
+    /// Returns the SSAO output texture view if available.
+    pub fn ssao_output_view(&self) -> Option<&wgpu::TextureView> {
+        self.ssao_output_view.as_ref()
+    }
+
+    /// Returns the SSAO pass.
+    pub fn ssao_pass(&self) -> Option<&crate::ssao_pass::SsaoPass> {
+        self.ssao_pass.as_ref()
+    }
+
+    /// Renders the SSAO pass.
+    /// Returns true if SSAO was rendered, false if resources are not available.
+    pub fn render_ssao(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        config: &polyscope_core::SsaoConfig,
+    ) -> bool {
+        // Check if all required resources are available
+        let (ssao_pass, depth_view, normal_view, noise_view, output_view) = match (
+            &self.ssao_pass,
+            Some(&self.depth_view),
+            self.normal_view.as_ref(),
+            self.ssao_noise_view.as_ref(),
+            self.ssao_output_view.as_ref(),
+        ) {
+            (Some(pass), Some(depth), Some(normal), Some(noise), Some(output)) => {
+                (pass, depth, normal, noise, output)
+            }
+            _ => return false,
+        };
+
+        if !config.enabled {
+            return false;
+        }
+
+        // Update SSAO uniforms
+        let proj = self.camera.projection_matrix();
+        let inv_proj = proj.inverse();
+        ssao_pass.update_uniforms(
+            &self.queue,
+            proj,
+            inv_proj,
+            config.radius,
+            config.bias,
+            config.intensity,
+            config.sample_count,
+            self.width as f32,
+            self.height as f32,
+        );
+
+        // Create bind groups
+        let ssao_bind_group =
+            ssao_pass.create_ssao_bind_group(&self.device, depth_view, normal_view, noise_view);
+        let blur_bind_group = ssao_pass.create_blur_bind_group(&self.device);
+
+        // Render SSAO pass
+        ssao_pass.render_ssao(encoder, &ssao_bind_group);
+
+        // Render blur pass to output texture
+        ssao_pass.render_blur(encoder, output_view, &blur_bind_group);
+
+        true
+    }
+
     /// Returns the tone map pass.
     pub fn tone_map_pass(&self) -> Option<&ToneMapPass> {
         self.tone_map_pass.as_ref()
     }
 
     /// Updates tone mapping uniforms.
-    pub fn update_tone_mapping(&self, exposure: f32, white_level: f32, gamma: f32) {
+    pub fn update_tone_mapping(
+        &self,
+        exposure: f32,
+        white_level: f32,
+        gamma: f32,
+        ssao_enabled: bool,
+    ) {
         if let Some(tone_map) = &self.tone_map_pass {
-            tone_map.update_uniforms(&self.queue, exposure, white_level, gamma);
+            tone_map.update_uniforms(&self.queue, exposure, white_level, gamma, ssao_enabled);
         }
     }
 
     /// Renders the tone mapping pass from HDR to the output view.
+    /// Uses SSAO texture if available, otherwise uses a default white texture.
     pub fn render_tone_mapping(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         output_view: &wgpu::TextureView,
     ) {
         if let (Some(tone_map), Some(hdr_view)) = (&self.tone_map_pass, &self.hdr_view) {
-            let bind_group = tone_map.create_bind_group(&self.device, hdr_view);
+            // Use SSAO output view if available, otherwise create a dummy white texture view
+            let ssao_view = self.ssao_output_view.as_ref().unwrap_or_else(|| {
+                // This should not happen in practice since we always create SSAO output
+                // But as a fallback, we'll use the HDR view (which will be ignored anyway
+                // when ssao_enabled is false)
+                hdr_view
+            });
+            let bind_group = tone_map.create_bind_group(&self.device, hdr_view, ssao_view);
             tone_map.render(encoder, output_view, &bind_group);
         }
     }
