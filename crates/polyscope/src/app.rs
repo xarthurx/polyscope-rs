@@ -1235,6 +1235,12 @@ impl App {
             });
         }
 
+        // Render slice plane visualizations (semi-transparent grids)
+        let (slice_planes, length_scale_for_planes) = crate::with_context(|ctx| {
+            (ctx.slice_planes().cloned().collect::<Vec<_>>(), ctx.length_scale)
+        });
+        engine.render_slice_planes(&mut encoder, &slice_planes, length_scale_for_planes);
+
         // Render ground plane to HDR texture (before tone mapping)
         let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
             let center = ctx.center();

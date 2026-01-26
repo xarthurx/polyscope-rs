@@ -13,6 +13,7 @@ use crate::error::{RenderError, RenderResult};
 use crate::ground_plane::GroundPlaneRenderData;
 use crate::materials::MaterialRegistry;
 use crate::shadow_map::ShadowMapPass;
+use crate::slice_plane_render::SlicePlaneRenderData;
 use crate::tone_mapping::ToneMapPass;
 
 /// Camera uniforms for GPU.
@@ -108,6 +109,12 @@ pub struct RenderEngine {
     ground_plane_bind_group_layout: wgpu::BindGroupLayout,
     /// Ground plane render data (lazily initialized).
     ground_plane_render_data: Option<GroundPlaneRenderData>,
+    /// Slice plane visualization pipeline.
+    slice_plane_vis_pipeline: wgpu::RenderPipeline,
+    /// Slice plane visualization bind group layout.
+    slice_plane_vis_bind_group_layout: wgpu::BindGroupLayout,
+    /// Slice plane render data (per-plane, lazily initialized).
+    slice_plane_render_data: Vec<SlicePlaneRenderData>,
     /// Screenshot capture texture (lazily initialized).
     screenshot_texture: Option<wgpu::Texture>,
     /// Screenshot capture buffer (lazily initialized).
@@ -388,6 +395,16 @@ impl RenderEngine {
                 cache: None,
             });
 
+        // Slice plane visualization pipeline
+        let slice_plane_vis_bind_group_layout =
+            crate::slice_plane_render::create_slice_plane_bind_group_layout(&device);
+        let slice_plane_vis_pipeline = crate::slice_plane_render::create_slice_plane_pipeline(
+            &device,
+            &slice_plane_vis_bind_group_layout,
+            wgpu::TextureFormat::Rgba16Float,
+            wgpu::TextureFormat::Depth24PlusStencil8,
+        );
+
         let mut engine = Self {
             instance,
             adapter,
@@ -422,6 +439,9 @@ impl RenderEngine {
             ground_plane_pipeline,
             ground_plane_bind_group_layout,
             ground_plane_render_data: None,
+            slice_plane_vis_pipeline,
+            slice_plane_vis_bind_group_layout,
+            slice_plane_render_data: Vec::new(),
             screenshot_texture: None,
             screenshot_buffer: None,
             screenshot_hdr_texture: None,
@@ -665,6 +685,16 @@ impl RenderEngine {
                 cache: None,
             });
 
+        // Slice plane visualization pipeline
+        let slice_plane_vis_bind_group_layout =
+            crate::slice_plane_render::create_slice_plane_bind_group_layout(&device);
+        let slice_plane_vis_pipeline = crate::slice_plane_render::create_slice_plane_pipeline(
+            &device,
+            &slice_plane_vis_bind_group_layout,
+            wgpu::TextureFormat::Rgba16Float,
+            wgpu::TextureFormat::Depth24PlusStencil8,
+        );
+
         let mut engine = Self {
             instance,
             adapter,
@@ -699,6 +729,9 @@ impl RenderEngine {
             ground_plane_pipeline,
             ground_plane_bind_group_layout,
             ground_plane_render_data: None,
+            slice_plane_vis_pipeline,
+            slice_plane_vis_bind_group_layout,
+            slice_plane_render_data: Vec::new(),
             screenshot_texture: None,
             screenshot_buffer: None,
             screenshot_hdr_texture: None,
@@ -2121,6 +2154,68 @@ impl RenderEngine {
             render_pass.set_bind_group(0, render_data.bind_group(), &[]);
             // 4 triangles * 3 vertices = 12 vertices for infinite plane
             render_pass.draw(0..12, 0..1);
+        }
+    }
+
+    /// Renders slice plane visualizations.
+    ///
+    /// Renders enabled slice planes as semi-transparent grids.
+    /// Should be called after rendering structures, before tone mapping.
+    pub fn render_slice_planes(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        planes: &[polyscope_core::slice_plane::SlicePlane],
+        length_scale: f32,
+    ) {
+        // Use HDR texture if available
+        let Some(view) = &self.hdr_view else {
+            return;
+        };
+
+        // Ensure we have enough render data for all planes
+        while self.slice_plane_render_data.len() < planes.len() {
+            let data = SlicePlaneRenderData::new(
+                &self.device,
+                &self.slice_plane_vis_bind_group_layout,
+                &self.camera_buffer,
+            );
+            self.slice_plane_render_data.push(data);
+        }
+
+        // Render each enabled plane that should be drawn
+        for (i, plane) in planes.iter().enumerate() {
+            if !plane.is_enabled() || !plane.draw_plane() {
+                continue;
+            }
+
+            // Update uniforms for this plane
+            self.slice_plane_render_data[i].update(&self.queue, plane, length_scale);
+
+            // Begin render pass for this plane
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Slice Plane Visualization Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load, // Preserve existing content
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+
+            render_pass.set_pipeline(&self.slice_plane_vis_pipeline);
+            self.slice_plane_render_data[i].draw(&mut render_pass);
         }
     }
 
