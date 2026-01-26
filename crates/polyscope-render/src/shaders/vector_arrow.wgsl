@@ -10,6 +10,18 @@ struct CameraUniforms {
     _padding: f32,
 }
 
+// Slice plane uniforms for fragment-level slicing
+struct SlicePlaneUniforms {
+    origin: vec3<f32>,
+    enabled: f32,
+    normal: vec3<f32>,
+    _padding: f32,
+}
+
+struct SlicePlanesArray {
+    planes: array<SlicePlaneUniforms, 4>,
+}
+
 struct VectorUniforms {
     length_scale: f32,
     radius: f32,
@@ -22,10 +34,13 @@ struct VectorUniforms {
 @group(0) @binding(2) var<storage, read> base_positions: array<vec3<f32>>;
 @group(0) @binding(3) var<storage, read> vectors: array<vec3<f32>>;
 
+@group(1) @binding(0) var<uniform> slice_planes: SlicePlanesArray;
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) normal: vec3<f32>,
     @location(1) color: vec3<f32>,
+    @location(2) world_position: vec3<f32>,
 }
 
 // Arrow cylinder mesh (simplified - 8 segments)
@@ -48,6 +63,7 @@ fn vs_main(
         out.clip_position = camera.view_proj * vec4<f32>(base_pos, 1.0);
         out.normal = vec3<f32>(0.0, 1.0, 0.0);
         out.color = vector_uniforms.color.rgb;
+        out.world_position = base_pos;
         return out;
     }
 
@@ -105,12 +121,24 @@ fn vs_main(
     out.clip_position = camera.view_proj * vec4<f32>(world_pos, 1.0);
     out.normal = world_normal;
     out.color = vector_uniforms.color.rgb;
+    out.world_position = world_pos;
 
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    // Slice plane culling
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let plane = slice_planes.planes[i];
+        if (plane.enabled > 0.5) {
+            let dist = dot(in.world_position - plane.origin, plane.normal);
+            if (dist < 0.0) {
+                discard;
+            }
+        }
+    }
+
     let light_dir = normalize(vec3<f32>(0.3, 0.5, 1.0));
     let ambient = 0.3;
     let diffuse = max(dot(normalize(in.normal), light_dir), 0.0) * 0.7;

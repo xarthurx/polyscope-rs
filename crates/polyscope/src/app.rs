@@ -1026,6 +1026,7 @@ impl App {
             // Draw vector quantities
             if let Some(pipeline) = &engine.vector_pipeline {
                 render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
@@ -1129,6 +1130,7 @@ impl App {
             // Draw curve network node spheres (tube mode - fills gaps at joints)
             if let Some(pipeline) = &engine.point_pipeline {
                 render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
@@ -1442,6 +1444,7 @@ impl App {
             // Draw point clouds
             if let Some(pipeline) = &engine.point_pipeline {
                 render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
@@ -1463,6 +1466,7 @@ impl App {
             // Draw vector quantities
             if let Some(pipeline) = &engine.vector_pipeline {
                 render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
@@ -1486,6 +1490,7 @@ impl App {
             // Draw surface meshes and volume meshes
             if let Some(pipeline) = &engine.mesh_pipeline {
                 render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
