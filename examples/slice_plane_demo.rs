@@ -6,9 +6,10 @@
 //! - Volume mesh (tetrahedral cube)
 //!
 //! Features:
-//! - Fragment-level slicing for all structure types
+//! - Fragment-level slicing for surface meshes and point clouds
+//! - Centroid-based cell culling for volume meshes (keeps whole tets)
 //! - Interactive gizmo control for plane positioning
-//! - Cross-section capping for volume meshes with color interpolation
+//! - Multiple slice planes
 //!
 //! Run with: cargo run --example slice_plane_demo
 
@@ -172,13 +173,14 @@ fn main() {
         .set_color(Vec3::new(0.4, 0.5, 0.7))
         .set_interior_color(Vec3::new(0.6, 0.3, 0.3));
 
-    // 4. Add a slice plane
+    // 4. Add slice planes
     println!();
-    println!("Adding slice plane...");
+    println!("Adding slice planes...");
 
     let slice_handle = polyscope::add_slice_plane("main_slicer");
+    let slice_handle_b = polyscope::add_slice_plane("secondary_slicer");
 
-    // Position the plane to cut through all structures
+    // Position the planes to cut through all structures
     slice_handle
         .set_origin(Vec3::new(0.0, 0.06, 0.0))
         .set_normal(Vec3::new(0.0, 1.0, 0.2).normalize())
@@ -187,13 +189,21 @@ fn main() {
         .set_draw_plane(true)
         .set_draw_widget(true); // Enable gizmo interaction
 
+    slice_handle_b
+        .set_origin(Vec3::new(-0.06, 0.04, 0.0))
+        .set_normal(Vec3::new(1.0, 0.2, 0.0).normalize())
+        .set_color(Vec3::new(0.3, 0.7, 0.9))
+        .set_transparency(0.35)
+        .set_draw_plane(true)
+        .set_draw_widget(false); // Keep gizmo on the main plane by default
+
     println!();
     println!("Controls:");
     println!("- Use the UI panel on the left to adjust slice plane parameters");
     println!("- Click 'Edit with Gizmo' button to enable interactive manipulation");
     println!("- Use Translate mode to move the plane, Rotate mode to change its orientation");
     println!("- Toggle 'draw_plane' to show/hide the slice plane visualization");
-    println!("- The tet_cube shows cross-section capping with interpolated colors");
+    println!("- The tet_cube uses centroid-based culling (no half-tets)");
     println!();
 
     polyscope::show();
