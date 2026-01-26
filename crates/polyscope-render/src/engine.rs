@@ -2737,9 +2737,10 @@ impl RenderEngine {
     /// Ensures OIT composite pass is initialized.
     pub fn ensure_oit_pass(&mut self) {
         if self.oit_composite_pass.is_none() {
+            // OIT composite renders to HDR texture (Rgba16Float), not swapchain
             self.oit_composite_pass = Some(crate::oit_pass::OitCompositePass::new(
                 &self.device,
-                self.surface_config.format,
+                wgpu::TextureFormat::Rgba16Float,
             ));
         }
     }
