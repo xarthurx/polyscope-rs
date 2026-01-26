@@ -205,7 +205,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 |---------|--------------|--------------|
 | Ground Plane | ✅ | ✅ |
 | Ground Shadows | ✅ | ✅ |
-| Ground Reflections | ✅ | ⚠️ Infrastructure only |
+| Ground Reflections | ✅ | ✅ |
 | Tone Mapping | ✅ | ✅ |
 | SSAO | ✅ | ✅ |
 | Slice Planes | ✅ | ✅ (max 4) |
@@ -322,18 +322,6 @@ with_point_cloud("my points", |pc| {
 4. **Shader Language**: GLSL → WGSL syntax differences
 
 ---
-
-## Partially Implemented Features
-
-The following features have infrastructure but are not fully functional:
-
-### Ground Reflections (Infrastructure Only)
-- ✅ `ReflectionPass` infrastructure and shaders
-- ✅ Reflection matrix computation functions
-- ✅ Ground stencil shader exists
-- ❌ No stencil pass to mark ground plane regions
-- ❌ No reflected geometry rendering in render loop
-- **Result:** No reflections appear
 
 ## Missing Features (Planned)
 

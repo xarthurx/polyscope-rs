@@ -26,7 +26,7 @@ Recommendations and thoughts are welcome in the [Discussions](https://github.com
 
 **Current Version:** 0.1.x (Alpha)
 
-**Feature Parity:** ~80% of C++ Polyscope 2.x
+**Feature Parity:** ~85% of C++ Polyscope 2.x
 
 ### What's Working
 
@@ -52,7 +52,6 @@ Recommendations and thoughts are welcome in the [Discussions](https://github.com
 ### What's In Progress
 
 - Transparency rendering
-- Ground reflections
 - Parameterization quantities
 - Full polygon mesh support
 
@@ -169,7 +168,7 @@ This project is inspired by the original [Polyscope](https://github.com/nmwsharp
 Contributions are welcome! Key areas where help is needed:
 
 - Completing quantity types (parameterization, intrinsic vectors)
-- Ground reflections integration
 - Improving transparency handling
+- Slice plane capping
 - Documentation and examples
 - Testing on different platforms
