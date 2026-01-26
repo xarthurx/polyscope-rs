@@ -12,6 +12,7 @@ use winit::{
     window::{Window, WindowId},
 };
 
+use polyscope_core::slice_plane::SlicePlaneUniforms;
 use polyscope_core::{GroundPlaneConfig, GroundPlaneMode};
 use polyscope_render::{reflection, PickResult, RenderEngine};
 use polyscope_structures::{
@@ -267,6 +268,13 @@ impl App {
 
         // Update camera uniforms
         engine.update_camera_uniforms();
+
+        // Update slice plane uniforms
+        crate::with_context(|ctx| {
+            engine.update_slice_plane_uniforms(
+                ctx.slice_planes().map(SlicePlaneUniforms::from),
+            );
+        });
 
         // Initialize GPU resources for any uninitialized point clouds and vector quantities
         crate::with_context_mut(|ctx| {
@@ -1187,6 +1195,7 @@ impl App {
             });
 
             render_pass.set_pipeline(pipeline);
+            render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
             crate::with_context(|ctx| {
                 for structure in ctx.registry.iter() {

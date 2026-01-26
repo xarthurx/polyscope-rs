@@ -952,6 +952,23 @@ impl RenderEngine {
             .write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[uniforms]));
     }
 
+    /// Updates slice plane uniforms from the provided slice plane data.
+    ///
+    /// Takes an iterator of `SlicePlaneUniforms` and uploads them to the GPU buffer.
+    /// Up to `MAX_SLICE_PLANES` planes are used; remaining slots are disabled.
+    pub fn update_slice_plane_uniforms<'a>(
+        &self,
+        planes: impl Iterator<Item = SlicePlaneUniforms>,
+    ) {
+        let mut uniforms = [SlicePlaneUniforms::default(); MAX_SLICE_PLANES];
+        for (i, plane) in planes.take(MAX_SLICE_PLANES).enumerate() {
+            uniforms[i] = plane;
+        }
+
+        self.queue
+            .write_buffer(&self.slice_plane_buffer, 0, bytemuck::cast_slice(&uniforms));
+    }
+
     /// Gets the point cloud bind group layout.
     pub fn point_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         self.point_bind_group_layout
@@ -1198,7 +1215,7 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("mesh pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout],
+                bind_group_layouts: &[&bind_group_layout, &self.slice_plane_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
