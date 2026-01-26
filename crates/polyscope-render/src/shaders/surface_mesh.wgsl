@@ -10,6 +10,18 @@ struct CameraUniforms {
     _padding: f32,
 }
 
+// Slice plane uniforms for fragment-level slicing
+struct SlicePlaneUniforms {
+    origin: vec3<f32>,
+    enabled: f32,
+    normal: vec3<f32>,
+    _padding: f32,
+}
+
+struct SlicePlanesArray {
+    planes: array<SlicePlaneUniforms, 4>,
+}
+
 struct MeshUniforms {
     model: mat4x4<f32>,
     shade_style: u32,      // 0 = smooth, 1 = flat, 2 = tri-flat
@@ -36,6 +48,8 @@ struct MeshUniforms {
 @group(0) @binding(4) var<storage, read> barycentrics: array<vec4<f32>>;
 @group(0) @binding(5) var<storage, read> colors: array<vec4<f32>>;
 @group(0) @binding(6) var<storage, read> edge_is_real: array<vec4<f32>>;
+
+@group(1) @binding(0) var<uniform> slice_planes: SlicePlanesArray;
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
@@ -87,6 +101,17 @@ fn fs_main(
     // Handle backface culling: if policy==3 and !front_facing, discard
     if (mesh_uniforms.backface_policy == 3u && !front_facing) {
         discard;
+    }
+
+    // Slice plane culling - discard fragments on negative side of enabled planes
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let plane = slice_planes.planes[i];
+        if (plane.enabled > 0.5) {
+            let dist = dot(in.world_position - plane.origin, plane.normal);
+            if (dist < 0.0) {
+                discard;
+            }
+        }
     }
 
     // Determine base color based on backface policy
