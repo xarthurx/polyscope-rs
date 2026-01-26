@@ -251,6 +251,119 @@ impl VolumeMesh {
         (positions, faces)
     }
 
+    /// Generates render geometry including any enabled quantity data.
+    pub fn generate_render_geometry_with_quantities(&self) -> VolumeMeshRenderGeometry {
+        let face_counts = self.compute_face_counts();
+        let mut positions = Vec::new();
+        let mut faces = Vec::new();
+        let mut vertex_indices = Vec::new(); // Track original vertex indices
+        let mut cell_indices = Vec::new();   // Track which cell each face belongs to
+
+        // First pass: generate geometry and track indices
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
+            if cell[4] == u32::MAX {
+                // Tetrahedron
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    if face_counts[&key] == 1 {
+                        let base_idx = positions.len() as u32;
+                        positions.push(self.vertices[cell[a] as usize]);
+                        positions.push(self.vertices[cell[b] as usize]);
+                        positions.push(self.vertices[cell[c] as usize]);
+                        vertex_indices.push(cell[a] as usize);
+                        vertex_indices.push(cell[b] as usize);
+                        vertex_indices.push(cell[c] as usize);
+                        cell_indices.push(cell_idx);
+                        cell_indices.push(cell_idx);
+                        cell_indices.push(cell_idx);
+                        faces.push([base_idx, base_idx + 1, base_idx + 2]);
+                    }
+                }
+            } else {
+                // Hexahedron
+                for quad in HEX_FACE_STENCIL {
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]];
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    if face_counts[&key] == 1 {
+                        for [a, b, c] in quad {
+                            let base_idx = positions.len() as u32;
+                            positions.push(self.vertices[cell[a] as usize]);
+                            positions.push(self.vertices[cell[b] as usize]);
+                            positions.push(self.vertices[cell[c] as usize]);
+                            vertex_indices.push(cell[a] as usize);
+                            vertex_indices.push(cell[b] as usize);
+                            vertex_indices.push(cell[c] as usize);
+                            cell_indices.push(cell_idx);
+                            cell_indices.push(cell_idx);
+                            cell_indices.push(cell_idx);
+                            faces.push([base_idx, base_idx + 1, base_idx + 2]);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Compute normals
+        let mut normals = vec![Vec3::ZERO; positions.len()];
+        for [a, b, c] in &faces {
+            let p0 = positions[*a as usize];
+            let p1 = positions[*b as usize];
+            let p2 = positions[*c as usize];
+            let normal = (p1 - p0).cross(p2 - p0).normalize_or_zero();
+            normals[*a as usize] = normal;
+            normals[*b as usize] = normal;
+            normals[*c as usize] = normal;
+        }
+
+        // Find enabled scalar quantity
+        let mut vertex_values = None;
+        let mut vertex_colors = None;
+
+        for q in &self.quantities {
+            if q.is_enabled() {
+                if let Some(scalar) = q.as_any().downcast_ref::<VolumeMeshVertexScalarQuantity>() {
+                    let values: Vec<f32> = vertex_indices.iter()
+                        .map(|&idx| scalar.values().get(idx).copied().unwrap_or(0.0))
+                        .collect();
+                    vertex_values = Some(values);
+                    break;
+                }
+                if let Some(color) = q.as_any().downcast_ref::<VolumeMeshVertexColorQuantity>() {
+                    let colors: Vec<Vec3> = vertex_indices.iter()
+                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec3::ONE))
+                        .collect();
+                    vertex_colors = Some(colors);
+                    break;
+                }
+                if let Some(scalar) = q.as_any().downcast_ref::<VolumeMeshCellScalarQuantity>() {
+                    let values: Vec<f32> = cell_indices.iter()
+                        .map(|&idx| scalar.values().get(idx).copied().unwrap_or(0.0))
+                        .collect();
+                    vertex_values = Some(values);
+                    break;
+                }
+                if let Some(color) = q.as_any().downcast_ref::<VolumeMeshCellColorQuantity>() {
+                    let colors: Vec<Vec3> = cell_indices.iter()
+                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec3::ONE))
+                        .collect();
+                    vertex_colors = Some(colors);
+                    break;
+                }
+            }
+        }
+
+        VolumeMeshRenderGeometry {
+            positions,
+            faces,
+            normals,
+            vertex_values,
+            vertex_colors,
+        }
+    }
+
     /// Initializes GPU render data.
     pub fn init_render_data(
         &mut self,
@@ -589,6 +702,17 @@ const HEX_FACE_STENCIL: [[[usize; 3]; 2]; 6] = [
     [[7, 4, 5], [7, 5, 6]], // Top
 ];
 
+/// Render geometry data with optional quantity values.
+pub struct VolumeMeshRenderGeometry {
+    pub positions: Vec<Vec3>,
+    pub faces: Vec<[u32; 3]>,
+    pub normals: Vec<Vec3>,
+    /// Per-vertex scalar values for color mapping (from enabled vertex scalar quantity).
+    pub vertex_values: Option<Vec<f32>>,
+    /// Per-vertex colors (from enabled vertex color quantity).
+    pub vertex_colors: Option<Vec<Vec3>>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -682,5 +806,31 @@ mod tests {
         assert_eq!(mesh.num_vertices(), 8);
         assert_eq!(mesh.num_cells(), 1);
         assert_eq!(mesh.cell_type(0), VolumeCellType::Hex);
+    }
+
+    #[test]
+    fn test_quantity_aware_geometry_generation() {
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let tets = vec![[0, 1, 2, 3]];
+        let mut mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
+
+        // Add vertex scalar quantity
+        mesh.add_vertex_scalar_quantity("temp", vec![0.0, 0.5, 1.0, 0.25]);
+
+        // Get the quantity and enable it
+        if let Some(q) = mesh.get_quantity_mut("temp") {
+            q.set_enabled(true);
+        }
+
+        // Generate geometry should include scalar values for color mapping
+        let render_data = mesh.generate_render_geometry_with_quantities();
+        assert!(render_data.vertex_values.is_some());
+        assert_eq!(render_data.vertex_values.as_ref().unwrap().len(),
+                   render_data.positions.len());
     }
 }
