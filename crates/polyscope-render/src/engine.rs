@@ -149,6 +149,8 @@ pub struct RenderEngine {
     oit_reveal_texture: Option<wgpu::Texture>,
     /// OIT reveal texture view.
     oit_reveal_view: Option<wgpu::TextureView>,
+    /// OIT composite pass.
+    oit_composite_pass: Option<crate::oit_pass::OitCompositePass>,
     /// Tone mapping post-processing pass.
     tone_map_pass: Option<ToneMapPass>,
     /// Shadow map pass for ground plane shadows.
@@ -467,6 +469,7 @@ impl RenderEngine {
             oit_accum_view: None,
             oit_reveal_texture: None,
             oit_reveal_view: None,
+            oit_composite_pass: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -761,6 +764,7 @@ impl RenderEngine {
             oit_accum_view: None,
             oit_reveal_texture: None,
             oit_reveal_view: None,
+            oit_composite_pass: None,
             tone_map_pass: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
@@ -2724,6 +2728,21 @@ impl RenderEngine {
     /// Returns the OIT reveal texture view, if initialized.
     pub fn oit_reveal_view(&self) -> Option<&wgpu::TextureView> {
         self.oit_reveal_view.as_ref()
+    }
+
+    /// Ensures OIT composite pass is initialized.
+    pub fn ensure_oit_pass(&mut self) {
+        if self.oit_composite_pass.is_none() {
+            self.oit_composite_pass = Some(crate::oit_pass::OitCompositePass::new(
+                &self.device,
+                self.surface_config.format,
+            ));
+        }
+    }
+
+    /// Returns the OIT composite pass, if initialized.
+    pub fn oit_composite_pass(&self) -> Option<&crate::oit_pass::OitCompositePass> {
+        self.oit_composite_pass.as_ref()
     }
 
     /// Creates the HDR intermediate texture for tone mapping.
