@@ -97,6 +97,9 @@ pub struct VolumeMesh {
     slice_render_data: Option<SliceMeshRenderData>,
     /// Cached slice plane parameters for invalidation (origin, normal)
     slice_plane_cache: Option<(Vec3, Vec3)>,
+    /// Cached cell culling plane parameters (origin, normal).
+    /// When Some, indicates render_data shows culled geometry.
+    culling_plane_cache: Option<(Vec3, Vec3)>,
 }
 
 impl VolumeMesh {
@@ -125,6 +128,7 @@ impl VolumeMesh {
             render_data: None,
             slice_render_data: None,
             slice_plane_cache: None,
+            culling_plane_cache: None,
         }
     }
 
@@ -290,6 +294,71 @@ impl VolumeMesh {
         face_counts
     }
 
+    /// Computes the centroid of a cell.
+    fn cell_centroid(&self, cell: &[u32; 8]) -> Vec3 {
+        if cell[4] == u32::MAX {
+            // Tetrahedron: average of 4 vertices
+            let sum = self.vertices[cell[0] as usize]
+                + self.vertices[cell[1] as usize]
+                + self.vertices[cell[2] as usize]
+                + self.vertices[cell[3] as usize];
+            sum / 4.0
+        } else {
+            // Hexahedron: average of 8 vertices
+            let sum = (0..8)
+                .map(|i| self.vertices[cell[i] as usize])
+                .fold(Vec3::ZERO, |a, b| a + b);
+            sum / 8.0
+        }
+    }
+
+    /// Tests if a cell should be visible based on slice plane.
+    /// Returns true if the cell's centroid is on the "kept" side of the plane.
+    fn is_cell_visible(&self, cell: &[u32; 8], plane_origin: Vec3, plane_normal: Vec3) -> bool {
+        let centroid = self.cell_centroid(cell);
+        let signed_dist = (centroid - plane_origin).dot(plane_normal);
+        // Keep cells on the positive side of the plane (same side as normal points)
+        signed_dist >= 0.0
+    }
+
+    /// Computes face counts for interior/exterior detection, only for visible cells.
+    fn compute_face_counts_with_culling(
+        &self,
+        plane_origin: Option<Vec3>,
+        plane_normal: Option<Vec3>,
+    ) -> HashMap<[u32; 4], usize> {
+        let mut face_counts: HashMap<[u32; 4], usize> = HashMap::new();
+
+        for cell in &self.cells {
+            // Skip cells culled by slice plane
+            if let (Some(origin), Some(normal)) = (plane_origin, plane_normal) {
+                if !self.is_cell_visible(cell, origin, normal) {
+                    continue;
+                }
+            }
+
+            if cell[4] == u32::MAX {
+                // Tetrahedron
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    *face_counts.entry(key).or_insert(0) += 1;
+                }
+            } else {
+                // Hexahedron
+                for quad in HEX_FACE_STENCIL {
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]];
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    *face_counts.entry(key).or_insert(0) += 1;
+                }
+            }
+        }
+
+        face_counts
+    }
+
     /// Generates triangulated exterior faces for rendering.
     fn generate_render_geometry(&self) -> (Vec<Vec3>, Vec<[u32; 3]>) {
         let face_counts = self.compute_face_counts();
@@ -320,6 +389,61 @@ impl VolumeMesh {
                     let key = canonical_face_key(v0, v1, v2, Some(v3));
                     if face_counts[&key] == 1 {
                         // Exterior face - emit both triangles
+                        for [a, b, c] in quad {
+                            let base_idx = positions.len() as u32;
+                            positions.push(self.vertices[cell[a] as usize]);
+                            positions.push(self.vertices[cell[b] as usize]);
+                            positions.push(self.vertices[cell[c] as usize]);
+                            faces.push([base_idx, base_idx + 1, base_idx + 2]);
+                        }
+                    }
+                }
+            }
+        }
+
+        (positions, faces)
+    }
+
+    /// Generates triangulated exterior faces with cell culling based on slice plane.
+    /// Only cells whose centroid is on the positive side of the plane are rendered.
+    fn generate_render_geometry_with_culling(
+        &self,
+        plane_origin: Vec3,
+        plane_normal: Vec3,
+    ) -> (Vec<Vec3>, Vec<[u32; 3]>) {
+        // Compute face counts only for visible cells
+        let face_counts = self.compute_face_counts_with_culling(Some(plane_origin), Some(plane_normal));
+        let mut positions = Vec::new();
+        let mut faces = Vec::new();
+
+        for cell in &self.cells {
+            // Skip cells culled by slice plane
+            if !self.is_cell_visible(cell, plane_origin, plane_normal) {
+                continue;
+            }
+
+            if cell[4] == u32::MAX {
+                // Tetrahedron
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    // Render face if it's exterior among visible cells
+                    if face_counts.get(&key) == Some(&1) {
+                        let base_idx = positions.len() as u32;
+                        positions.push(self.vertices[cell[a] as usize]);
+                        positions.push(self.vertices[cell[b] as usize]);
+                        positions.push(self.vertices[cell[c] as usize]);
+                        faces.push([base_idx, base_idx + 1, base_idx + 2]);
+                    }
+                }
+            } else {
+                // Hexahedron
+                for quad in HEX_FACE_STENCIL {
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]];
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    if face_counts.get(&key) == Some(&1) {
                         for [a, b, c] in quad {
                             let base_idx = positions.len() as u32;
                             positions.push(self.vertices[cell[a] as usize]);
@@ -490,6 +614,81 @@ impl VolumeMesh {
         self.render_data = Some(render_data);
     }
 
+    /// Reinitializes render data with cell culling based on slice plane.
+    /// Cells whose centroid is on the negative side of the plane are hidden.
+    /// Uses caching to avoid regenerating geometry every frame.
+    pub fn update_render_data_with_culling(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        plane_origin: Vec3,
+        plane_normal: Vec3,
+    ) {
+        // Check if cache is still valid (plane hasn't moved)
+        let cache_valid = self.culling_plane_cache.map_or(false, |(o, n)| {
+            (o - plane_origin).length_squared() < 1e-10
+                && (n - plane_normal).length_squared() < 1e-10
+        });
+
+        if cache_valid && self.render_data.is_some() {
+            // Cached geometry is still valid
+            return;
+        }
+
+        let (positions, triangles) =
+            self.generate_render_geometry_with_culling(plane_origin, plane_normal);
+
+        if triangles.is_empty() {
+            self.render_data = None;
+            self.culling_plane_cache = Some((plane_origin, plane_normal));
+            return;
+        }
+
+        // Compute per-vertex normals
+        let mut normals = vec![Vec3::ZERO; positions.len()];
+        for [a, b, c] in &triangles {
+            let p0 = positions[*a as usize];
+            let p1 = positions[*b as usize];
+            let p2 = positions[*c as usize];
+            let normal = (p1 - p0).cross(p2 - p0).normalize_or_zero();
+            normals[*a as usize] = normal;
+            normals[*b as usize] = normal;
+            normals[*c as usize] = normal;
+        }
+
+        let edge_is_real: Vec<Vec3> = vec![Vec3::ONE; triangles.len() * 3];
+
+        let render_data = SurfaceMeshRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            &positions,
+            &triangles,
+            &normals,
+            &edge_is_real,
+        );
+
+        self.render_data = Some(render_data);
+        self.culling_plane_cache = Some((plane_origin, plane_normal));
+    }
+
+    /// Resets render data to show all cells (no culling).
+    pub fn reset_render_data(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+    ) {
+        self.culling_plane_cache = None;
+        self.init_render_data(device, bind_group_layout, camera_buffer);
+    }
+
+    /// Returns true if the mesh is currently showing culled geometry.
+    pub fn is_culled(&self) -> bool {
+        self.culling_plane_cache.is_some()
+    }
+
     /// Returns the render data if available.
     pub fn render_data(&self) -> Option<&SurfaceMeshRenderData> {
         self.render_data.as_ref()
@@ -498,7 +697,11 @@ impl VolumeMesh {
     /// Updates GPU buffers.
     pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
         if let Some(ref rd) = self.render_data {
+            // Convert transform to array format for GPU
+            let model_matrix = self.transform.to_cols_array_2d();
+
             let uniforms = MeshUniforms {
+                model_matrix,
                 shade_style: 0, // smooth
                 show_edges: if self.edge_width > 0.0 { 1 } else { 0 },
                 edge_width: self.edge_width,
@@ -506,6 +709,7 @@ impl VolumeMesh {
                 surface_color: [self.color.x, self.color.y, self.color.z, 1.0],
                 edge_color: [self.edge_color.x, self.edge_color.y, self.edge_color.z, 1.0],
                 backface_policy: 0,
+                slice_planes_enabled: 0,
                 ..Default::default()
             };
             rd.update_uniforms(queue, &uniforms);
@@ -931,6 +1135,7 @@ impl Structure for VolumeMesh {
         self.render_data = None;
         self.slice_render_data = None;
         self.slice_plane_cache = None;
+        self.culling_plane_cache = None;
         for quantity in &mut self.quantities {
             quantity.refresh();
         }

@@ -1212,10 +1212,21 @@ impl GroupHandle {
 ///
 /// Slice planes allow visualizing the interior of 3D geometry by
 /// discarding fragments on one side of the plane.
+///
+/// The plane is created at the scene center with a size proportional to the
+/// scene's length scale, ensuring it's visible regardless of the scene scale.
 pub fn add_slice_plane(name: impl Into<String>) -> SlicePlaneHandle {
     let name = name.into();
     with_context_mut(|ctx| {
-        ctx.add_slice_plane(&name);
+        let length_scale = ctx.length_scale;
+        // Get scene center before creating the plane (to avoid borrow issues)
+        let center = (ctx.bounding_box.0 + ctx.bounding_box.1) * 0.5;
+        let plane = ctx.add_slice_plane(&name);
+        // Set plane_size to be visible relative to the scene
+        // Using length_scale * 0.5 gives a reasonably sized plane
+        plane.set_plane_size(length_scale * 0.5);
+        // Position the plane at the scene center
+        plane.set_origin(center);
     });
     SlicePlaneHandle { name }
 }
@@ -1794,7 +1805,26 @@ pub fn handle_slice_plane_action(
         polyscope_ui::SlicePlanesAction::None => {}
         polyscope_ui::SlicePlanesAction::Add(name) => {
             add_slice_plane(&name);
-            current_settings.push(polyscope_ui::SlicePlaneSettings::with_name(&name));
+            // Get the actual settings from the created plane (it has scene-relative values)
+            let settings = with_context(|ctx| {
+                if let Some(plane) = ctx.get_slice_plane(&name) {
+                    polyscope_ui::SlicePlaneSettings {
+                        name: plane.name().to_string(),
+                        enabled: plane.is_enabled(),
+                        origin: plane.origin().to_array(),
+                        normal: plane.normal().to_array(),
+                        draw_plane: plane.draw_plane(),
+                        draw_widget: plane.draw_widget(),
+                        color: plane.color().to_array(),
+                        transparency: plane.transparency(),
+                        plane_size: plane.plane_size(),
+                        is_selected: false,
+                    }
+                } else {
+                    polyscope_ui::SlicePlaneSettings::with_name(&name)
+                }
+            });
+            current_settings.push(settings);
         }
         polyscope_ui::SlicePlanesAction::Remove(idx) => {
             if idx < current_settings.len() {

@@ -31,9 +31,9 @@ struct MeshUniforms {
     surface_color: vec4<f32>,
     edge_color: vec4<f32>,
     backface_policy: u32,  // 0 = identical, 1 = different, 2 = custom, 3 = cull
+    slice_planes_enabled: u32, // 0 = off, 1 = on
     _pad1_0: f32,
     _pad1_1: f32,
-    _pad1_2: f32,
     _pad2_0: f32,
     _pad2_1: f32,
     _pad2_2: f32,
@@ -104,12 +104,14 @@ fn fs_main(
     }
 
     // Slice plane culling - discard fragments on negative side of enabled planes
-    for (var i = 0u; i < 4u; i = i + 1u) {
-        let plane = slice_planes.planes[i];
-        if (plane.enabled > 0.5) {
-            let dist = dot(in.world_position - plane.origin, plane.normal);
-            if (dist < 0.0) {
-                discard;
+    if (mesh_uniforms.slice_planes_enabled != 0u) {
+        for (var i = 0u; i < 4u; i = i + 1u) {
+            let plane = slice_planes.planes[i];
+            if (plane.enabled > 0.5) {
+                let dist = dot(in.world_position - plane.origin, plane.normal);
+                if (dist < 0.0) {
+                    discard;
+                }
             }
         }
     }

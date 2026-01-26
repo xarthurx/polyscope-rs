@@ -192,6 +192,15 @@ impl App {
                     } else {
                         continue;
                     }
+                } else if structure.type_name() == "VolumeMesh" {
+                    if let Some(vol) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                        // Sample vertices for easier picking
+                        let verts = vol.vertices();
+                        let step = (verts.len() / 100).max(1);
+                        verts.iter().step_by(step).copied().collect()
+                    } else {
+                        continue;
+                    }
                 } else {
                     // For other structure types, use bounding box center
                     if let Some((min, max)) = structure.bounding_box() {
@@ -409,27 +418,33 @@ impl App {
 
                 if structure.type_name() == "VolumeMesh" {
                     if let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>() {
-                        if vm.render_data().is_none() {
+                        // Find first enabled slice plane
+                        let enabled_plane = slice_planes.iter().find(|p| p.is_enabled());
+
+                        if let Some(plane) = enabled_plane {
+                            // Use cell culling: regenerate geometry with only visible cells
+                            // (cells whose centroid is on the positive side of the plane)
+                            vm.update_render_data_with_culling(
+                                &engine.device,
+                                engine.mesh_bind_group_layout(),
+                                engine.camera_buffer(),
+                                plane.origin(),
+                                plane.normal(),
+                            );
+                        } else if vm.is_culled() {
+                            // Was culled but no slice plane is active now - reset to show all cells
+                            vm.reset_render_data(
+                                &engine.device,
+                                engine.mesh_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        } else if vm.render_data().is_none() {
+                            // No slice plane active, initialize normally
                             vm.init_render_data(
                                 &engine.device,
                                 engine.mesh_bind_group_layout(),
                                 engine.camera_buffer(),
                             );
-                        }
-
-                        // Update slice render data for enabled slice planes
-                        for plane in &slice_planes {
-                            if plane.is_enabled() {
-                                vm.update_slice_render_data(
-                                    &engine.device,
-                                    &engine.queue,
-                                    engine.mesh_bind_group_layout(),
-                                    engine.camera_buffer(),
-                                    plane.origin(),
-                                    plane.normal(),
-                                );
-                                break; // Only handle first enabled plane for now
-                            }
                         }
                     }
                 }
@@ -829,6 +844,14 @@ impl App {
                                     } else if type_name == "SurfaceMesh" {
                                         if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
                                             mesh.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                                        }
+                                    } else if type_name == "CurveNetwork" {
+                                        if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                                            cn.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                                        }
+                                    } else if type_name == "VolumeMesh" {
+                                        if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                                            vm.update_gpu_buffers(&engine.queue);
                                         }
                                     }
                                 }
@@ -1361,7 +1384,7 @@ impl App {
                     }
                     if structure.type_name() == "VolumeMesh" {
                         if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
-                            // Render exterior faces
+                            // Render exterior faces (includes cell culling when slice plane is active)
                             if let Some(render_data) = vm.render_data() {
                                 render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                 render_pass.set_index_buffer(
@@ -1370,14 +1393,8 @@ impl App {
                                 );
                                 render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
                             }
-
-                            // Render slice cap geometry
-                            if let Some(slice_data) = vm.slice_render_data() {
-                                if !slice_data.is_empty() {
-                                    render_pass.set_bind_group(0, slice_data.bind_group(), &[]);
-                                    render_pass.draw(0..slice_data.num_indices(), 0..1);
-                                }
-                            }
+                            // Note: No slice cap geometry needed - we use cell culling
+                            // which shows whole cells instead of cross-section caps
                         }
                     }
                 }

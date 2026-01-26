@@ -166,19 +166,20 @@ fn order_polygon_vertices(
         return;
     };
 
-    // Sort by angle around centroid
+    // Sort by angle around centroid using signed angle
     let mut indices: Vec<usize> = (0..vertices.len()).collect();
 
     indices.sort_by(|&a, &b| {
         let va = (vertices[a] - centroid).normalize();
         let vb = (vertices[b] - centroid).normalize();
 
-        // Compute signed angle using dot and cross products
-        let cross_a = normal.cross(ref_dir);
-        let cross_b = normal.cross(ref_dir);
+        // Compute signed angle relative to ref_dir around normal axis
+        // angle = atan2(cross.dot(normal), dot(ref_dir, v))
+        let cross_a = ref_dir.cross(va);
+        let cross_b = ref_dir.cross(vb);
 
-        let angle_a = ref_dir.dot(va).clamp(-1.0, 1.0).acos() * cross_a.dot(va).signum();
-        let angle_b = ref_dir.dot(vb).clamp(-1.0, 1.0).acos() * cross_b.dot(vb).signum();
+        let angle_a = cross_a.dot(normal).atan2(ref_dir.dot(va));
+        let angle_b = cross_b.dot(normal).atan2(ref_dir.dot(vb));
 
         angle_a.partial_cmp(&angle_b).unwrap_or(std::cmp::Ordering::Equal)
     });
