@@ -1,7 +1,9 @@
 //! Surface mesh structure.
 
+mod intrinsic_vector_quantity;
 mod parameterization_quantity;
 mod quantities;
+pub use intrinsic_vector_quantity::*;
 pub use parameterization_quantity::*;
 pub use quantities::*;
 
@@ -577,6 +579,16 @@ impl SurfaceMesh {
                     .downcast_mut::<MeshCornerParameterizationQuantity>()
                 {
                     pq.build_egui_ui(ui);
+                } else if let Some(iq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshVertexIntrinsicVectorQuantity>()
+                {
+                    iq.build_egui_ui(ui);
+                } else if let Some(iq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshFaceIntrinsicVectorQuantity>()
+                {
+                    iq.build_egui_ui(ui);
                 }
             }
         }
@@ -770,6 +782,145 @@ impl SurfaceMesh {
             MeshCornerParameterizationQuantity::new(name, self.name.clone(), coords);
         self.add_quantity(Box::new(quantity));
         self
+    }
+
+    /// Adds a vertex intrinsic vector quantity with explicit tangent basis.
+    pub fn add_vertex_intrinsic_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec2>,
+        basis_x: Vec<Vec3>,
+        basis_y: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = MeshVertexIntrinsicVectorQuantity::new(
+            name,
+            self.name.clone(),
+            vectors,
+            basis_x,
+            basis_y,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex intrinsic vector quantity with auto-computed tangent basis.
+    pub fn add_vertex_intrinsic_vector_quantity_auto(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec2>,
+    ) -> &mut Self {
+        let (bx, by) = self.compute_vertex_tangent_basis();
+        self.add_vertex_intrinsic_vector_quantity(name, vectors, bx, by)
+    }
+
+    /// Adds a face intrinsic vector quantity with explicit tangent basis.
+    pub fn add_face_intrinsic_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec2>,
+        basis_x: Vec<Vec3>,
+        basis_y: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = MeshFaceIntrinsicVectorQuantity::new(
+            name,
+            self.name.clone(),
+            vectors,
+            basis_x,
+            basis_y,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a face intrinsic vector quantity with auto-computed tangent basis.
+    pub fn add_face_intrinsic_vector_quantity_auto(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec2>,
+    ) -> &mut Self {
+        let (bx, by) = self.compute_face_tangent_basis();
+        self.add_face_intrinsic_vector_quantity(name, vectors, bx, by)
+    }
+
+    /// Compute default per-face tangent basis from first edge direction.
+    #[must_use]
+    pub fn compute_face_tangent_basis(&self) -> (Vec<Vec3>, Vec<Vec3>) {
+        let mut basis_x = Vec::with_capacity(self.faces.len());
+        let mut basis_y = Vec::with_capacity(self.faces.len());
+
+        for (face_idx, face) in self.faces.iter().enumerate() {
+            if face.len() >= 3 {
+                let v0 = self.vertices[face[0] as usize];
+                let v1 = self.vertices[face[1] as usize];
+                let normal = self.face_normals[face_idx];
+
+                let bx = (v1 - v0).normalize_or_zero();
+                let by = normal.cross(bx).normalize_or_zero();
+                basis_x.push(bx);
+                basis_y.push(by);
+            } else {
+                basis_x.push(Vec3::X);
+                basis_y.push(Vec3::Y);
+            }
+        }
+
+        (basis_x, basis_y)
+    }
+
+    /// Compute default per-vertex tangent basis from area-weighted face bases.
+    #[must_use]
+    pub fn compute_vertex_tangent_basis(&self) -> (Vec<Vec3>, Vec<Vec3>) {
+        let (face_bx, _face_by) = self.compute_face_tangent_basis();
+
+        let mut vert_bx = vec![Vec3::ZERO; self.vertices.len()];
+
+        for (face_idx, face) in self.faces.iter().enumerate() {
+            if face.len() < 3 {
+                continue;
+            }
+
+            // Compute face area
+            let v0 = self.vertices[face[0] as usize];
+            let mut area = 0.0f32;
+            for i in 1..(face.len() - 1) {
+                let v1 = self.vertices[face[i] as usize];
+                let v2 = self.vertices[face[i + 1] as usize];
+                area += (v1 - v0).cross(v2 - v0).length() * 0.5;
+            }
+
+            let weighted_bx = face_bx[face_idx] * area;
+            for &vi in face {
+                vert_bx[vi as usize] += weighted_bx;
+            }
+        }
+
+        // Orthonormalize against vertex normals
+        let mut basis_x = Vec::with_capacity(self.vertices.len());
+        let mut basis_y = Vec::with_capacity(self.vertices.len());
+
+        for (i, normal) in self.vertex_normals.iter().enumerate() {
+            let mut bx = vert_bx[i];
+            // Project out normal component and normalize
+            bx -= *normal * normal.dot(bx);
+            bx = bx.normalize_or_zero();
+
+            // If degenerate, pick an arbitrary tangent
+            if bx.length_squared() < 1e-6 {
+                bx = if normal.x.abs() < 0.9 {
+                    Vec3::X
+                } else {
+                    Vec3::Y
+                };
+                bx -= *normal * normal.dot(bx);
+                bx = bx.normalize_or_zero();
+            }
+
+            let by = normal.cross(bx).normalize_or_zero();
+            basis_x.push(bx);
+            basis_y.push(by);
+        }
+
+        (basis_x, basis_y)
     }
 
     // === GPU resource methods ===

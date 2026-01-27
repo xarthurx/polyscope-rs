@@ -229,3 +229,83 @@ pub fn build_parameterization_quantity_ui(
 
     changed
 }
+
+/// Builds UI for an intrinsic vector quantity.
+pub fn build_intrinsic_vector_quantity_ui(
+    ui: &mut Ui,
+    name: &str,
+    enabled: &mut bool,
+    length_scale: &mut f32,
+    radius: &mut f32,
+    color: &mut [f32; 3],
+    n_sym: &mut u32,
+) -> bool {
+    let mut changed = false;
+
+    ui.horizontal(|ui| {
+        if ui.checkbox(enabled, name).changed() {
+            changed = true;
+        }
+    });
+
+    if *enabled {
+        ui.indent(name, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Length:");
+                if ui
+                    .add(
+                        egui::DragValue::new(length_scale)
+                            .speed(0.01)
+                            .range(0.01..=5.0),
+                    )
+                    .changed()
+                {
+                    changed = true;
+                }
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Radius:");
+                if ui
+                    .add(egui::DragValue::new(radius).speed(0.001).range(0.001..=0.1))
+                    .changed()
+                {
+                    changed = true;
+                }
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Color:");
+                if ui.color_edit_button_rgb(color).changed() {
+                    changed = true;
+                }
+            });
+
+            // Symmetry control
+            ui.horizontal(|ui| {
+                ui.label("Symmetry:");
+                let sym_label = match *n_sym {
+                    1 => "Vector (1)",
+                    2 => "Line (2)",
+                    4 => "Cross (4)",
+                    _ => "Custom",
+                };
+                egui::ComboBox::from_id_salt(format!("{name}_sym"))
+                    .selected_text(sym_label)
+                    .show_ui(ui, |ui| {
+                        if ui.selectable_value(n_sym, 1, "Vector (1)").changed() {
+                            changed = true;
+                        }
+                        if ui.selectable_value(n_sym, 2, "Line (2)").changed() {
+                            changed = true;
+                        }
+                        if ui.selectable_value(n_sym, 4, "Cross (4)").changed() {
+                            changed = true;
+                        }
+                    });
+            });
+        });
+    }
+
+    changed
+}
