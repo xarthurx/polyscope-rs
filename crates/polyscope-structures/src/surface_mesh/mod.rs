@@ -1,9 +1,11 @@
 //! Surface mesh structure.
 
+mod parameterization_quantity;
 mod quantities;
+pub use parameterization_quantity::*;
 pub use quantities::*;
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
@@ -565,6 +567,16 @@ impl SurfaceMesh {
                     .downcast_mut::<MeshFaceVectorQuantity>()
                 {
                     vq.build_egui_ui(ui);
+                } else if let Some(pq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshVertexParameterizationQuantity>()
+                {
+                    pq.build_egui_ui(ui);
+                } else if let Some(pq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshCornerParameterizationQuantity>()
+                {
+                    pq.build_egui_ui(ui);
                 }
             }
         }
@@ -643,6 +655,44 @@ impl SurfaceMesh {
         None
     }
 
+    /// Returns the currently active vertex parameterization quantity, if any.
+    #[must_use]
+    pub fn active_vertex_parameterization_quantity(
+        &self,
+    ) -> Option<&MeshVertexParameterizationQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Parameterization {
+                if let Some(pq) =
+                    q.as_any().downcast_ref::<MeshVertexParameterizationQuantity>()
+                {
+                    return Some(pq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active corner parameterization quantity, if any.
+    #[must_use]
+    pub fn active_corner_parameterization_quantity(
+        &self,
+    ) -> Option<&MeshCornerParameterizationQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Parameterization {
+                if let Some(pq) =
+                    q.as_any().downcast_ref::<MeshCornerParameterizationQuantity>()
+                {
+                    return Some(pq);
+                }
+            }
+        }
+        None
+    }
+
     /// Adds a face scalar quantity to this mesh.
     pub fn add_face_scalar_quantity(
         &mut self,
@@ -694,6 +744,30 @@ impl SurfaceMesh {
         vectors: Vec<Vec3>,
     ) -> &mut Self {
         let quantity = MeshFaceVectorQuantity::new(name, self.name.clone(), vectors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex parameterization (UV) quantity to this mesh.
+    pub fn add_vertex_parameterization_quantity(
+        &mut self,
+        name: impl Into<String>,
+        coords: Vec<Vec2>,
+    ) -> &mut Self {
+        let quantity =
+            MeshVertexParameterizationQuantity::new(name, self.name.clone(), coords);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a corner parameterization (UV) quantity to this mesh.
+    pub fn add_corner_parameterization_quantity(
+        &mut self,
+        name: impl Into<String>,
+        coords: Vec<Vec2>,
+    ) -> &mut Self {
+        let quantity =
+            MeshCornerParameterizationQuantity::new(name, self.name.clone(), coords);
         self.add_quantity(Box::new(quantity));
         self
     }
@@ -792,8 +866,33 @@ impl SurfaceMesh {
         render_data.update_shadow_model(queue, model_matrix);
 
         // Apply quantity colors with priority:
-        // vertex color > face color > vertex scalar > face scalar > surface color
-        if let Some(cq) = self.active_vertex_color_quantity() {
+        // vertex param > corner param > vertex color > face color > vertex scalar > face scalar > surface color
+        if let Some(pq) = self.active_vertex_parameterization_quantity() {
+            let colors = pq.compute_colors();
+            render_data.update_colors(queue, &colors, &self.triangulation);
+        } else if let Some(pq) = self.active_corner_parameterization_quantity() {
+            // Corner parameterization: compute per-corner colors, expand to per-vertex
+            // (for now, treat as per-face by averaging corners)
+            let corner_colors = pq.compute_colors();
+            let mut vertex_colors = vec![Vec3::splat(0.5); self.vertices.len()];
+            let mut counts = vec![0u32; self.vertices.len()];
+            let mut corner_idx = 0;
+            for face in &self.faces {
+                for &vi in face {
+                    if corner_idx < corner_colors.len() {
+                        vertex_colors[vi as usize] += corner_colors[corner_idx];
+                        counts[vi as usize] += 1;
+                        corner_idx += 1;
+                    }
+                }
+            }
+            for (i, count) in counts.iter().enumerate() {
+                if *count > 0 {
+                    vertex_colors[i] /= *count as f32;
+                }
+            }
+            render_data.update_colors(queue, &vertex_colors, &self.triangulation);
+        } else if let Some(cq) = self.active_vertex_color_quantity() {
             // Direct vertex color quantity
             render_data.update_colors(queue, cq.colors(), &self.triangulation);
         } else if let Some(cq) = self.active_face_color_quantity() {

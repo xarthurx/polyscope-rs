@@ -81,7 +81,7 @@ pub use polyscope_core::{
     group::Group,
     options::Options,
     pick::{PickResult, Pickable},
-    quantity::{Quantity, QuantityKind},
+    quantity::{ParamCoordsType, ParamVizStyle, Quantity, QuantityKind},
     registry::Registry,
     slice_plane::{SlicePlane, SlicePlaneUniforms, MAX_SLICE_PLANES},
     state::{with_context, with_context_mut, Context},
