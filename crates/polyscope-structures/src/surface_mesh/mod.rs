@@ -439,7 +439,7 @@ impl SurfaceMesh {
         self.edge_is_real.clear();
         self.edge_is_real.reserve(self.triangulation.len() * 3);
 
-        for range in self.face_to_tri_range.iter() {
+        for range in &self.face_to_tri_range {
             let num_tris = range.end - range.start;
 
             for (j, _tri_idx) in range.clone().enumerate() {
