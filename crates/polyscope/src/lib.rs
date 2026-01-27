@@ -2032,12 +2032,8 @@ pub fn handle_group_action(
                 current_settings.remove(idx);
             }
         }
-        polyscope_ui::GroupsAction::ToggleEnabled(idx) => {
-            if idx < current_settings.len() {
-                apply_group_settings(&current_settings[idx]);
-            }
-        }
-        polyscope_ui::GroupsAction::ToggleDetails(idx) => {
+        polyscope_ui::GroupsAction::ToggleEnabled(idx)
+        | polyscope_ui::GroupsAction::ToggleDetails(idx) => {
             if idx < current_settings.len() {
                 apply_group_settings(&current_settings[idx]);
             }

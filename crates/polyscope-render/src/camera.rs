@@ -95,7 +95,8 @@ impl AxisDirection {
 
     /// Converts from a u32 index (used in UI) to `AxisDirection`.
     /// Order: 0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z
-    #[must_use] 
+    #[must_use]
+    #[allow(clippy::match_same_arms)] // 2 and _ both map to PosY (default) intentionally
     pub fn from_index(index: u32) -> Self {
         match index {
             0 => AxisDirection::PosX,

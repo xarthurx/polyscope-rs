@@ -885,10 +885,8 @@ impl App {
                 polyscope_ui::ViewAction::Screenshot => {
                     screenshot_requested = true;
                 }
-                polyscope_ui::ViewAction::ResetView => {
-                    // TODO: Reset camera view
-                }
-                polyscope_ui::ViewAction::None => {}
+                // TODO: ResetView should reset camera view
+                polyscope_ui::ViewAction::ResetView | polyscope_ui::ViewAction::None => {}
             }
 
             // Camera settings panel
@@ -1363,8 +1361,8 @@ impl App {
         let gp_shadow_mode = match self.ground_plane.mode {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::ShadowOnly => 1u32,
-            GroundPlaneMode::Tile => 2u32,
-            GroundPlaneMode::TileReflection => 2u32, // TileReflection also uses tile mode with shadows
+            // TileReflection also uses tile mode with shadows
+            GroundPlaneMode::Tile | GroundPlaneMode::TileReflection => 2u32,
         };
 
         // Compute pass for curve network tubes
@@ -2192,8 +2190,7 @@ impl App {
         let screenshot_gp_shadow_mode = match self.ground_plane.mode {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::ShadowOnly => 1u32,
-            GroundPlaneMode::Tile => 2u32,
-            GroundPlaneMode::TileReflection => 2u32,
+            GroundPlaneMode::Tile | GroundPlaneMode::TileReflection => 2u32,
         };
         let screenshot_reflection_intensity = if self.ground_plane.mode == GroundPlaneMode::TileReflection {
             self.ground_plane.reflection_intensity
@@ -2520,9 +2517,8 @@ impl ApplicationHandler for App {
 
                                     let element_type = match type_name.as_str() {
                                         "PointCloud" => polyscope_render::PickElementType::Point,
-                                        "SurfaceMesh" => polyscope_render::PickElementType::Face,
+                                        "SurfaceMesh" | "VolumeMesh" => polyscope_render::PickElementType::Face,
                                         "CurveNetwork" => polyscope_render::PickElementType::Edge,
-                                        "VolumeMesh" => polyscope_render::PickElementType::Face,
                                         _ => polyscope_render::PickElementType::None,
                                     };
 
