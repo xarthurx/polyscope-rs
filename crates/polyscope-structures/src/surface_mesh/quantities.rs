@@ -579,3 +579,129 @@ impl Quantity for MeshVertexVectorQuantity {
 }
 
 impl VertexQuantity for MeshVertexVectorQuantity {}
+
+/// A face vector quantity on a surface mesh.
+pub struct MeshFaceVectorQuantity {
+    name: String,
+    structure_name: String,
+    vectors: Vec<Vec3>,
+    enabled: bool,
+    length_scale: f32,
+    radius: f32,
+    color: Vec3,
+}
+
+impl MeshFaceVectorQuantity {
+    /// Creates a new face vector quantity.
+    pub fn new(
+        name: impl Into<String>,
+        structure_name: impl Into<String>,
+        vectors: Vec<Vec3>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            structure_name: structure_name.into(),
+            vectors,
+            enabled: false,
+            length_scale: 1.0,
+            radius: 0.005,
+            color: Vec3::new(0.2, 0.2, 0.8),
+        }
+    }
+
+    /// Returns the vectors.
+    #[must_use]
+    pub fn vectors(&self) -> &[Vec3] {
+        &self.vectors
+    }
+
+    /// Gets the length scale.
+    #[must_use]
+    pub fn length_scale(&self) -> f32 {
+        self.length_scale
+    }
+
+    /// Sets the length scale.
+    pub fn set_length_scale(&mut self, scale: f32) {
+        self.length_scale = scale;
+    }
+
+    /// Gets the radius.
+    #[must_use]
+    pub fn radius(&self) -> f32 {
+        self.radius
+    }
+
+    /// Sets the radius.
+    pub fn set_radius(&mut self, r: f32) {
+        self.radius = r;
+    }
+
+    /// Gets the color.
+    #[must_use]
+    pub fn color(&self) -> Vec3 {
+        self.color
+    }
+
+    /// Sets the color.
+    pub fn set_color(&mut self, c: Vec3) {
+        self.color = c;
+    }
+
+    /// Builds the egui UI for this quantity.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        let mut color = [self.color.x, self.color.y, self.color.z];
+        let changed = polyscope_ui::build_vector_quantity_ui(
+            ui,
+            &self.name,
+            &mut self.enabled,
+            &mut self.length_scale,
+            &mut self.radius,
+            &mut color,
+        );
+        if changed {
+            self.color = Vec3::new(color[0], color[1], color[2]);
+        }
+        changed
+    }
+}
+
+impl Quantity for MeshFaceVectorQuantity {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Vector
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
+
+    fn refresh(&mut self) {}
+
+    fn data_size(&self) -> usize {
+        self.vectors.len()
+    }
+}
+
+impl FaceQuantity for MeshFaceVectorQuantity {}

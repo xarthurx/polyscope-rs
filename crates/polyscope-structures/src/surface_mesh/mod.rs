@@ -560,6 +560,11 @@ impl SurfaceMesh {
                     .downcast_mut::<MeshVertexVectorQuantity>()
                 {
                     vq.build_egui_ui(ui);
+                } else if let Some(vq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshFaceVectorQuantity>()
+                {
+                    vq.build_egui_ui(ui);
                 }
             }
         }
@@ -678,6 +683,17 @@ impl SurfaceMesh {
         vectors: Vec<Vec3>,
     ) -> &mut Self {
         let quantity = MeshVertexVectorQuantity::new(name, self.name.clone(), vectors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a face vector quantity to this mesh.
+    pub fn add_face_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = MeshFaceVectorQuantity::new(name, self.name.clone(), vectors);
         self.add_quantity(Box::new(quantity));
         self
     }
@@ -1281,6 +1297,49 @@ mod tests {
         let q = mesh.get_quantity("normals").expect("quantity not found");
         assert_eq!(q.data_size(), 3);
         assert_eq!(q.kind(), QuantityKind::Vector);
+    }
+
+    /// Test face vector quantity.
+    #[test]
+    fn test_face_vector_quantity() {
+        use polyscope_core::quantity::QuantityKind;
+
+        let vertices = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        ];
+        let faces = vec![vec![0, 1, 2]];
+        let mut mesh = SurfaceMesh::new("test", vertices, faces);
+
+        mesh.add_face_vector_quantity("face_normals", vec![Vec3::Z]);
+
+        let q = mesh
+            .get_quantity("face_normals")
+            .expect("quantity not found");
+        assert_eq!(q.data_size(), 1);
+        assert_eq!(q.kind(), QuantityKind::Vector);
+    }
+
+    /// Test face vector quantity properties.
+    #[test]
+    fn test_face_vector_quantity_properties() {
+        let mut vq = MeshFaceVectorQuantity::new("test_vectors", "mesh", vec![Vec3::X, Vec3::Y]);
+
+        // Test default values
+        assert_eq!(vq.length_scale(), 1.0);
+        assert_eq!(vq.radius(), 0.005);
+        assert_eq!(vq.color(), Vec3::new(0.2, 0.2, 0.8));
+
+        // Test setters
+        vq.set_length_scale(2.0);
+        assert_eq!(vq.length_scale(), 2.0);
+
+        vq.set_radius(0.01);
+        assert_eq!(vq.radius(), 0.01);
+
+        vq.set_color(Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(vq.color(), Vec3::new(1.0, 0.0, 0.0));
     }
 
     /// Test vector quantity properties.

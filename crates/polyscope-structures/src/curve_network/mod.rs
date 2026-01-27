@@ -259,6 +259,28 @@ impl CurveNetwork {
         self
     }
 
+    /// Adds a node vector quantity to this curve network.
+    pub fn add_node_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = CurveNodeVectorQuantity::new(name, self.name.clone(), vectors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds an edge vector quantity to this curve network.
+    pub fn add_edge_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = CurveEdgeVectorQuantity::new(name, self.name.clone(), vectors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
     /// Returns the currently active node scalar quantity, if any.
     #[must_use]
     pub fn active_node_scalar_quantity(&self) -> Option<&CurveNodeScalarQuantity> {
@@ -367,6 +389,16 @@ impl CurveNetwork {
                     .downcast_mut::<CurveEdgeColorQuantity>()
                 {
                     cq.build_egui_ui(ui);
+                } else if let Some(vq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<CurveNodeVectorQuantity>()
+                {
+                    vq.build_egui_ui(ui);
+                } else if let Some(vq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<CurveEdgeVectorQuantity>()
+                {
+                    vq.build_egui_ui(ui);
                 }
             }
         }
@@ -715,5 +747,25 @@ mod tests {
         assert_eq!(cn.material(), "default");
         cn.set_material("clay");
         assert_eq!(cn.material(), "clay");
+    }
+
+    #[test]
+    fn test_curve_network_vector_quantities() {
+        use polyscope_core::quantity::QuantityKind;
+
+        let nodes = vec![Vec3::ZERO, Vec3::X, Vec3::Y];
+        let edges = vec![[0, 1], [1, 2]];
+        let mut cn = CurveNetwork::new("test", nodes, edges);
+
+        cn.add_node_vector_quantity("node_vecs", vec![Vec3::X, Vec3::Y, Vec3::Z]);
+        cn.add_edge_vector_quantity("edge_vecs", vec![Vec3::X, Vec3::Y]);
+
+        let nq = cn.get_quantity("node_vecs").expect("node vector not found");
+        assert_eq!(nq.data_size(), 3);
+        assert_eq!(nq.kind(), QuantityKind::Vector);
+
+        let eq = cn.get_quantity("edge_vecs").expect("edge vector not found");
+        assert_eq!(eq.data_size(), 2);
+        assert_eq!(eq.kind(), QuantityKind::Vector);
     }
 }
