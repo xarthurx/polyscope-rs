@@ -267,8 +267,8 @@ pub fn build_intrinsic_vector_quantity_ui(
                 if ui
                     .add(
                         egui::DragValue::new(length_scale)
-                            .speed(0.01)
-                            .range(0.01..=5.0),
+                            .speed(0.001)
+                            .range(0.0001..=10.0),
                     )
                     .changed()
                 {
@@ -279,7 +279,11 @@ pub fn build_intrinsic_vector_quantity_ui(
             ui.horizontal(|ui| {
                 ui.label("Radius:");
                 if ui
-                    .add(egui::DragValue::new(radius).speed(0.001).range(0.001..=0.1))
+                    .add(
+                        egui::DragValue::new(radius)
+                            .speed(0.00001)
+                            .range(0.00001..=0.1),
+                    )
                     .changed()
                 {
                     changed = true;

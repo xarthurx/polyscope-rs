@@ -44,12 +44,16 @@ struct VertexOutput {
     @location(2) world_position: vec3<f32>,
 }
 
-// Arrow geometry: cylinder shaft + cone arrowhead
-// Shaft: 8 segments × 6 verts = 48 verts (indices 0..47)
-// Cone:  8 segments × 3 verts = 24 verts (indices 48..71)
-// Total: 72 vertices per arrow instance
+// Arrow geometry: cylinder shaft + cone sides + cone cap + shaft cap
+// Shaft sides: 8 segments × 6 verts = 48 verts (indices 0..47)
+// Cone sides:  8 segments × 3 verts = 24 verts (indices 48..71)
+// Cone cap:    8 segments × 3 verts = 24 verts (indices 72..95)
+// Shaft cap:   8 segments × 3 verts = 24 verts (indices 96..119)
+// Total: 120 vertices per arrow instance
 const SEGMENTS: u32 = 8u;
 const SHAFT_VERTS: u32 = 48u; // SEGMENTS * 6
+const CONE_SIDE_VERTS: u32 = 24u; // SEGMENTS * 3
+const CONE_CAP_VERTS: u32 = 24u; // SEGMENTS * 3
 
 // Arrow proportions
 const CONE_HEIGHT_FRAC: f32 = 0.3;     // Cone takes 30% of total arrow length
@@ -123,8 +127,8 @@ fn vs_main(
             local_pos = vec3<f32>(cos(angle0) * shaft_radius, sin(angle0) * shaft_radius, shaft_height);
             local_normal = vec3<f32>(cos(angle0), sin(angle0), 0.0);
         }
-    } else {
-        // === Cone arrowhead ===
+    } else if (vertex_index < SHAFT_VERTS + CONE_SIDE_VERTS) {
+        // === Cone arrowhead sides ===
         let cone_index = vertex_index - SHAFT_VERTS;
         let segment = cone_index / 3u;
         let tri_vert = cone_index % 3u;
@@ -154,6 +158,46 @@ fn vs_main(
             // Average normal for tip (use midpoint angle)
             let mid_angle = (angle0 + angle1) * 0.5;
             local_normal = vec3<f32>(cos(mid_angle) * n_radial, sin(mid_angle) * n_radial, n_axial);
+        }
+    } else if (vertex_index < SHAFT_VERTS + CONE_SIDE_VERTS + CONE_CAP_VERTS) {
+        // === Cone bottom cap (disc) ===
+        let cap_index = vertex_index - SHAFT_VERTS - CONE_SIDE_VERTS;
+        let segment = cap_index / 3u;
+        let tri_vert = cap_index % 3u;
+
+        let angle0 = f32(segment) / f32(SEGMENTS) * 6.283185;
+        let angle1 = f32(segment + 1u) / f32(SEGMENTS) * 6.283185;
+
+        // Normal points back toward shaft base (negative Z in local space)
+        local_normal = vec3<f32>(0.0, 0.0, -1.0);
+
+        // Fan triangle: center, edge at angle1, edge at angle0 (CW winding for outward -Z normal)
+        if (tri_vert == 0u) {
+            local_pos = vec3<f32>(0.0, 0.0, shaft_height);
+        } else if (tri_vert == 1u) {
+            local_pos = vec3<f32>(cos(angle1) * cone_base_radius, sin(angle1) * cone_base_radius, shaft_height);
+        } else {
+            local_pos = vec3<f32>(cos(angle0) * cone_base_radius, sin(angle0) * cone_base_radius, shaft_height);
+        }
+    } else {
+        // === Shaft bottom cap (disc) ===
+        let cap_index = vertex_index - SHAFT_VERTS - CONE_SIDE_VERTS - CONE_CAP_VERTS;
+        let segment = cap_index / 3u;
+        let tri_vert = cap_index % 3u;
+
+        let angle0 = f32(segment) / f32(SEGMENTS) * 6.283185;
+        let angle1 = f32(segment + 1u) / f32(SEGMENTS) * 6.283185;
+
+        // Normal points away from arrow tip (negative Z in local space)
+        local_normal = vec3<f32>(0.0, 0.0, -1.0);
+
+        // Fan triangle: center, edge at angle1, edge at angle0 (CW winding for outward -Z normal)
+        if (tri_vert == 0u) {
+            local_pos = vec3<f32>(0.0, 0.0, 0.0);
+        } else if (tri_vert == 1u) {
+            local_pos = vec3<f32>(cos(angle1) * shaft_radius, sin(angle1) * shaft_radius, 0.0);
+        } else {
+            local_pos = vec3<f32>(cos(angle0) * shaft_radius, sin(angle0) * shaft_radius, 0.0);
         }
     }
 

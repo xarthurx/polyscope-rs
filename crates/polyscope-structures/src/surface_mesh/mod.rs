@@ -785,6 +785,110 @@ impl SurfaceMesh {
         None
     }
 
+    /// Returns the currently active vertex intrinsic vector quantity (immutable), if any.
+    #[must_use]
+    pub fn active_vertex_intrinsic_vector_quantity(
+        &self,
+    ) -> Option<&MeshVertexIntrinsicVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(iq) = q
+                    .as_any()
+                    .downcast_ref::<MeshVertexIntrinsicVectorQuantity>()
+                {
+                    return Some(iq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active vertex intrinsic vector quantity (mutable), if any.
+    pub fn active_vertex_intrinsic_vector_quantity_mut(
+        &mut self,
+    ) -> Option<&mut MeshVertexIntrinsicVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &mut self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(iq) = q
+                    .as_any_mut()
+                    .downcast_mut::<MeshVertexIntrinsicVectorQuantity>()
+                {
+                    return Some(iq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active face intrinsic vector quantity (immutable), if any.
+    #[must_use]
+    pub fn active_face_intrinsic_vector_quantity(
+        &self,
+    ) -> Option<&MeshFaceIntrinsicVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(iq) = q.as_any().downcast_ref::<MeshFaceIntrinsicVectorQuantity>() {
+                    return Some(iq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active face intrinsic vector quantity (mutable), if any.
+    pub fn active_face_intrinsic_vector_quantity_mut(
+        &mut self,
+    ) -> Option<&mut MeshFaceIntrinsicVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &mut self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(iq) = q
+                    .as_any_mut()
+                    .downcast_mut::<MeshFaceIntrinsicVectorQuantity>()
+                {
+                    return Some(iq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active one-form quantity (immutable), if any.
+    #[must_use]
+    pub fn active_one_form_quantity(&self) -> Option<&MeshOneFormQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(oq) = q.as_any().downcast_ref::<MeshOneFormQuantity>() {
+                    return Some(oq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active one-form quantity (mutable), if any.
+    pub fn active_one_form_quantity_mut(&mut self) -> Option<&mut MeshOneFormQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &mut self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(oq) = q.as_any_mut().downcast_mut::<MeshOneFormQuantity>() {
+                    return Some(oq);
+                }
+            }
+        }
+        None
+    }
+
     /// Adds a face scalar quantity to this mesh.
     pub fn add_face_scalar_quantity(
         &mut self,
@@ -869,6 +973,8 @@ impl SurfaceMesh {
     }
 
     /// Adds a vertex intrinsic vector quantity with explicit tangent basis.
+    ///
+    /// Arrow length and radius are auto-scaled based on mesh extent and vector magnitudes.
     pub fn add_vertex_intrinsic_vector_quantity(
         &mut self,
         name: impl Into<String>,
@@ -876,13 +982,14 @@ impl SurfaceMesh {
         basis_x: Vec<Vec3>,
         basis_y: Vec<Vec3>,
     ) -> &mut Self {
-        let quantity = MeshVertexIntrinsicVectorQuantity::new(
+        let mut quantity = MeshVertexIntrinsicVectorQuantity::new(
             name,
             self.name.clone(),
             vectors,
             basis_x,
             basis_y,
         );
+        quantity.auto_scale(self.length_scale());
         self.add_quantity(Box::new(quantity));
         self
     }
@@ -898,6 +1005,8 @@ impl SurfaceMesh {
     }
 
     /// Adds a face intrinsic vector quantity with explicit tangent basis.
+    ///
+    /// Arrow length and radius are auto-scaled based on mesh extent and vector magnitudes.
     pub fn add_face_intrinsic_vector_quantity(
         &mut self,
         name: impl Into<String>,
@@ -905,13 +1014,14 @@ impl SurfaceMesh {
         basis_x: Vec<Vec3>,
         basis_y: Vec<Vec3>,
     ) -> &mut Self {
-        let quantity = MeshFaceIntrinsicVectorQuantity::new(
+        let mut quantity = MeshFaceIntrinsicVectorQuantity::new(
             name,
             self.name.clone(),
             vectors,
             basis_x,
             basis_y,
         );
+        quantity.auto_scale(self.length_scale());
         self.add_quantity(Box::new(quantity));
         self
     }
@@ -931,13 +1041,15 @@ impl SurfaceMesh {
     /// A one-form assigns a scalar value to each edge, rendered as arrows
     /// at edge midpoints. The `orientations` array specifies the sign convention
     /// for each edge (true = canonical low→high vertex direction).
+    /// Arrow length and radius are auto-scaled based on mesh extent and edge flow magnitudes.
     pub fn add_one_form_quantity(
         &mut self,
         name: impl Into<String>,
         values: Vec<f32>,
         orientations: Vec<bool>,
     ) -> &mut Self {
-        let quantity = MeshOneFormQuantity::new(name, self.name.clone(), values, orientations);
+        let mut quantity = MeshOneFormQuantity::new(name, self.name.clone(), values, orientations);
+        quantity.auto_scale(self.length_scale(), &self.vertices, &self.edges);
         self.add_quantity(Box::new(quantity));
         self
     }

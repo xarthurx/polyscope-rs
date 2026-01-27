@@ -6,6 +6,7 @@
 
 use glam::Vec3;
 use polyscope_core::quantity::{EdgeQuantity, Quantity, QuantityKind};
+use polyscope_render::{VectorRenderData, VectorUniforms};
 
 /// A one-form quantity on a surface mesh.
 ///
@@ -21,6 +22,7 @@ pub struct MeshOneFormQuantity {
     length_scale: f32,
     radius: f32,
     color: Vec3,
+    render_data: Option<VectorRenderData>,
 }
 
 impl MeshOneFormQuantity {
@@ -40,6 +42,7 @@ impl MeshOneFormQuantity {
             length_scale: 1.0,
             radius: 0.005,
             color: Vec3::new(0.2, 0.7, 0.2),
+            render_data: None,
         }
     }
 
@@ -130,6 +133,68 @@ impl MeshOneFormQuantity {
         }
 
         (positions, vectors)
+    }
+
+    /// Auto-scales length and radius based on the structure's bounding box diagonal.
+    pub fn auto_scale(
+        &mut self,
+        structure_length_scale: f32,
+        vertices: &[Vec3],
+        edges: &[(u32, u32)],
+    ) {
+        let (_positions, vecs) = self.compute_edge_vectors(vertices, edges);
+        let avg_length: f32 = if vecs.is_empty() {
+            1.0
+        } else {
+            let sum: f32 = vecs.iter().map(|v| v.length()).sum();
+            sum / vecs.len() as f32
+        };
+        if avg_length > 1e-8 {
+            self.length_scale = 0.02 * structure_length_scale / avg_length;
+        }
+        self.radius = 0.002 * structure_length_scale;
+    }
+
+    /// Initializes GPU resources for this vector quantity.
+    ///
+    /// Computes edge midpoint positions and direction vectors from the mesh,
+    /// then creates GPU buffers for arrow rendering.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        vertices: &[Vec3],
+        edges: &[(u32, u32)],
+    ) {
+        let (positions, vectors) = self.compute_edge_vectors(vertices, edges);
+        self.render_data = Some(VectorRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            &positions,
+            &vectors,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    #[must_use]
+    pub fn render_data(&self) -> Option<&VectorRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU uniforms with the given model transform.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, model: &glam::Mat4) {
+        if let Some(render_data) = &self.render_data {
+            let uniforms = VectorUniforms {
+                model: model.to_cols_array(),
+                length_scale: self.length_scale,
+                radius: self.radius,
+                _padding: [0.0; 2],
+                color: [self.color.x, self.color.y, self.color.z, 1.0],
+            };
+            render_data.update_uniforms(queue, &uniforms);
+        }
     }
 
     /// Builds the egui UI for this quantity.

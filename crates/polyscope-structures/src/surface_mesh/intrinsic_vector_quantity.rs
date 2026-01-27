@@ -2,6 +2,7 @@
 
 use glam::{Vec2, Vec3};
 use polyscope_core::quantity::{FaceQuantity, Quantity, QuantityKind, VertexQuantity};
+use polyscope_render::{VectorRenderData, VectorUniforms};
 
 /// A vertex intrinsic vector quantity on a surface mesh.
 ///
@@ -18,6 +19,7 @@ pub struct MeshVertexIntrinsicVectorQuantity {
     length_scale: f32,
     radius: f32,
     color: Vec3,
+    render_data: Option<VectorRenderData>,
 }
 
 impl MeshVertexIntrinsicVectorQuantity {
@@ -40,6 +42,7 @@ impl MeshVertexIntrinsicVectorQuantity {
             length_scale: 1.0,
             radius: 0.005,
             color: Vec3::new(0.8, 0.2, 0.8),
+            render_data: None,
         }
     }
 
@@ -141,6 +144,67 @@ impl MeshVertexIntrinsicVectorQuantity {
         result
     }
 
+    /// Auto-scales length and radius based on the structure's bounding box diagonal.
+    pub fn auto_scale(&mut self, structure_length_scale: f32) {
+        let world_vecs = self.compute_world_vectors();
+        let avg_length: f32 = if world_vecs.is_empty() {
+            1.0
+        } else {
+            let sum: f32 = world_vecs.iter().map(|v| v.length()).sum();
+            sum / world_vecs.len() as f32
+        };
+        if avg_length > 1e-8 {
+            self.length_scale = 0.02 * structure_length_scale / avg_length;
+        }
+        self.radius = 0.002 * structure_length_scale;
+    }
+
+    /// Initializes GPU resources for this vector quantity.
+    ///
+    /// Projects 2D tangent-space vectors to 3D world space (with symmetry)
+    /// and creates GPU buffers for rendering as arrows.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        base_positions: &[Vec3],
+    ) {
+        let sym_vectors = self.compute_symmetric_world_vectors();
+        let bases: Vec<Vec3> = sym_vectors
+            .iter()
+            .map(|(idx, _)| base_positions[*idx])
+            .collect();
+        let vecs: Vec<Vec3> = sym_vectors.iter().map(|(_, v)| *v).collect();
+        self.render_data = Some(VectorRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            &bases,
+            &vecs,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    #[must_use]
+    pub fn render_data(&self) -> Option<&VectorRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU uniforms with the given model transform.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, model: &glam::Mat4) {
+        if let Some(render_data) = &self.render_data {
+            let uniforms = VectorUniforms {
+                model: model.to_cols_array(),
+                length_scale: self.length_scale,
+                radius: self.radius,
+                _padding: [0.0; 2],
+                color: [self.color.x, self.color.y, self.color.z, 1.0],
+            };
+            render_data.update_uniforms(queue, &uniforms);
+        }
+    }
+
     /// Builds the egui UI for this quantity.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
         let mut color = [self.color.x, self.color.y, self.color.z];
@@ -205,6 +269,7 @@ pub struct MeshFaceIntrinsicVectorQuantity {
     length_scale: f32,
     radius: f32,
     color: Vec3,
+    render_data: Option<VectorRenderData>,
 }
 
 impl MeshFaceIntrinsicVectorQuantity {
@@ -227,6 +292,7 @@ impl MeshFaceIntrinsicVectorQuantity {
             length_scale: 1.0,
             radius: 0.005,
             color: Vec3::new(0.2, 0.8, 0.8),
+            render_data: None,
         }
     }
 
@@ -322,6 +388,64 @@ impl MeshFaceIntrinsicVectorQuantity {
             }
         }
         result
+    }
+
+    /// Auto-scales length and radius based on the structure's bounding box diagonal.
+    pub fn auto_scale(&mut self, structure_length_scale: f32) {
+        let world_vecs = self.compute_world_vectors();
+        let avg_length: f32 = if world_vecs.is_empty() {
+            1.0
+        } else {
+            let sum: f32 = world_vecs.iter().map(|v| v.length()).sum();
+            sum / world_vecs.len() as f32
+        };
+        if avg_length > 1e-8 {
+            self.length_scale = 0.02 * structure_length_scale / avg_length;
+        }
+        self.radius = 0.002 * structure_length_scale;
+    }
+
+    /// Initializes GPU resources for this vector quantity.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        base_positions: &[Vec3],
+    ) {
+        let sym_vectors = self.compute_symmetric_world_vectors();
+        let bases: Vec<Vec3> = sym_vectors
+            .iter()
+            .map(|(idx, _)| base_positions[*idx])
+            .collect();
+        let vecs: Vec<Vec3> = sym_vectors.iter().map(|(_, v)| *v).collect();
+        self.render_data = Some(VectorRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            &bases,
+            &vecs,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    #[must_use]
+    pub fn render_data(&self) -> Option<&VectorRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU uniforms with the given model transform.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, model: &glam::Mat4) {
+        if let Some(render_data) = &self.render_data {
+            let uniforms = VectorUniforms {
+                model: model.to_cols_array(),
+                length_scale: self.length_scale,
+                radius: self.radius,
+                _padding: [0.0; 2],
+                color: [self.color.x, self.color.y, self.color.z, 1.0],
+            };
+            render_data.update_uniforms(queue, &uniforms);
+        }
     }
 
     /// Builds the egui UI for this quantity.
