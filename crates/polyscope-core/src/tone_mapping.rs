@@ -25,23 +25,27 @@ impl Default for ToneMappingConfig {
 
 impl ToneMappingConfig {
     /// Creates a new tone mapping configuration with default values.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Sets the exposure value.
+    #[must_use] 
     pub fn with_exposure(mut self, exposure: f32) -> Self {
         self.exposure = exposure;
         self
     }
 
     /// Sets the white level.
+    #[must_use] 
     pub fn with_white_level(mut self, white_level: f32) -> Self {
         self.white_level = white_level;
         self
     }
 
     /// Sets the gamma value.
+    #[must_use] 
     pub fn with_gamma(mut self, gamma: f32) -> Self {
         self.gamma = gamma;
         self

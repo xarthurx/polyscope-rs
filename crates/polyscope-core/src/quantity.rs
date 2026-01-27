@@ -49,7 +49,7 @@ pub trait Quantity: Any + Send + Sync {
     /// Sets the enabled state of this quantity.
     fn set_enabled(&mut self, enabled: bool);
 
-    /// Builds the ImGui UI controls for this quantity.
+    /// Builds the `ImGui` UI controls for this quantity.
     fn build_ui(&mut self, ui: &dyn std::any::Any);
 
     /// Refreshes GPU resources after data changes.

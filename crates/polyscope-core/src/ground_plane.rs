@@ -21,7 +21,7 @@ pub enum GroundPlaneMode {
 pub struct GroundPlaneConfig {
     /// Rendering mode.
     pub mode: GroundPlaneMode,
-    /// Height of the ground plane (Y coordinate), used when height_is_relative is false.
+    /// Height of the ground plane (Y coordinate), used when `height_is_relative` is false.
     pub height: f32,
     /// Whether height is relative to scene bounds (auto-placed below scene).
     pub height_is_relative: bool,

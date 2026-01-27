@@ -16,6 +16,7 @@ pub struct Registry {
 
 impl Registry {
     /// Creates a new empty registry.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -38,11 +39,12 @@ impl Registry {
     }
 
     /// Gets a reference to a structure by type and name.
+    #[must_use] 
     pub fn get(&self, type_name: &str, name: &str) -> Option<&dyn Structure> {
         self.structures
             .get(type_name)
             .and_then(|m| m.get(name))
-            .map(|s| s.as_ref())
+            .map(std::convert::AsRef::as_ref)
     }
 
     /// Gets a mutable reference to a structure by type and name.
@@ -51,10 +53,11 @@ impl Registry {
     }
 
     /// Checks if a structure with the given type and name exists.
+    #[must_use] 
     pub fn contains(&self, type_name: &str, name: &str) -> bool {
         self.structures
             .get(type_name)
-            .map_or(false, |m| m.contains_key(name))
+            .is_some_and(|m| m.contains_key(name))
     }
 
     /// Removes a structure by type and name.
@@ -79,7 +82,7 @@ impl Registry {
         self.structures
             .values()
             .flat_map(|m| m.values())
-            .map(|s| s.as_ref())
+            .map(std::convert::AsRef::as_ref)
     }
 
     /// Returns a mutable iterator over all structures.
@@ -88,13 +91,15 @@ impl Registry {
     }
 
     /// Returns the total number of registered structures.
+    #[must_use] 
     pub fn len(&self) -> usize {
-        self.structures.values().map(|m| m.len()).sum()
+        self.structures.values().map(std::collections::HashMap::len).sum()
     }
 
     /// Returns true if the registry is empty.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
-        self.structures.values().all(|m| m.is_empty())
+        self.structures.values().all(std::collections::HashMap::is_empty)
     }
 
     /// Returns all structures of a given type.
@@ -103,7 +108,7 @@ impl Registry {
             .get(type_name)
             .into_iter()
             .flat_map(|m| m.values())
-            .map(|s| s.as_ref())
+            .map(std::convert::AsRef::as_ref)
     }
 }
 

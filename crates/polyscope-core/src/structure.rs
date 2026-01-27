@@ -26,7 +26,7 @@ pub trait Structure: Any + Send + Sync {
     /// Returns the unique name of this structure.
     fn name(&self) -> &str;
 
-    /// Returns the type name of this structure (e.g., "PointCloud", "SurfaceMesh").
+    /// Returns the type name of this structure (e.g., "`PointCloud`", "`SurfaceMesh`").
     fn type_name(&self) -> &'static str;
 
     /// Returns the axis-aligned bounding box in world coordinates.
@@ -59,10 +59,10 @@ pub trait Structure: Any + Send + Sync {
     /// Called during the pick render pass.
     fn draw_pick(&self, ctx: &mut dyn RenderContext);
 
-    /// Builds the ImGui UI for this structure.
+    /// Builds the `ImGui` UI for this structure.
     fn build_ui(&mut self, ui: &dyn std::any::Any);
 
-    /// Builds the ImGui UI for a picked element.
+    /// Builds the `ImGui` UI for a picked element.
     fn build_pick_ui(&self, ui: &dyn std::any::Any, pick: &PickResult);
 
     /// Refreshes GPU resources after data changes.

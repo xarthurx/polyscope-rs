@@ -65,11 +65,13 @@ impl SlicePlane {
     }
 
     /// Returns the name of this slice plane.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Returns the origin point of the plane.
+    #[must_use] 
     pub fn origin(&self) -> Vec3 {
         self.origin
     }
@@ -80,6 +82,7 @@ impl SlicePlane {
     }
 
     /// Returns the normal direction of the plane.
+    #[must_use] 
     pub fn normal(&self) -> Vec3 {
         self.normal
     }
@@ -96,6 +99,7 @@ impl SlicePlane {
     }
 
     /// Returns whether the slice plane is enabled.
+    #[must_use] 
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
@@ -106,6 +110,7 @@ impl SlicePlane {
     }
 
     /// Returns whether to draw the plane visualization.
+    #[must_use] 
     pub fn draw_plane(&self) -> bool {
         self.draw_plane
     }
@@ -116,6 +121,7 @@ impl SlicePlane {
     }
 
     /// Returns whether to draw the widget.
+    #[must_use] 
     pub fn draw_widget(&self) -> bool {
         self.draw_widget
     }
@@ -126,6 +132,7 @@ impl SlicePlane {
     }
 
     /// Returns the color of the plane visualization.
+    #[must_use] 
     pub fn color(&self) -> Vec3 {
         self.color
     }
@@ -136,6 +143,7 @@ impl SlicePlane {
     }
 
     /// Returns the transparency of the plane visualization.
+    #[must_use] 
     pub fn transparency(&self) -> f32 {
         self.transparency
     }
@@ -146,6 +154,7 @@ impl SlicePlane {
     }
 
     /// Returns the size of the plane visualization (half-extent in each direction).
+    #[must_use] 
     pub fn plane_size(&self) -> f32 {
         self.plane_size
     }
@@ -158,16 +167,19 @@ impl SlicePlane {
     /// Returns the signed distance from a point to the plane.
     ///
     /// Positive values are on the normal side (kept), negative on the opposite (discarded).
+    #[must_use] 
     pub fn signed_distance(&self, point: Vec3) -> f32 {
         (point - self.origin).dot(self.normal)
     }
 
     /// Returns whether a point is on the kept side of the plane.
+    #[must_use] 
     pub fn is_kept(&self, point: Vec3) -> bool {
         !self.enabled || self.signed_distance(point) >= 0.0
     }
 
     /// Projects a point onto the plane.
+    #[must_use] 
     pub fn project(&self, point: Vec3) -> Vec3 {
         point - self.signed_distance(point) * self.normal
     }
@@ -180,6 +192,7 @@ impl SlicePlane {
     ///
     /// The plane normal becomes the local X axis, with Y and Z axes
     /// forming an orthonormal basis in the plane.
+    #[must_use] 
     pub fn to_transform(&self) -> Mat4 {
         let x_axis = self.normal.normalize();
 

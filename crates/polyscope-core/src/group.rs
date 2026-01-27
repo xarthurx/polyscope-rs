@@ -17,7 +17,7 @@ pub struct Group {
     enabled: bool,
     /// Whether to show child details in the UI.
     show_child_details: bool,
-    /// Names of child structures (type_name:name format).
+    /// Names of child structures (`type_name:name` format).
     child_structures: HashSet<String>,
     /// Names of child groups.
     child_groups: HashSet<String>,
@@ -39,11 +39,13 @@ impl Group {
     }
 
     /// Returns the name of this group.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Returns whether this group is enabled.
+    #[must_use] 
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
@@ -54,6 +56,7 @@ impl Group {
     }
 
     /// Returns whether child details should be shown in UI.
+    #[must_use] 
     pub fn show_child_details(&self) -> bool {
         self.show_child_details
     }
@@ -64,6 +67,7 @@ impl Group {
     }
 
     /// Returns the parent group name, if any.
+    #[must_use] 
     pub fn parent_group(&self) -> Option<&str> {
         self.parent_group.as_deref()
     }
@@ -75,22 +79,23 @@ impl Group {
 
     /// Adds a structure to this group.
     ///
-    /// The structure is identified by "type_name:name" format.
+    /// The structure is identified by "`type_name:name`" format.
     pub fn add_structure(&mut self, type_name: &str, name: &str) {
         self.child_structures
-            .insert(format!("{}:{}", type_name, name));
+            .insert(format!("{type_name}:{name}"));
     }
 
     /// Removes a structure from this group.
     pub fn remove_structure(&mut self, type_name: &str, name: &str) {
         self.child_structures
-            .remove(&format!("{}:{}", type_name, name));
+            .remove(&format!("{type_name}:{name}"));
     }
 
     /// Returns whether this group contains a structure.
+    #[must_use] 
     pub fn contains_structure(&self, type_name: &str, name: &str) -> bool {
         self.child_structures
-            .contains(&format!("{}:{}", type_name, name))
+            .contains(&format!("{type_name}:{name}"))
     }
 
     /// Adds a child group.
@@ -104,6 +109,7 @@ impl Group {
     }
 
     /// Returns whether this group contains a child group.
+    #[must_use] 
     pub fn contains_child_group(&self, group_name: &str) -> bool {
         self.child_groups.contains(group_name)
     }
@@ -122,20 +128,23 @@ impl Group {
 
     /// Returns the child group names.
     pub fn child_groups(&self) -> impl Iterator<Item = &str> {
-        self.child_groups.iter().map(|s| s.as_str())
+        self.child_groups.iter().map(std::string::String::as_str)
     }
 
     /// Returns the number of child structures.
+    #[must_use] 
     pub fn num_child_structures(&self) -> usize {
         self.child_structures.len()
     }
 
     /// Returns the number of child groups.
+    #[must_use] 
     pub fn num_child_groups(&self) -> usize {
         self.child_groups.len()
     }
 
     /// Returns true if this group has no children.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.child_structures.is_empty() && self.child_groups.is_empty()
     }

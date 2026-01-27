@@ -61,41 +61,48 @@ impl Default for GizmoConfig {
 
 impl GizmoConfig {
     /// Creates a new gizmo configuration with default settings.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Sets the gizmo mode.
+    #[must_use] 
     pub fn with_mode(mut self, mode: GizmoMode) -> Self {
         self.mode = mode;
         self
     }
 
     /// Sets the coordinate space.
+    #[must_use] 
     pub fn with_space(mut self, space: GizmoSpace) -> Self {
         self.space = space;
         self
     }
 
     /// Sets the gizmo size.
+    #[must_use] 
     pub fn with_size(mut self, size: f32) -> Self {
         self.size = size;
         self
     }
 
     /// Sets the translation snap value.
+    #[must_use] 
     pub fn with_snap_translate(mut self, snap: f32) -> Self {
         self.snap_translate = snap;
         self
     }
 
     /// Sets the rotation snap value in degrees.
+    #[must_use] 
     pub fn with_snap_rotate(mut self, snap: f32) -> Self {
         self.snap_rotate = snap;
         self
     }
 
     /// Sets the scale snap value.
+    #[must_use] 
     pub fn with_snap_scale(mut self, snap: f32) -> Self {
         self.snap_scale = snap;
         self
@@ -127,11 +134,13 @@ impl Default for Transform {
 
 impl Transform {
     /// Creates a new identity transform.
+    #[must_use] 
     pub fn identity() -> Self {
         Self::default()
     }
 
     /// Creates a transform from a translation.
+    #[must_use] 
     pub fn from_translation(translation: Vec3) -> Self {
         Self {
             translation,
@@ -140,6 +149,7 @@ impl Transform {
     }
 
     /// Creates a transform from a rotation.
+    #[must_use] 
     pub fn from_rotation(rotation: Quat) -> Self {
         Self {
             rotation,
@@ -148,6 +158,7 @@ impl Transform {
     }
 
     /// Creates a transform from a scale.
+    #[must_use] 
     pub fn from_scale(scale: Vec3) -> Self {
         Self {
             scale,
@@ -158,6 +169,7 @@ impl Transform {
     /// Creates a transform from a Mat4.
     ///
     /// This decomposition may not be exact for matrices with shear.
+    #[must_use] 
     pub fn from_matrix(matrix: Mat4) -> Self {
         let (scale, rotation, translation) = matrix.to_scale_rotation_translation();
         Self {
@@ -168,11 +180,13 @@ impl Transform {
     }
 
     /// Converts this transform to a Mat4.
+    #[must_use] 
     pub fn to_matrix(&self) -> Mat4 {
         Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
     }
 
     /// Returns the rotation as Euler angles (in radians).
+    #[must_use] 
     pub fn euler_angles(&self) -> Vec3 {
         let (x, y, z) = self.rotation.to_euler(glam::EulerRot::XYZ);
         Vec3::new(x, y, z)
@@ -184,6 +198,7 @@ impl Transform {
     }
 
     /// Returns the rotation as Euler angles (in degrees).
+    #[must_use] 
     pub fn euler_angles_degrees(&self) -> Vec3 {
         self.euler_angles() * (180.0 / std::f32::consts::PI)
     }
@@ -255,6 +270,7 @@ pub enum GizmoAxis {
 
 impl GizmoAxis {
     /// Returns the direction vector for this axis.
+    #[must_use] 
     pub fn direction(&self) -> Option<Vec3> {
         match self {
             GizmoAxis::X => Some(Vec3::X),
@@ -265,6 +281,7 @@ impl GizmoAxis {
     }
 
     /// Returns the color for this axis.
+    #[must_use] 
     pub fn color(&self) -> Vec3 {
         match self {
             GizmoAxis::X | GizmoAxis::YZ => Vec3::new(1.0, 0.2, 0.2), // Red
