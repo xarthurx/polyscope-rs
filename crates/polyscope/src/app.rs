@@ -41,6 +41,9 @@ pub struct App {
     // Selection state
     selection: Option<PickResult>,
     last_click_pos: Option<(f64, f64)>,
+    // Double-click detection
+    last_left_click_time: Option<std::time::Instant>,
+    last_left_click_screen_pos: Option<(f64, f64)>,
     // GPU picking - selected element index (from GPU pick)
     selected_element_index: Option<u32>,
     // Ground plane settings
@@ -89,6 +92,8 @@ impl App {
             drag_distance: 0.0,
             selection: None,
             last_click_pos: None,
+            last_left_click_time: None,
+            last_left_click_screen_pos: None,
             selected_element_index: None,
             ground_plane: GroundPlaneConfig::default(),
             screenshot_pending: None,
@@ -702,6 +707,47 @@ impl App {
                                 );
                             }
                         }
+
+                        // Initialize vertex intrinsic vector quantity render data if enabled
+                        let vertices = mesh.vertices().to_vec();
+                        if let Some(iq) = mesh.active_vertex_intrinsic_vector_quantity_mut() {
+                            if iq.render_data().is_none() {
+                                iq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &vertices,
+                                );
+                            }
+                        }
+
+                        // Initialize face intrinsic vector quantity render data if enabled
+                        let centroids = mesh.face_centroids();
+                        if let Some(iq) = mesh.active_face_intrinsic_vector_quantity_mut() {
+                            if iq.render_data().is_none() {
+                                iq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &centroids,
+                                );
+                            }
+                        }
+
+                        // Initialize one-form quantity render data if enabled
+                        let vertices = mesh.vertices().to_vec();
+                        let edges = mesh.edges().to_vec();
+                        if let Some(oq) = mesh.active_one_form_quantity_mut() {
+                            if oq.render_data().is_none() {
+                                oq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &vertices,
+                                    &edges,
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -841,6 +887,21 @@ impl App {
                         // Update face vector quantity uniforms
                         if let Some(vq) = mesh.active_face_vector_quantity() {
                             vq.update_uniforms(&engine.queue, &model);
+                        }
+
+                        // Update vertex intrinsic vector quantity uniforms
+                        if let Some(iq) = mesh.active_vertex_intrinsic_vector_quantity() {
+                            iq.update_uniforms(&engine.queue, &model);
+                        }
+
+                        // Update face intrinsic vector quantity uniforms
+                        if let Some(iq) = mesh.active_face_intrinsic_vector_quantity() {
+                            iq.update_uniforms(&engine.queue, &model);
+                        }
+
+                        // Update one-form quantity uniforms
+                        if let Some(oq) = mesh.active_one_form_quantity() {
+                            oq.update_uniforms(&engine.queue, &model);
                         }
                     }
                 }
@@ -1598,8 +1659,8 @@ impl App {
                                 if let Some(vq) = pc.active_vector_quantity() {
                                     if let Some(render_data) = vq.render_data() {
                                         render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                        // shaft: 8×6=48 + cone: 8×3=24 = 72 vertices per arrow
-                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                        // shaft sides: 8×6=48 + cone sides: 8×3=24 + cone cap: 8×3=24 + shaft cap: 8×3=24 = 120 vertices per arrow
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
                                     }
                                 }
                             }
@@ -1610,14 +1671,35 @@ impl App {
                                 if let Some(vq) = mesh.active_vertex_vector_quantity() {
                                     if let Some(render_data) = vq.render_data() {
                                         render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
                                     }
                                 }
                                 // Draw face vector quantity (e.g. face normals)
                                 if let Some(vq) = mesh.active_face_vector_quantity() {
                                     if let Some(render_data) = vq.render_data() {
                                         render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                // Draw vertex intrinsic vector quantity (e.g. tangent field)
+                                if let Some(iq) = mesh.active_vertex_intrinsic_vector_quantity() {
+                                    if let Some(render_data) = iq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                // Draw face intrinsic vector quantity
+                                if let Some(iq) = mesh.active_face_intrinsic_vector_quantity() {
+                                    if let Some(render_data) = iq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                // Draw one-form quantity (edge flow arrows)
+                                if let Some(oq) = mesh.active_one_form_quantity() {
+                                    if let Some(render_data) = oq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
                                     }
                                 }
                             }
@@ -2190,7 +2272,7 @@ impl App {
                                 if let Some(vq) = pc.active_vector_quantity() {
                                     if let Some(render_data) = vq.render_data() {
                                         render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
                                     }
                                 }
                             }
@@ -2201,14 +2283,35 @@ impl App {
                                 if let Some(vq) = mesh.active_vertex_vector_quantity() {
                                     if let Some(render_data) = vq.render_data() {
                                         render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
                                     }
                                 }
                                 // Draw face vector quantity (e.g. face normals)
                                 if let Some(vq) = mesh.active_face_vector_quantity() {
                                     if let Some(render_data) = vq.render_data() {
                                         render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                // Draw vertex intrinsic vector quantity (e.g. tangent field)
+                                if let Some(iq) = mesh.active_vertex_intrinsic_vector_quantity() {
+                                    if let Some(render_data) = iq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                // Draw face intrinsic vector quantity
+                                if let Some(iq) = mesh.active_face_intrinsic_vector_quantity() {
+                                    if let Some(render_data) = iq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                // Draw one-form quantity (edge flow arrows)
+                                if let Some(oq) = mesh.active_one_form_quantity() {
+                                    if let Some(render_data) = oq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
                                     }
                                 }
                             }
@@ -2522,6 +2625,80 @@ impl ApplicationHandler for App {
                         return;
                     }
 
+                    // Double-click detection
+                    const DOUBLE_CLICK_TIME_MS: u128 = 500;
+                    const DOUBLE_CLICK_DIST: f64 = 10.0;
+
+                    let is_double_click = if let (Some(prev_time), Some(prev_pos)) =
+                        (self.last_left_click_time, self.last_left_click_screen_pos)
+                    {
+                        let elapsed = prev_time.elapsed().as_millis();
+                        let dist = ((self.mouse_pos.0 - prev_pos.0).powi(2)
+                            + (self.mouse_pos.1 - prev_pos.1).powi(2))
+                        .sqrt();
+                        elapsed < DOUBLE_CLICK_TIME_MS && dist < DOUBLE_CLICK_DIST
+                    } else {
+                        false
+                    };
+
+                    // Record this click for next double-click check
+                    if self.drag_distance < DRAG_THRESHOLD {
+                        self.last_left_click_time = Some(std::time::Instant::now());
+                        self.last_left_click_screen_pos = Some(self.mouse_pos);
+                    } else {
+                        // Drags reset double-click tracking
+                        self.last_left_click_time = None;
+                        self.last_left_click_screen_pos = None;
+                    }
+
+                    // Handle double-click: set view center to clicked 3D point
+                    if is_double_click && !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD
+                    {
+                        // Extract camera data before mutable borrow
+                        let ray_data = if let Some(engine) = &self.engine {
+                            let click_screen =
+                                glam::Vec2::new(self.mouse_pos.0 as f32, self.mouse_pos.1 as f32);
+                            self.screen_ray(
+                                click_screen,
+                                engine.width,
+                                engine.height,
+                                &engine.camera,
+                            )
+                        } else {
+                            None
+                        };
+
+                        if let Some((ray_origin, ray_dir)) = ray_data {
+                            let plane_params = crate::with_context(|ctx| {
+                                ctx.slice_planes()
+                                    .filter(|p| p.is_enabled())
+                                    .map(|p| (p.origin(), p.normal()))
+                                    .collect::<Vec<_>>()
+                            });
+
+                            if let Some((_type_name, _name, t)) =
+                                self.pick_structure_at_ray(ray_origin, ray_dir, &plane_params)
+                            {
+                                let hit_point = ray_origin + ray_dir * t;
+                                if let Some(engine) = &mut self.engine {
+                                    engine.camera.target = hit_point;
+                                    log::info!(
+                                        "Double-click: set view center to ({:.3}, {:.3}, {:.3})",
+                                        hit_point.x,
+                                        hit_point.y,
+                                        hit_point.z
+                                    );
+                                }
+                            }
+                        }
+
+                        // Reset double-click state so triple-click doesn't re-trigger
+                        self.last_left_click_time = None;
+                        self.last_left_click_screen_pos = None;
+                        self.last_click_pos = None;
+                        return;
+                    }
+
                     // Check if this was a click (not a drag) in the 3D viewport
                     if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
                         log::debug!("[CLICK DEBUG] Processing click in 3D viewport");
@@ -2726,6 +2903,14 @@ impl ApplicationHandler for App {
                         _ => {}
                     }
                 }
+            }
+            WindowEvent::DroppedFile(path) => {
+                log::info!("File dropped: {}", path.display());
+                crate::with_context_mut(|ctx| {
+                    if let Some(callback) = &mut ctx.file_drop_callback {
+                        callback(&[path]);
+                    }
+                });
             }
             _ => {}
         }

@@ -373,6 +373,31 @@ pub fn remove_all_floating_quantities() {
     });
 }
 
+/// Sets a callback that is invoked when files are dropped onto the polyscope window.
+///
+/// The callback receives a slice of file paths that were dropped.
+///
+/// # Example
+/// ```no_run
+/// polyscope::set_file_drop_callback(|paths| {
+///     for path in paths {
+///         println!("Dropped: {}", path.display());
+///     }
+/// });
+/// ```
+pub fn set_file_drop_callback(callback: impl FnMut(&[std::path::PathBuf]) + Send + Sync + 'static) {
+    with_context_mut(|ctx| {
+        ctx.file_drop_callback = Some(Box::new(callback));
+    });
+}
+
+/// Clears the file drop callback.
+pub fn clear_file_drop_callback() {
+    with_context_mut(|ctx| {
+        ctx.file_drop_callback = None;
+    });
+}
+
 /// Requests a redraw of the scene.
 pub fn request_redraw() {
     // TODO: Implement redraw request

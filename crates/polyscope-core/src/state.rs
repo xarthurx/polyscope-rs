@@ -13,6 +13,9 @@ use crate::quantity::Quantity;
 use crate::registry::Registry;
 use crate::slice_plane::SlicePlane;
 
+/// Callback type for file drop events.
+pub type FileDropCallback = Box<dyn FnMut(&[std::path::PathBuf]) + Send + Sync>;
+
 /// Global context singleton.
 static CONTEXT: OnceLock<RwLock<Context>> = OnceLock::new();
 
@@ -50,7 +53,9 @@ pub struct Context {
 
     /// Floating quantities (not attached to any structure).
     pub floating_quantities: Vec<Box<dyn Quantity>>,
-    // User callback will be added later with proper thread-safety handling
+
+    /// Callback invoked when files are dropped onto the window.
+    pub file_drop_callback: Option<FileDropCallback>,
 }
 
 impl Default for Context {
@@ -67,6 +72,7 @@ impl Default for Context {
             length_scale: 1.0,
             bounding_box: (Vec3::ZERO, Vec3::ONE),
             floating_quantities: Vec::new(),
+            file_drop_callback: None,
         }
     }
 }

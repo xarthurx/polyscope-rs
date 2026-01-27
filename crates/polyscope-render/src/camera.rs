@@ -235,6 +235,9 @@ impl Camera {
     }
 
     /// Orbits the camera around the target.
+    ///
+    /// After computing the new position from spherical angles, re-normalizes
+    /// the distance to prevent numerical drift over many small orbit steps.
     pub fn orbit(&mut self, delta_x: f32, delta_y: f32) {
         let radius = (self.position - self.target).length();
         let mut theta = (self.position.x - self.target.x).atan2(self.position.z - self.target.z);
@@ -249,6 +252,13 @@ impl Camera {
                 radius * phi.cos(),
                 radius * phi.sin() * theta.cos(),
             );
+
+        // Re-enforce exact distance to prevent numerical drift in turntable mode
+        let offset = self.position - self.target;
+        let actual_dist = offset.length();
+        if actual_dist > 1e-8 {
+            self.position = self.target + offset * (radius / actual_dist);
+        }
     }
 
     /// Pans the camera.
