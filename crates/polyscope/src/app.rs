@@ -676,6 +676,32 @@ impl App {
                                 );
                             }
                         }
+
+                        // Initialize vertex vector quantity render data if enabled
+                        let vertices = mesh.vertices().to_vec();
+                        if let Some(vq) = mesh.active_vertex_vector_quantity_mut() {
+                            if vq.render_data().is_none() {
+                                vq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &vertices,
+                                );
+                            }
+                        }
+
+                        // Initialize face vector quantity render data if enabled
+                        let centroids = mesh.face_centroids();
+                        if let Some(vq) = mesh.active_face_vector_quantity_mut() {
+                            if vq.render_data().is_none() {
+                                vq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &centroids,
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -795,8 +821,9 @@ impl App {
                         pc.update_pick_uniforms(&engine.queue);
 
                         // Update vector quantity uniforms
+                        let model = structure.transform();
                         if let Some(vq) = pc.active_vector_quantity() {
-                            vq.update_uniforms(&engine.queue);
+                            vq.update_uniforms(&engine.queue, &model);
                         }
                     }
                 }
@@ -804,6 +831,17 @@ impl App {
                 if structure.type_name() == "SurfaceMesh" {
                     if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
                         mesh.update_gpu_buffers(&engine.queue, &engine.color_maps);
+
+                        // Update vertex vector quantity uniforms
+                        let model = structure.transform();
+                        if let Some(vq) = mesh.active_vertex_vector_quantity() {
+                            vq.update_uniforms(&engine.queue, &model);
+                        }
+
+                        // Update face vector quantity uniforms
+                        if let Some(vq) = mesh.active_face_vector_quantity() {
+                            vq.update_uniforms(&engine.queue, &model);
+                        }
                     }
                 }
 
@@ -1560,8 +1598,26 @@ impl App {
                                 if let Some(vq) = pc.active_vector_quantity() {
                                     if let Some(render_data) = vq.render_data() {
                                         render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                        // 8 segments * 6 vertices = 48 vertices per arrow
-                                        render_pass.draw(0..48, 0..render_data.num_vectors);
+                                        // shaft: 8×6=48 + cone: 8×3=24 = 72 vertices per arrow
+                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                    }
+                                }
+                            }
+                        }
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                // Draw vertex vector quantity (e.g. vertex normals)
+                                if let Some(vq) = mesh.active_vertex_vector_quantity() {
+                                    if let Some(render_data) = vq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                    }
+                                }
+                                // Draw face vector quantity (e.g. face normals)
+                                if let Some(vq) = mesh.active_face_vector_quantity() {
+                                    if let Some(render_data) = vq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..72, 0..render_data.num_vectors);
                                     }
                                 }
                             }
@@ -2134,7 +2190,25 @@ impl App {
                                 if let Some(vq) = pc.active_vector_quantity() {
                                     if let Some(render_data) = vq.render_data() {
                                         render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                        render_pass.draw(0..48, 0..render_data.num_vectors);
+                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                    }
+                                }
+                            }
+                        }
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                // Draw vertex vector quantity (e.g. vertex normals)
+                                if let Some(vq) = mesh.active_vertex_vector_quantity() {
+                                    if let Some(render_data) = vq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..72, 0..render_data.num_vectors);
+                                    }
+                                }
+                                // Draw face vector quantity (e.g. face normals)
+                                if let Some(vq) = mesh.active_face_vector_quantity() {
+                                    if let Some(render_data) = vq.render_data() {
+                                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..72, 0..render_data.num_vectors);
                                     }
                                 }
                             }

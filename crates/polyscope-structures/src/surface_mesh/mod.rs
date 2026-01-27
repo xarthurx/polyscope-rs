@@ -643,6 +643,76 @@ impl SurfaceMesh {
         None
     }
 
+    /// Returns the currently active vertex vector quantity, if any.
+    #[must_use]
+    pub fn active_vertex_vector_quantity(&self) -> Option<&MeshVertexVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any().downcast_ref::<MeshVertexVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns a mutable reference to the active vertex vector quantity.
+    pub fn active_vertex_vector_quantity_mut(&mut self) -> Option<&mut MeshVertexVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &mut self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any_mut().downcast_mut::<MeshVertexVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active face vector quantity, if any.
+    #[must_use]
+    pub fn active_face_vector_quantity(&self) -> Option<&MeshFaceVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any().downcast_ref::<MeshFaceVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns a mutable reference to the active face vector quantity.
+    pub fn active_face_vector_quantity_mut(&mut self) -> Option<&mut MeshFaceVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &mut self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any_mut().downcast_mut::<MeshFaceVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Computes face centroids (used as base positions for face vector quantities).
+    #[must_use]
+    pub fn face_centroids(&self) -> Vec<Vec3> {
+        self.faces
+            .iter()
+            .map(|face| {
+                let sum: Vec3 = face.iter().map(|&vi| self.vertices[vi as usize]).sum();
+                sum / face.len() as f32
+            })
+            .collect()
+    }
+
     /// Adds a face scalar quantity to this mesh.
     pub fn add_face_scalar_quantity(
         &mut self,
@@ -677,23 +747,29 @@ impl SurfaceMesh {
     }
 
     /// Adds a vertex vector quantity to this mesh.
+    ///
+    /// Arrow length and radius are auto-scaled based on mesh extent and vector magnitudes.
     pub fn add_vertex_vector_quantity(
         &mut self,
         name: impl Into<String>,
         vectors: Vec<Vec3>,
     ) -> &mut Self {
-        let quantity = MeshVertexVectorQuantity::new(name, self.name.clone(), vectors);
+        let mut quantity = MeshVertexVectorQuantity::new(name, self.name.clone(), vectors);
+        quantity.auto_scale(self.length_scale());
         self.add_quantity(Box::new(quantity));
         self
     }
 
     /// Adds a face vector quantity to this mesh.
+    ///
+    /// Arrow length and radius are auto-scaled based on mesh extent and vector magnitudes.
     pub fn add_face_vector_quantity(
         &mut self,
         name: impl Into<String>,
         vectors: Vec<Vec3>,
     ) -> &mut Self {
-        let quantity = MeshFaceVectorQuantity::new(name, self.name.clone(), vectors);
+        let mut quantity = MeshFaceVectorQuantity::new(name, self.name.clone(), vectors);
+        quantity.auto_scale(self.length_scale());
         self.add_quantity(Box::new(quantity));
         self
     }

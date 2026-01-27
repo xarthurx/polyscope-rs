@@ -205,10 +205,11 @@ impl PointCloudVectorQuantity {
         self.render_data.as_ref()
     }
 
-    /// Updates GPU uniforms.
-    pub fn update_uniforms(&self, queue: &wgpu::Queue) {
+    /// Updates GPU uniforms with the given model transform.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, model: &glam::Mat4) {
         if let Some(render_data) = &self.render_data {
             let uniforms = VectorUniforms {
+                model: model.to_cols_array(),
                 length_scale: self.length_scale,
                 radius: self.radius,
                 _padding: [0.0; 2],

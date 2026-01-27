@@ -16,6 +16,7 @@ pub struct VectorRenderData {
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[allow(clippy::pub_underscore_fields)]
 pub struct VectorUniforms {
+    pub model: [f32; 16],
     pub length_scale: f32,
     pub radius: f32,
     pub _padding: [f32; 2],
@@ -24,7 +25,15 @@ pub struct VectorUniforms {
 
 impl Default for VectorUniforms {
     fn default() -> Self {
+        #[rustfmt::skip]
+        let identity: [f32; 16] = [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ];
         Self {
+            model: identity,
             length_scale: 1.0,
             radius: 0.005,
             _padding: [0.0; 2],

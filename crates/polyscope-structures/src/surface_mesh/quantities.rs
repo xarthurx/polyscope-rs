@@ -2,7 +2,7 @@
 
 use glam::Vec3;
 use polyscope_core::quantity::{FaceQuantity, Quantity, QuantityKind, VertexQuantity};
-use polyscope_render::ColorMap;
+use polyscope_render::{ColorMap, VectorRenderData, VectorUniforms};
 
 /// A vertex scalar quantity on a surface mesh.
 pub struct MeshVertexScalarQuantity {
@@ -463,6 +463,7 @@ pub struct MeshVertexVectorQuantity {
     length_scale: f32,
     radius: f32,
     color: Vec3,
+    render_data: Option<VectorRenderData>,
 }
 
 impl MeshVertexVectorQuantity {
@@ -480,6 +481,7 @@ impl MeshVertexVectorQuantity {
             length_scale: 1.0,
             radius: 0.005,
             color: Vec3::new(0.8, 0.2, 0.2),
+            render_data: None,
         }
     }
 
@@ -520,6 +522,62 @@ impl MeshVertexVectorQuantity {
     /// Sets the color.
     pub fn set_color(&mut self, c: Vec3) {
         self.color = c;
+    }
+
+    /// Auto-scales length and radius based on the structure's bounding box diagonal
+    /// and the average vector magnitude, so arrows are proportionally visible.
+    ///
+    /// Target: effective arrow length ≈ 2% of bbox diagonal, radius = 1/10 of length.
+    pub fn auto_scale(&mut self, structure_length_scale: f32) {
+        let avg_length: f32 = if self.vectors.is_empty() {
+            1.0
+        } else {
+            let sum: f32 = self.vectors.iter().map(|v| v.length()).sum();
+            sum / self.vectors.len() as f32
+        };
+        if avg_length > 1e-8 {
+            // Effective arrow length ≈ 2% of bbox diagonal
+            self.length_scale = 0.02 * structure_length_scale / avg_length;
+        }
+        // Radius = 1/10 of effective arrow length ≈ 0.2% of bbox diagonal
+        self.radius = 0.002 * structure_length_scale;
+    }
+
+    /// Initializes GPU resources for this vector quantity.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        base_positions: &[Vec3],
+    ) {
+        self.render_data = Some(VectorRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            base_positions,
+            &self.vectors,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    #[must_use]
+    pub fn render_data(&self) -> Option<&VectorRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU uniforms with the given model transform.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, model: &glam::Mat4) {
+        if let Some(render_data) = &self.render_data {
+            let uniforms = VectorUniforms {
+                model: model.to_cols_array(),
+                length_scale: self.length_scale,
+                radius: self.radius,
+                _padding: [0.0; 2],
+                color: [self.color.x, self.color.y, self.color.z, 1.0],
+            };
+            render_data.update_uniforms(queue, &uniforms);
+        }
     }
 
     /// Builds the egui UI for this quantity.
@@ -589,6 +647,7 @@ pub struct MeshFaceVectorQuantity {
     length_scale: f32,
     radius: f32,
     color: Vec3,
+    render_data: Option<VectorRenderData>,
 }
 
 impl MeshFaceVectorQuantity {
@@ -606,6 +665,7 @@ impl MeshFaceVectorQuantity {
             length_scale: 1.0,
             radius: 0.005,
             color: Vec3::new(0.2, 0.2, 0.8),
+            render_data: None,
         }
     }
 
@@ -646,6 +706,62 @@ impl MeshFaceVectorQuantity {
     /// Sets the color.
     pub fn set_color(&mut self, c: Vec3) {
         self.color = c;
+    }
+
+    /// Auto-scales length and radius based on the structure's bounding box diagonal
+    /// and the average vector magnitude, so arrows are proportionally visible.
+    ///
+    /// Target: effective arrow length ≈ 2% of bbox diagonal, radius = 1/10 of length.
+    pub fn auto_scale(&mut self, structure_length_scale: f32) {
+        let avg_length: f32 = if self.vectors.is_empty() {
+            1.0
+        } else {
+            let sum: f32 = self.vectors.iter().map(|v| v.length()).sum();
+            sum / self.vectors.len() as f32
+        };
+        if avg_length > 1e-8 {
+            // Effective arrow length ≈ 2% of bbox diagonal
+            self.length_scale = 0.02 * structure_length_scale / avg_length;
+        }
+        // Radius = 1/10 of effective arrow length ≈ 0.2% of bbox diagonal
+        self.radius = 0.002 * structure_length_scale;
+    }
+
+    /// Initializes GPU resources for this vector quantity.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        base_positions: &[Vec3],
+    ) {
+        self.render_data = Some(VectorRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            base_positions,
+            &self.vectors,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    #[must_use]
+    pub fn render_data(&self) -> Option<&VectorRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU uniforms with the given model transform.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, model: &glam::Mat4) {
+        if let Some(render_data) = &self.render_data {
+            let uniforms = VectorUniforms {
+                model: model.to_cols_array(),
+                length_scale: self.length_scale,
+                radius: self.radius,
+                _padding: [0.0; 2],
+                color: [self.color.x, self.color.y, self.color.z, 1.0],
+            };
+            render_data.update_uniforms(queue, &uniforms);
+        }
     }
 
     /// Builds the egui UI for this quantity.
