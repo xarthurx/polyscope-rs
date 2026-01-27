@@ -8,6 +8,13 @@
 //! - Volume grids (implicit surfaces)
 //! - Camera views
 
+// Type casts in geometry code: Conversions between index types (u32, usize) and
+// coordinate types (f32, f64) are intentional. Mesh indices and vertex counts
+// will not exceed u32::MAX in practice for 3D visualization.
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_precision_loss)]
+
 pub mod camera_view;
 pub mod curve_network;
 pub mod point_cloud;

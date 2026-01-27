@@ -43,6 +43,13 @@
 //! - [`VolumeGrid`] - A regular grid of values (for implicit surfaces)
 //! - [`CameraView`] - A camera frustum visualization
 
+// Type casts in visualization code: Conversions between coordinate types (f32, f64)
+// and index types (u32, usize) are intentional. Values are bounded by practical
+// limits (screen resolution, mesh sizes).
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_precision_loss)]
+
 mod app;
 
 // Re-export core types

@@ -6,6 +6,14 @@
 //! - Material and color map systems
 //! - Camera and view management
 
+// Type casts in graphics code: These lints flag intentional conversions between
+// GPU types (u32 indices, f32 coordinates) and CPU types (usize, f64). The values
+// involved are bounded (mesh vertices, texture dimensions, pixel coordinates) and
+// will not overflow in practice. Suppressing at crate level to avoid noise.
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_precision_loss)]
+
 pub mod buffer;
 pub mod camera;
 pub mod color_maps;

@@ -1,5 +1,12 @@
 //! UI layer for polyscope-rs using egui.
 
+// Type casts in UI code: Conversions between pixel coordinates and
+// screen dimensions (f32, f64, u32, usize) are intentional. Values
+// are bounded by screen resolution.
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_precision_loss)]
+
 pub mod gizmo;
 pub mod integration;
 pub mod panels;
