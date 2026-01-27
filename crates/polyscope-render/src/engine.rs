@@ -1014,10 +1014,7 @@ impl RenderEngine {
     ///
     /// Takes an iterator of `SlicePlaneUniforms` and uploads them to the GPU buffer.
     /// Up to `MAX_SLICE_PLANES` planes are used; remaining slots are disabled.
-    pub fn update_slice_plane_uniforms<'a>(
-        &self,
-        planes: impl Iterator<Item = SlicePlaneUniforms>,
-    ) {
+    pub fn update_slice_plane_uniforms(&self, planes: impl Iterator<Item = SlicePlaneUniforms>) {
         let mut uniforms = [SlicePlaneUniforms::default(); MAX_SLICE_PLANES];
         for (i, plane) in planes.take(MAX_SLICE_PLANES).enumerate() {
             uniforms[i] = plane;

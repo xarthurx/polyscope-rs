@@ -13,6 +13,7 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_wrap)]
 // Documentation lints: Detailed error/panic docs will be added as the API stabilizes.
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
@@ -20,6 +21,22 @@
 #![allow(clippy::too_many_lines)]
 // Method design: Some methods take &self for API consistency even when not using it.
 #![allow(clippy::unused_self)]
+// Variable naming: In graphics code, similar variable names (e.g., color1, color2) are common.
+#![allow(clippy::similar_names)]
+// Argument design: Some functions take ownership for API consistency.
+#![allow(clippy::needless_pass_by_value)]
+// Slice handling: Sometimes &mut Vec is needed for push/pop operations.
+#![allow(clippy::ptr_arg)]
+// Default initialization: Sometimes we need to modify fields after default.
+#![allow(clippy::field_reassign_with_default)]
+// Default access: In wgpu pipeline code, Default::default() is idiomatic.
+#![allow(clippy::default_trait_access)]
+// Lifetimes: Some patterns require explicit lifetimes for clarity.
+#![allow(clippy::needless_lifetimes)]
+// Control flow: Sometimes if-let-else is clearer than let-else.
+#![allow(clippy::manual_let_else)]
+// Function signatures: Complex rendering functions need many parameters.
+#![allow(clippy::too_many_arguments)]
 
 pub mod buffer;
 pub mod camera;

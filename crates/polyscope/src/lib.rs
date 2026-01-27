@@ -60,6 +60,12 @@
 #![allow(clippy::too_many_arguments)]
 // Method design: Some methods take &self for API consistency or future expansion.
 #![allow(clippy::unused_self)]
+// Argument design: Some functions take ownership for API consistency.
+#![allow(clippy::needless_pass_by_value)]
+// Variable naming: Short names (x, y, z) are clear in context.
+#![allow(clippy::many_single_char_names)]
+// Configuration structs may have many boolean fields.
+#![allow(clippy::struct_excessive_bools)]
 
 mod app;
 

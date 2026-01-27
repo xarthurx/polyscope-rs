@@ -15,6 +15,14 @@
 #![allow(clippy::struct_excessive_bools)]
 // Method design: Some methods take &self for API consistency even when not using it.
 #![allow(clippy::unused_self)]
+// Argument design: UI callbacks often take ownership for simplicity.
+#![allow(clippy::needless_pass_by_value)]
+// Function signatures: Complex UI functions may need many parameters.
+#![allow(clippy::too_many_arguments)]
+// Slice handling: Sometimes &mut Vec is needed for push/pop operations.
+#![allow(clippy::ptr_arg)]
+// Type casts: UI element indices may need u32 to i32 conversion.
+#![allow(clippy::cast_possible_wrap)]
 
 pub mod gizmo;
 pub mod integration;

@@ -14,6 +14,7 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_wrap)]
 // Documentation lints: Detailed error/panic docs will be added as the API stabilizes.
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
@@ -21,6 +22,18 @@
 #![allow(clippy::unused_self)]
 // Struct design: Configuration structs may have many boolean fields.
 #![allow(clippy::struct_excessive_bools)]
+// Variable naming: In geometry code, similar variable names are common.
+#![allow(clippy::similar_names)]
+// Argument design: Some functions take ownership for API consistency.
+#![allow(clippy::needless_pass_by_value)]
+// Function signatures: Some geometry operations need many parameters.
+#![allow(clippy::too_many_arguments)]
+// Code style: Sometimes if-let-else is clearer than let-else.
+#![allow(clippy::option_if_let_else)]
+// Lifetimes: Some patterns require explicit lifetimes for clarity.
+#![allow(clippy::needless_lifetimes)]
+// Function length: Complex geometry operations are legitimately complex.
+#![allow(clippy::too_many_lines)]
 
 pub mod camera_view;
 pub mod curve_network;
