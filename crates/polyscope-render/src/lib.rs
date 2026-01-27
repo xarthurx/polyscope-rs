@@ -15,6 +15,14 @@
 // Documentation lints - internal functions don't need exhaustive panic/error docs
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::missing_errors_doc)]
+// Builder patterns return Self which doesn't need must_use
+#![allow(clippy::must_use_candidate)]
+// Trait implementations may not use all params
+#![allow(clippy::unused_self)]
+// Large pipeline setup functions
+#![allow(clippy::too_many_lines)]
+// Use approximate constants for clarity
+#![allow(clippy::approx_constant)]
 
 pub mod buffer;
 pub mod camera;

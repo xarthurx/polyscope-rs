@@ -50,6 +50,13 @@
 // Documentation lints - internal functions don't need exhaustive panic/error docs
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::missing_errors_doc)]
+// Builder patterns and options structs
+#![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::must_use_candidate)]
+// Large functions are acceptable in app code
+#![allow(clippy::too_many_lines)]
+// Items after statements is common in match handling
+#![allow(clippy::items_after_statements)]
 
 mod app;
 
