@@ -2842,8 +2842,8 @@ impl RenderEngine {
                 // OIT does NOT write to depth buffer, but still reads it
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: false, // Important: don't write depth for transparency
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: false,
+                    depth_compare: wgpu::CompareFunction::LessEqual,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),

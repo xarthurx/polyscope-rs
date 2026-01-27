@@ -76,7 +76,7 @@ pub struct AppearanceSettings {
 impl Default for AppearanceSettings {
     fn default() -> Self {
         Self {
-            transparency_mode: 1, // Simple
+            transparency_mode: 1, // Simple (default)
             ssaa_factor: 1,
             max_fps: 60,
             ssao_enabled: false,

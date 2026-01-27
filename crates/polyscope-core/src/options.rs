@@ -82,9 +82,9 @@ pub enum GroundPlaneMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum TransparencyMode {
     /// Simple transparency (order-dependent).
-    #[default]
     Simple,
-    /// Weighted blended OIT.
+    /// Weighted blended OIT (default - handles overlapping geometry correctly).
+    #[default]
     WeightedBlended,
     /// No transparency.
     None,

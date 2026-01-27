@@ -63,7 +63,7 @@ struct VertexOutput {
 // OIT output: accumulation texture and reveal texture
 struct OitOutput {
     @location(0) accum: vec4<f32>,
-    @location(1) reveal: f32,
+    @location(1) reveal: vec4<f32>,  // Only .r is used, but vec4 is safer for some drivers
 }
 
 @vertex
@@ -94,12 +94,14 @@ fn vs_main(
     return out;
 }
 
-// Weight function for OIT (from McGuire and Bavoil 2013)
+// Weight function for OIT (simplified version)
+// The original McGuire/Bavoil weight function was too aggressive.
+// This simpler version provides depth-based ordering without extreme values.
 fn oit_weight(depth: f32, alpha: f32) -> f32 {
-    // Depth-based weight function
-    let a = min(1.0, alpha * 10.0) + 0.01;
-    let b = 1.0 - depth * 0.9;
-    return clamp(a * a * a * 1e8 * b * b * b, 1e-2, 3e3);
+    // Simple depth-based weight: closer objects get higher weight
+    // depth is in [0, 1] where 0 is near, 1 is far
+    let z = 1.0 - depth; // invert so near = 1, far = 0
+    return max(0.01, z * z * z * 1000.0);
 }
 
 @fragment
@@ -217,7 +219,8 @@ fn fs_main(
     // Accumulation: premultiplied color * weight
     out.accum = vec4<f32>(color * alpha, alpha) * weight;
     // Reveal: alpha (will be multiplied via blend state to compute product)
-    out.reveal = alpha;
+    // Output as vec4 for compatibility - only .r channel is used
+    out.reveal = vec4<f32>(alpha, 0.0, 0.0, 1.0);
 
     return out;
 }

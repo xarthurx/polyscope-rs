@@ -1696,8 +1696,9 @@ impl App {
                     }
                     if structure.type_name() == "SurfaceMesh" {
                         if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                            // In OIT mode, skip transparent meshes in this pass
-                            if use_oit && mesh.transparency() > 0.001 {
+                            // In OIT mode, ALL surface meshes go through OIT pass
+                            // This avoids z-fighting on overlapping opaque geometry
+                            if use_oit {
                                 continue;
                             }
                             if let Some(render_data) = mesh.render_data() {
@@ -1729,129 +1730,8 @@ impl App {
             });
         }
 
-        // OIT (Order-Independent Transparency) pass for transparent surface meshes
-        if self.appearance_settings.transparency_mode == 2 {
-            // Check if there are any transparent meshes to render
-            let has_transparent_meshes = crate::with_context(|ctx| {
-                ctx.registry.iter().any(|s| {
-                    if !s.is_enabled() || s.type_name() != "SurfaceMesh" {
-                        return false;
-                    }
-                    if let Some(mesh) = s.as_any().downcast_ref::<SurfaceMesh>() {
-                        mesh.transparency() > 0.001
-                    } else {
-                        false
-                    }
-                })
-            });
-
-            if has_transparent_meshes {
-                // Ensure OIT resources are initialized
-                engine.ensure_oit_textures();
-                engine.ensure_oit_pass();
-                engine.ensure_mesh_oit_pipeline();
-
-                let oit_accum_view = engine.oit_accum_view().unwrap();
-                let oit_reveal_view = engine.oit_reveal_view().unwrap();
-                let oit_pipeline = engine.mesh_oit_pipeline().unwrap();
-
-                // OIT Accumulation Pass
-                {
-                    let mut oit_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("OIT Accumulation Pass"),
-                        color_attachments: &[
-                            // Accumulation buffer (clear to black/zero)
-                            Some(wgpu::RenderPassColorAttachment {
-                                view: oit_accum_view,
-                                resolve_target: None,
-                                ops: wgpu::Operations {
-                                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                                    store: wgpu::StoreOp::Store,
-                                },
-                                depth_slice: None,
-                            }),
-                            // Reveal buffer (clear to 1.0 = fully transparent)
-                            Some(wgpu::RenderPassColorAttachment {
-                                view: oit_reveal_view,
-                                resolve_target: None,
-                                ops: wgpu::Operations {
-                                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                                    store: wgpu::StoreOp::Store,
-                                },
-                                depth_slice: None,
-                            }),
-                        ],
-                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                            view: &engine.depth_view,
-                            depth_ops: Some(wgpu::Operations {
-                                load: wgpu::LoadOp::Load, // Keep opaque depth
-                                store: wgpu::StoreOp::Store,
-                            }),
-                            stencil_ops: None,
-                        }),
-                        ..Default::default()
-                    });
-
-                    oit_pass.set_pipeline(oit_pipeline);
-                    oit_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
-
-                    // Render only transparent meshes
-                    crate::with_context(|ctx| {
-                        for structure in ctx.registry.iter() {
-                            if !structure.is_enabled() {
-                                continue;
-                            }
-                            if structure.type_name() == "SurfaceMesh" {
-                                if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                    // Only render transparent meshes in OIT pass
-                                    if mesh.transparency() <= 0.001 {
-                                        continue;
-                                    }
-                                    if let Some(render_data) = mesh.render_data() {
-                                        oit_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                        oit_pass.set_index_buffer(
-                                            render_data.index_buffer.slice(..),
-                                            wgpu::IndexFormat::Uint32,
-                                        );
-                                        oit_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
-
-                // OIT Composite Pass - blend transparent result over opaque scene
-                {
-                    let hdr_view = engine.hdr_view().expect("HDR view should be available");
-                    let oit_composite = engine.oit_composite_pass().unwrap();
-                    let oit_bind_group = oit_composite.create_bind_group(
-                        &engine.device,
-                        oit_accum_view,
-                        oit_reveal_view,
-                    );
-
-                    let mut composite_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("OIT Composite Pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: hdr_view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load, // Keep opaque content
-                                store: wgpu::StoreOp::Store,
-                            },
-                            depth_slice: None,
-                        })],
-                        depth_stencil_attachment: None,
-                        ..Default::default()
-                    });
-
-                    oit_composite.draw(&mut composite_pass, &oit_bind_group);
-                }
-            }
-        }
-
-        // Render ground plane to HDR texture (before tone mapping)
+        // Render ground plane BEFORE OIT so transparent objects composite correctly over it
+        // Get scene parameters for ground plane
         let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
             let center = ctx.center();
             (
@@ -1861,7 +1741,7 @@ impl App {
             )
         });
 
-        // Ground plane and reflection rendering
+        // Ground plane and reflection rendering (before OIT so depth is available)
         if self.ground_plane.mode == GroundPlaneMode::TileReflection {
             // Compute ground height
             let ground_height = if self.ground_plane.height_is_relative {
@@ -1967,6 +1847,121 @@ impl App {
                 gp_shadow_mode,
                 0.0,
             );
+        }
+
+        // OIT (Order-Independent Transparency) pass for surface meshes
+        // All surface meshes go through OIT to handle overlapping geometry correctly
+        if self.appearance_settings.transparency_mode == 2 {
+            // Check if there are any surface meshes to render
+            let has_surface_meshes = crate::with_context(|ctx| {
+                ctx.registry.iter().any(|s| {
+                    s.is_enabled() && s.type_name() == "SurfaceMesh"
+                })
+            });
+
+            if has_surface_meshes {
+                // Ensure OIT resources are initialized
+                engine.ensure_oit_textures();
+                engine.ensure_oit_pass();
+                engine.ensure_mesh_oit_pipeline();
+
+                let oit_accum_view = engine.oit_accum_view().unwrap();
+                let oit_reveal_view = engine.oit_reveal_view().unwrap();
+                let oit_pipeline = engine.mesh_oit_pipeline().unwrap();
+
+                // OIT Accumulation Pass
+                {
+                    let mut oit_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("OIT Accumulation Pass"),
+                        color_attachments: &[
+                            // Accumulation buffer (clear to black/zero)
+                            Some(wgpu::RenderPassColorAttachment {
+                                view: oit_accum_view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                                depth_slice: None,
+                            }),
+                            // Reveal buffer (clear to 1.0 = fully transparent)
+                            Some(wgpu::RenderPassColorAttachment {
+                                view: oit_reveal_view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                                depth_slice: None,
+                            }),
+                        ],
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: &engine.depth_view,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Load, // Keep opaque depth
+                                store: wgpu::StoreOp::Store,
+                            }),
+                            stencil_ops: None,
+                        }),
+                        ..Default::default()
+                    });
+
+                    oit_pass.set_pipeline(oit_pipeline);
+                    oit_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
+
+                    // Render only transparent meshes
+                    crate::with_context(|ctx| {
+                        for structure in ctx.registry.iter() {
+                            if !structure.is_enabled() {
+                                continue;
+                            }
+                            if structure.type_name() == "SurfaceMesh" {
+                                if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                    // Render ALL surface meshes through OIT
+                                    // This handles both transparent and opaque meshes,
+                                    // avoiding z-fighting on overlapping geometry
+                                    if let Some(render_data) = mesh.render_data() {
+                                        oit_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                        oit_pass.set_index_buffer(
+                                            render_data.index_buffer.slice(..),
+                                            wgpu::IndexFormat::Uint32,
+                                        );
+                                        oit_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // OIT Composite Pass - blend transparent result over opaque scene
+                {
+                    let hdr_view = engine.hdr_view().expect("HDR view should be available");
+                    let oit_composite = engine.oit_composite_pass().unwrap();
+                    let oit_bind_group = oit_composite.create_bind_group(
+                        &engine.device,
+                        oit_accum_view,
+                        oit_reveal_view,
+                    );
+
+                    let mut composite_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("OIT Composite Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: hdr_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load, // Keep opaque content
+                                store: wgpu::StoreOp::Store,
+                            },
+                            depth_slice: None,
+                        })],
+                        depth_stencil_attachment: None,
+                        ..Default::default()
+                    });
+
+                    oit_composite.draw(&mut composite_pass, &oit_bind_group);
+                }
+            }
         }
 
         // Render SSAO if enabled
@@ -2355,26 +2350,27 @@ impl ApplicationHandler for App {
                     self.drag_distance += delta_x.abs() + delta_y.abs();
                 }
 
-                // Camera control: only if egui isn't using the pointer
-                // Controls (matching C++ Polyscope):
-                // - Left drag (no Shift): Rotate/orbit
-                // - Left drag + Shift OR Right drag: Pan
-                if !egui_using_pointer {
-                    if let Some(engine) = &mut self.engine {
-                        let is_rotate = self.left_mouse_down && !self.shift_down;
-                        let is_pan = (self.left_mouse_down && self.shift_down) || self.right_mouse_down;
+                // Camera control:
+                // - Left drag (no Shift): Rotate/orbit - only if egui isn't using pointer (gizmo)
+                // - Left drag + Shift OR Right drag: Pan - right drag always works
+                if let Some(engine) = &mut self.engine {
+                    // Left drag rotation: blocked when gizmo is active
+                    let is_rotate = self.left_mouse_down && !self.shift_down && !egui_using_pointer;
+                    // Left+Shift pan: blocked when gizmo is active
+                    let is_left_pan = self.left_mouse_down && self.shift_down && !egui_using_pointer;
+                    // Right drag pan: always works regardless of selection/gizmo
+                    let is_right_pan = self.right_mouse_down;
 
-                        if is_rotate {
-                            engine
-                                .camera
-                                .orbit(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
-                        } else if is_pan {
-                            let scale =
-                                engine.camera.position.distance(engine.camera.target) * 0.002;
-                            engine
-                                .camera
-                                .pan(-delta_x as f32 * scale, delta_y as f32 * scale);
-                        }
+                    if is_rotate {
+                        engine
+                            .camera
+                            .orbit(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
+                    } else if is_left_pan || is_right_pan {
+                        let scale =
+                            engine.camera.position.distance(engine.camera.target) * 0.002;
+                        engine
+                            .camera
+                            .pan(-delta_x as f32 * scale, delta_y as f32 * scale);
                     }
                 }
             }
