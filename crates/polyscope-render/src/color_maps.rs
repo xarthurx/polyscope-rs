@@ -59,6 +59,7 @@ impl ColorMapRegistry {
         registry
     }
 
+    #[allow(clippy::approx_constant)] // These are color values, not mathematical constants
     fn register_defaults(&mut self) {
         // Viridis color map
         self.register(ColorMap::new(
