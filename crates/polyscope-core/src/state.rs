@@ -156,16 +156,12 @@ impl Context {
     /// Checks if a group and all its ancestors are enabled.
     fn is_group_and_ancestors_enabled(&self, group_name: &str) -> bool {
         let mut current = group_name;
-        loop {
-            if let Some(group) = self.groups.get(current) {
-                if !group.is_enabled() {
-                    return false;
-                }
-                if let Some(parent) = group.parent_group() {
-                    current = parent;
-                } else {
-                    break;
-                }
+        while let Some(group) = self.groups.get(current) {
+            if !group.is_enabled() {
+                return false;
+            }
+            if let Some(parent) = group.parent_group() {
+                current = parent;
             } else {
                 break;
             }
