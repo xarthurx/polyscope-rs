@@ -128,13 +128,9 @@ Weighted Blended Order-Independent Transparency (OIT) is implemented via `OitPas
 - **Version:** 0.2.0
 - **Clippy:** Clean (zero warnings)
 - **Tests:** Passing
-- **Feature parity:** ~85% of C++ Polyscope 2.x
+- **Feature parity:** ~92% of C++ Polyscope 2.x
 
 ### Missing Features (vs C++ Polyscope)
-- Parameterization quantities (UV visualization)
-- Intrinsic vector quantities
-- One-form quantities
-- Floating quantities (screen-space)
 - Full polygon mesh support (arbitrary polygons beyond triangles)
 - Color RGBA (currently RGB only)
 

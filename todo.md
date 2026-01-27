@@ -49,10 +49,10 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 
 ### Tier 3 — Advanced Quantity Types
 
-- [ ] **Parameterization Quantities** - UV coordinates visualization, checker pattern, grid lines on UV space
-- [ ] **Intrinsic Vectors** - Tangent-space vector visualization, requires local coordinate frame computation
-- [ ] **One-Form Quantities** - Differential form visualization, edge-based data display
-- [ ] **Floating Quantities** - Screen-space data visualization, annotations, labels, billboards
+- [x] **Parameterization Quantities** - UV coordinates visualization with checker, grid, local check, and local radial styles. Both vertex and corner variants.
+- [x] **Intrinsic Vectors** - Tangent-space vector visualization with auto-computed tangent basis and n-fold symmetry (1=vector, 2=line, 4=cross).
+- [x] **One-Form Quantities** - Differential form visualization as edge-midpoint arrows with orientation support.
+- [x] **Floating Quantities** - Scalar images (colormap-based), color images (direct RGB), depth render images, color render images, and raw color images for screen-space data.
 
 ### Tier 4 — Polish
 
