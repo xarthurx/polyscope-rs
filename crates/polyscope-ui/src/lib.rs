@@ -9,6 +9,12 @@
 // Documentation lints: Detailed error/panic docs will be added as the API stabilizes.
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
+// Function length: UI layout and rendering functions are legitimately complex.
+#![allow(clippy::too_many_lines)]
+// Struct design: Settings structs naturally have many boolean options.
+#![allow(clippy::struct_excessive_bools)]
+// Method design: Some methods take &self for API consistency even when not using it.
+#![allow(clippy::unused_self)]
 
 pub mod gizmo;
 pub mod integration;

@@ -9,6 +9,10 @@
 // Documentation lints: Detailed error/panic docs will be added as the API stabilizes.
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
+// Struct design: Options and configuration structs naturally have many boolean fields
+// and field names may include the struct name for clarity.
+#![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::struct_field_names)]
 
 pub mod error;
 pub mod gizmo;

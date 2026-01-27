@@ -52,6 +52,14 @@
 // Documentation lints: Detailed error/panic docs will be added as the API stabilizes.
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
+// Function length: Event handling and application logic are legitimately complex.
+#![allow(clippy::too_many_lines)]
+// Code organization: Local types in event handlers improve readability.
+#![allow(clippy::items_after_statements)]
+// Function signatures: Some public API functions need many parameters for flexibility.
+#![allow(clippy::too_many_arguments)]
+// Method design: Some methods take &self for API consistency or future expansion.
+#![allow(clippy::unused_self)]
 
 mod app;
 

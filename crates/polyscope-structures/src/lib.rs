@@ -17,6 +17,10 @@
 // Documentation lints: Detailed error/panic docs will be added as the API stabilizes.
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
+// Method design: Some methods take &self for API consistency even when not using it.
+#![allow(clippy::unused_self)]
+// Struct design: Configuration structs may have many boolean fields.
+#![allow(clippy::struct_excessive_bools)]
 
 pub mod camera_view;
 pub mod curve_network;

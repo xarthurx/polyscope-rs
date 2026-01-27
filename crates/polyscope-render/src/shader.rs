@@ -33,30 +33,35 @@ impl ShaderBuilder {
     }
 
     /// Sets the vertex shader source (WGSL).
+    #[must_use]
     pub fn with_vertex(mut self, source: impl Into<String>) -> Self {
         self.vertex_source = Some(source.into());
         self
     }
 
     /// Sets the fragment shader source (WGSL).
+    #[must_use]
     pub fn with_fragment(mut self, source: impl Into<String>) -> Self {
         self.fragment_source = Some(source.into());
         self
     }
 
     /// Sets the vertex shader entry point.
+    #[must_use]
     pub fn with_vertex_entry(mut self, entry: impl Into<String>) -> Self {
         self.vertex_entry = entry.into();
         self
     }
 
     /// Sets the fragment shader entry point.
+    #[must_use]
     pub fn with_fragment_entry(mut self, entry: impl Into<String>) -> Self {
         self.fragment_entry = entry.into();
         self
     }
 
     /// Sets the shader label for debugging.
+    #[must_use]
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
