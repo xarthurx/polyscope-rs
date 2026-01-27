@@ -6,6 +6,10 @@
 //! - Global state management and structure registry
 //! - Configuration options and persistent values
 
+// Documentation lints - internal functions don't need exhaustive panic/error docs
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::missing_errors_doc)]
+
 pub mod error;
 pub mod gizmo;
 pub mod ground_plane;
