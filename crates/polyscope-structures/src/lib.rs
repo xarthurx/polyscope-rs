@@ -8,6 +8,11 @@
 //! - Volume grids (implicit surfaces)
 //! - Camera views
 
+// Graphics code intentionally uses casts for indices, colors, and coordinates
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+
 pub mod camera_view;
 pub mod curve_network;
 pub mod point_cloud;

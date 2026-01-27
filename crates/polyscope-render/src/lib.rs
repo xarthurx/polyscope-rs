@@ -6,6 +6,11 @@
 //! - Material and color map systems
 //! - Camera and view management
 
+// Graphics code intentionally uses casts for indices, colors, and coordinates
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+
 pub mod buffer;
 pub mod camera;
 pub mod color_maps;

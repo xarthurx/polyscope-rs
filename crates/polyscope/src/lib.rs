@@ -43,6 +43,11 @@
 //! - [`VolumeGrid`] - A regular grid of values (for implicit surfaces)
 //! - [`CameraView`] - A camera frustum visualization
 
+// Graphics code intentionally uses casts for indices, colors, and coordinates
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+
 mod app;
 
 // Re-export core types
