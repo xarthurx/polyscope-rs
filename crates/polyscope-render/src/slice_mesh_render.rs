@@ -17,12 +17,12 @@ pub struct SliceMeshRenderData {
     index_buffer: wgpu::Buffer,
     /// Normal buffer (vertex normals, vec4 for alignment).
     normal_buffer: wgpu::Buffer,
-    /// Barycentric coordinate buffer for wireframe rendering.
-    barycentric_buffer: wgpu::Buffer,
+    /// Barycentric coordinate buffer for wireframe rendering (kept alive for bind_group).
+    _barycentric_buffer: wgpu::Buffer,
     /// Color buffer (per-vertex colors).
     color_buffer: wgpu::Buffer,
-    /// Edge is real buffer (all ones for slice mesh - all edges are real).
-    edge_is_real_buffer: wgpu::Buffer,
+    /// Edge is real buffer (kept alive for bind_group).
+    _edge_is_real_buffer: wgpu::Buffer,
     /// Uniform buffer for mesh-specific settings.
     uniform_buffer: wgpu::Buffer,
     /// Bind group for this slice mesh.
@@ -170,9 +170,9 @@ impl SliceMeshRenderData {
             vertex_buffer,
             index_buffer,
             normal_buffer,
-            barycentric_buffer,
+            _barycentric_buffer: barycentric_buffer,
             color_buffer,
-            edge_is_real_buffer,
+            _edge_is_real_buffer: edge_is_real_buffer,
             uniform_buffer,
             bind_group,
             num_indices,
@@ -240,6 +240,11 @@ impl SliceMeshRenderData {
     /// Returns the bind group for rendering.
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
+    }
+
+    /// Returns the index buffer for rendering.
+    pub fn index_buffer(&self) -> &wgpu::Buffer {
+        &self.index_buffer
     }
 
     /// Returns the number of indices to draw.
