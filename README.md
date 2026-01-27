@@ -28,14 +28,14 @@ Recommendations and thoughts are welcome in the [Discussions](https://github.com
 
 **Current Version:** 0.2.0 (Alpha)
 
-**Feature Parity:** ~85% of C++ Polyscope 2.x
+**Feature Parity:** ~95% of C++ Polyscope 2.x
 
 ### What's Working
 
 | Feature | Status |
 |---------|--------|
 | Point Clouds | ✅ Full support |
-| Surface Meshes | ✅ Triangle meshes |
+| Surface Meshes | ✅ Triangle meshes with full quantity support |
 | Curve Networks | ✅ Full support |
 | Volume Meshes | ✅ Tet/Hex cells |
 | Volume Grids | ✅ Basic support |
@@ -51,12 +51,13 @@ Recommendations and thoughts are welcome in the [Discussions](https://github.com
 | SSAO | ✅ Ambient occlusion |
 | Screenshots | ✅ PNG/JPEG export |
 | Picking | ✅ Structure/Element |
+| Parameterization | ✅ Checker/Grid/Local styles |
+| Intrinsic Vectors | ✅ Tangent-space with symmetry |
+| One-Forms | ✅ Edge-based differential forms |
+| Floating Quantities | ✅ Scalar/Color/Render images |
 
 ### What's Not Yet Implemented
 
-- Parameterization quantities (UV visualization)
-- Intrinsic vector / one-form quantities
-- Floating quantities (screen-space)
 - Full polygon mesh support (arbitrary polygons)
 - Color RGBA support (currently RGB only)
 
@@ -65,7 +66,7 @@ See [docs/architecture-differences.md](docs/architecture-differences.md) for a d
 ## Features
 
 - **Point Clouds** - Visualize point sets with scalar, vector, and color quantities
-- **Surface Meshes** - Render triangular meshes with per-vertex/face data
+- **Surface Meshes** - Render triangular meshes with scalars, vectors, colors, parameterization, intrinsic vectors, and one-forms
 - **Curve Networks** - Display networks of curves and edges
 - **Volume Meshes** - Visualize tetrahedral and hexahedral meshes
 - **Volume Grids** - Render implicit surfaces via marching cubes
@@ -172,8 +173,7 @@ This project is inspired by the original [Polyscope](https://github.com/nmwsharp
 
 Contributions are welcome! Key areas where help is needed:
 
-- Completing quantity types (parameterization, intrinsic vectors, one-forms)
-- Full polygon mesh support
+- Full polygon mesh support (arbitrary polygons)
 - Color RGBA support
 - Documentation and examples
-- Testing on different platforms
+- Testing on different platforms (macOS, WebGPU)

@@ -68,7 +68,16 @@ Since wgpu does not support geometry shaders, we use **compute shaders** for geo
 Uses geometry shader to generate cylinder + cone geometry from line segments, then ray-casts in fragment shader.
 
 ### polyscope-rs Approach
-Uses instanced rendering with a precomputed arrow mesh template, transformed per-instance by position and vector direction.
+Uses instanced rendering with procedurally generated arrow geometry in the vertex shader (`vector_arrow.wgsl`). Each arrow instance is 120 vertices (8-segment cross-section):
+
+- **Shaft cylinder**: 48 vertices (8 quads = 16 triangles)
+- **Cone sides**: 24 vertices (8 triangles)
+- **Cone bottom cap**: 24 vertices (8 fan triangles)
+- **Shaft bottom cap**: 24 vertices (8 fan triangles)
+
+Arrow proportions: cone takes 30% of total length, cone radius = 2× shaft radius. An orthonormal basis is built per-instance from the vector direction, then local coordinates are transformed to world space.
+
+**Shared infrastructure**: All vector-like quantities (vertex/face vectors, intrinsic vectors, one-forms) share the same shader and `VectorRenderData` GPU resources. Registration methods call `auto_scale()` to set length and radius proportional to the structure's bounding box diagonal.
 
 ## GPU Picking
 
@@ -196,7 +205,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Structure | C++ Polyscope | polyscope-rs | Notes |
 |-----------|--------------|--------------|-------|
 | Point Cloud | ✅ Full | ✅ Full | Complete feature parity |
-| Surface Mesh | ✅ Full | ✅ Most | Triangles full (vertex/face scalar/color/vector), polygons basic |
+| Surface Mesh | ✅ Full | ✅ Most | Triangles full (vertex/face scalar/color/vector/parameterization/intrinsic vector/one-form), polygons basic |
 | Curve Network | ✅ Full | ✅ Full | Line, loop, segments; tube rendering via compute shaders; node/edge scalar/color/vector quantities |
 | Volume Mesh | ✅ Full | ✅ Full | Tet/hex cells, quantities, interior face detection, slice capping |
 | Volume Grid | ✅ Full | ✅ Basic | Node scalars only. Missing: cell quantities, isosurface rendering |
@@ -346,3 +355,5 @@ The following C++ Polyscope features are not yet implemented but planned:
 
 1. **Full Polygon Mesh Support** - Arbitrary polygons (not just triangles)
 2. **Color RGBA** - Currently only RGB; alpha channel not supported
+
+All major quantity types are now implemented, including parameterization, intrinsic vectors, and one-forms with full GPU rendering.

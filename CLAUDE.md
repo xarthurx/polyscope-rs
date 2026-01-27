@@ -71,11 +71,12 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 ### Structures (polyscope-structures)
 
 - `PointCloud` - Point set with scalar/vector/color quantities (full feature parity)
-- `SurfaceMesh` - Triangle mesh with vertex/face scalar/color/vector quantities
+- `SurfaceMesh` - Triangle mesh with full quantity support: vertex/face scalar/color/vector, parameterization (checker/grid/local), intrinsic vectors (tangent-space with n-fold symmetry), one-forms (edge-based differential forms)
 - `CurveNetwork` - Edge network with node/edge scalar/color/vector quantities, tube rendering via compute shaders
 - `VolumeMesh` - Tet/hex mesh with vertex/cell scalar/color/vector quantities, slice plane capping (full)
 - `VolumeGrid` - Regular 3D grid with node scalar quantities (missing: cell quantities, isosurface)
 - `CameraView` - Camera frustum visualization (full)
+- `FloatingQuantity` - Screen-space quantities: scalar images, color images, depth/color/raw render images
 
 ## Technology Stack
 
@@ -101,15 +102,19 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 
 1. Create quantity struct implementing `Quantity` trait
 2. Add appropriate marker trait (`VertexQuantity`, `FaceQuantity`, etc.)
-3. Add convenience method on parent structure
-4. Add UI controls in `polyscope-ui`
+3. Add GPU rendering fields and methods (`render_data`, `init_gpu_resources`, `update_uniforms`, `render_data()`)
+4. Add active accessor methods on parent structure (e.g., `active_vertex_vector_quantity()`)
+5. Add `auto_scale()` call in the structure's registration method
+6. Add init/update/draw code in `app.rs` render pipeline
+7. Add convenience method on parent structure
+8. Add UI controls in `polyscope-ui`
 
 ### Shader Development
 
 Shaders are written in WGSL (WebGPU Shading Language). Implemented shaders:
 - Point sphere impostor (instanced rendering, no geometry shaders)
 - Mesh surface (flat/smooth shading)
-- Vector arrows (instanced with precomputed mesh template)
+- Vector arrows (instanced, fully capped shaft+cone, 120 verts/arrow)
 - Ground plane with shadows and reflections
 - Curve network (line mode + tube mode via compute shaders)
 - GPU picking (point, mesh, curve, volume)
@@ -144,11 +149,21 @@ Weighted Blended Order-Independent Transparency (OIT) is implemented via `OitPas
 - **Version:** 0.2.0
 - **Clippy:** Clean (zero warnings)
 - **Tests:** Passing
-- **Feature parity:** ~92% of C++ Polyscope 2.x
+- **Feature parity:** ~95% of C++ Polyscope 2.x
 
 ### Missing Features (vs C++ Polyscope)
 - Full polygon mesh support (arbitrary polygons beyond triangles)
 - Color RGBA (currently RGB only)
+
+### Vector Arrow Geometry
+
+Arrow instances use 120 vertices each (8-segment cross-section):
+- Shaft cylinder: 48 verts (8 segments × 6)
+- Cone sides: 24 verts (8 segments × 3)
+- Cone bottom cap: 24 verts (8 segments × 3)
+- Shaft bottom cap: 24 verts (8 segments × 3)
+
+All vector-like quantities (vertex/face vectors, intrinsic vectors, one-forms) share `vector_arrow.wgsl` and `VectorRenderData` GPU resources. Registration methods call `auto_scale()` to size arrows proportionally to the structure's bounding box.
 
 ## Reference
 

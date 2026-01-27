@@ -11,15 +11,17 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 - [x] egui UI integration (pure Rust, no native dependencies)
 - [x] Global state management with thread-safe context
 - [x] Structure registry with unique IDs
-- [x] Quantity system (scalars, vectors, colors)
+- [x] Quantity system (scalars, vectors, colors, parameterization, intrinsic vectors, one-forms)
+- [x] Vector arrow rendering — Fully capped arrows (shaft + cone caps, 120 verts/instance), auto-scaling at registration
 
 #### Structures
 - [x] **PointCloud** - Full feature parity with sphere impostors
-- [x] **SurfaceMesh** - Triangles with vertex/face scalar/color/vector quantities, flat/smooth shading
+- [x] **SurfaceMesh** - Triangles with vertex/face scalar/color/vector quantities, parameterization (checker/grid/local), intrinsic vectors (tangent-space, n-fold symmetry), one-forms (edge arrows), flat/smooth shading
 - [x] **CurveNetwork** - Lines + tubes via compute shaders, node/edge scalar/color/vector quantities
 - [x] **VolumeMesh** - Tet/hex cells, interior face detection, slice capping, vertex/cell scalar/color/vector quantities
 - [x] **VolumeGrid** - Node/cell scalars, wireframe bounding box visualization
 - [x] **CameraView** - Frustum visualization
+- [x] **FloatingQuantity** - Scalar images, color images, depth/color/raw render images
 
 #### Scene Features
 - [x] Ground plane with shadows
@@ -53,6 +55,8 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 - [x] **Intrinsic Vectors** - Tangent-space vector visualization with auto-computed tangent basis and n-fold symmetry (1=vector, 2=line, 4=cross).
 - [x] **One-Form Quantities** - Differential form visualization as edge-midpoint arrows with orientation support.
 - [x] **Floating Quantities** - Scalar images (colormap-based), color images (direct RGB), depth render images, color render images, and raw color images for screen-space data.
+
+All Tier 3 quantities have full GPU rendering pipelines (init/update/draw), auto-scaling, and egui UI controls.
 
 ### Tier 4 — Polish
 
