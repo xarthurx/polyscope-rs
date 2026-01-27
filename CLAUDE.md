@@ -119,6 +119,22 @@ Shaders are written in WGSL (WebGPU Shading Language). Implemented shaders:
 - Slice plane visualization (grid pattern)
 - Volume mesh slice capping
 
+### Critical: Model Transform Propagation
+
+Any GPU data derived from a structure's geometry (positions, normals, directions, etc.) **must** be transformed by the structure's model matrix at render time. This applies to:
+
+- Vector arrow base positions and directions (via `VectorUniforms.model`)
+- Pick buffers and hit-testing coordinates
+- Any new quantity that bakes world-space positions into GPU buffers
+
+When adding a new rendered quantity or GPU resource:
+1. Include a `model: mat4x4<f32>` in the shader's uniform struct
+2. Apply it in the vertex shader to both positions (w=1) and directions (w=0)
+3. Pass `structure.transform()` every frame via `update_uniforms()`
+4. Never assume GPU-baked positions are in world space — they are in local/object space
+
+Failure to do this causes quantities to stay frozen in place when the user moves or rotates the structure via gizmos.
+
 ### Transparency (polyscope-render)
 
 Weighted Blended Order-Independent Transparency (OIT) is implemented via `OitPass` and `oit_composite.wgsl`. Surface meshes support `set_transparency()`.
