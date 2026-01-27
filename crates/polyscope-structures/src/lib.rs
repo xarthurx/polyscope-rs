@@ -14,6 +14,9 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::cast_precision_loss)]
+// Documentation lints: Detailed error/panic docs will be added as the API stabilizes.
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 
 pub mod camera_view;
 pub mod curve_network;
