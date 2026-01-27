@@ -21,6 +21,7 @@ pub struct ShaderBuilder {
 
 impl ShaderBuilder {
     /// Creates a new shader builder.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             vertex_source: None,
@@ -89,7 +90,7 @@ impl ShaderBuilder {
         }
 
         // Otherwise combine them
-        Ok(format!("{}\n\n{}", vertex, fragment))
+        Ok(format!("{vertex}\n\n{fragment}"))
     }
 }
 

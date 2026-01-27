@@ -23,6 +23,7 @@ impl ColorMap {
     }
 
     /// Samples the color map at a given value (0 to 1).
+    #[must_use] 
     pub fn sample(&self, t: f32) -> Vec3 {
         let t = t.clamp(0.0, 1.0);
 
@@ -51,6 +52,7 @@ pub struct ColorMapRegistry {
 
 impl ColorMapRegistry {
     /// Creates a new color map registry with default color maps.
+    #[must_use] 
     pub fn new() -> Self {
         let mut registry = Self::default();
         registry.register_defaults();
@@ -140,12 +142,13 @@ impl ColorMapRegistry {
     }
 
     /// Gets a color map by name.
+    #[must_use] 
     pub fn get(&self, name: &str) -> Option<&ColorMap> {
         self.color_maps.get(name)
     }
 
     /// Returns all color map names.
     pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.color_maps.keys().map(|s| s.as_str())
+        self.color_maps.keys().map(std::string::String::as_str)
     }
 }

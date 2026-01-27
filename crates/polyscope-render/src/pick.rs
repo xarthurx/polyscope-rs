@@ -27,7 +27,7 @@ pub enum PickElementType {
 pub struct PickResult {
     /// Whether something was hit.
     pub hit: bool,
-    /// The type of structure that was hit (e.g., "point_cloud", "surface_mesh").
+    /// The type of structure that was hit (e.g., "`point_cloud`", "`surface_mesh`").
     pub structure_type: String,
     /// The name of the structure that was hit.
     pub structure_name: String,
@@ -47,14 +47,16 @@ pub struct PickResult {
 /// - R contains bits 16-23
 /// - G contains bits 8-15
 /// - B contains bits 0-7
+#[must_use] 
 pub fn color_to_index(r: u8, g: u8, b: u8) -> u32 {
-    ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+    (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b)
 }
 
 /// Encodes a structure ID and element ID into RGB pick color.
 ///
 /// Uses 12 bits for structure ID (max 4096) and 12 bits for element ID (max 4096).
 /// Layout: R[7:0] = struct[11:4], G[7:4] = struct[3:0], G[3:0] = elem[11:8], B[7:0] = elem[7:0]
+#[must_use] 
 pub fn encode_pick_id(structure_id: u16, element_id: u16) -> [u8; 3] {
     let s = structure_id & 0xFFF; // 12 bits max
     let e = element_id & 0xFFF; // 12 bits max
@@ -66,9 +68,10 @@ pub fn encode_pick_id(structure_id: u16, element_id: u16) -> [u8; 3] {
 }
 
 /// Decodes RGB pick color back to structure ID and element ID.
+#[must_use] 
 pub fn decode_pick_id(r: u8, g: u8, b: u8) -> (u16, u16) {
-    let structure_id = ((r as u16) << 4) | ((g as u16) >> 4);
-    let element_id = (((g & 0xF) as u16) << 8) | (b as u16);
+    let structure_id = (u16::from(r) << 4) | (u16::from(g) >> 4);
+    let element_id = (u16::from(g & 0xF) << 8) | u16::from(b);
     (structure_id, element_id)
 }
 
@@ -101,6 +104,7 @@ impl Default for PickUniforms {
 /// - R contains bits 16-23
 /// - G contains bits 8-15
 /// - B contains bits 0-7
+#[must_use] 
 pub fn index_to_color(index: u32) -> [u8; 3] {
     [
         ((index >> 16) & 0xFF) as u8,

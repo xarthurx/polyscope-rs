@@ -34,6 +34,7 @@ impl Default for VectorUniforms {
 }
 
 impl VectorRenderData {
+    #[must_use] 
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,

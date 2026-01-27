@@ -70,6 +70,7 @@ impl CameraView {
     }
 
     /// Gets the camera parameters.
+    #[must_use] 
     pub fn params(&self) -> &CameraParameters {
         &self.params
     }
@@ -82,6 +83,7 @@ impl CameraView {
     }
 
     /// Gets the widget color.
+    #[must_use] 
     pub fn color(&self) -> Vec3 {
         self.color
     }
@@ -94,6 +96,7 @@ impl CameraView {
     }
 
     /// Gets the widget focal length (distance from camera origin to frame).
+    #[must_use] 
     pub fn widget_focal_length(&self) -> f32 {
         self.widget_focal_length
     }
@@ -107,6 +110,7 @@ impl CameraView {
     }
 
     /// Gets the widget thickness (line/sphere radius relative to focal length).
+    #[must_use] 
     pub fn widget_thickness(&self) -> f32 {
         self.widget_thickness
     }
@@ -232,6 +236,7 @@ impl CameraView {
     }
 
     /// Returns the render data if available.
+    #[must_use] 
     pub fn render_data(&self) -> Option<&CurveNetworkRenderData> {
         self.render_data.as_ref()
     }
@@ -355,7 +360,7 @@ impl HasQuantities for CameraView {
         self.quantities
             .iter()
             .find(|q| q.name() == name)
-            .map(|q| q.as_ref())
+            .map(std::convert::AsRef::as_ref)
     }
 
     fn get_quantity_mut(&mut self, name: &str) -> Option<&mut Box<dyn Quantity>> {

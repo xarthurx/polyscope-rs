@@ -31,6 +31,7 @@ impl VolumeMeshVertexVectorQuantity {
         }
     }
 
+    #[must_use] 
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
     }
@@ -114,6 +115,7 @@ impl VolumeMeshCellVectorQuantity {
         }
     }
 
+    #[must_use] 
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
     }

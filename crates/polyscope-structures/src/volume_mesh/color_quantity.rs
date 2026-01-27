@@ -25,6 +25,7 @@ impl VolumeMeshVertexColorQuantity {
         }
     }
 
+    #[must_use] 
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
@@ -78,6 +79,7 @@ impl VolumeMeshCellColorQuantity {
         }
     }
 
+    #[must_use] 
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }

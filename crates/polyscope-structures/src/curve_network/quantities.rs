@@ -22,8 +22,8 @@ impl CurveNodeScalarQuantity {
         structure_name: impl Into<String>,
         values: Vec<f32>,
     ) -> Self {
-        let min = values.iter().cloned().fold(f32::INFINITY, f32::min);
-        let max = values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min = values.iter().copied().fold(f32::INFINITY, f32::min);
+        let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
 
         Self {
             name: name.into(),
@@ -37,11 +37,13 @@ impl CurveNodeScalarQuantity {
     }
 
     /// Returns the scalar values.
+    #[must_use] 
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Maps scalar values to colors using the colormap.
+    #[must_use] 
     pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
@@ -56,6 +58,7 @@ impl CurveNodeScalarQuantity {
     }
 
     /// Gets the colormap name.
+    #[must_use] 
     pub fn colormap_name(&self) -> &str {
         &self.colormap_name
     }
@@ -66,11 +69,13 @@ impl CurveNodeScalarQuantity {
     }
 
     /// Gets the range minimum.
+    #[must_use] 
     pub fn range_min(&self) -> f32 {
         self.range_min
     }
 
     /// Gets the range maximum.
+    #[must_use] 
     pub fn range_max(&self) -> f32 {
         self.range_max
     }
@@ -158,8 +163,8 @@ impl CurveEdgeScalarQuantity {
         structure_name: impl Into<String>,
         values: Vec<f32>,
     ) -> Self {
-        let min = values.iter().cloned().fold(f32::INFINITY, f32::min);
-        let max = values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min = values.iter().copied().fold(f32::INFINITY, f32::min);
+        let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
 
         Self {
             name: name.into(),
@@ -173,11 +178,13 @@ impl CurveEdgeScalarQuantity {
     }
 
     /// Returns the scalar values.
+    #[must_use] 
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Maps scalar values to colors using the colormap.
+    #[must_use] 
     pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
@@ -192,6 +199,7 @@ impl CurveEdgeScalarQuantity {
     }
 
     /// Gets the colormap name.
+    #[must_use] 
     pub fn colormap_name(&self) -> &str {
         &self.colormap_name
     }
@@ -202,11 +210,13 @@ impl CurveEdgeScalarQuantity {
     }
 
     /// Gets the range minimum.
+    #[must_use] 
     pub fn range_min(&self) -> f32 {
         self.range_min
     }
 
     /// Gets the range maximum.
+    #[must_use] 
     pub fn range_max(&self) -> f32 {
         self.range_max
     }
@@ -300,6 +310,7 @@ impl CurveNodeColorQuantity {
     }
 
     /// Returns the colors.
+    #[must_use] 
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
@@ -383,6 +394,7 @@ impl CurveEdgeColorQuantity {
     }
 
     /// Returns the colors.
+    #[must_use] 
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }

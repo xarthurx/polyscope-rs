@@ -60,6 +60,7 @@ pub struct ShadowMapPass {
 
 impl ShadowMapPass {
     /// Creates a new shadow map pass.
+    #[must_use] 
     pub fn new(device: &wgpu::Device) -> Self {
         // Create depth texture for shadow map
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -169,6 +170,7 @@ impl ShadowMapPass {
     ///
     /// Creates an orthographic projection from the light's perspective that
     /// encompasses the scene.
+    #[must_use] 
     pub fn compute_light_matrix(scene_center: Vec3, scene_radius: f32, light_dir: Vec3) -> Mat4 {
         let light_dir = light_dir.normalize();
         let light_pos = scene_center - light_dir * scene_radius * 2.0;
@@ -224,26 +226,31 @@ impl ShadowMapPass {
     }
 
     /// Returns the shadow map depth view.
+    #[must_use] 
     pub fn depth_view(&self) -> &wgpu::TextureView {
         &self.depth_view
     }
 
     /// Returns the light uniform buffer.
+    #[must_use] 
     pub fn light_buffer(&self) -> &wgpu::Buffer {
         &self.light_buffer
     }
 
     /// Returns the comparison sampler.
+    #[must_use] 
     pub fn comparison_sampler(&self) -> &wgpu::Sampler {
         &self.comparison_sampler
     }
 
     /// Returns the bind group for shadow sampling.
+    #[must_use] 
     pub fn shadow_bind_group(&self) -> &wgpu::BindGroup {
         &self.shadow_bind_group
     }
 
     /// Returns the bind group layout for shadow sampling.
+    #[must_use] 
     pub fn shadow_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.shadow_bind_group_layout
     }

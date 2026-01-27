@@ -142,11 +142,11 @@ pub struct RenderEngine {
     ssao_output_texture: Option<wgpu::Texture>,
     /// SSAO output texture view.
     ssao_output_view: Option<wgpu::TextureView>,
-    /// OIT accumulation texture (RGBA16Float) - stores weighted color sum.
+    /// OIT accumulation texture (`RGBA16Float`) - stores weighted color sum.
     oit_accum_texture: Option<wgpu::Texture>,
     /// OIT accumulation texture view.
     oit_accum_view: Option<wgpu::TextureView>,
-    /// OIT reveal texture (R8Unorm) - stores transmittance product.
+    /// OIT reveal texture (`R8Unorm`) - stores transmittance product.
     oit_reveal_texture: Option<wgpu::Texture>,
     /// OIT reveal texture view.
     oit_reveal_view: Option<wgpu::TextureView>,
@@ -172,9 +172,9 @@ pub struct RenderEngine {
     reflected_mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
 
     // Pick system - structure ID management
-    /// Map from (type_name, name) to structure pick ID.
+    /// Map from (`type_name`, name) to structure pick ID.
     structure_id_map: HashMap<(String, String), u16>,
-    /// Reverse map from structure pick ID to (type_name, name).
+    /// Reverse map from structure pick ID to (`type_name`, name).
     structure_id_reverse: HashMap<u16, (String, String)>,
     /// Next available structure ID (0 is reserved for background).
     next_structure_id: u16,
@@ -2097,7 +2097,7 @@ impl RenderEngine {
     /// * `length_scale` - Scene length scale
     /// * `height_override` - Optional manual height (None = auto below scene)
     /// * `shadow_darkness` - Shadow darkness (0.0 = no shadow, 1.0 = full black)
-    /// * `shadow_mode` - Shadow mode: 0=none, 1=shadow_only, 2=tile_with_shadow
+    /// * `shadow_mode` - Shadow mode: 0=none, `1=shadow_only`, `2=tile_with_shadow`
     /// * `reflection_intensity` - Reflection intensity (0.0 = opaque, affects transparency)
     #[allow(clippy::too_many_arguments)]
     pub fn render_ground_plane(
@@ -2283,9 +2283,9 @@ impl RenderEngine {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: clear_color[0] as f64,
-                            g: clear_color[1] as f64,
-                            b: clear_color[2] as f64,
+                            r: f64::from(clear_color[0]),
+                            g: f64::from(clear_color[1]),
+                            b: f64::from(clear_color[2]),
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -2444,7 +2444,7 @@ impl RenderEngine {
     pub fn create_screenshot_target(&mut self) -> wgpu::TextureView {
         // Calculate buffer size with proper alignment
         let bytes_per_row = Self::aligned_bytes_per_row(self.width);
-        let buffer_size = (bytes_per_row * self.height) as u64;
+        let buffer_size = u64::from(bytes_per_row * self.height);
 
         // Create HDR texture for rendering (matches pipeline format)
         let hdr_texture = self.device.create_texture(&wgpu::TextureDescriptor {
@@ -2545,7 +2545,7 @@ impl RenderEngine {
         let bytes_per_pixel = 4u32; // RGBA8
         let unaligned = width * bytes_per_pixel;
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        (unaligned + align - 1) / align * align
+        unaligned.div_ceil(align) * align
     }
 
     /// Captures the screenshot after rendering to the screenshot target.
@@ -2679,8 +2679,8 @@ impl RenderEngine {
     /// Ensures OIT (Order-Independent Transparency) textures exist and match viewport size.
     pub fn ensure_oit_textures(&mut self) {
         let needs_create = self.oit_accum_texture.is_none()
-            || self.oit_accum_texture.as_ref().map(|t| t.width()) != Some(self.width)
-            || self.oit_accum_texture.as_ref().map(|t| t.height()) != Some(self.height);
+            || self.oit_accum_texture.as_ref().map(wgpu::Texture::width) != Some(self.width)
+            || self.oit_accum_texture.as_ref().map(wgpu::Texture::height) != Some(self.height);
 
         if !needs_create {
             return;
@@ -3077,7 +3077,7 @@ impl RenderEngine {
     ) {
         if let (Some(tone_map), Some(hdr_view)) = (&self.tone_map_pass, &self.hdr_view) {
             // Use SSAO output view if available, otherwise create a dummy white texture view
-            let ssao_view = self.ssao_output_view.as_ref().unwrap_or_else(|| {
+            let ssao_view = self.ssao_output_view.as_ref().unwrap_or({
                 // This should not happen in practice since we always create SSAO output
                 // But as a fallback, we'll use the HDR view (which will be ignored anyway
                 // when ssao_enabled is false)
@@ -3155,7 +3155,7 @@ impl RenderEngine {
 
     /// Renders a single reflected mesh.
     ///
-    /// Call this for each visible surface mesh after render_stencil_pass.
+    /// Call this for each visible surface mesh after `render_stencil_pass`.
     pub fn render_reflected_mesh(
         &self,
         render_pass: &mut wgpu::RenderPass,

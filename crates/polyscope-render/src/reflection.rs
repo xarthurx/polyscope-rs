@@ -6,6 +6,7 @@ use glam::{Mat4, Vec3, Vec4};
 ///
 /// The plane is defined by a point on the plane and its normal.
 /// The resulting matrix reflects points across this plane.
+#[must_use] 
 pub fn reflection_matrix(plane_point: Vec3, plane_normal: Vec3) -> Mat4 {
     let n = plane_normal.normalize();
     let d = -plane_point.dot(n);
@@ -27,6 +28,7 @@ pub fn reflection_matrix(plane_point: Vec3, plane_normal: Vec3) -> Mat4 {
 /// Computes a reflection matrix for a horizontal ground plane at given height.
 ///
 /// Assumes Y-up coordinate system.
+#[must_use] 
 pub fn ground_reflection_matrix(height: f32) -> Mat4 {
     reflection_matrix(Vec3::new(0.0, height, 0.0), Vec3::Y)
 }

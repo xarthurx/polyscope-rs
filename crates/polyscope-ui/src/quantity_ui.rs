@@ -72,7 +72,7 @@ pub fn build_color_quantity_ui(
         if ui.checkbox(enabled, name).changed() {
             changed = true;
         }
-        ui.label(format!("({} colors)", num_colors));
+        ui.label(format!("({num_colors} colors)"));
     });
 
     changed

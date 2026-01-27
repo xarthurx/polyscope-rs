@@ -123,56 +123,67 @@ impl SurfaceMesh {
     }
 
     /// Returns the number of vertices.
+    #[must_use] 
     pub fn num_vertices(&self) -> usize {
         self.vertices.len()
     }
 
     /// Returns the number of faces.
+    #[must_use] 
     pub fn num_faces(&self) -> usize {
         self.faces.len()
     }
 
     /// Returns the number of triangles in the triangulation.
+    #[must_use] 
     pub fn num_triangles(&self) -> usize {
         self.triangulation.len()
     }
 
     /// Returns the number of edges.
+    #[must_use] 
     pub fn num_edges(&self) -> usize {
         self.edges.len()
     }
 
     /// Returns the vertices.
+    #[must_use] 
     pub fn vertices(&self) -> &[Vec3] {
         &self.vertices
     }
 
     /// Returns the faces (polygon indices).
+    #[must_use] 
     pub fn faces(&self) -> &[Vec<u32>] {
         &self.faces
     }
 
     /// Returns the triangulation.
+    #[must_use] 
     pub fn triangulation(&self) -> &[[u32; 3]] {
         &self.triangulation
     }
 
     /// Returns the mapping from face index to triangle range.
+    #[must_use] 
     pub fn face_to_tri_range(&self) -> &[Range<usize>] {
         &self.face_to_tri_range
     }
 
     /// Returns the vertex normals.
+    #[must_use] 
     pub fn vertex_normals(&self) -> &[Vec3] {
         &self.vertex_normals
     }
 
     /// Returns the face normals.
+    #[must_use] 
     pub fn face_normals(&self) -> &[Vec3] {
         &self.face_normals
     }
 
     /// Returns the corner normals (per triangle vertex).
+    #[must_use] 
     pub fn corner_normals(&self) -> &[Vec3] {
         &self.corner_normals
     }
@@ -182,11 +193,13 @@ impl SurfaceMesh {
     /// - x = 1.0 if edge from this vertex to next is real, 0.0 if internal
     /// - y = 1.0 if edge from next to prev is real (always real for middle edge)
     /// - z = 1.0 if edge from prev to this is real, 0.0 if internal
+    #[must_use] 
     pub fn edge_is_real(&self) -> &[Vec3] {
         &self.edge_is_real
     }
 
     /// Returns the unique edges as sorted pairs.
+    #[must_use] 
     pub fn edges(&self) -> &[(u32, u32)] {
         &self.edges
     }
@@ -208,6 +221,7 @@ impl SurfaceMesh {
     // === Render option getters and setters ===
 
     /// Gets the shade style.
+    #[must_use] 
     pub fn shade_style(&self) -> ShadeStyle {
         self.shade_style
     }
@@ -218,6 +232,7 @@ impl SurfaceMesh {
     }
 
     /// Gets the edge width.
+    #[must_use] 
     pub fn edge_width(&self) -> f32 {
         self.edge_width
     }
@@ -228,6 +243,7 @@ impl SurfaceMesh {
     }
 
     /// Gets the edge color.
+    #[must_use] 
     pub fn edge_color(&self) -> Vec3 {
         self.edge_color
     }
@@ -238,6 +254,7 @@ impl SurfaceMesh {
     }
 
     /// Gets whether edges are shown.
+    #[must_use] 
     pub fn show_edges(&self) -> bool {
         self.show_edges
     }
@@ -248,6 +265,7 @@ impl SurfaceMesh {
     }
 
     /// Gets the backface policy.
+    #[must_use] 
     pub fn backface_policy(&self) -> BackfacePolicy {
         self.backface_policy
     }
@@ -258,6 +276,7 @@ impl SurfaceMesh {
     }
 
     /// Gets the backface color.
+    #[must_use] 
     pub fn backface_color(&self) -> Vec3 {
         self.backface_color
     }
@@ -268,6 +287,7 @@ impl SurfaceMesh {
     }
 
     /// Gets the surface color.
+    #[must_use] 
     pub fn surface_color(&self) -> Vec3 {
         self.surface_color
     }
@@ -278,6 +298,7 @@ impl SurfaceMesh {
     }
 
     /// Gets the transparency (1.0 = opaque, 0.0 = fully transparent).
+    #[must_use] 
     pub fn transparency(&self) -> f32 {
         self.transparency
     }
@@ -418,7 +439,7 @@ impl SurfaceMesh {
         self.edge_is_real.clear();
         self.edge_is_real.reserve(self.triangulation.len() * 3);
 
-        for (_face_idx, range) in self.face_to_tri_range.iter().enumerate() {
+        for range in self.face_to_tri_range.iter() {
             let num_tris = range.end - range.start;
 
             for (j, _tri_idx) in range.clone().enumerate() {
@@ -460,7 +481,7 @@ impl SurfaceMesh {
         }
 
         self.edges = edge_set.into_iter().collect();
-        self.edges.sort(); // Sort for deterministic ordering
+        self.edges.sort_unstable(); // Sort for deterministic ordering
     }
 
     /// Builds the egui UI for this surface mesh.
@@ -558,6 +579,7 @@ impl SurfaceMesh {
     }
 
     /// Returns the currently active vertex scalar quantity, if any.
+    #[must_use] 
     pub fn active_vertex_scalar_quantity(&self) -> Option<&MeshVertexScalarQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -572,6 +594,7 @@ impl SurfaceMesh {
     }
 
     /// Returns the currently active face scalar quantity, if any.
+    #[must_use] 
     pub fn active_face_scalar_quantity(&self) -> Option<&MeshFaceScalarQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -586,6 +609,7 @@ impl SurfaceMesh {
     }
 
     /// Returns the currently active vertex color quantity, if any.
+    #[must_use] 
     pub fn active_vertex_color_quantity(&self) -> Option<&MeshVertexColorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -600,6 +624,7 @@ impl SurfaceMesh {
     }
 
     /// Returns the currently active face color quantity, if any.
+    #[must_use] 
     pub fn active_face_color_quantity(&self) -> Option<&MeshFaceColorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -678,6 +703,7 @@ impl SurfaceMesh {
     }
 
     /// Returns the render data if initialized.
+    #[must_use] 
     pub fn render_data(&self) -> Option<&SurfaceMeshRenderData> {
         self.render_data.as_ref()
     }
@@ -697,15 +723,17 @@ impl SurfaceMesh {
     }
 
     /// Returns the shadow bind group if initialized.
+    #[must_use] 
     pub fn shadow_bind_group(&self) -> Option<&wgpu::BindGroup> {
         self.render_data.as_ref()?.shadow_bind_group.as_ref()
     }
 
     /// Returns whether shadow resources are initialized.
+    #[must_use] 
     pub fn has_shadow_resources(&self) -> bool {
         self.render_data
             .as_ref()
-            .map_or(false, |rd| rd.has_shadow_resources())
+            .is_some_and(polyscope_render::SurfaceMeshRenderData::has_shadow_resources)
     }
 
     /// Updates GPU buffers with current mesh settings.
@@ -831,8 +859,7 @@ impl Structure for SurfaceMesh {
 
     fn length_scale(&self) -> f32 {
         self.bounding_box()
-            .map(|(min, max)| (max - min).length())
-            .unwrap_or(1.0)
+            .map_or(1.0, |(min, max)| (max - min).length())
     }
 
     fn transform(&self) -> Mat4 {
@@ -853,14 +880,12 @@ impl Structure for SurfaceMesh {
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {
         if !self.enabled {
-            return;
         }
         // TODO: Implement mesh rendering
     }
 
     fn draw_pick(&self, _ctx: &mut dyn RenderContext) {
         if !self.enabled {
-            return;
         }
         // TODO: Implement mesh picking
     }
@@ -891,7 +916,7 @@ impl HasQuantities for SurfaceMesh {
         self.quantities
             .iter()
             .find(|q| q.name() == name)
-            .map(|q| q.as_ref())
+            .map(std::convert::AsRef::as_ref)
     }
 
     fn get_quantity_mut(&mut self, name: &str) -> Option<&mut Box<dyn Quantity>> {

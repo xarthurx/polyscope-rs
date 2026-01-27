@@ -54,16 +54,19 @@ impl VolumeGridNodeScalarQuantity {
     }
 
     /// Returns the values.
+    #[must_use] 
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Returns the grid node dimensions.
+    #[must_use] 
     pub fn node_dim(&self) -> UVec3 {
         self.node_dim
     }
 
     /// Gets the value at a 3D index.
+    #[must_use] 
     pub fn get(&self, i: u32, j: u32, k: u32) -> f32 {
         let idx = i as usize
             + j as usize * self.node_dim.x as usize
@@ -72,6 +75,7 @@ impl VolumeGridNodeScalarQuantity {
     }
 
     /// Gets the color map name.
+    #[must_use] 
     pub fn color_map(&self) -> &str {
         &self.color_map
     }
@@ -83,6 +87,7 @@ impl VolumeGridNodeScalarQuantity {
     }
 
     /// Gets the data range.
+    #[must_use] 
     pub fn data_range(&self) -> (f32, f32) {
         (self.data_min, self.data_max)
     }
@@ -200,16 +205,19 @@ impl VolumeGridCellScalarQuantity {
     }
 
     /// Returns the values.
+    #[must_use] 
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Returns the grid cell dimensions.
+    #[must_use] 
     pub fn cell_dim(&self) -> UVec3 {
         self.cell_dim
     }
 
     /// Gets the value at a 3D index.
+    #[must_use] 
     pub fn get(&self, i: u32, j: u32, k: u32) -> f32 {
         let idx = i as usize
             + j as usize * self.cell_dim.x as usize
@@ -218,6 +226,7 @@ impl VolumeGridCellScalarQuantity {
     }
 
     /// Gets the color map name.
+    #[must_use] 
     pub fn color_map(&self) -> &str {
         &self.color_map
     }
@@ -229,6 +238,7 @@ impl VolumeGridCellScalarQuantity {
     }
 
     /// Gets the data range.
+    #[must_use] 
     pub fn data_range(&self) -> (f32, f32) {
         (self.data_min, self.data_max)
     }

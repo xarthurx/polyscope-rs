@@ -37,11 +37,13 @@ impl MeshVertexScalarQuantity {
     }
 
     /// Returns the scalar values.
+    #[must_use] 
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Gets the colormap name.
+    #[must_use] 
     pub fn colormap_name(&self) -> &str {
         &self.colormap_name
     }
@@ -52,11 +54,13 @@ impl MeshVertexScalarQuantity {
     }
 
     /// Gets the range minimum.
+    #[must_use] 
     pub fn range_min(&self) -> f32 {
         self.range_min
     }
 
     /// Gets the range maximum.
+    #[must_use] 
     pub fn range_max(&self) -> f32 {
         self.range_max
     }
@@ -68,6 +72,7 @@ impl MeshVertexScalarQuantity {
     }
 
     /// Maps scalar values to colors using the colormap.
+    #[must_use] 
     pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
@@ -169,11 +174,13 @@ impl MeshFaceScalarQuantity {
     }
 
     /// Returns the scalar values.
+    #[must_use] 
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Gets the colormap name.
+    #[must_use] 
     pub fn colormap_name(&self) -> &str {
         &self.colormap_name
     }
@@ -184,11 +191,13 @@ impl MeshFaceScalarQuantity {
     }
 
     /// Gets the range minimum.
+    #[must_use] 
     pub fn range_min(&self) -> f32 {
         self.range_min
     }
 
     /// Gets the range maximum.
+    #[must_use] 
     pub fn range_max(&self) -> f32 {
         self.range_max
     }
@@ -201,6 +210,7 @@ impl MeshFaceScalarQuantity {
 
     /// Computes vertex colors by expanding face values to all vertices of each face.
     /// For each vertex, uses the color of the last face it belongs to.
+    #[must_use] 
     pub fn compute_vertex_colors(
         &self,
         faces: &[Vec<u32>],
@@ -302,6 +312,7 @@ impl MeshVertexColorQuantity {
     }
 
     /// Returns the colors.
+    #[must_use] 
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
@@ -376,12 +387,14 @@ impl MeshFaceColorQuantity {
     }
 
     /// Returns the colors.
+    #[must_use] 
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
 
     /// Computes vertex colors by expanding face colors to all vertices of each face.
     /// For each vertex, uses the color of the last face it belongs to.
+    #[must_use] 
     pub fn compute_vertex_colors(&self, faces: &[Vec<u32>], num_vertices: usize) -> Vec<Vec3> {
         let mut colors = vec![Vec3::splat(0.5); num_vertices];
 
@@ -471,11 +484,13 @@ impl MeshVertexVectorQuantity {
     }
 
     /// Returns the vectors.
+    #[must_use] 
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
     }
 
     /// Gets the length scale.
+    #[must_use] 
     pub fn length_scale(&self) -> f32 {
         self.length_scale
     }
@@ -486,6 +501,7 @@ impl MeshVertexVectorQuantity {
     }
 
     /// Gets the radius.
+    #[must_use] 
     pub fn radius(&self) -> f32 {
         self.radius
     }
@@ -496,6 +512,7 @@ impl MeshVertexVectorQuantity {
     }
 
     /// Gets the color.
+    #[must_use] 
     pub fn color(&self) -> Vec3 {
         self.color
     }

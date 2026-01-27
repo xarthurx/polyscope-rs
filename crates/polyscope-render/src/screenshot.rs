@@ -5,24 +5,18 @@ use std::path::Path;
 
 /// Options for taking screenshots.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct ScreenshotOptions {
     /// Whether to use transparent background (PNG only).
     pub transparent_background: bool,
 }
 
-impl Default for ScreenshotOptions {
-    fn default() -> Self {
-        Self {
-            transparent_background: false,
-        }
-    }
-}
 
 /// Saves raw BGRA pixel data to an image file.
 ///
 /// # Arguments
 /// * `filename` - Output filename (supports .png, .jpg, .jpeg)
-/// * `data` - Raw BGRA pixel data (4 bytes per pixel, as from wgpu Bgra8UnormSrgb format)
+/// * `data` - Raw BGRA pixel data (4 bytes per pixel, as from wgpu `Bgra8UnormSrgb` format)
 /// * `width` - Image width in pixels
 /// * `height` - Image height in pixels
 ///
@@ -38,7 +32,7 @@ pub fn save_image(
     let extension = path
         .extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase())
+        .map(str::to_lowercase)
         .unwrap_or_default();
 
     // Convert BGRA to RGBA (wgpu surface format is Bgra8UnormSrgb)
@@ -72,7 +66,7 @@ pub fn save_image(
 /// Saves raw BGRA pixel data to a PNG buffer in memory.
 ///
 /// # Arguments
-/// * `data` - Raw BGRA pixel data (4 bytes per pixel, as from wgpu Bgra8UnormSrgb format)
+/// * `data` - Raw BGRA pixel data (4 bytes per pixel, as from wgpu `Bgra8UnormSrgb` format)
 /// * `width` - Image width in pixels
 /// * `height` - Image height in pixels
 ///

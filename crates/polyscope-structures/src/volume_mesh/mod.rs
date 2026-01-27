@@ -71,7 +71,7 @@ pub enum VolumeCellType {
 /// A volume mesh structure (tetrahedral or hexahedral).
 ///
 /// Cells are stored as arrays of 8 vertex indices. For tetrahedra,
-/// only the first 4 indices are used (indices 4-7 are set to u32::MAX).
+/// only the first 4 indices are used (indices 4-7 are set to `u32::MAX`).
 pub struct VolumeMesh {
     name: String,
 
@@ -98,7 +98,7 @@ pub struct VolumeMesh {
     /// Cached slice plane parameters for invalidation (origin, normal)
     slice_plane_cache: Option<(Vec3, Vec3)>,
     /// Cached cell culling plane parameters (origin, normal) for each enabled plane.
-    /// When Some, indicates render_data shows culled geometry.
+    /// When Some, indicates `render_data` shows culled geometry.
     culling_plane_cache: Option<Vec<(Vec3, Vec3)>>,
 }
 
@@ -108,7 +108,7 @@ impl VolumeMesh {
     /// # Arguments
     /// * `name` - The name of the mesh
     /// * `vertices` - Vertex positions
-    /// * `cells` - Cell indices, 8 per cell (unused indices should be u32::MAX)
+    /// * `cells` - Cell indices, 8 per cell (unused indices should be `u32::MAX`)
     pub fn new(name: impl Into<String>, vertices: Vec<Vec3>, cells: Vec<[u32; 8]>) -> Self {
         let color = Vec3::new(0.25, 0.50, 0.75);
         // Interior color is a desaturated version
@@ -163,16 +163,19 @@ impl VolumeMesh {
     }
 
     /// Returns the number of vertices.
+    #[must_use] 
     pub fn num_vertices(&self) -> usize {
         self.vertices.len()
     }
 
     /// Returns the number of cells.
+    #[must_use] 
     pub fn num_cells(&self) -> usize {
         self.cells.len()
     }
 
     /// Returns the cell type of the given cell.
+    #[must_use] 
     pub fn cell_type(&self, cell_idx: usize) -> VolumeCellType {
         if self.cells[cell_idx][4] == u32::MAX {
             VolumeCellType::Tet
@@ -182,16 +185,19 @@ impl VolumeMesh {
     }
 
     /// Returns the vertices.
+    #[must_use] 
     pub fn vertices(&self) -> &[Vec3] {
         &self.vertices
     }
 
     /// Returns the cells.
+    #[must_use] 
     pub fn cells(&self) -> &[[u32; 8]] {
         &self.cells
     }
 
     /// Gets the base color.
+    #[must_use] 
     pub fn color(&self) -> Vec3 {
         self.color
     }
@@ -203,6 +209,7 @@ impl VolumeMesh {
     }
 
     /// Gets the interior color.
+    #[must_use] 
     pub fn interior_color(&self) -> Vec3 {
         self.interior_color
     }
@@ -214,6 +221,7 @@ impl VolumeMesh {
     }
 
     /// Gets the edge color.
+    #[must_use] 
     pub fn edge_color(&self) -> Vec3 {
         self.edge_color
     }
@@ -225,6 +233,7 @@ impl VolumeMesh {
     }
 
     /// Gets the edge width.
+    #[must_use] 
     pub fn edge_width(&self) -> f32 {
         self.edge_width
     }
@@ -237,6 +246,7 @@ impl VolumeMesh {
 
     /// Decomposes all cells into tetrahedra.
     /// Tets pass through unchanged, hexes are decomposed into 5 tets.
+    #[must_use] 
     pub fn decompose_to_tets(&self) -> Vec<[u32; 4]> {
         let mut tets = Vec::new();
 
@@ -246,7 +256,7 @@ impl VolumeMesh {
                 tets.push([cell[0], cell[1], cell[2], cell[3]]);
             } else {
                 // Hex - decompose using diagonal pattern (5 tets)
-                for tet_local in HEX_TO_TET_PATTERN.iter() {
+                for tet_local in &HEX_TO_TET_PATTERN {
                     let tet = [
                         cell[tet_local[0]],
                         cell[tet_local[1]],
@@ -262,6 +272,7 @@ impl VolumeMesh {
     }
 
     /// Returns the number of tetrahedra (including decomposed hexes).
+    #[must_use] 
     pub fn num_tets(&self) -> usize {
         self.decompose_to_tets().len()
     }
@@ -465,6 +476,7 @@ impl VolumeMesh {
     }
 
     /// Generates render geometry including any enabled quantity data.
+    #[must_use] 
     pub fn generate_render_geometry_with_quantities(&self) -> VolumeMeshRenderGeometry {
         let face_counts = self.compute_face_counts();
         let mut positions = Vec::new();
@@ -630,7 +642,7 @@ impl VolumeMesh {
         planes: &[(Vec3, Vec3)],
     ) {
         // Check if cache is still valid (plane hasn't moved)
-        let cache_valid = self.culling_plane_cache.as_ref().map_or(false, |cache| {
+        let cache_valid = self.culling_plane_cache.as_ref().is_some_and(|cache| {
             if cache.len() != planes.len() {
                 return false;
             }
@@ -692,17 +704,20 @@ impl VolumeMesh {
     }
 
     /// Returns true if the mesh is currently showing culled geometry.
+    #[must_use] 
     pub fn is_culled(&self) -> bool {
         self.culling_plane_cache.is_some()
     }
 
     /// Returns the render data if available.
+    #[must_use] 
     pub fn render_data(&self) -> Option<&SurfaceMeshRenderData> {
         self.render_data.as_ref()
     }
 
     /// Generates triangulated exterior faces for picking.
     /// Uses current slice plane culling if provided.
+    #[must_use] 
     pub fn pick_triangles(&self, planes: &[(Vec3, Vec3)]) -> (Vec<Vec3>, Vec<[u32; 3]>) {
         if planes.is_empty() {
             self.generate_render_geometry()
@@ -720,7 +735,7 @@ impl VolumeMesh {
             let uniforms = MeshUniforms {
                 model_matrix,
                 shade_style: 0, // smooth
-                show_edges: if self.edge_width > 0.0 { 1 } else { 0 },
+                show_edges: u32::from(self.edge_width > 0.0),
                 edge_width: self.edge_width,
                 transparency: 0.0,
                 surface_color: [self.color.x, self.color.y, self.color.z, 1.0],
@@ -746,7 +761,7 @@ impl VolumeMesh {
         plane_normal: Vec3,
     ) -> bool {
         // Check if cache is still valid
-        let cache_valid = self.slice_plane_cache.map_or(false, |(o, n)| {
+        let cache_valid = self.slice_plane_cache.is_some_and(|(o, n)| {
             (o - plane_origin).length_squared() < 1e-10 && (n - plane_normal).length_squared() < 1e-10
         });
 
@@ -795,6 +810,7 @@ impl VolumeMesh {
     }
 
     /// Returns the slice render data if available.
+    #[must_use] 
     pub fn slice_render_data(&self) -> Option<&SliceMeshRenderData> {
         self.slice_render_data.as_ref()
     }
@@ -969,6 +985,7 @@ impl VolumeMesh {
     ///
     /// # Returns
     /// `Some(SliceMeshData)` if the plane intersects the mesh, `None` otherwise.
+    #[must_use] 
     pub fn generate_slice_geometry(
         &self,
         plane_origin: Vec3,
@@ -979,7 +996,7 @@ impl VolumeMesh {
         let mut colors = Vec::new();
 
         // Get active vertex color quantity for interpolation (if any)
-        let vertex_colors = self.active_vertex_color_quantity().map(|q| q.colors());
+        let vertex_colors = self.active_vertex_color_quantity().map(color_quantity::VolumeMeshVertexColorQuantity::colors);
 
         for (cell_idx, cell) in self.cells.iter().enumerate() {
             let cell_type = self.cell_type(cell_idx);
@@ -1067,11 +1084,13 @@ pub struct SliceMeshData {
 
 impl SliceMeshData {
     /// Returns the number of triangles in the slice mesh.
+    #[must_use] 
     pub fn num_triangles(&self) -> usize {
         self.vertices.len() / 3
     }
 
     /// Returns true if the slice mesh is empty.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.vertices.is_empty()
     }
@@ -1112,8 +1131,7 @@ impl Structure for VolumeMesh {
 
     fn length_scale(&self) -> f32 {
         self.bounding_box()
-            .map(|(min, max)| (max - min).length())
-            .unwrap_or(1.0)
+            .map_or(1.0, |(min, max)| (max - min).length())
     }
 
     fn transform(&self) -> Mat4 {
@@ -1169,7 +1187,7 @@ impl HasQuantities for VolumeMesh {
         self.quantities
             .iter()
             .find(|q| q.name() == name)
-            .map(|q| q.as_ref())
+            .map(std::convert::AsRef::as_ref)
     }
 
     fn get_quantity_mut(&mut self, name: &str) -> Option<&mut Box<dyn Quantity>> {
@@ -1189,10 +1207,10 @@ impl HasQuantities for VolumeMesh {
 use std::collections::HashMap;
 
 /// Generates a canonical (sorted) face key for hashing.
-/// For triangular faces, the fourth element is u32::MAX.
+/// For triangular faces, the fourth element is `u32::MAX`.
 fn canonical_face_key(v0: u32, v1: u32, v2: u32, v3: Option<u32>) -> [u32; 4] {
     let mut key = [v0, v1, v2, v3.unwrap_or(u32::MAX)];
-    key.sort();
+    key.sort_unstable();
     key
 }
 

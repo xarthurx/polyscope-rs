@@ -17,17 +17,17 @@ pub struct SliceMeshRenderData {
     index_buffer: wgpu::Buffer,
     /// Normal buffer (vertex normals, vec4 for alignment).
     normal_buffer: wgpu::Buffer,
-    /// Barycentric coordinate buffer for wireframe rendering (kept alive for bind_group).
+    /// Barycentric coordinate buffer for wireframe rendering (kept alive for `bind_group`).
     _barycentric_buffer: wgpu::Buffer,
     /// Color buffer (per-vertex colors).
     color_buffer: wgpu::Buffer,
-    /// Edge is real buffer (kept alive for bind_group).
+    /// Edge is real buffer (kept alive for `bind_group`).
     _edge_is_real_buffer: wgpu::Buffer,
     /// Uniform buffer for mesh-specific settings.
     uniform_buffer: wgpu::Buffer,
     /// Bind group for this slice mesh.
     bind_group: wgpu::BindGroup,
-    /// Number of indices (num_triangles * 3).
+    /// Number of indices (`num_triangles` * 3).
     num_indices: u32,
 }
 
@@ -41,6 +41,7 @@ impl SliceMeshRenderData {
     /// * `vertices` - Vertex positions (3 per triangle)
     /// * `normals` - Vertex normals (3 per triangle)
     /// * `colors` - Vertex colors (3 per triangle)
+    #[must_use] 
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -238,21 +239,25 @@ impl SliceMeshRenderData {
     }
 
     /// Returns the bind group for rendering.
+    #[must_use] 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
 
     /// Returns the index buffer for rendering.
+    #[must_use] 
     pub fn index_buffer(&self) -> &wgpu::Buffer {
         &self.index_buffer
     }
 
     /// Returns the number of indices to draw.
+    #[must_use] 
     pub fn num_indices(&self) -> u32 {
         self.num_indices
     }
 
     /// Returns true if the slice mesh is empty.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.num_indices == 0
     }

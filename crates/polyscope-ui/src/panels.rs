@@ -179,8 +179,10 @@ pub struct SlicePlaneSelectionInfo {
 
 /// Actions specific to slice plane gizmo manipulation.
 #[derive(Debug, Clone, PartialEq)]
+#[derive(Default)]
 pub enum SlicePlaneGizmoAction {
     /// No action.
+    #[default]
     None,
     /// Slice plane selection changed.
     SelectionChanged,
@@ -190,11 +192,6 @@ pub enum SlicePlaneGizmoAction {
     Deselect,
 }
 
-impl Default for SlicePlaneGizmoAction {
-    fn default() -> Self {
-        Self::None
-    }
-}
 
 /// Settings for a single group in the UI.
 #[derive(Debug, Clone)]
@@ -207,7 +204,7 @@ pub struct GroupSettings {
     pub show_child_details: bool,
     /// Parent group name (if any).
     pub parent_group: Option<String>,
-    /// Child structure identifiers (type_name, name).
+    /// Child structure identifiers (`type_name`, name).
     pub child_structures: Vec<(String, String)>,
     /// Child group names.
     pub child_groups: Vec<String>,
@@ -247,7 +244,7 @@ pub enum GroupsAction {
     Remove(usize),
     /// Toggle enabled state for group at index.
     ToggleEnabled(usize),
-    /// Toggle show_child_details for group at index.
+    /// Toggle `show_child_details` for group at index.
     ToggleDetails(usize),
 }
 
@@ -460,7 +457,7 @@ fn build_group_item(ui: &mut Ui, settings: &mut GroupSettings) -> bool {
         ui.indent("structures", |ui| {
             for (type_name, name) in &settings.child_structures {
                 ui.horizontal(|ui| {
-                    ui.label(format!("[{}]", type_name));
+                    ui.label(format!("[{type_name}]"));
                     ui.label(name);
                 });
             }
@@ -473,7 +470,7 @@ fn build_group_item(ui: &mut Ui, settings: &mut GroupSettings) -> bool {
         ui.label("Child groups:");
         ui.indent("child_groups", |ui| {
             for child_name in &settings.child_groups {
-                ui.label(format!("  {}", child_name));
+                ui.label(format!("  {child_name}"));
             }
         });
     }
@@ -534,7 +531,7 @@ pub fn build_groups_section(
                 );
 
                 CollapsingHeader::new(header_text)
-                    .id_salt(format!("group_{}", idx))
+                    .id_salt(format!("group_{idx}"))
                     .default_open(false)
                     .show(ui, |ui| {
                         if build_group_item(ui, group) && action == GroupsAction::None {
@@ -759,7 +756,7 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
 }
 
 /// Builds the scene extents section.
-/// Returns true if auto_compute changed.
+/// Returns true if `auto_compute` changed.
 pub fn build_scene_extents_section(ui: &mut Ui, extents: &mut SceneExtents) -> bool {
     let mut changed = false;
 
@@ -1223,14 +1220,13 @@ pub fn build_slice_planes_section(
                     format!("{} {}", if plane.enabled { "●" } else { "○" }, plane.name);
 
                 CollapsingHeader::new(header_text)
-                    .id_salt(format!("slice_plane_{}", idx))
+                    .id_salt(format!("slice_plane_{idx}"))
                     .default_open(false)
                     .show(ui, |ui| {
-                        if build_slice_plane_item(ui, plane) {
-                            if action == SlicePlanesAction::None {
+                        if build_slice_plane_item(ui, plane)
+                            && action == SlicePlanesAction::None {
                                 action = SlicePlanesAction::Modified(idx);
                             }
-                        }
 
                         ui.separator();
                         if ui.button("Remove").clicked() {

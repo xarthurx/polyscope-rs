@@ -33,6 +33,7 @@ pub struct ToneMapPass {
 
 impl ToneMapPass {
     /// Creates a new tone mapping pass.
+    #[must_use] 
     pub fn new(device: &wgpu::Device, output_format: wgpu::TextureFormat) -> Self {
         // Create bind group layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -161,12 +162,13 @@ impl ToneMapPass {
             exposure,
             white_level,
             gamma,
-            ssao_enabled: if ssao_enabled { 1 } else { 0 },
+            ssao_enabled: u32::from(ssao_enabled),
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
     }
 
     /// Creates a bind group for rendering.
+    #[must_use] 
     pub fn create_bind_group(
         &self,
         device: &wgpu::Device,

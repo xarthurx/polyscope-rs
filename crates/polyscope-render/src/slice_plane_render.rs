@@ -7,7 +7,7 @@ use polyscope_core::slice_plane::SlicePlane;
 use wgpu::util::DeviceExt;
 
 /// GPU representation of slice plane visualization uniforms.
-/// Matches the shader's PlaneUniforms struct.
+/// Matches the shader's `PlaneUniforms` struct.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[allow(clippy::pub_underscore_fields)]
@@ -82,6 +82,7 @@ impl SlicePlaneRenderData {
     /// * `device` - The wgpu device
     /// * `bind_group_layout` - The bind group layout
     /// * `camera_buffer` - The camera uniform buffer
+    #[must_use] 
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -139,6 +140,7 @@ impl SlicePlaneRenderData {
     }
 
     /// Returns the bind group for rendering.
+    #[must_use] 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
@@ -146,7 +148,7 @@ impl SlicePlaneRenderData {
     /// Draws the slice plane visualization.
     ///
     /// Draws 6 vertices (2 triangles) forming a quad. Both sides are rendered
-    /// because the pipeline has cull_mode: None.
+    /// because the pipeline has `cull_mode`: None.
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.draw(0..6, 0..1);
@@ -154,6 +156,7 @@ impl SlicePlaneRenderData {
 }
 
 /// Creates the bind group layout for slice plane rendering.
+#[must_use] 
 pub fn create_slice_plane_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Slice Plane Bind Group Layout"),
@@ -185,6 +188,7 @@ pub fn create_slice_plane_bind_group_layout(device: &wgpu::Device) -> wgpu::Bind
 }
 
 /// Creates the render pipeline for slice plane visualization.
+#[must_use] 
 pub fn create_slice_plane_pipeline(
     device: &wgpu::Device,
     bind_group_layout: &wgpu::BindGroupLayout,

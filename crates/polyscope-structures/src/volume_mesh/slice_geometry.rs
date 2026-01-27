@@ -12,12 +12,13 @@ pub struct CellSliceResult {
     /// Intersection points (vertices of the slice polygon)
     pub vertices: Vec<Vec3>,
     /// Interpolation data for vertex attributes.
-    /// Each entry is (vert_a, vert_b, t) where result = lerp(a, b, t)
+    /// Each entry is (`vert_a`, `vert_b`, t) where result = lerp(a, b, t)
     pub interpolation: Vec<(u32, u32, f32)>,
 }
 
 impl CellSliceResult {
     /// Creates an empty slice result (no intersection).
+    #[must_use] 
     pub fn empty() -> Self {
         Self {
             vertices: Vec::new(),
@@ -26,6 +27,7 @@ impl CellSliceResult {
     }
 
     /// Returns true if the slice produced a valid polygon.
+    #[must_use] 
     pub fn has_intersection(&self) -> bool {
         self.vertices.len() >= 3
     }
@@ -43,6 +45,7 @@ impl CellSliceResult {
 ///
 /// # Returns
 /// A `CellSliceResult` containing 0, 3, or 4 vertices depending on the intersection.
+#[must_use] 
 pub fn slice_tet(
     v0: Vec3,
     v1: Vec3,
@@ -97,6 +100,7 @@ pub fn slice_tet(
 ///
 /// # Returns
 /// A `CellSliceResult` containing 0, 3-6 vertices depending on the intersection.
+#[must_use] 
 pub fn slice_hex(vertices: [Vec3; 8], plane_origin: Vec3, plane_normal: Vec3) -> CellSliceResult {
     // Standard decomposition of a hex into 5 tets
     // This decomposition is symmetric and works for any hex orientation

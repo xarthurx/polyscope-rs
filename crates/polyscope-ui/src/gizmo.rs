@@ -22,6 +22,7 @@ impl Default for TransformGizmo {
 
 impl TransformGizmo {
     /// Creates a new transform gizmo.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             gizmo: Gizmo::default(),
@@ -67,22 +68,22 @@ impl TransformGizmo {
         let (scale, rotation, translation) = model_matrix.to_scale_rotation_translation();
         let transform = Transform {
             translation: mint::Vector3 {
-                x: translation.x as f64,
-                y: translation.y as f64,
-                z: translation.z as f64,
+                x: f64::from(translation.x),
+                y: f64::from(translation.y),
+                z: f64::from(translation.z),
             },
             rotation: mint::Quaternion {
                 v: mint::Vector3 {
-                    x: rotation.x as f64,
-                    y: rotation.y as f64,
-                    z: rotation.z as f64,
+                    x: f64::from(rotation.x),
+                    y: f64::from(rotation.y),
+                    z: f64::from(rotation.z),
                 },
-                s: rotation.w as f64,
+                s: f64::from(rotation.w),
             },
             scale: mint::Vector3 {
-                x: scale.x as f64,
-                y: scale.y as f64,
-                z: scale.z as f64,
+                x: f64::from(scale.x),
+                y: f64::from(scale.y),
+                z: f64::from(scale.z),
             },
         };
 
@@ -138,6 +139,7 @@ impl TransformGizmo {
     }
 
     /// Decomposes a Mat4 into translation, rotation (Euler degrees), and scale.
+    #[must_use] 
     pub fn decompose_transform(matrix: Mat4) -> (Vec3, Vec3, Vec3) {
         let (scale, rotation, translation) = matrix.to_scale_rotation_translation();
         let euler = rotation.to_euler(glam::EulerRot::XYZ);
@@ -150,6 +152,7 @@ impl TransformGizmo {
     }
 
     /// Composes a Mat4 from translation, rotation (Euler degrees), and scale.
+    #[must_use] 
     pub fn compose_transform(translation: Vec3, euler_degrees: Vec3, scale: Vec3) -> Mat4 {
         let rotation = Quat::from_euler(
             glam::EulerRot::XYZ,
@@ -161,29 +164,29 @@ impl TransformGizmo {
     }
 }
 
-/// Convert glam Mat4 (f32) to DMat4 (f64).
+/// Convert glam Mat4 (f32) to `DMat4` (f64).
 fn mat4_to_dmat4(m: Mat4) -> DMat4 {
     DMat4::from_cols_array(&[
-        m.x_axis.x as f64,
-        m.x_axis.y as f64,
-        m.x_axis.z as f64,
-        m.x_axis.w as f64,
-        m.y_axis.x as f64,
-        m.y_axis.y as f64,
-        m.y_axis.z as f64,
-        m.y_axis.w as f64,
-        m.z_axis.x as f64,
-        m.z_axis.y as f64,
-        m.z_axis.z as f64,
-        m.z_axis.w as f64,
-        m.w_axis.x as f64,
-        m.w_axis.y as f64,
-        m.w_axis.z as f64,
-        m.w_axis.w as f64,
+        f64::from(m.x_axis.x),
+        f64::from(m.x_axis.y),
+        f64::from(m.x_axis.z),
+        f64::from(m.x_axis.w),
+        f64::from(m.y_axis.x),
+        f64::from(m.y_axis.y),
+        f64::from(m.y_axis.z),
+        f64::from(m.y_axis.w),
+        f64::from(m.z_axis.x),
+        f64::from(m.z_axis.y),
+        f64::from(m.z_axis.z),
+        f64::from(m.z_axis.w),
+        f64::from(m.w_axis.x),
+        f64::from(m.w_axis.y),
+        f64::from(m.w_axis.z),
+        f64::from(m.w_axis.w),
     ])
 }
 
-/// Convert DMat4 to row-major mint matrix.
+/// Convert `DMat4` to row-major mint matrix.
 fn dmat4_to_row_mint(m: DMat4) -> mint::RowMatrix4<f64> {
     // glam stores column-major, mint::RowMatrix4 expects row-major
     mint::RowMatrix4 {

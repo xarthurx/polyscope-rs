@@ -84,7 +84,7 @@ use glam::UVec3;
 use std::sync::Mutex;
 
 /// Global screenshot request storage.
-/// This allows screenshot() to be called from user code while show() is running.
+/// This allows `screenshot()` to be called from user code while `show()` is running.
 static SCREENSHOT_REQUEST: Mutex<Option<ScreenshotRequest>> = Mutex::new(None);
 
 /// A pending screenshot request.
@@ -183,6 +183,7 @@ pub fn init() -> Result<()> {
 }
 
 /// Returns whether polyscope has been initialized.
+#[must_use] 
 pub fn is_initialized() -> bool {
     polyscope_core::state::is_initialized()
 }
@@ -245,6 +246,7 @@ pub fn register_surface_mesh(
 }
 
 /// Gets a registered point cloud by name.
+#[must_use] 
 pub fn get_point_cloud(name: &str) -> Option<PointCloudHandle> {
     with_context(|ctx| {
         if ctx.registry.contains("PointCloud", name) {
@@ -258,6 +260,7 @@ pub fn get_point_cloud(name: &str) -> Option<PointCloudHandle> {
 }
 
 /// Gets a registered surface mesh by name.
+#[must_use] 
 pub fn get_surface_mesh(name: &str) -> Option<SurfaceMeshHandle> {
     with_context(|ctx| {
         if ctx.registry.contains("SurfaceMesh", name) {
@@ -305,11 +308,13 @@ pub struct PointCloudHandle {
 
 impl PointCloudHandle {
     /// Returns the name of this point cloud.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Adds a scalar quantity to this point cloud.
+    #[must_use] 
     pub fn add_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
         with_context_mut(|ctx| {
             if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name) {
@@ -322,6 +327,7 @@ impl PointCloudHandle {
     }
 
     /// Adds a vector quantity to this point cloud.
+    #[must_use] 
     pub fn add_vector_quantity(&self, name: &str, vectors: Vec<Vec3>) -> &Self {
         with_context_mut(|ctx| {
             if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name) {
@@ -334,6 +340,7 @@ impl PointCloudHandle {
     }
 
     /// Adds a color quantity to this point cloud.
+    #[must_use] 
     pub fn add_color_quantity(&self, name: &str, colors: Vec<Vec3>) -> &Self {
         with_context_mut(|ctx| {
             if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name) {
@@ -354,6 +361,7 @@ pub struct SurfaceMeshHandle {
 
 impl SurfaceMeshHandle {
     /// Returns the name of this mesh.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -469,6 +477,7 @@ pub fn register_curve_network_segments(
 }
 
 /// Gets a registered curve network by name.
+#[must_use] 
 pub fn get_curve_network(name: &str) -> Option<CurveNetworkHandle> {
     with_context(|ctx| {
         if ctx.registry.contains("CurveNetwork", name) {
@@ -489,11 +498,13 @@ pub struct CurveNetworkHandle {
 
 impl CurveNetworkHandle {
     /// Returns the name of this curve network.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Sets the base color.
+    #[must_use] 
     pub fn set_color(&self, color: Vec3) -> &Self {
         with_curve_network(&self.name, |cn| {
             cn.set_color(color);
@@ -502,6 +513,7 @@ impl CurveNetworkHandle {
     }
 
     /// Sets the radius.
+    #[must_use] 
     pub fn set_radius(&self, radius: f32, is_relative: bool) -> &Self {
         with_curve_network(&self.name, |cn| {
             cn.set_radius(radius, is_relative);
@@ -510,6 +522,7 @@ impl CurveNetworkHandle {
     }
 
     /// Sets the material.
+    #[must_use] 
     pub fn set_material(&self, material: &str) -> &Self {
         with_curve_network(&self.name, |cn| {
             cn.set_material(material);
@@ -582,6 +595,7 @@ pub fn register_camera_view_look_at(
 }
 
 /// Gets a registered camera view by name.
+#[must_use] 
 pub fn get_camera_view(name: &str) -> Option<CameraViewHandle> {
     with_context(|ctx| {
         if ctx.registry.contains("CameraView", name) {
@@ -602,11 +616,13 @@ pub struct CameraViewHandle {
 
 impl CameraViewHandle {
     /// Returns the name of this camera view.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Sets the widget color.
+    #[must_use] 
     pub fn set_color(&self, color: Vec3) -> &Self {
         with_camera_view(&self.name, |cv| {
             cv.set_color(color);
@@ -615,6 +631,7 @@ impl CameraViewHandle {
     }
 
     /// Sets the widget focal length.
+    #[must_use] 
     pub fn set_widget_focal_length(&self, length: f32, is_relative: bool) -> &Self {
         with_camera_view(&self.name, |cv| {
             cv.set_widget_focal_length(length, is_relative);
@@ -623,6 +640,7 @@ impl CameraViewHandle {
     }
 
     /// Sets the widget thickness.
+    #[must_use] 
     pub fn set_widget_thickness(&self, thickness: f32) -> &Self {
         with_camera_view(&self.name, |cv| {
             cv.set_widget_thickness(thickness);
@@ -631,6 +649,7 @@ impl CameraViewHandle {
     }
 
     /// Updates the camera parameters.
+    #[must_use] 
     pub fn set_params(&self, params: CameraParameters) -> &Self {
         with_camera_view(&self.name, |cv| {
             cv.set_params(params);
@@ -704,6 +723,7 @@ pub fn register_volume_grid_uniform(
 }
 
 /// Gets a registered volume grid by name.
+#[must_use] 
 pub fn get_volume_grid(name: &str) -> Option<VolumeGridHandle> {
     with_context(|ctx| {
         if ctx.registry.contains("VolumeGrid", name) {
@@ -724,11 +744,13 @@ pub struct VolumeGridHandle {
 
 impl VolumeGridHandle {
     /// Returns the name of this volume grid.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Sets the edge color.
+    #[must_use] 
     pub fn set_edge_color(&self, color: Vec3) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.set_edge_color(color);
@@ -737,6 +759,7 @@ impl VolumeGridHandle {
     }
 
     /// Sets the edge width.
+    #[must_use] 
     pub fn set_edge_width(&self, width: f32) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.set_edge_width(width);
@@ -745,6 +768,7 @@ impl VolumeGridHandle {
     }
 
     /// Adds a node scalar quantity.
+    #[must_use] 
     pub fn add_node_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.add_node_scalar_quantity(name, values);
@@ -753,6 +777,7 @@ impl VolumeGridHandle {
     }
 
     /// Adds a cell scalar quantity.
+    #[must_use] 
     pub fn add_cell_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.add_cell_scalar_quantity(name, values);
@@ -835,7 +860,7 @@ pub fn register_hex_mesh(
 
 /// Registers a generic volume mesh with polyscope.
 ///
-/// Cells are stored as 8-index arrays. For tetrahedra, indices 4-7 should be u32::MAX.
+/// Cells are stored as 8-index arrays. For tetrahedra, indices 4-7 should be `u32::MAX`.
 pub fn register_volume_mesh(
     name: impl Into<String>,
     vertices: Vec<Vec3>,
@@ -855,6 +880,7 @@ pub fn register_volume_mesh(
 }
 
 /// Gets a registered volume mesh by name.
+#[must_use] 
 pub fn get_volume_mesh(name: &str) -> Option<VolumeMeshHandle> {
     with_context(|ctx| {
         if ctx.registry.contains("VolumeMesh", name) {
@@ -875,11 +901,13 @@ pub struct VolumeMeshHandle {
 
 impl VolumeMeshHandle {
     /// Returns the name of this volume mesh.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Sets the base color.
+    #[must_use] 
     pub fn set_color(&self, color: Vec3) -> &Self {
         with_volume_mesh(&self.name, |vm| {
             vm.set_color(color);
@@ -888,6 +916,7 @@ impl VolumeMeshHandle {
     }
 
     /// Sets the interior color.
+    #[must_use] 
     pub fn set_interior_color(&self, color: Vec3) -> &Self {
         with_volume_mesh(&self.name, |vm| {
             vm.set_interior_color(color);
@@ -896,6 +925,7 @@ impl VolumeMeshHandle {
     }
 
     /// Sets the edge color.
+    #[must_use] 
     pub fn set_edge_color(&self, color: Vec3) -> &Self {
         with_volume_mesh(&self.name, |vm| {
             vm.set_edge_color(color);
@@ -904,6 +934,7 @@ impl VolumeMeshHandle {
     }
 
     /// Sets the edge width.
+    #[must_use] 
     pub fn set_edge_width(&self, width: f32) -> &Self {
         with_volume_mesh(&self.name, |vm| {
             vm.set_edge_width(width);
@@ -1013,6 +1044,7 @@ pub fn create_group(name: impl Into<String>) -> GroupHandle {
 }
 
 /// Gets an existing group by name.
+#[must_use] 
 pub fn get_group(name: &str) -> Option<GroupHandle> {
     with_context(|ctx| {
         if ctx.has_group(name) {
@@ -1035,11 +1067,12 @@ pub fn remove_group(name: &str) {
 }
 
 /// Returns all group names.
+#[must_use] 
 pub fn get_all_groups() -> Vec<String> {
     with_context(|ctx| {
         ctx.group_names()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect()
     })
 }
@@ -1052,11 +1085,13 @@ pub struct GroupHandle {
 
 impl GroupHandle {
     /// Returns the name of this group.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Sets whether this group is enabled (visible).
+    #[must_use] 
     pub fn set_enabled(&self, enabled: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1067,15 +1102,16 @@ impl GroupHandle {
     }
 
     /// Returns whether this group is enabled.
+    #[must_use] 
     pub fn is_enabled(&self) -> bool {
         with_context(|ctx| {
             ctx.get_group(&self.name)
-                .map(|g| g.is_enabled())
-                .unwrap_or(false)
+                .is_some_and(polyscope_core::Group::is_enabled)
         })
     }
 
     /// Sets whether child details are shown in UI.
+    #[must_use] 
     pub fn set_show_child_details(&self, show: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1086,6 +1122,7 @@ impl GroupHandle {
     }
 
     /// Adds a point cloud to this group.
+    #[must_use] 
     pub fn add_point_cloud(&self, pc_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1096,6 +1133,7 @@ impl GroupHandle {
     }
 
     /// Adds a surface mesh to this group.
+    #[must_use] 
     pub fn add_surface_mesh(&self, mesh_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1106,6 +1144,7 @@ impl GroupHandle {
     }
 
     /// Adds a curve network to this group.
+    #[must_use] 
     pub fn add_curve_network(&self, cn_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1116,6 +1155,7 @@ impl GroupHandle {
     }
 
     /// Adds a volume mesh to this group.
+    #[must_use] 
     pub fn add_volume_mesh(&self, vm_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1126,6 +1166,7 @@ impl GroupHandle {
     }
 
     /// Adds a volume grid to this group.
+    #[must_use] 
     pub fn add_volume_grid(&self, vg_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1136,6 +1177,7 @@ impl GroupHandle {
     }
 
     /// Adds a camera view to this group.
+    #[must_use] 
     pub fn add_camera_view(&self, cv_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1146,6 +1188,7 @@ impl GroupHandle {
     }
 
     /// Removes a structure from this group.
+    #[must_use] 
     pub fn remove_structure(&self, type_name: &str, name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1156,6 +1199,7 @@ impl GroupHandle {
     }
 
     /// Adds a child group to this group.
+    #[must_use] 
     pub fn add_child_group(&self, child_name: &str) -> &Self {
         with_context_mut(|ctx| {
             // Set parent on child group
@@ -1171,6 +1215,7 @@ impl GroupHandle {
     }
 
     /// Removes a child group from this group.
+    #[must_use] 
     pub fn remove_child_group(&self, child_name: &str) -> &Self {
         with_context_mut(|ctx| {
             // Remove parent from child group
@@ -1186,20 +1231,20 @@ impl GroupHandle {
     }
 
     /// Returns the number of structures in this group.
+    #[must_use] 
     pub fn num_structures(&self) -> usize {
         with_context(|ctx| {
             ctx.get_group(&self.name)
-                .map(|g| g.num_child_structures())
-                .unwrap_or(0)
+                .map_or(0, polyscope_core::Group::num_child_structures)
         })
     }
 
     /// Returns the number of child groups.
+    #[must_use] 
     pub fn num_child_groups(&self) -> usize {
         with_context(|ctx| {
             ctx.get_group(&self.name)
-                .map(|g| g.num_child_groups())
-                .unwrap_or(0)
+                .map_or(0, polyscope_core::Group::num_child_groups)
         })
     }
 }
@@ -1246,6 +1291,7 @@ pub fn add_slice_plane_with_pose(
 }
 
 /// Gets an existing slice plane by name.
+#[must_use] 
 pub fn get_slice_plane(name: &str) -> Option<SlicePlaneHandle> {
     with_context(|ctx| {
         if ctx.has_slice_plane(name) {
@@ -1273,11 +1319,12 @@ pub fn remove_all_slice_planes() {
 }
 
 /// Returns all slice plane names.
+#[must_use] 
 pub fn get_all_slice_planes() -> Vec<String> {
     with_context(|ctx| {
         ctx.slice_plane_names()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect()
     })
 }
@@ -1290,11 +1337,13 @@ pub struct SlicePlaneHandle {
 
 impl SlicePlaneHandle {
     /// Returns the name of this slice plane.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Sets the pose (origin and normal) of the slice plane.
+    #[must_use] 
     pub fn set_pose(&self, origin: Vec3, normal: Vec3) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1305,6 +1354,7 @@ impl SlicePlaneHandle {
     }
 
     /// Sets the origin point of the plane.
+    #[must_use] 
     pub fn set_origin(&self, origin: Vec3) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1315,15 +1365,16 @@ impl SlicePlaneHandle {
     }
 
     /// Gets the origin point of the plane.
+    #[must_use] 
     pub fn origin(&self) -> Vec3 {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map(|p| p.origin())
-                .unwrap_or(Vec3::ZERO)
+                .map_or(Vec3::ZERO, polyscope_core::SlicePlane::origin)
         })
     }
 
     /// Sets the normal direction of the plane.
+    #[must_use] 
     pub fn set_normal(&self, normal: Vec3) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1334,15 +1385,16 @@ impl SlicePlaneHandle {
     }
 
     /// Gets the normal direction of the plane.
+    #[must_use] 
     pub fn normal(&self) -> Vec3 {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map(|p| p.normal())
-                .unwrap_or(Vec3::Y)
+                .map_or(Vec3::Y, polyscope_core::SlicePlane::normal)
         })
     }
 
     /// Sets whether the slice plane is enabled.
+    #[must_use] 
     pub fn set_enabled(&self, enabled: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1353,15 +1405,16 @@ impl SlicePlaneHandle {
     }
 
     /// Returns whether the slice plane is enabled.
+    #[must_use] 
     pub fn is_enabled(&self) -> bool {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map(|p| p.is_enabled())
-                .unwrap_or(false)
+                .is_some_and(polyscope_core::SlicePlane::is_enabled)
         })
     }
 
     /// Sets whether to draw the plane visualization.
+    #[must_use] 
     pub fn set_draw_plane(&self, draw: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1372,15 +1425,16 @@ impl SlicePlaneHandle {
     }
 
     /// Returns whether the plane visualization is drawn.
+    #[must_use] 
     pub fn draw_plane(&self) -> bool {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map(|p| p.draw_plane())
-                .unwrap_or(false)
+                .is_some_and(polyscope_core::SlicePlane::draw_plane)
         })
     }
 
     /// Sets whether to draw the widget.
+    #[must_use] 
     pub fn set_draw_widget(&self, draw: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1391,15 +1445,16 @@ impl SlicePlaneHandle {
     }
 
     /// Returns whether the widget is drawn.
+    #[must_use] 
     pub fn draw_widget(&self) -> bool {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map(|p| p.draw_widget())
-                .unwrap_or(false)
+                .is_some_and(polyscope_core::SlicePlane::draw_widget)
         })
     }
 
     /// Sets the color of the plane visualization.
+    #[must_use] 
     pub fn set_color(&self, color: Vec3) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1410,15 +1465,16 @@ impl SlicePlaneHandle {
     }
 
     /// Gets the color of the plane visualization.
+    #[must_use] 
     pub fn color(&self) -> Vec3 {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map(|p| p.color())
-                .unwrap_or(Vec3::new(0.5, 0.5, 0.5))
+                .map_or(Vec3::new(0.5, 0.5, 0.5), polyscope_core::SlicePlane::color)
         })
     }
 
     /// Sets the transparency of the plane visualization.
+    #[must_use] 
     pub fn set_transparency(&self, transparency: f32) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1429,15 +1485,16 @@ impl SlicePlaneHandle {
     }
 
     /// Gets the transparency of the plane visualization.
+    #[must_use] 
     pub fn transparency(&self) -> f32 {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map(|p| p.transparency())
-                .unwrap_or(0.3)
+                .map_or(0.3, polyscope_core::SlicePlane::transparency)
         })
     }
 
     /// Sets the size of the plane visualization (half-extent in each direction).
+    #[must_use] 
     pub fn set_plane_size(&self, size: f32) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1448,11 +1505,11 @@ impl SlicePlaneHandle {
     }
 
     /// Gets the size of the plane visualization (half-extent in each direction).
+    #[must_use] 
     pub fn plane_size(&self) -> f32 {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map(|p| p.plane_size())
-                .unwrap_or(0.1)
+                .map_or(0.1, polyscope_core::SlicePlane::plane_size)
         })
     }
 }
@@ -1479,6 +1536,7 @@ pub fn deselect_structure() {
 }
 
 /// Returns the currently selected structure, if any.
+#[must_use] 
 pub fn get_selected_structure() -> Option<(String, String)> {
     with_context(|ctx| {
         ctx.selected_structure()
@@ -1487,8 +1545,9 @@ pub fn get_selected_structure() -> Option<(String, String)> {
 }
 
 /// Returns whether any structure is currently selected.
+#[must_use] 
 pub fn has_selection() -> bool {
-    with_context(|ctx| ctx.has_selection())
+    with_context(polyscope_core::Context::has_selection)
 }
 
 /// Sets the gizmo mode (translate, rotate, or scale).
@@ -1499,6 +1558,7 @@ pub fn set_gizmo_mode(mode: GizmoMode) {
 }
 
 /// Returns the current gizmo mode.
+#[must_use] 
 pub fn get_gizmo_mode() -> GizmoMode {
     with_context(|ctx| ctx.gizmo().mode)
 }
@@ -1511,6 +1571,7 @@ pub fn set_gizmo_space(space: GizmoSpace) {
 }
 
 /// Returns the current gizmo coordinate space.
+#[must_use] 
 pub fn get_gizmo_space() -> GizmoSpace {
     with_context(|ctx| ctx.gizmo().space)
 }
@@ -1523,6 +1584,7 @@ pub fn set_gizmo_visible(visible: bool) {
 }
 
 /// Returns whether the gizmo is visible.
+#[must_use] 
 pub fn is_gizmo_visible() -> bool {
     with_context(|ctx| ctx.gizmo().visible)
 }
@@ -1570,13 +1632,13 @@ pub fn set_selected_transform(transform: Mat4) {
 /// Gets the transform of the currently selected structure.
 ///
 /// Returns identity matrix if no structure is selected.
+#[must_use] 
 pub fn get_selected_transform() -> Mat4 {
     with_context(|ctx| {
         if let Some((type_name, name)) = ctx.selected_structure() {
             ctx.registry
                 .get(type_name, name)
-                .map(|s| s.transform())
-                .unwrap_or(Mat4::IDENTITY)
+                .map_or(Mat4::IDENTITY, polyscope_core::Structure::transform)
         } else {
             Mat4::IDENTITY
         }
@@ -1604,11 +1666,12 @@ pub fn set_point_cloud_transform(name: &str, transform: Mat4) {
 }
 
 /// Gets the transform of a point cloud by name.
+#[must_use] 
 pub fn get_point_cloud_transform(name: &str) -> Option<Mat4> {
     with_context(|ctx| {
         ctx.registry
             .get("PointCloud", name)
-            .map(|pc| pc.transform())
+            .map(polyscope_core::Structure::transform)
     })
 }
 
@@ -1622,8 +1685,9 @@ pub fn set_surface_mesh_transform(name: &str, transform: Mat4) {
 }
 
 /// Gets the transform of a surface mesh by name.
+#[must_use] 
 pub fn get_surface_mesh_transform(name: &str) -> Option<Mat4> {
-    with_context(|ctx| ctx.registry.get("SurfaceMesh", name).map(|m| m.transform()))
+    with_context(|ctx| ctx.registry.get("SurfaceMesh", name).map(polyscope_core::Structure::transform))
 }
 
 /// Sets the transform of a curve network by name.
@@ -1636,11 +1700,12 @@ pub fn set_curve_network_transform(name: &str, transform: Mat4) {
 }
 
 /// Gets the transform of a curve network by name.
+#[must_use] 
 pub fn get_curve_network_transform(name: &str) -> Option<Mat4> {
     with_context(|ctx| {
         ctx.registry
             .get("CurveNetwork", name)
-            .map(|cn| cn.transform())
+            .map(polyscope_core::Structure::transform)
     })
 }
 
@@ -1654,11 +1719,12 @@ pub fn set_volume_mesh_transform(name: &str, transform: Mat4) {
 }
 
 /// Gets the transform of a volume mesh by name.
+#[must_use] 
 pub fn get_volume_mesh_transform(name: &str) -> Option<Mat4> {
     with_context(|ctx| {
         ctx.registry
             .get("VolumeMesh", name)
-            .map(|vm| vm.transform())
+            .map(polyscope_core::Structure::transform)
     })
 }
 
@@ -1666,7 +1732,7 @@ pub fn get_volume_mesh_transform(name: &str) -> Option<Mat4> {
 // Camera and UI Sync Functions
 // ============================================================================
 
-/// Syncs CameraSettings from UI to the actual Camera.
+/// Syncs `CameraSettings` from UI to the actual Camera.
 pub fn apply_camera_settings(
     camera: &mut polyscope_render::Camera,
     settings: &polyscope_ui::CameraSettings,
@@ -1703,7 +1769,8 @@ pub fn apply_camera_settings(
     camera.set_ortho_scale(settings.ortho_scale);
 }
 
-/// Creates CameraSettings from the current Camera state.
+/// Creates `CameraSettings` from the current Camera state.
+#[must_use] 
 pub fn camera_to_settings(camera: &polyscope_render::Camera) -> polyscope_ui::CameraSettings {
     use polyscope_render::{AxisDirection, NavigationStyle, ProjectionMode};
 
@@ -1737,6 +1804,7 @@ pub fn camera_to_settings(camera: &polyscope_render::Camera) -> polyscope_ui::Ca
 }
 
 /// Gets scene extents from the global context.
+#[must_use] 
 pub fn get_scene_extents() -> polyscope_ui::SceneExtents {
     polyscope_core::state::with_context(|ctx| polyscope_ui::SceneExtents {
         auto_compute: ctx.options.auto_compute_scene_extents,
@@ -1758,6 +1826,7 @@ pub fn set_auto_compute_extents(auto: bool) {
 // ============================================================================
 
 /// Gets all slice planes as UI settings.
+#[must_use] 
 pub fn get_slice_plane_settings() -> Vec<polyscope_ui::SlicePlaneSettings> {
     with_context(|ctx| {
         let selected = ctx.selected_slice_plane();
@@ -1846,6 +1915,7 @@ pub fn handle_slice_plane_action(
 // ============================================================================
 
 /// Gets slice plane selection info for gizmo rendering.
+#[must_use] 
 pub fn get_slice_plane_selection_info() -> polyscope_ui::SlicePlaneSelectionInfo {
     with_context(|ctx| {
         if let Some(name) = ctx.selected_slice_plane() {
@@ -1914,6 +1984,7 @@ pub fn apply_slice_plane_gizmo_transform(origin: [f32; 3], rotation_degrees: [f3
 // ============================================================================
 
 /// Gets all groups as UI settings.
+#[must_use] 
 pub fn get_group_settings() -> Vec<polyscope_ui::GroupSettings> {
     with_context(|ctx| {
         ctx.groups
@@ -1922,12 +1993,12 @@ pub fn get_group_settings() -> Vec<polyscope_ui::GroupSettings> {
                 name: group.name().to_string(),
                 enabled: group.is_enabled(),
                 show_child_details: group.show_child_details(),
-                parent_group: group.parent_group().map(|s| s.to_string()),
+                parent_group: group.parent_group().map(std::string::ToString::to_string),
                 child_structures: group
                     .child_structures()
                     .map(|(t, n)| (t.to_string(), n.to_string()))
                     .collect(),
-                child_groups: group.child_groups().map(|s| s.to_string()).collect(),
+                child_groups: group.child_groups().map(std::string::ToString::to_string).collect(),
             })
             .collect()
     })
@@ -1979,6 +2050,7 @@ pub fn handle_group_action(
 // ============================================================================
 
 /// Gets gizmo settings for UI.
+#[must_use] 
 pub fn get_gizmo_settings() -> polyscope_ui::GizmoSettings {
     with_context(|ctx| {
         let gizmo = ctx.gizmo();
@@ -2009,6 +2081,7 @@ pub fn apply_gizmo_settings(settings: &polyscope_ui::GizmoSettings) {
 }
 
 /// Gets selection info for UI.
+#[must_use] 
 pub fn get_selection_info() -> polyscope_ui::SelectionInfo {
     with_context(|ctx| {
         if let Some((type_name, name)) = ctx.selected_structure() {
@@ -2016,16 +2089,14 @@ pub fn get_selection_info() -> polyscope_ui::SelectionInfo {
             let (transform, bbox) = ctx
                 .registry
                 .get(type_name, name)
-                .map(|s| (s.transform(), s.bounding_box()))
-                .unwrap_or((Mat4::IDENTITY, None));
+                .map_or((Mat4::IDENTITY, None), |s| (s.transform(), s.bounding_box()));
 
             let t = Transform::from_matrix(transform);
             let euler = t.euler_angles_degrees();
 
             // Compute centroid from bounding box (world space)
             let centroid = bbox
-                .map(|(min, max)| (min + max) * 0.5)
-                .unwrap_or(t.translation);
+                .map_or(t.translation, |(min, max)| (min + max) * 0.5);
 
             polyscope_ui::SelectionInfo {
                 has_selection: true,

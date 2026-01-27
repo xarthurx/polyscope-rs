@@ -45,11 +45,13 @@ impl VolumeMeshVertexScalarQuantity {
     }
 
     /// Returns the values.
+    #[must_use] 
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Gets the color map name.
+    #[must_use] 
     pub fn color_map(&self) -> &str {
         &self.color_map
     }
@@ -61,6 +63,7 @@ impl VolumeMeshVertexScalarQuantity {
     }
 
     /// Gets the data range.
+    #[must_use] 
     pub fn data_range(&self) -> (f32, f32) {
         (self.data_min, self.data_max)
     }
@@ -144,11 +147,13 @@ impl VolumeMeshCellScalarQuantity {
     }
 
     /// Returns the values.
+    #[must_use] 
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Gets the color map name.
+    #[must_use] 
     pub fn color_map(&self) -> &str {
         &self.color_map
     }
@@ -160,6 +165,7 @@ impl VolumeMeshCellScalarQuantity {
     }
 
     /// Gets the data range.
+    #[must_use] 
     pub fn data_range(&self) -> (f32, f32) {
         (self.data_min, self.data_max)
     }

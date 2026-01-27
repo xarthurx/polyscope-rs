@@ -3,7 +3,7 @@
 use wgpu::util::DeviceExt;
 
 /// GPU representation of ground plane uniforms.
-/// Matches the shader's GroundUniforms struct.
+/// Matches the shader's `GroundUniforms` struct.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GroundPlaneUniforms {
@@ -25,7 +25,7 @@ pub struct GroundPlaneUniforms {
     pub up_sign: f32,
     /// Shadow darkness (0.0 = no shadow, 1.0 = full black)
     pub shadow_darkness: f32,
-    /// Shadow mode: 0=none, 1=shadow_only, 2=tile_with_shadow
+    /// Shadow mode: 0=none, `1=shadow_only`, `2=tile_with_shadow`
     pub shadow_mode: u32,
     /// Whether camera is in orthographic mode (0=perspective, 1=orthographic)
     pub is_orthographic: u32,
@@ -65,9 +65,10 @@ impl GroundPlaneRenderData {
     /// * `device` - The wgpu device
     /// * `bind_group_layout` - The bind group layout
     /// * `camera_buffer` - The camera uniform buffer
-    /// * `light_buffer` - The light uniform buffer (from ShadowMapPass)
+    /// * `light_buffer` - The light uniform buffer (from `ShadowMapPass`)
     /// * `shadow_depth_view` - The shadow map depth texture view
     /// * `shadow_sampler` - The shadow comparison sampler
+    #[must_use] 
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -127,7 +128,7 @@ impl GroundPlaneRenderData {
     /// * `camera_height` - Current camera Y position
     /// * `height_override` - Optional manual height override
     /// * `shadow_darkness` - Shadow darkness (0.0 = no shadow, 1.0 = full black)
-    /// * `shadow_mode` - Shadow mode: 0=none, 1=shadow_only, 2=tile_with_shadow
+    /// * `shadow_mode` - Shadow mode: 0=none, `1=shadow_only`, `2=tile_with_shadow`
     /// * `is_orthographic` - Whether camera is in orthographic mode
     /// * `reflection_intensity` - Reflection intensity (0.0 = opaque, 1.0 = mirror)
     #[allow(clippy::too_many_arguments)]
@@ -168,7 +169,7 @@ impl GroundPlaneRenderData {
             up_sign: 1.0, // Y is up, so positive
             shadow_darkness,
             shadow_mode,
-            is_orthographic: if is_orthographic { 1 } else { 0 },
+            is_orthographic: u32::from(is_orthographic),
             reflection_intensity,
         };
 
@@ -176,6 +177,7 @@ impl GroundPlaneRenderData {
     }
 
     /// Returns the bind group for rendering.
+    #[must_use] 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }

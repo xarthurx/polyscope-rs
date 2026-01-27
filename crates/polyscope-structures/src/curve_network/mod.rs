@@ -104,46 +104,55 @@ impl CurveNetwork {
     }
 
     /// Returns the structure name.
+    #[must_use] 
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Returns the number of nodes.
+    #[must_use] 
     pub fn num_nodes(&self) -> usize {
         self.node_positions.len()
     }
 
     /// Returns the number of edges.
+    #[must_use] 
     pub fn num_edges(&self) -> usize {
         self.edge_tail_inds.len()
     }
 
     /// Returns the node positions.
+    #[must_use] 
     pub fn nodes(&self) -> &[Vec3] {
         &self.node_positions
     }
 
     /// Returns the edge tail indices.
+    #[must_use] 
     pub fn edge_tail_inds(&self) -> &[u32] {
         &self.edge_tail_inds
     }
 
     /// Returns the edge tip indices.
+    #[must_use] 
     pub fn edge_tip_inds(&self) -> &[u32] {
         &self.edge_tip_inds
     }
 
     /// Returns the edge centers.
+    #[must_use] 
     pub fn edge_centers(&self) -> &[Vec3] {
         &self.edge_centers
     }
 
     /// Returns the node degrees.
+    #[must_use] 
     pub fn node_degrees(&self) -> &[usize] {
         &self.node_degrees
     }
 
     /// Gets the base color.
+    #[must_use] 
     pub fn color(&self) -> Vec3 {
         self.color
     }
@@ -155,11 +164,13 @@ impl CurveNetwork {
     }
 
     /// Gets the radius.
+    #[must_use] 
     pub fn radius(&self) -> f32 {
         self.radius
     }
 
     /// Returns whether the radius is relative to scene scale.
+    #[must_use] 
     pub fn radius_is_relative(&self) -> bool {
         self.radius_is_relative
     }
@@ -172,6 +183,7 @@ impl CurveNetwork {
     }
 
     /// Gets the material name.
+    #[must_use] 
     pub fn material(&self) -> &str {
         &self.material
     }
@@ -183,6 +195,7 @@ impl CurveNetwork {
     }
 
     /// Gets the render mode (0 = line, 1 = tube).
+    #[must_use] 
     pub fn render_mode(&self) -> u32 {
         self.render_mode
     }
@@ -245,6 +258,7 @@ impl CurveNetwork {
     }
 
     /// Returns the currently active node scalar quantity, if any.
+    #[must_use] 
     pub fn active_node_scalar_quantity(&self) -> Option<&CurveNodeScalarQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -259,6 +273,7 @@ impl CurveNetwork {
     }
 
     /// Returns the currently active edge scalar quantity, if any.
+    #[must_use] 
     pub fn active_edge_scalar_quantity(&self) -> Option<&CurveEdgeScalarQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -273,6 +288,7 @@ impl CurveNetwork {
     }
 
     /// Returns the currently active node color quantity, if any.
+    #[must_use] 
     pub fn active_node_color_quantity(&self) -> Option<&CurveNodeColorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -287,6 +303,7 @@ impl CurveNetwork {
     }
 
     /// Returns the currently active edge color quantity, if any.
+    #[must_use] 
     pub fn active_edge_color_quantity(&self) -> Option<&CurveEdgeColorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -371,6 +388,7 @@ impl CurveNetwork {
     }
 
     /// Returns the render data if initialized.
+    #[must_use] 
     pub fn render_data(&self) -> Option<&CurveNetworkRenderData> {
         self.render_data.as_ref()
     }
@@ -418,7 +436,7 @@ impl CurveNetwork {
         let uniforms = CurveNetworkUniforms {
             color: [self.color.x, self.color.y, self.color.z, 1.0],
             radius: self.radius,
-            radius_is_relative: if self.radius_is_relative { 1 } else { 0 },
+            radius_is_relative: u32::from(self.radius_is_relative),
             render_mode: self.render_mode,
             _padding: 0.0,
         };
@@ -536,8 +554,7 @@ impl Structure for CurveNetwork {
 
     fn length_scale(&self) -> f32 {
         self.bounding_box()
-            .map(|(min, max)| (max - min).length())
-            .unwrap_or(1.0)
+            .map_or(1.0, |(min, max)| (max - min).length())
     }
 
     fn transform(&self) -> Mat4 {
@@ -558,14 +575,12 @@ impl Structure for CurveNetwork {
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {
         if !self.enabled {
-            return;
         }
         // TODO: Implement curve network rendering
     }
 
     fn draw_pick(&self, _ctx: &mut dyn RenderContext) {
         if !self.enabled {
-            return;
         }
         // TODO: Implement curve network picking
     }
@@ -596,7 +611,7 @@ impl HasQuantities for CurveNetwork {
         self.quantities
             .iter()
             .find(|q| q.name() == name)
-            .map(|q| q.as_ref())
+            .map(std::convert::AsRef::as_ref)
     }
 
     fn get_quantity_mut(&mut self, name: &str) -> Option<&mut Box<dyn Quantity>> {

@@ -6,7 +6,7 @@ use wgpu::util::DeviceExt;
 use crate::point_cloud_render::PointUniforms;
 
 /// Uniforms for curve network rendering.
-/// Layout must match WGSL CurveNetworkUniforms exactly (32 bytes).
+/// Layout must match WGSL `CurveNetworkUniforms` exactly (32 bytes).
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[allow(clippy::pub_underscore_fields)]
@@ -61,7 +61,7 @@ pub struct CurveNetworkRenderData {
     // Tube rendering resources
     /// Generated vertex buffer from compute shader (36 vertices per edge).
     pub generated_vertex_buffer: Option<wgpu::Buffer>,
-    /// Buffer containing num_edges as uniform.
+    /// Buffer containing `num_edges` as uniform.
     pub num_edges_buffer: Option<wgpu::Buffer>,
     /// Bind group for tube compute shader.
     pub compute_bind_group: Option<wgpu::BindGroup>,
@@ -69,7 +69,7 @@ pub struct CurveNetworkRenderData {
     pub tube_render_bind_group: Option<wgpu::BindGroup>,
 
     // Node sphere rendering resources (for tube mode joint filling)
-    /// Uniform buffer for node sphere rendering (matches PointUniforms).
+    /// Uniform buffer for node sphere rendering (matches `PointUniforms`).
     pub node_uniform_buffer: Option<wgpu::Buffer>,
     /// Bind group for node sphere rendering (uses point pipeline).
     pub node_render_bind_group: Option<wgpu::BindGroup>,
@@ -85,6 +85,7 @@ impl CurveNetworkRenderData {
     /// * `node_positions` - Node positions
     /// * `edge_tail_inds` - Edge start indices
     /// * `edge_tip_inds` - Edge end indices
+    #[must_use] 
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -281,6 +282,7 @@ impl CurveNetworkRenderData {
     }
 
     /// Returns whether tube resources are initialized.
+    #[must_use] 
     pub fn has_tube_resources(&self) -> bool {
         self.generated_vertex_buffer.is_some()
     }
@@ -330,6 +332,7 @@ impl CurveNetworkRenderData {
     }
 
     /// Returns whether node render resources are initialized.
+    #[must_use] 
     pub fn has_node_render_resources(&self) -> bool {
         self.node_render_bind_group.is_some()
     }

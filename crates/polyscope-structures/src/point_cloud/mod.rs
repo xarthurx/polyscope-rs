@@ -46,11 +46,13 @@ impl PointCloud {
     }
 
     /// Returns the number of points.
+    #[must_use] 
     pub fn num_points(&self) -> usize {
         self.points.len()
     }
 
     /// Returns the points.
+    #[must_use] 
     pub fn points(&self) -> &[Vec3] {
         &self.points
     }
@@ -103,6 +105,7 @@ impl PointCloud {
     }
 
     /// Returns the render data if initialized.
+    #[must_use] 
     pub fn render_data(&self) -> Option<&PointCloudRenderData> {
         self.render_data.as_ref()
     }
@@ -119,7 +122,7 @@ impl PointCloud {
 
         // Create pick uniform buffer
         let pick_uniforms = PickUniforms {
-            structure_id: structure_id as u32,
+            structure_id: u32::from(structure_id),
             point_radius: self.point_radius,
             _padding: [0.0; 2],
         };
@@ -156,6 +159,7 @@ impl PointCloud {
     }
 
     /// Returns the pick bind group if initialized.
+    #[must_use] 
     pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
         self.pick_bind_group.as_ref()
     }
@@ -164,7 +168,7 @@ impl PointCloud {
     pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
         if let Some(buffer) = &self.pick_uniform_buffer {
             let pick_uniforms = PickUniforms {
-                structure_id: self.structure_id as u32,
+                structure_id: u32::from(self.structure_id),
                 point_radius: self.point_radius,
                 _padding: [0.0; 2],
             };
@@ -178,6 +182,7 @@ impl PointCloud {
     }
 
     /// Gets the point radius.
+    #[must_use] 
     pub fn point_radius(&self) -> f32 {
         self.point_radius
     }
@@ -188,11 +193,13 @@ impl PointCloud {
     }
 
     /// Gets the base color.
+    #[must_use] 
     pub fn base_color(&self) -> Vec3 {
         self.base_color
     }
 
     /// Returns the currently active color quantity, if any.
+    #[must_use] 
     pub fn active_color_quantity(&self) -> Option<&PointCloudColorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -207,6 +214,7 @@ impl PointCloud {
     }
 
     /// Returns the currently active scalar quantity, if any.
+    #[must_use] 
     pub fn active_scalar_quantity(&self) -> Option<&PointCloudScalarQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -221,6 +229,7 @@ impl PointCloud {
     }
 
     /// Returns the currently active vector quantity, if any.
+    #[must_use] 
     pub fn active_vector_quantity(&self) -> Option<&PointCloudVectorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -372,8 +381,7 @@ impl Structure for PointCloud {
 
     fn length_scale(&self) -> f32 {
         self.bounding_box()
-            .map(|(min, max)| (max - min).length())
-            .unwrap_or(1.0)
+            .map_or(1.0, |(min, max)| (max - min).length())
     }
 
     fn transform(&self) -> Mat4 {
@@ -394,14 +402,12 @@ impl Structure for PointCloud {
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {
         if !self.enabled {
-            return;
         }
         // TODO: Implement point cloud rendering
     }
 
     fn draw_pick(&self, _ctx: &mut dyn RenderContext) {
         if !self.enabled {
-            return;
         }
         // TODO: Implement point cloud picking
     }
@@ -431,7 +437,7 @@ impl HasQuantities for PointCloud {
         self.quantities
             .iter()
             .find(|q| q.name() == name)
-            .map(|q| q.as_ref())
+            .map(std::convert::AsRef::as_ref)
     }
 
     fn get_quantity_mut(&mut self, name: &str) -> Option<&mut Box<dyn Quantity>> {

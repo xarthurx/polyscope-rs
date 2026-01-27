@@ -125,7 +125,7 @@ impl App {
     /// Performs GPU-based picking to find which structure and element is at the given screen position.
     ///
     /// Uses the GPU pick buffer to determine the exact structure and element at the click position.
-    /// Returns (type_name, name, element_index) or None if clicking on empty space.
+    /// Returns (`type_name`, name, `element_index`) or None if clicking on empty space.
     fn gpu_pick_at(&self, x: u32, y: u32) -> Option<(String, String, u32)> {
         let engine = self.engine.as_ref()?;
 
@@ -139,16 +139,16 @@ impl App {
 
         // Look up structure info from ID
         let (type_name, name) = engine.lookup_structure_id(struct_id)?;
-        Some((type_name.to_string(), name.to_string(), elem_id as u32))
+        Some((type_name.to_string(), name.to_string(), u32::from(elem_id)))
     }
 
     /// Performs screen-space picking to find which structure (if any) is at the given screen position.
     ///
     /// Projects sample points from each structure to screen space and checks if the click
-    /// is within a threshold distance. Returns the (type_name, name) of the clicked structure,
+    /// is within a threshold distance. Returns the (`type_name`, name) of the clicked structure,
     /// or None if clicking on empty space.
     ///
-    /// NOTE: This is the fallback method. GPU picking (gpu_pick_at) is preferred when available.
+    /// NOTE: This is the fallback method. GPU picking (`gpu_pick_at`) is preferred when available.
     #[allow(dead_code)]
     fn pick_structure_at_screen_pos(
         &self,
@@ -400,7 +400,7 @@ impl App {
         let f = 1.0 / a;
         let s = ray_origin - v0;
         let u = f * s.dot(h);
-        if u < 0.0 || u > 1.0 {
+        if !(0.0..=1.0).contains(&u) {
             return None;
         }
         let q = s.cross(edge1);
@@ -577,7 +577,7 @@ impl App {
         // Auto-fit camera to scene on first render with structures
         if !self.camera_fitted {
             let (has_structures, bbox) = crate::with_context(|ctx| {
-                let has_structures = ctx.registry.len() > 0;
+                let has_structures = !ctx.registry.is_empty();
                 (has_structures, ctx.bounding_box)
             });
 
@@ -679,8 +679,8 @@ impl App {
                             );
                         }
                         // Check what needs initialization
-                        let needs_tube = cn.render_data().map_or(false, |rd| !rd.has_tube_resources());
-                        let needs_node = cn.render_data().map_or(false, |rd| !rd.has_node_render_resources());
+                        let needs_tube = cn.render_data().is_some_and(|rd| !rd.has_tube_resources());
+                        let needs_node = cn.render_data().is_some_and(|rd| !rd.has_node_render_resources());
 
                         // Initialize tube resources if not already done
                         if needs_tube {
@@ -1049,7 +1049,7 @@ impl App {
         // Common gizmo setup - check if pointer is over UI panel
         const LEFT_PANEL_WIDTH: f32 = 320.0;
         let pointer_over_ui = egui.context.input(|i| {
-            i.pointer.hover_pos().map_or(false, |pos| pos.x <= LEFT_PANEL_WIDTH)
+            i.pointer.hover_pos().is_some_and(|pos| pos.x <= LEFT_PANEL_WIDTH)
         });
 
         // Get camera matrices from engine - MUST match what's used for 3D rendering
@@ -1348,9 +1348,9 @@ impl App {
         }
 
         // Store background color for use in render passes
-        let bg_r = self.background_color.x as f64;
-        let bg_g = self.background_color.y as f64;
-        let bg_b = self.background_color.z as f64;
+        let bg_r = f64::from(self.background_color.x);
+        let bg_g = f64::from(self.background_color.y);
+        let bg_b = f64::from(self.background_color.z);
 
         // Store ground plane settings for later use
         let gp_enabled = self.ground_plane.mode != GroundPlaneMode::None;
@@ -1388,7 +1388,7 @@ impl App {
                                 if let Some(render_data) = cn.render_data() {
                                     if let Some(compute_bg) = &render_data.compute_bind_group {
                                         compute_pass.set_bind_group(0, compute_bg, &[]);
-                                        let num_workgroups = (render_data.num_edges + 63) / 64;
+                                        let num_workgroups = render_data.num_edges.div_ceil(64);
                                         compute_pass.dispatch_workgroups(num_workgroups, 1, 1);
                                     }
                                 }
@@ -2032,9 +2032,9 @@ impl App {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: self.background_color.x as f64,
-                            g: self.background_color.y as f64,
-                            b: self.background_color.z as f64,
+                            r: f64::from(self.background_color.x),
+                            g: f64::from(self.background_color.y),
+                            b: f64::from(self.background_color.z),
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -2224,15 +2224,15 @@ impl App {
                 let (width, height) = engine.dimensions();
                 match polyscope_render::save_image(&filename, &data, width, height) {
                     Ok(()) => {
-                        log::info!("Screenshot saved to {}", filename);
+                        log::info!("Screenshot saved to {filename}");
                     }
                     Err(e) => {
-                        log::error!("Failed to save screenshot: {}", e);
+                        log::error!("Failed to save screenshot: {e}");
                     }
                 }
             }
             Err(e) => {
-                log::error!("Failed to capture screenshot: {}", e);
+                log::error!("Failed to capture screenshot: {e}");
             }
         }
     }
@@ -2386,179 +2386,176 @@ impl ApplicationHandler for App {
                 // Threshold for distinguishing click from drag (in pixels)
                 const DRAG_THRESHOLD: f64 = 5.0;
 
-                match (button, state) {
-                    (MouseButton::Left, ElementState::Released) => {
-                        // DEBUG: Log click event
-                        log::debug!(
-                            "[CLICK DEBUG] Left mouse released at ({:.1}, {:.1}), drag_distance={:.2}, mouse_in_ui_panel={}, egui_using_pointer={}, egui_consumed={}",
-                            self.mouse_pos.0, self.mouse_pos.1, self.drag_distance, mouse_in_ui_panel, egui_using_pointer, egui_consumed
-                        );
+                if let (MouseButton::Left, ElementState::Released) = (button, state) {
+                    // DEBUG: Log click event
+                    log::debug!(
+                        "[CLICK DEBUG] Left mouse released at ({:.1}, {:.1}), drag_distance={:.2}, mouse_in_ui_panel={}, egui_using_pointer={}, egui_consumed={}",
+                        self.mouse_pos.0, self.mouse_pos.1, self.drag_distance, mouse_in_ui_panel, egui_using_pointer, egui_consumed
+                    );
 
-                        // Skip if egui is actively using pointer AND this was a drag (gizmo being dragged)
-                        // But allow clicks through - egui_using_pointer can be true even for simple clicks
-                        // when gizmo is visible, so we only skip if it was actually a drag operation
-                        if egui_using_pointer && self.drag_distance >= DRAG_THRESHOLD {
-                            log::debug!("[CLICK DEBUG] EARLY RETURN: egui was dragging (drag_distance={:.2})", self.drag_distance);
-                            self.last_click_pos = None;
-                            return;
-                        }
+                    // Skip if egui is actively using pointer AND this was a drag (gizmo being dragged)
+                    // But allow clicks through - egui_using_pointer can be true even for simple clicks
+                    // when gizmo is visible, so we only skip if it was actually a drag operation
+                    if egui_using_pointer && self.drag_distance >= DRAG_THRESHOLD {
+                        log::debug!("[CLICK DEBUG] EARLY RETURN: egui was dragging (drag_distance={:.2})", self.drag_distance);
+                        self.last_click_pos = None;
+                        return;
+                    }
 
-                        // Check if this was a click (not a drag) in the 3D viewport
-                        if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
-                            log::debug!("[CLICK DEBUG] Processing click in 3D viewport");
-                            if let Some(engine) = &self.engine {
-                                let click_screen = glam::Vec2::new(
-                                    self.mouse_pos.0 as f32,
-                                    self.mouse_pos.1 as f32,
-                                );
+                    // Check if this was a click (not a drag) in the 3D viewport
+                    if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
+                        log::debug!("[CLICK DEBUG] Processing click in 3D viewport");
+                        if let Some(engine) = &self.engine {
+                            let click_screen = glam::Vec2::new(
+                                self.mouse_pos.0 as f32,
+                                self.mouse_pos.1 as f32,
+                            );
 
-                                let ray = self.screen_ray(
-                                    click_screen,
-                                    engine.width,
-                                    engine.height,
-                                    &engine.camera,
-                                );
-                                let Some((ray_origin, ray_dir)) = ray else {
-                                    log::debug!("[CLICK DEBUG] No ray - deselecting");
+                            let ray = self.screen_ray(
+                                click_screen,
+                                engine.width,
+                                engine.height,
+                                &engine.camera,
+                            );
+                            let Some((ray_origin, ray_dir)) = ray else {
+                                log::debug!("[CLICK DEBUG] No ray - deselecting");
+                                self.selection = None;
+                                self.selected_element_index = None;
+                                self.selection_info = polyscope_ui::SelectionInfo::default();
+                                crate::deselect_structure();
+                                self.deselect_slice_plane_selection();
+                                self.last_click_pos = None;
+                                return;
+                            };
+
+                            let plane_hit = self.pick_slice_plane_at_ray(ray_origin, ray_dir);
+                            log::debug!("[CLICK DEBUG] plane_hit: {plane_hit:?}");
+
+                            let plane_params = crate::with_context(|ctx| {
+                                let mut enabled_planes: Vec<(String, Vec3, Vec3)> = ctx
+                                    .slice_planes()
+                                    .filter(|p| p.is_enabled())
+                                    .map(|p| (p.name().to_string(), p.origin(), p.normal()))
+                                    .collect();
+                                enabled_planes.sort_by(|a, b| a.0.cmp(&b.0));
+                                enabled_planes
+                                    .into_iter()
+                                    .map(|(_, origin, normal)| (origin, normal))
+                                    .collect::<Vec<_>>()
+                            });
+
+                            let structure_hit =
+                                self.pick_structure_at_ray(ray_origin, ray_dir, &plane_params);
+                            log::debug!("[CLICK DEBUG] structure_hit: {structure_hit:?}");
+
+                            // GPU picking for point clouds, refined with ray distance
+                            let gpu_picked = self
+                                .gpu_pick_at(self.mouse_pos.0 as u32, self.mouse_pos.1 as u32);
+                            log::debug!("[CLICK DEBUG] gpu_picked: {gpu_picked:?}");
+                            let point_hit = gpu_picked.and_then(|(type_name, name, idx)| {
+                                if type_name == "PointCloud" {
+                                    self.pick_point_cloud_at_ray(ray_origin, ray_dir, &name, idx)
+                                        .map(|t| (name, idx, t))
+                                } else {
+                                    None
+                                }
+                            });
+                            log::debug!("[CLICK DEBUG] point_hit: {point_hit:?}");
+
+                            enum ClickHit {
+                                Plane(String),
+                                Structure { type_name: String, name: String, element_index: u32 },
+                            }
+
+                            let mut best_hit: Option<(ClickHit, f32)> = None;
+
+                            if let Some((name, t)) = plane_hit {
+                                best_hit = Some((ClickHit::Plane(name), t));
+                            }
+
+                            if let Some((type_name, name, t)) = structure_hit {
+                                let is_better =
+                                    best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                if is_better {
+                                    best_hit = Some((
+                                        ClickHit::Structure {
+                                            type_name,
+                                            name,
+                                            element_index: 0,
+                                        },
+                                        t,
+                                    ));
+                                }
+                            }
+
+                            if let Some((name, idx, t)) = point_hit {
+                                let is_better =
+                                    best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                if is_better {
+                                    best_hit = Some((
+                                        ClickHit::Structure {
+                                            type_name: "PointCloud".to_string(),
+                                            name,
+                                            element_index: idx,
+                                        },
+                                        t,
+                                    ));
+                                }
+                            }
+
+                            match &best_hit {
+                                Some((ClickHit::Plane(plane_name), t)) => {
+                                    log::debug!("[CLICK DEBUG] Hit plane '{plane_name}' at t={t}");
+                                    // Select the slice plane and clear structure selection
+                                    self.selection = None;
+                                    self.selected_element_index = None;
+                                    self.selection_info = polyscope_ui::SelectionInfo::default();
+                                    crate::deselect_structure();
+                                    self.select_slice_plane_by_name(plane_name);
+                                }
+                                Some((ClickHit::Structure { type_name, name, element_index }, t)) => {
+                                    log::debug!("[CLICK DEBUG] Hit structure '{type_name}::{name}' element {element_index} at t={t}");
+                                    self.selected_element_index = Some(*element_index);
+                                    self.deselect_slice_plane_selection();
+
+                                    let element_type = match type_name.as_str() {
+                                        "PointCloud" => polyscope_render::PickElementType::Point,
+                                        "SurfaceMesh" => polyscope_render::PickElementType::Face,
+                                        "CurveNetwork" => polyscope_render::PickElementType::Edge,
+                                        "VolumeMesh" => polyscope_render::PickElementType::Face,
+                                        _ => polyscope_render::PickElementType::None,
+                                    };
+
+                                    self.selection = Some(PickResult {
+                                        hit: true,
+                                        structure_type: type_name.clone(),
+                                        structure_name: name.clone(),
+                                        element_index: u64::from(*element_index),
+                                        element_type,
+                                        screen_pos: click_screen,
+                                        depth: 0.5,
+                                    });
+                                    crate::select_structure(type_name, name);
+                                    self.selection_info = crate::get_selection_info();
+                                }
+                                None => {
+                                    log::debug!("[CLICK DEBUG] No hit - DESELECTING");
+                                    // Nothing was clicked - deselect
                                     self.selection = None;
                                     self.selected_element_index = None;
                                     self.selection_info = polyscope_ui::SelectionInfo::default();
                                     crate::deselect_structure();
                                     self.deselect_slice_plane_selection();
-                                    self.last_click_pos = None;
-                                    return;
-                                };
-
-                                let plane_hit = self.pick_slice_plane_at_ray(ray_origin, ray_dir);
-                                log::debug!("[CLICK DEBUG] plane_hit: {:?}", plane_hit);
-
-                                let plane_params = crate::with_context(|ctx| {
-                                    let mut enabled_planes: Vec<(String, Vec3, Vec3)> = ctx
-                                        .slice_planes()
-                                        .filter(|p| p.is_enabled())
-                                        .map(|p| (p.name().to_string(), p.origin(), p.normal()))
-                                        .collect();
-                                    enabled_planes.sort_by(|a, b| a.0.cmp(&b.0));
-                                    enabled_planes
-                                        .into_iter()
-                                        .map(|(_, origin, normal)| (origin, normal))
-                                        .collect::<Vec<_>>()
-                                });
-
-                                let structure_hit =
-                                    self.pick_structure_at_ray(ray_origin, ray_dir, &plane_params);
-                                log::debug!("[CLICK DEBUG] structure_hit: {:?}", structure_hit);
-
-                                // GPU picking for point clouds, refined with ray distance
-                                let gpu_picked = self
-                                    .gpu_pick_at(self.mouse_pos.0 as u32, self.mouse_pos.1 as u32);
-                                log::debug!("[CLICK DEBUG] gpu_picked: {:?}", gpu_picked);
-                                let point_hit = gpu_picked.and_then(|(type_name, name, idx)| {
-                                    if type_name == "PointCloud" {
-                                        self.pick_point_cloud_at_ray(ray_origin, ray_dir, &name, idx)
-                                            .map(|t| (name, idx, t))
-                                    } else {
-                                        None
-                                    }
-                                });
-                                log::debug!("[CLICK DEBUG] point_hit: {:?}", point_hit);
-
-                                enum ClickHit {
-                                    Plane(String),
-                                    Structure { type_name: String, name: String, element_index: u32 },
-                                }
-
-                                let mut best_hit: Option<(ClickHit, f32)> = None;
-
-                                if let Some((name, t)) = plane_hit {
-                                    best_hit = Some((ClickHit::Plane(name), t));
-                                }
-
-                                if let Some((type_name, name, t)) = structure_hit {
-                                    let is_better =
-                                        best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
-                                    if is_better {
-                                        best_hit = Some((
-                                            ClickHit::Structure {
-                                                type_name,
-                                                name,
-                                                element_index: 0,
-                                            },
-                                            t,
-                                        ));
-                                    }
-                                }
-
-                                if let Some((name, idx, t)) = point_hit {
-                                    let is_better =
-                                        best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
-                                    if is_better {
-                                        best_hit = Some((
-                                            ClickHit::Structure {
-                                                type_name: "PointCloud".to_string(),
-                                                name,
-                                                element_index: idx,
-                                            },
-                                            t,
-                                        ));
-                                    }
-                                }
-
-                                match &best_hit {
-                                    Some((ClickHit::Plane(plane_name), t)) => {
-                                        log::debug!("[CLICK DEBUG] Hit plane '{}' at t={}", plane_name, t);
-                                        // Select the slice plane and clear structure selection
-                                        self.selection = None;
-                                        self.selected_element_index = None;
-                                        self.selection_info = polyscope_ui::SelectionInfo::default();
-                                        crate::deselect_structure();
-                                        self.select_slice_plane_by_name(plane_name);
-                                    }
-                                    Some((ClickHit::Structure { type_name, name, element_index }, t)) => {
-                                        log::debug!("[CLICK DEBUG] Hit structure '{}::{}' element {} at t={}", type_name, name, element_index, t);
-                                        self.selected_element_index = Some(*element_index);
-                                        self.deselect_slice_plane_selection();
-
-                                        let element_type = match type_name.as_str() {
-                                            "PointCloud" => polyscope_render::PickElementType::Point,
-                                            "SurfaceMesh" => polyscope_render::PickElementType::Face,
-                                            "CurveNetwork" => polyscope_render::PickElementType::Edge,
-                                            "VolumeMesh" => polyscope_render::PickElementType::Face,
-                                            _ => polyscope_render::PickElementType::None,
-                                        };
-
-                                        self.selection = Some(PickResult {
-                                            hit: true,
-                                            structure_type: type_name.clone(),
-                                            structure_name: name.clone(),
-                                            element_index: *element_index as u64,
-                                            element_type,
-                                            screen_pos: click_screen,
-                                            depth: 0.5,
-                                        });
-                                        crate::select_structure(type_name, name);
-                                        self.selection_info = crate::get_selection_info();
-                                    }
-                                    None => {
-                                        log::debug!("[CLICK DEBUG] No hit - DESELECTING");
-                                        // Nothing was clicked - deselect
-                                        self.selection = None;
-                                        self.selected_element_index = None;
-                                        self.selection_info = polyscope_ui::SelectionInfo::default();
-                                        crate::deselect_structure();
-                                        self.deselect_slice_plane_selection();
-                                    }
                                 }
                             }
-                        } else {
-                            log::debug!(
-                                "[CLICK DEBUG] SKIPPED: mouse_in_ui_panel={} or drag_distance={:.2} >= {}",
-                                mouse_in_ui_panel, self.drag_distance, DRAG_THRESHOLD
-                            );
                         }
-                        self.last_click_pos = None;
+                    } else {
+                        log::debug!(
+                            "[CLICK DEBUG] SKIPPED: mouse_in_ui_panel={} or drag_distance={:.2} >= {}",
+                            mouse_in_ui_panel, self.drag_distance, DRAG_THRESHOLD
+                        );
                     }
-                    _ => {}
+                    self.last_click_pos = None;
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {

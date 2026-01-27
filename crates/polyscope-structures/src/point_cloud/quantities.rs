@@ -22,8 +22,8 @@ impl PointCloudScalarQuantity {
         structure_name: impl Into<String>,
         values: Vec<f32>,
     ) -> Self {
-        let min = values.iter().cloned().fold(f32::INFINITY, f32::min);
-        let max = values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min = values.iter().copied().fold(f32::INFINITY, f32::min);
+        let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
 
         Self {
             name: name.into(),
@@ -37,11 +37,13 @@ impl PointCloudScalarQuantity {
     }
 
     /// Returns the scalar values.
+    #[must_use] 
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Maps scalar values to colors using the colormap.
+    #[must_use] 
     pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
@@ -56,6 +58,7 @@ impl PointCloudScalarQuantity {
     }
 
     /// Gets the colormap name.
+    #[must_use] 
     pub fn colormap_name(&self) -> &str {
         &self.colormap_name
     }
@@ -66,11 +69,13 @@ impl PointCloudScalarQuantity {
     }
 
     /// Gets the range minimum.
+    #[must_use] 
     pub fn range_min(&self) -> f32 {
         self.range_min
     }
 
     /// Gets the range maximum.
+    #[must_use] 
     pub fn range_max(&self) -> f32 {
         self.range_max
     }
@@ -172,6 +177,7 @@ impl PointCloudVectorQuantity {
     }
 
     /// Returns the vectors.
+    #[must_use] 
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
     }
@@ -194,6 +200,7 @@ impl PointCloudVectorQuantity {
     }
 
     /// Returns the render data if initialized.
+    #[must_use] 
     pub fn render_data(&self) -> Option<&VectorRenderData> {
         self.render_data.as_ref()
     }
@@ -227,16 +234,19 @@ impl PointCloudVectorQuantity {
     }
 
     /// Gets the length scale.
+    #[must_use] 
     pub fn length_scale(&self) -> f32 {
         self.length_scale
     }
 
     /// Gets the radius.
+    #[must_use] 
     pub fn radius(&self) -> f32 {
         self.radius
     }
 
     /// Gets the color.
+    #[must_use] 
     pub fn color(&self) -> Vec3 {
         self.color
     }
@@ -327,6 +337,7 @@ impl PointCloudColorQuantity {
     }
 
     /// Returns the colors.
+    #[must_use] 
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
