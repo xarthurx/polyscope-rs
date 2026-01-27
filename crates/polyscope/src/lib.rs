@@ -81,7 +81,7 @@ pub use polyscope_core::{
     group::Group,
     options::Options,
     pick::{PickResult, Pickable},
-    quantity::{Quantity, QuantityKind},
+    quantity::{ParamCoordsType, ParamVizStyle, Quantity, QuantityKind},
     registry::Registry,
     slice_plane::{SlicePlane, SlicePlaneUniforms, MAX_SLICE_PLANES},
     state::{with_context, with_context_mut, Context},
@@ -324,6 +324,52 @@ pub fn remove_all_structures() {
     with_context_mut(|ctx| {
         ctx.registry.clear();
         ctx.update_extents();
+    });
+}
+
+// ============================================================================
+// Floating Quantity Registration
+// ============================================================================
+
+/// Registers a floating scalar image (not attached to any structure).
+pub fn register_floating_scalar_image(
+    name: impl Into<String>,
+    width: u32,
+    height: u32,
+    values: Vec<f32>,
+) {
+    use polyscope_structures::floating::FloatingScalarImage;
+    let img = FloatingScalarImage::new(name, width, height, values);
+    with_context_mut(|ctx| {
+        ctx.floating_quantities.push(Box::new(img));
+    });
+}
+
+/// Registers a floating color image (not attached to any structure).
+pub fn register_floating_color_image(
+    name: impl Into<String>,
+    width: u32,
+    height: u32,
+    colors: Vec<Vec3>,
+) {
+    use polyscope_structures::floating::FloatingColorImage;
+    let img = FloatingColorImage::new(name, width, height, colors);
+    with_context_mut(|ctx| {
+        ctx.floating_quantities.push(Box::new(img));
+    });
+}
+
+/// Removes a floating quantity by name.
+pub fn remove_floating_quantity(name: &str) {
+    with_context_mut(|ctx| {
+        ctx.floating_quantities.retain(|q| q.name() != name);
+    });
+}
+
+/// Removes all floating quantities.
+pub fn remove_all_floating_quantities() {
+    with_context_mut(|ctx| {
+        ctx.floating_quantities.clear();
     });
 }
 

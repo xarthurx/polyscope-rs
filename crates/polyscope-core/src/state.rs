@@ -9,6 +9,7 @@ use crate::error::{PolyscopeError, Result};
 use crate::gizmo::GizmoConfig;
 use crate::group::Group;
 use crate::options::Options;
+use crate::quantity::Quantity;
 use crate::registry::Registry;
 use crate::slice_plane::SlicePlane;
 
@@ -46,6 +47,9 @@ pub struct Context {
 
     /// Axis-aligned bounding box for all registered structures.
     pub bounding_box: (Vec3, Vec3),
+
+    /// Floating quantities (not attached to any structure).
+    pub floating_quantities: Vec<Box<dyn Quantity>>,
     // User callback will be added later with proper thread-safety handling
 }
 
@@ -62,6 +66,7 @@ impl Default for Context {
             options: Options::default(),
             length_scale: 1.0,
             bounding_box: (Vec3::ZERO, Vec3::ONE),
+            floating_quantities: Vec::new(),
         }
     }
 }
@@ -383,6 +388,7 @@ pub fn shutdown_context() {
             ctx.slice_planes.clear();
             ctx.selected_structure = None;
             ctx.selected_slice_plane = None;
+            ctx.floating_quantities.clear();
         }
     }
 }

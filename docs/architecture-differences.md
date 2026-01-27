@@ -201,7 +201,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Volume Mesh | ✅ Full | ✅ Full | Tet/hex cells, quantities, interior face detection, slice capping |
 | Volume Grid | ✅ Full | ✅ Basic | Node scalars only. Missing: cell quantities, isosurface rendering |
 | Camera View | ✅ Full | ✅ Full | Frustum visualization |
-| Floating Quantities | ✅ Full | ❌ Not yet | Screen-space quantities |
+| Floating Quantities | ✅ Full | ✅ Most | Scalar/color images, depth/color render images |
 
 ### Quantities
 
@@ -211,9 +211,9 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Vector | ✅ | ✅ |
 | Color (RGB) | ✅ | ✅ |
 | Color (RGBA) | ✅ | ⚠️ RGB only |
-| Parameterization | ✅ | ❌ |
-| Intrinsic Vector | ✅ | ❌ |
-| One Form | ✅ | ❌ |
+| Parameterization | ✅ | ✅ |
+| Intrinsic Vector | ✅ | ✅ |
+| One Form | ✅ | ✅ |
 
 ### Scene Features
 
@@ -344,10 +344,5 @@ with_point_cloud("my points", |pc| {
 
 The following C++ Polyscope features are not yet implemented but planned:
 
-1. **Floating Quantities** - Screen-space data visualization
-2. **Parameterization Quantities** - UV coordinates visualization
-3. **Intrinsic Vectors** - Tangent-space vector visualization
-4. **One-Form Quantities** - Differential form visualization
-5. **Full Polygon Mesh Support** - Arbitrary polygons (not just triangles)
-6. **Color RGBA** - Currently only RGB; alpha channel not supported
-7. **Color RGBA** - Currently only RGB; alpha channel not supported
+1. **Full Polygon Mesh Support** - Arbitrary polygons (not just triangles)
+2. **Color RGBA** - Currently only RGB; alpha channel not supported

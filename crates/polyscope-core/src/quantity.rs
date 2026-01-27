@@ -70,3 +70,27 @@ pub trait EdgeQuantity: Quantity {}
 
 /// Marker trait for quantities defined on cells (for volume meshes).
 pub trait CellQuantity: Quantity {}
+
+/// Visualization style for parameterization quantities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParamVizStyle {
+    /// Two-color checker pattern over UV space.
+    #[default]
+    Checker,
+    /// Two-color grid lines over UV space.
+    Grid,
+    /// Checkerboard overlay on radial colormap centered at (0,0).
+    LocalCheck,
+    /// Distance stripes over radial colormap centered at (0,0).
+    LocalRad,
+}
+
+/// How to interpret UV coordinates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParamCoordsType {
+    /// Coordinates in [0,1] range.
+    #[default]
+    Unit,
+    /// Coordinates scaled like world-space mesh positions.
+    World,
+}

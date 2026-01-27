@@ -1,9 +1,15 @@
 //! Surface mesh structure.
 
+mod intrinsic_vector_quantity;
+mod one_form_quantity;
+mod parameterization_quantity;
 mod quantities;
+pub use intrinsic_vector_quantity::*;
+pub use one_form_quantity::*;
+pub use parameterization_quantity::*;
 pub use quantities::*;
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
@@ -565,6 +571,29 @@ impl SurfaceMesh {
                     .downcast_mut::<MeshFaceVectorQuantity>()
                 {
                     vq.build_egui_ui(ui);
+                } else if let Some(pq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshVertexParameterizationQuantity>()
+                {
+                    pq.build_egui_ui(ui);
+                } else if let Some(pq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshCornerParameterizationQuantity>()
+                {
+                    pq.build_egui_ui(ui);
+                } else if let Some(iq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshVertexIntrinsicVectorQuantity>()
+                {
+                    iq.build_egui_ui(ui);
+                } else if let Some(iq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshFaceIntrinsicVectorQuantity>()
+                {
+                    iq.build_egui_ui(ui);
+                } else if let Some(oq) = quantity.as_any_mut().downcast_mut::<MeshOneFormQuantity>()
+                {
+                    oq.build_egui_ui(ui);
                 }
             }
         }
@@ -643,74 +672,44 @@ impl SurfaceMesh {
         None
     }
 
-    /// Returns the currently active vertex vector quantity, if any.
+    /// Returns the currently active vertex parameterization quantity, if any.
     #[must_use]
-    pub fn active_vertex_vector_quantity(&self) -> Option<&MeshVertexVectorQuantity> {
+    pub fn active_vertex_parameterization_quantity(
+        &self,
+    ) -> Option<&MeshVertexParameterizationQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any().downcast_ref::<MeshVertexVectorQuantity>() {
-                    return Some(vq);
+            if q.is_enabled() && q.kind() == QuantityKind::Parameterization {
+                if let Some(pq) = q
+                    .as_any()
+                    .downcast_ref::<MeshVertexParameterizationQuantity>()
+                {
+                    return Some(pq);
                 }
             }
         }
         None
     }
 
-    /// Returns a mutable reference to the active vertex vector quantity.
-    pub fn active_vertex_vector_quantity_mut(&mut self) -> Option<&mut MeshVertexVectorQuantity> {
-        use polyscope_core::quantity::QuantityKind;
-
-        for q in &mut self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any_mut().downcast_mut::<MeshVertexVectorQuantity>() {
-                    return Some(vq);
-                }
-            }
-        }
-        None
-    }
-
-    /// Returns the currently active face vector quantity, if any.
+    /// Returns the currently active corner parameterization quantity, if any.
     #[must_use]
-    pub fn active_face_vector_quantity(&self) -> Option<&MeshFaceVectorQuantity> {
+    pub fn active_corner_parameterization_quantity(
+        &self,
+    ) -> Option<&MeshCornerParameterizationQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any().downcast_ref::<MeshFaceVectorQuantity>() {
-                    return Some(vq);
+            if q.is_enabled() && q.kind() == QuantityKind::Parameterization {
+                if let Some(pq) = q
+                    .as_any()
+                    .downcast_ref::<MeshCornerParameterizationQuantity>()
+                {
+                    return Some(pq);
                 }
             }
         }
         None
-    }
-
-    /// Returns a mutable reference to the active face vector quantity.
-    pub fn active_face_vector_quantity_mut(&mut self) -> Option<&mut MeshFaceVectorQuantity> {
-        use polyscope_core::quantity::QuantityKind;
-
-        for q in &mut self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any_mut().downcast_mut::<MeshFaceVectorQuantity>() {
-                    return Some(vq);
-                }
-            }
-        }
-        None
-    }
-
-    /// Computes face centroids (used as base positions for face vector quantities).
-    #[must_use]
-    pub fn face_centroids(&self) -> Vec<Vec3> {
-        self.faces
-            .iter()
-            .map(|face| {
-                let sum: Vec3 = face.iter().map(|&vi| self.vertices[vi as usize]).sum();
-                sum / face.len() as f32
-            })
-            .collect()
     }
 
     /// Adds a face scalar quantity to this mesh.
@@ -772,6 +771,183 @@ impl SurfaceMesh {
         quantity.auto_scale(self.length_scale());
         self.add_quantity(Box::new(quantity));
         self
+    }
+
+    /// Adds a vertex parameterization (UV) quantity to this mesh.
+    pub fn add_vertex_parameterization_quantity(
+        &mut self,
+        name: impl Into<String>,
+        coords: Vec<Vec2>,
+    ) -> &mut Self {
+        let quantity = MeshVertexParameterizationQuantity::new(name, self.name.clone(), coords);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a corner parameterization (UV) quantity to this mesh.
+    pub fn add_corner_parameterization_quantity(
+        &mut self,
+        name: impl Into<String>,
+        coords: Vec<Vec2>,
+    ) -> &mut Self {
+        let quantity = MeshCornerParameterizationQuantity::new(name, self.name.clone(), coords);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex intrinsic vector quantity with explicit tangent basis.
+    pub fn add_vertex_intrinsic_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec2>,
+        basis_x: Vec<Vec3>,
+        basis_y: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = MeshVertexIntrinsicVectorQuantity::new(
+            name,
+            self.name.clone(),
+            vectors,
+            basis_x,
+            basis_y,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a vertex intrinsic vector quantity with auto-computed tangent basis.
+    pub fn add_vertex_intrinsic_vector_quantity_auto(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec2>,
+    ) -> &mut Self {
+        let (bx, by) = self.compute_vertex_tangent_basis();
+        self.add_vertex_intrinsic_vector_quantity(name, vectors, bx, by)
+    }
+
+    /// Adds a face intrinsic vector quantity with explicit tangent basis.
+    pub fn add_face_intrinsic_vector_quantity(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec2>,
+        basis_x: Vec<Vec3>,
+        basis_y: Vec<Vec3>,
+    ) -> &mut Self {
+        let quantity = MeshFaceIntrinsicVectorQuantity::new(
+            name,
+            self.name.clone(),
+            vectors,
+            basis_x,
+            basis_y,
+        );
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a face intrinsic vector quantity with auto-computed tangent basis.
+    pub fn add_face_intrinsic_vector_quantity_auto(
+        &mut self,
+        name: impl Into<String>,
+        vectors: Vec<Vec2>,
+    ) -> &mut Self {
+        let (bx, by) = self.compute_face_tangent_basis();
+        self.add_face_intrinsic_vector_quantity(name, vectors, bx, by)
+    }
+
+    /// Adds a one-form quantity to this mesh.
+    ///
+    /// A one-form assigns a scalar value to each edge, rendered as arrows
+    /// at edge midpoints. The `orientations` array specifies the sign convention
+    /// for each edge (true = canonical low→high vertex direction).
+    pub fn add_one_form_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+        orientations: Vec<bool>,
+    ) -> &mut Self {
+        let quantity = MeshOneFormQuantity::new(name, self.name.clone(), values, orientations);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Compute default per-face tangent basis from first edge direction.
+    #[must_use]
+    pub fn compute_face_tangent_basis(&self) -> (Vec<Vec3>, Vec<Vec3>) {
+        let mut basis_x = Vec::with_capacity(self.faces.len());
+        let mut basis_y = Vec::with_capacity(self.faces.len());
+
+        for (face_idx, face) in self.faces.iter().enumerate() {
+            if face.len() >= 3 {
+                let v0 = self.vertices[face[0] as usize];
+                let v1 = self.vertices[face[1] as usize];
+                let normal = self.face_normals[face_idx];
+
+                let bx = (v1 - v0).normalize_or_zero();
+                let by = normal.cross(bx).normalize_or_zero();
+                basis_x.push(bx);
+                basis_y.push(by);
+            } else {
+                basis_x.push(Vec3::X);
+                basis_y.push(Vec3::Y);
+            }
+        }
+
+        (basis_x, basis_y)
+    }
+
+    /// Compute default per-vertex tangent basis from area-weighted face bases.
+    #[must_use]
+    pub fn compute_vertex_tangent_basis(&self) -> (Vec<Vec3>, Vec<Vec3>) {
+        let (face_bx, _face_by) = self.compute_face_tangent_basis();
+
+        let mut vert_bx = vec![Vec3::ZERO; self.vertices.len()];
+
+        for (face_idx, face) in self.faces.iter().enumerate() {
+            if face.len() < 3 {
+                continue;
+            }
+
+            // Compute face area
+            let v0 = self.vertices[face[0] as usize];
+            let mut area = 0.0f32;
+            for i in 1..(face.len() - 1) {
+                let v1 = self.vertices[face[i] as usize];
+                let v2 = self.vertices[face[i + 1] as usize];
+                area += (v1 - v0).cross(v2 - v0).length() * 0.5;
+            }
+
+            let weighted_bx = face_bx[face_idx] * area;
+            for &vi in face {
+                vert_bx[vi as usize] += weighted_bx;
+            }
+        }
+
+        // Orthonormalize against vertex normals
+        let mut basis_x = Vec::with_capacity(self.vertices.len());
+        let mut basis_y = Vec::with_capacity(self.vertices.len());
+
+        for (i, normal) in self.vertex_normals.iter().enumerate() {
+            let mut bx = vert_bx[i];
+            // Project out normal component and normalize
+            bx -= *normal * normal.dot(bx);
+            bx = bx.normalize_or_zero();
+
+            // If degenerate, pick an arbitrary tangent
+            if bx.length_squared() < 1e-6 {
+                bx = if normal.x.abs() < 0.9 {
+                    Vec3::X
+                } else {
+                    Vec3::Y
+                };
+                bx -= *normal * normal.dot(bx);
+                bx = bx.normalize_or_zero();
+            }
+
+            let by = normal.cross(bx).normalize_or_zero();
+            basis_x.push(bx);
+            basis_y.push(by);
+        }
+
+        (basis_x, basis_y)
     }
 
     // === GPU resource methods ===
@@ -868,8 +1044,33 @@ impl SurfaceMesh {
         render_data.update_shadow_model(queue, model_matrix);
 
         // Apply quantity colors with priority:
-        // vertex color > face color > vertex scalar > face scalar > surface color
-        if let Some(cq) = self.active_vertex_color_quantity() {
+        // vertex param > corner param > vertex color > face color > vertex scalar > face scalar > surface color
+        if let Some(pq) = self.active_vertex_parameterization_quantity() {
+            let colors = pq.compute_colors();
+            render_data.update_colors(queue, &colors, &self.triangulation);
+        } else if let Some(pq) = self.active_corner_parameterization_quantity() {
+            // Corner parameterization: compute per-corner colors, expand to per-vertex
+            // (for now, treat as per-face by averaging corners)
+            let corner_colors = pq.compute_colors();
+            let mut vertex_colors = vec![Vec3::splat(0.5); self.vertices.len()];
+            let mut counts = vec![0u32; self.vertices.len()];
+            let mut corner_idx = 0;
+            for face in &self.faces {
+                for &vi in face {
+                    if corner_idx < corner_colors.len() {
+                        vertex_colors[vi as usize] += corner_colors[corner_idx];
+                        counts[vi as usize] += 1;
+                        corner_idx += 1;
+                    }
+                }
+            }
+            for (i, count) in counts.iter().enumerate() {
+                if *count > 0 {
+                    vertex_colors[i] /= *count as f32;
+                }
+            }
+            render_data.update_colors(queue, &vertex_colors, &self.triangulation);
+        } else if let Some(cq) = self.active_vertex_color_quantity() {
             // Direct vertex color quantity
             render_data.update_colors(queue, cq.colors(), &self.triangulation);
         } else if let Some(cq) = self.active_face_color_quantity() {

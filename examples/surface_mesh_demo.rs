@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example `surface_mesh_demo`
 
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 
 /// Load an OBJ file and return vertices and triangle faces.
 fn load_obj(path: &str) -> (Vec<Vec3>, Vec<glam::UVec3>) {
@@ -118,6 +118,28 @@ fn main() {
         // Add face vector quantity (face normals)
         mesh.add_face_vector_quantity("face normals", face_normals.clone());
 
+        // Add parameterization quantity (UV from projection)
+        let uv_coords: Vec<Vec2> = vertices
+            .iter()
+            .map(|v| Vec2::new(v.x * 5.0, v.z * 5.0))
+            .collect();
+        mesh.add_vertex_parameterization_quantity("uv_projection", uv_coords);
+
+        // Add intrinsic vector quantity (tangent field, auto basis)
+        let tangent_vecs: Vec<Vec2> = vertices
+            .iter()
+            .map(|v| Vec2::new(v.y.sin(), v.x.cos()).normalize_or_zero() * 0.02)
+            .collect();
+        mesh.add_vertex_intrinsic_vector_quantity_auto("tangent_field", tangent_vecs);
+
+        // Add one-form quantity (edge-based flow values)
+        let num_edges = mesh.edges().len();
+        let edge_values: Vec<f32> = (0..num_edges)
+            .map(|i| (i as f32 * 0.1).sin() * 0.02)
+            .collect();
+        let edge_orientations: Vec<bool> = (0..num_edges).map(|i| i % 2 == 0).collect();
+        mesh.add_one_form_quantity("edge_flow", edge_values, edge_orientations);
+
         // Set a nice surface color
         mesh.set_surface_color(Vec3::new(0.8, 0.6, 0.4));
     });
@@ -128,6 +150,9 @@ fn main() {
     println!("  - height_color: vertex color (position-based)");
     println!("  - vertex normals: vertex vector quantity");
     println!("  - face normals: face vector quantity");
+    println!("  - uv_projection: parameterization (checker)");
+    println!("  - tangent_field: intrinsic vector (auto basis)");
+    println!("  - edge_flow: one-form (edge-based flow)");
     println!();
     println!("Controls:");
     println!("  - Left drag: Orbit camera");
