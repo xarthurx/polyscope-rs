@@ -1,9 +1,11 @@
 //! Surface mesh structure.
 
 mod intrinsic_vector_quantity;
+mod one_form_quantity;
 mod parameterization_quantity;
 mod quantities;
 pub use intrinsic_vector_quantity::*;
+pub use one_form_quantity::*;
 pub use parameterization_quantity::*;
 pub use quantities::*;
 
@@ -589,6 +591,11 @@ impl SurfaceMesh {
                     .downcast_mut::<MeshFaceIntrinsicVectorQuantity>()
                 {
                     iq.build_egui_ui(ui);
+                } else if let Some(oq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<MeshOneFormQuantity>()
+                {
+                    oq.build_egui_ui(ui);
                 }
             }
         }
@@ -840,6 +847,22 @@ impl SurfaceMesh {
     ) -> &mut Self {
         let (bx, by) = self.compute_face_tangent_basis();
         self.add_face_intrinsic_vector_quantity(name, vectors, bx, by)
+    }
+
+    /// Adds a one-form quantity to this mesh.
+    ///
+    /// A one-form assigns a scalar value to each edge, rendered as arrows
+    /// at edge midpoints. The `orientations` array specifies the sign convention
+    /// for each edge (true = canonical low→high vertex direction).
+    pub fn add_one_form_quantity(
+        &mut self,
+        name: impl Into<String>,
+        values: Vec<f32>,
+        orientations: Vec<bool>,
+    ) -> &mut Self {
+        let quantity = MeshOneFormQuantity::new(name, self.name.clone(), values, orientations);
+        self.add_quantity(Box::new(quantity));
+        self
     }
 
     /// Compute default per-face tangent basis from first edge direction.
