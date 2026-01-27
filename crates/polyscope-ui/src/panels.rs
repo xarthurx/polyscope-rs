@@ -178,8 +178,7 @@ pub struct SlicePlaneSelectionInfo {
 }
 
 /// Actions specific to slice plane gizmo manipulation.
-#[derive(Debug, Clone, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum SlicePlaneGizmoAction {
     /// No action.
     #[default]
@@ -191,7 +190,6 @@ pub enum SlicePlaneGizmoAction {
     /// Deselect the slice plane.
     Deselect,
 }
-
 
 /// Settings for a single group in the UI.
 #[derive(Debug, Clone)]
@@ -349,13 +347,25 @@ pub fn build_gizmo_section(
                     ui.label("Pos:");
                     let mut changed = false;
                     changed |= ui
-                        .add(DragValue::new(&mut selection.translation[0]).speed(0.1).prefix("X:"))
+                        .add(
+                            DragValue::new(&mut selection.translation[0])
+                                .speed(0.1)
+                                .prefix("X:"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(DragValue::new(&mut selection.translation[1]).speed(0.1).prefix("Y:"))
+                        .add(
+                            DragValue::new(&mut selection.translation[1])
+                                .speed(0.1)
+                                .prefix("Y:"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(DragValue::new(&mut selection.translation[2]).speed(0.1).prefix("Z:"))
+                        .add(
+                            DragValue::new(&mut selection.translation[2])
+                                .speed(0.1)
+                                .prefix("Z:"),
+                        )
                         .changed();
                     if changed {
                         action = GizmoAction::TransformChanged;
@@ -367,13 +377,28 @@ pub fn build_gizmo_section(
                     ui.label("Rot:");
                     let mut changed = false;
                     changed |= ui
-                        .add(DragValue::new(&mut selection.rotation_degrees[0]).speed(1.0).prefix("X:").suffix("°"))
+                        .add(
+                            DragValue::new(&mut selection.rotation_degrees[0])
+                                .speed(1.0)
+                                .prefix("X:")
+                                .suffix("°"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(DragValue::new(&mut selection.rotation_degrees[1]).speed(1.0).prefix("Y:").suffix("°"))
+                        .add(
+                            DragValue::new(&mut selection.rotation_degrees[1])
+                                .speed(1.0)
+                                .prefix("Y:")
+                                .suffix("°"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(DragValue::new(&mut selection.rotation_degrees[2]).speed(1.0).prefix("Z:").suffix("°"))
+                        .add(
+                            DragValue::new(&mut selection.rotation_degrees[2])
+                                .speed(1.0)
+                                .prefix("Z:")
+                                .suffix("°"),
+                        )
                         .changed();
                     if changed && action == GizmoAction::None {
                         action = GizmoAction::TransformChanged;
@@ -385,13 +410,28 @@ pub fn build_gizmo_section(
                     ui.label("Scale:");
                     let mut changed = false;
                     changed |= ui
-                        .add(DragValue::new(&mut selection.scale[0]).speed(0.01).prefix("X:").range(0.01..=100.0))
+                        .add(
+                            DragValue::new(&mut selection.scale[0])
+                                .speed(0.01)
+                                .prefix("X:")
+                                .range(0.01..=100.0),
+                        )
                         .changed();
                     changed |= ui
-                        .add(DragValue::new(&mut selection.scale[1]).speed(0.01).prefix("Y:").range(0.01..=100.0))
+                        .add(
+                            DragValue::new(&mut selection.scale[1])
+                                .speed(0.01)
+                                .prefix("Y:")
+                                .range(0.01..=100.0),
+                        )
                         .changed();
                     changed |= ui
-                        .add(DragValue::new(&mut selection.scale[2]).speed(0.01).prefix("Z:").range(0.01..=100.0))
+                        .add(
+                            DragValue::new(&mut selection.scale[2])
+                                .speed(0.01)
+                                .prefix("Z:")
+                                .range(0.01..=100.0),
+                        )
                         .changed();
                     if changed && action == GizmoAction::None {
                         action = GizmoAction::TransformChanged;
@@ -407,11 +447,19 @@ pub fn build_gizmo_section(
                         action = GizmoAction::SettingsChanged;
                     }
                     if settings.visible {
-                        if ui.selectable_label(!settings.local_space, "W").on_hover_text("World space").clicked() {
+                        if ui
+                            .selectable_label(!settings.local_space, "W")
+                            .on_hover_text("World space")
+                            .clicked()
+                        {
                             settings.local_space = false;
                             action = GizmoAction::SettingsChanged;
                         }
-                        if ui.selectable_label(settings.local_space, "L").on_hover_text("Local space").clicked() {
+                        if ui
+                            .selectable_label(settings.local_space, "L")
+                            .on_hover_text("Local space")
+                            .clicked()
+                        {
                             settings.local_space = true;
                             action = GizmoAction::SettingsChanged;
                         }
@@ -1223,10 +1271,9 @@ pub fn build_slice_planes_section(
                     .id_salt(format!("slice_plane_{idx}"))
                     .default_open(false)
                     .show(ui, |ui| {
-                        if build_slice_plane_item(ui, plane)
-                            && action == SlicePlanesAction::None {
-                                action = SlicePlanesAction::Modified(idx);
-                            }
+                        if build_slice_plane_item(ui, plane) && action == SlicePlanesAction::None {
+                            action = SlicePlanesAction::Modified(idx);
+                        }
 
                         ui.separator();
                         if ui.button("Remove").clicked() {
@@ -1305,20 +1352,14 @@ pub fn build_ground_plane_section(
 
                 ui.horizontal(|ui| {
                     ui.label("Blur iterations:");
-                    if ui
-                        .add(Slider::new(shadow_blur_iters, 0..=5))
-                        .changed()
-                    {
+                    if ui.add(Slider::new(shadow_blur_iters, 0..=5)).changed() {
                         changed = true;
                     }
                 });
 
                 ui.horizontal(|ui| {
                     ui.label("Darkness:");
-                    if ui
-                        .add(Slider::new(shadow_darkness, 0.0..=1.0))
-                        .changed()
-                    {
+                    if ui.add(Slider::new(shadow_darkness, 0.0..=1.0)).changed() {
                         changed = true;
                     }
                 });

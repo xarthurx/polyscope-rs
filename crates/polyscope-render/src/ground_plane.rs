@@ -68,7 +68,7 @@ impl GroundPlaneRenderData {
     /// * `light_buffer` - The light uniform buffer (from `ShadowMapPass`)
     /// * `shadow_depth_view` - The shadow map depth texture view
     /// * `shadow_sampler` - The shadow comparison sampler
-    #[must_use] 
+    #[must_use]
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -177,7 +177,7 @@ impl GroundPlaneRenderData {
     }
 
     /// Returns the bind group for rendering.
-    #[must_use] 
+    #[must_use]
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }

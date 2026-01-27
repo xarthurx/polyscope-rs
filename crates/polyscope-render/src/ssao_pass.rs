@@ -64,7 +64,7 @@ pub struct SsaoPass {
 
 impl SsaoPass {
     /// Creates a new SSAO pass.
-    #[must_use] 
+    #[must_use]
     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
         // Create SSAO shader
         let ssao_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -138,12 +138,11 @@ impl SsaoPass {
             });
 
         // SSAO pipeline
-        let ssao_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("SSAO Pipeline Layout"),
-                bind_group_layouts: &[&ssao_bind_group_layout],
-                push_constant_ranges: &[],
-            });
+        let ssao_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("SSAO Pipeline Layout"),
+            bind_group_layouts: &[&ssao_bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
         let ssao_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("SSAO Pipeline"),
@@ -209,12 +208,11 @@ impl SsaoPass {
             });
 
         // Blur pipeline
-        let blur_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("SSAO Blur Pipeline Layout"),
-                bind_group_layouts: &[&blur_bind_group_layout],
-                push_constant_ranges: &[],
-            });
+        let blur_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("SSAO Blur Pipeline Layout"),
+            bind_group_layouts: &[&blur_bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
         let blur_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("SSAO Blur Pipeline"),
@@ -361,11 +359,15 @@ impl SsaoPass {
             screen_height: height,
             _padding: [0.0; 2],
         };
-        queue.write_buffer(&self.ssao_uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        queue.write_buffer(
+            &self.ssao_uniform_buffer,
+            0,
+            bytemuck::cast_slice(&[uniforms]),
+        );
     }
 
     /// Creates a bind group for the SSAO pass.
-    #[must_use] 
+    #[must_use]
     pub fn create_ssao_bind_group(
         &self,
         device: &wgpu::Device,
@@ -402,7 +404,7 @@ impl SsaoPass {
     }
 
     /// Creates a bind group for the blur pass.
-    #[must_use] 
+    #[must_use]
     pub fn create_blur_bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("SSAO Blur Bind Group"),
@@ -474,7 +476,7 @@ impl SsaoPass {
     }
 
     /// Returns the blurred SSAO texture view.
-    #[must_use] 
+    #[must_use]
     pub fn ssao_view(&self) -> &wgpu::TextureView {
         &self.ssao_view
     }

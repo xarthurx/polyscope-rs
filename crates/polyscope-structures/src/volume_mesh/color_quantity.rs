@@ -25,7 +25,7 @@ impl VolumeMeshVertexColorQuantity {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
@@ -43,16 +43,32 @@ impl VolumeMeshVertexColorQuantity {
 }
 
 impl Quantity for VolumeMeshVertexColorQuantity {
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { &self.structure_name }
-    fn kind(&self) -> QuantityKind { QuantityKind::Color }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
-    fn data_size(&self) -> usize { self.colors.len() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Color
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+    fn data_size(&self) -> usize {
+        self.colors.len()
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl VertexQuantity for VolumeMeshVertexColorQuantity {}
@@ -79,7 +95,7 @@ impl VolumeMeshCellColorQuantity {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
@@ -97,16 +113,32 @@ impl VolumeMeshCellColorQuantity {
 }
 
 impl Quantity for VolumeMeshCellColorQuantity {
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { &self.structure_name }
-    fn kind(&self) -> QuantityKind { QuantityKind::Color }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
-    fn data_size(&self) -> usize { self.colors.len() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Color
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+    fn data_size(&self) -> usize {
+        self.colors.len()
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl CellQuantity for VolumeMeshCellColorQuantity {}
@@ -117,10 +149,7 @@ mod tests {
 
     #[test]
     fn test_vertex_color_quantity() {
-        let colors = vec![
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        ];
+        let colors = vec![Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0)];
         let quantity = VolumeMeshVertexColorQuantity::new("colors", "mesh", colors.clone());
 
         assert_eq!(quantity.name(), "colors");

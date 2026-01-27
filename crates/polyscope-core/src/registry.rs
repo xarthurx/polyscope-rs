@@ -16,7 +16,7 @@ pub struct Registry {
 
 impl Registry {
     /// Creates a new empty registry.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -39,7 +39,7 @@ impl Registry {
     }
 
     /// Gets a reference to a structure by type and name.
-    #[must_use] 
+    #[must_use]
     pub fn get(&self, type_name: &str, name: &str) -> Option<&dyn Structure> {
         self.structures
             .get(type_name)
@@ -53,7 +53,7 @@ impl Registry {
     }
 
     /// Checks if a structure with the given type and name exists.
-    #[must_use] 
+    #[must_use]
     pub fn contains(&self, type_name: &str, name: &str) -> bool {
         self.structures
             .get(type_name)
@@ -91,15 +91,20 @@ impl Registry {
     }
 
     /// Returns the total number of registered structures.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
-        self.structures.values().map(std::collections::HashMap::len).sum()
+        self.structures
+            .values()
+            .map(std::collections::HashMap::len)
+            .sum()
     }
 
     /// Returns true if the registry is empty.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.structures.values().all(std::collections::HashMap::is_empty)
+        self.structures
+            .values()
+            .all(std::collections::HashMap::is_empty)
     }
 
     /// Returns all structures of a given type.

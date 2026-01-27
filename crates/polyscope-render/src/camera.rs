@@ -48,7 +48,7 @@ pub enum AxisDirection {
 
 impl AxisDirection {
     /// Returns the unit vector for this direction.
-    #[must_use] 
+    #[must_use]
     pub fn to_vec3(self) -> Vec3 {
         match self {
             AxisDirection::PosX => Vec3::X,
@@ -61,7 +61,7 @@ impl AxisDirection {
     }
 
     /// Returns display name.
-    #[must_use] 
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             AxisDirection::PosX => "+X",
@@ -81,7 +81,7 @@ impl AxisDirection {
     /// - -Z up → -X front
     /// - +X up → +Y front
     /// - -X up → -Y front
-    #[must_use] 
+    #[must_use]
     pub fn default_front_direction(self) -> AxisDirection {
         match self {
             AxisDirection::PosY => AxisDirection::NegZ,
@@ -110,7 +110,7 @@ impl AxisDirection {
     }
 
     /// Converts to a u32 index (used in UI).
-    #[must_use] 
+    #[must_use]
     pub fn to_index(self) -> u32 {
         match self {
             AxisDirection::PosX => 0,
@@ -156,7 +156,7 @@ pub struct Camera {
 
 impl Camera {
     /// Creates a new camera with default settings.
-    #[must_use] 
+    #[must_use]
     pub fn new(aspect_ratio: f32) -> Self {
         Self {
             position: Vec3::new(0.0, 0.0, 3.0),
@@ -181,13 +181,13 @@ impl Camera {
     }
 
     /// Returns the view matrix.
-    #[must_use] 
+    #[must_use]
     pub fn view_matrix(&self) -> Mat4 {
         Mat4::look_at_rh(self.position, self.target, self.up)
     }
 
     /// Returns the projection matrix.
-    #[must_use] 
+    #[must_use]
     pub fn projection_matrix(&self) -> Mat4 {
         match self.projection_mode {
             ProjectionMode::Perspective => {
@@ -209,7 +209,7 @@ impl Camera {
                     half_width,
                     -half_height,
                     half_height,
-                    -ortho_depth,  // Negative near to see behind focus point
+                    -ortho_depth, // Negative near to see behind focus point
                     ortho_depth,
                 )
             }
@@ -217,19 +217,19 @@ impl Camera {
     }
 
     /// Returns the combined view-projection matrix.
-    #[must_use] 
+    #[must_use]
     pub fn view_projection_matrix(&self) -> Mat4 {
         self.projection_matrix() * self.view_matrix()
     }
 
     /// Returns the camera's forward direction.
-    #[must_use] 
+    #[must_use]
     pub fn forward(&self) -> Vec3 {
         (self.target - self.position).normalize()
     }
 
     /// Returns the camera's right direction.
-    #[must_use] 
+    #[must_use]
     pub fn right(&self) -> Vec3 {
         self.forward().cross(self.up).normalize()
     }
@@ -341,7 +341,7 @@ impl Camera {
     }
 
     /// Returns FOV in degrees.
-    #[must_use] 
+    #[must_use]
     pub fn fov_degrees(&self) -> f32 {
         self.fov.to_degrees()
     }
@@ -435,7 +435,10 @@ mod tests {
         camera.zoom(1.0); // Zoom in
         let new_distance = camera.position.distance(camera.target);
 
-        assert!(new_distance < initial_distance, "Perspective zoom in should decrease distance");
+        assert!(
+            new_distance < initial_distance,
+            "Perspective zoom in should decrease distance"
+        );
     }
 
     #[test]
@@ -448,6 +451,9 @@ mod tests {
         camera.zoom(1.0); // Zoom in (positive delta)
         let new_scale = camera.ortho_scale;
 
-        assert!(new_scale < initial_scale, "Orthographic zoom in should decrease scale");
+        assert!(
+            new_scale < initial_scale,
+            "Orthographic zoom in should decrease scale"
+        );
     }
 }

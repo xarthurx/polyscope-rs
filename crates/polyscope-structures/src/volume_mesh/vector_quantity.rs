@@ -31,7 +31,7 @@ impl VolumeMeshVertexVectorQuantity {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
     }
@@ -64,25 +64,43 @@ impl VolumeMeshVertexVectorQuantity {
         if self.enabled {
             ui.horizontal(|ui| {
                 ui.label("Length:");
-                ui.add(egui::DragValue::new(&mut self.vector_length_scale)
-                    .speed(0.01)
-                    .range(0.001..=10.0));
+                ui.add(
+                    egui::DragValue::new(&mut self.vector_length_scale)
+                        .speed(0.01)
+                        .range(0.001..=10.0),
+                );
             });
         }
     }
 }
 
 impl Quantity for VolumeMeshVertexVectorQuantity {
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { &self.structure_name }
-    fn kind(&self) -> QuantityKind { QuantityKind::Vector }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
-    fn data_size(&self) -> usize { self.vectors.len() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Vector
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+    fn data_size(&self) -> usize {
+        self.vectors.len()
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl VertexQuantity for VolumeMeshVertexVectorQuantity {}
@@ -115,7 +133,7 @@ impl VolumeMeshCellVectorQuantity {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
     }
@@ -148,25 +166,43 @@ impl VolumeMeshCellVectorQuantity {
         if self.enabled {
             ui.horizontal(|ui| {
                 ui.label("Length:");
-                ui.add(egui::DragValue::new(&mut self.vector_length_scale)
-                    .speed(0.01)
-                    .range(0.001..=10.0));
+                ui.add(
+                    egui::DragValue::new(&mut self.vector_length_scale)
+                        .speed(0.01)
+                        .range(0.001..=10.0),
+                );
             });
         }
     }
 }
 
 impl Quantity for VolumeMeshCellVectorQuantity {
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { &self.structure_name }
-    fn kind(&self) -> QuantityKind { QuantityKind::Vector }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
-    fn data_size(&self) -> usize { self.vectors.len() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Vector
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+    fn data_size(&self) -> usize {
+        self.vectors.len()
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl CellQuantity for VolumeMeshCellVectorQuantity {}
@@ -177,10 +213,7 @@ mod tests {
 
     #[test]
     fn test_vertex_vector_quantity() {
-        let vectors = vec![
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        ];
+        let vectors = vec![Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0)];
         let quantity = VolumeMeshVertexVectorQuantity::new("velocity", "mesh", vectors.clone());
 
         assert_eq!(quantity.name(), "velocity");

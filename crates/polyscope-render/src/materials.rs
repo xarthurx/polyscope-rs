@@ -69,43 +69,43 @@ impl Material {
     }
 
     /// Creates the "clay" material - matte, minimal specularity.
-    #[must_use] 
+    #[must_use]
     pub fn clay() -> Self {
         Self::with_properties("clay", 0.25, 0.75, 0.1, 8.0)
     }
 
     /// Creates the "wax" material - slightly glossy, soft highlights.
-    #[must_use] 
+    #[must_use]
     pub fn wax() -> Self {
         Self::with_properties("wax", 0.2, 0.7, 0.4, 16.0)
     }
 
     /// Creates the "candy" material - shiny, bright highlights.
-    #[must_use] 
+    #[must_use]
     pub fn candy() -> Self {
         Self::with_properties("candy", 0.15, 0.6, 0.7, 64.0)
     }
 
     /// Creates the "ceramic" material - smooth, moderate gloss.
-    #[must_use] 
+    #[must_use]
     pub fn ceramic() -> Self {
         Self::with_properties("ceramic", 0.2, 0.65, 0.5, 32.0)
     }
 
     /// Creates the "jade" material - translucent appearance (simulated).
-    #[must_use] 
+    #[must_use]
     pub fn jade() -> Self {
         Self::with_properties("jade", 0.3, 0.6, 0.3, 24.0)
     }
 
     /// Creates the "mud" material - very matte, no specularity.
-    #[must_use] 
+    #[must_use]
     pub fn mud() -> Self {
         Self::with_properties("mud", 0.3, 0.7, 0.0, 1.0)
     }
 
     /// Creates the "normal" material - balanced properties.
-    #[must_use] 
+    #[must_use]
     pub fn normal() -> Self {
         Self::with_properties("normal", 0.2, 0.7, 0.3, 32.0)
     }
@@ -162,7 +162,7 @@ pub struct MaterialRegistry {
 
 impl MaterialRegistry {
     /// Creates a new material registry with default materials.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         let mut registry = Self {
             materials: HashMap::new(),
@@ -190,13 +190,13 @@ impl MaterialRegistry {
     }
 
     /// Gets a material by name.
-    #[must_use] 
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Material> {
         self.materials.get(name)
     }
 
     /// Gets the default material.
-    #[must_use] 
+    #[must_use]
     pub fn default_material(&self) -> &Material {
         self.materials
             .get(&self.default_material)
@@ -216,19 +216,22 @@ impl MaterialRegistry {
     }
 
     /// Returns all material names.
-    #[must_use] 
+    #[must_use]
     pub fn names(&self) -> Vec<&str> {
-        self.materials.keys().map(std::string::String::as_str).collect()
+        self.materials
+            .keys()
+            .map(std::string::String::as_str)
+            .collect()
     }
 
     /// Returns the number of registered materials.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.materials.len()
     }
 
     /// Returns true if no materials are registered.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.materials.is_empty()
     }

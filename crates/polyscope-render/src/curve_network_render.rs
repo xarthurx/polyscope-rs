@@ -85,7 +85,7 @@ impl CurveNetworkRenderData {
     /// * `node_positions` - Node positions
     /// * `edge_tail_inds` - Edge start indices
     /// * `edge_tip_inds` - Edge end indices
-    #[must_use] 
+    #[must_use]
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -282,7 +282,7 @@ impl CurveNetworkRenderData {
     }
 
     /// Returns whether tube resources are initialized.
-    #[must_use] 
+    #[must_use]
     pub fn has_tube_resources(&self) -> bool {
         self.generated_vertex_buffer.is_some()
     }
@@ -332,7 +332,7 @@ impl CurveNetworkRenderData {
     }
 
     /// Returns whether node render resources are initialized.
-    #[must_use] 
+    #[must_use]
     pub fn has_node_render_resources(&self) -> bool {
         self.node_render_bind_group.is_some()
     }

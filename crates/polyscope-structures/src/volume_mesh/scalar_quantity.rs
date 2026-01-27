@@ -41,17 +41,21 @@ impl VolumeMeshVertexScalarQuantity {
                 max = max.max(v);
             }
         }
-        if min > max { (0.0, 1.0) } else { (min, max) }
+        if min > max {
+            (0.0, 1.0)
+        } else {
+            (min, max)
+        }
     }
 
     /// Returns the values.
-    #[must_use] 
+    #[must_use]
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Gets the color map name.
-    #[must_use] 
+    #[must_use]
     pub fn color_map(&self) -> &str {
         &self.color_map
     }
@@ -63,7 +67,7 @@ impl VolumeMeshVertexScalarQuantity {
     }
 
     /// Gets the data range.
-    #[must_use] 
+    #[must_use]
     pub fn data_range(&self) -> (f32, f32) {
         (self.data_min, self.data_max)
     }
@@ -90,16 +94,32 @@ impl VolumeMeshVertexScalarQuantity {
 }
 
 impl Quantity for VolumeMeshVertexScalarQuantity {
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { &self.structure_name }
-    fn kind(&self) -> QuantityKind { QuantityKind::Scalar }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
-    fn data_size(&self) -> usize { self.values.len() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Scalar
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+    fn data_size(&self) -> usize {
+        self.values.len()
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl VertexQuantity for VolumeMeshVertexScalarQuantity {}
@@ -143,17 +163,21 @@ impl VolumeMeshCellScalarQuantity {
                 max = max.max(v);
             }
         }
-        if min > max { (0.0, 1.0) } else { (min, max) }
+        if min > max {
+            (0.0, 1.0)
+        } else {
+            (min, max)
+        }
     }
 
     /// Returns the values.
-    #[must_use] 
+    #[must_use]
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Gets the color map name.
-    #[must_use] 
+    #[must_use]
     pub fn color_map(&self) -> &str {
         &self.color_map
     }
@@ -165,7 +189,7 @@ impl VolumeMeshCellScalarQuantity {
     }
 
     /// Gets the data range.
-    #[must_use] 
+    #[must_use]
     pub fn data_range(&self) -> (f32, f32) {
         (self.data_min, self.data_max)
     }
@@ -192,16 +216,32 @@ impl VolumeMeshCellScalarQuantity {
 }
 
 impl Quantity for VolumeMeshCellScalarQuantity {
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { &self.structure_name }
-    fn kind(&self) -> QuantityKind { QuantityKind::Scalar }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
-    fn data_size(&self) -> usize { self.values.len() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Scalar
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+    fn data_size(&self) -> usize {
+        self.values.len()
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl CellQuantity for VolumeMeshCellScalarQuantity {}
@@ -213,11 +253,8 @@ mod tests {
     #[test]
     fn test_vertex_scalar_quantity_creation() {
         let values = vec![0.0, 1.0, 2.0, 3.0];
-        let quantity = VolumeMeshVertexScalarQuantity::new(
-            "temperature",
-            "my_mesh",
-            values.clone(),
-        );
+        let quantity =
+            VolumeMeshVertexScalarQuantity::new("temperature", "my_mesh", values.clone());
 
         assert_eq!(quantity.name(), "temperature");
         assert_eq!(quantity.values(), &values);
@@ -227,11 +264,7 @@ mod tests {
     #[test]
     fn test_cell_scalar_quantity_creation() {
         let values = vec![0.5, 1.5];
-        let quantity = VolumeMeshCellScalarQuantity::new(
-            "pressure",
-            "my_mesh",
-            values.clone(),
-        );
+        let quantity = VolumeMeshCellScalarQuantity::new("pressure", "my_mesh", values.clone());
 
         assert_eq!(quantity.name(), "pressure");
         assert_eq!(quantity.values(), &values);

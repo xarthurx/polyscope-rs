@@ -125,7 +125,7 @@ impl SurfaceMeshRenderData {
     /// * `triangles` - Triangle indices (each [u32; 3] is one triangle)
     /// * `vertex_normals` - Per-vertex normals
     /// * `edge_is_real` - Per-triangle-vertex flags marking real polygon edges vs internal triangulation edges
-    #[must_use] 
+    #[must_use]
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -295,12 +295,7 @@ impl SurfaceMeshRenderData {
 
     /// Updates the per-vertex color buffer with per-original-vertex colors.
     /// This expands the colors to match the per-triangle-vertex buffer layout.
-    pub fn update_colors(
-        &self,
-        queue: &wgpu::Queue,
-        colors: &[Vec3],
-        triangles: &[[u32; 3]],
-    ) {
+    pub fn update_colors(&self, queue: &wgpu::Queue, colors: &[Vec3], triangles: &[[u32; 3]]) {
         // Expand per-vertex colors to per-triangle-vertex
         let mut expanded_colors: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
         for tri in triangles {
@@ -309,7 +304,11 @@ impl SurfaceMeshRenderData {
                 expanded_colors.extend_from_slice(&[c.x, c.y, c.z, 1.0]);
             }
         }
-        queue.write_buffer(&self.color_buffer, 0, bytemuck::cast_slice(&expanded_colors));
+        queue.write_buffer(
+            &self.color_buffer,
+            0,
+            bytemuck::cast_slice(&expanded_colors),
+        );
     }
 
     /// Clears the color buffer (sets all colors to zero, which means use `surface_color`).
@@ -364,7 +363,7 @@ impl SurfaceMeshRenderData {
     }
 
     /// Returns whether shadow resources have been initialized.
-    #[must_use] 
+    #[must_use]
     pub fn has_shadow_resources(&self) -> bool {
         self.shadow_bind_group.is_some()
     }
@@ -373,7 +372,7 @@ impl SurfaceMeshRenderData {
     ///
     /// The shadow pass uses non-indexed drawing with storage buffers,
     /// so this returns the number of expanded triangle vertices.
-    #[must_use] 
+    #[must_use]
     pub fn num_vertices(&self) -> u32 {
         self.num_indices // Same as expanded triangle vertex count
     }
@@ -394,43 +393,43 @@ impl SurfaceMeshRenderData {
     // Buffer getters for reflection rendering
 
     /// Returns the uniform buffer.
-    #[must_use] 
+    #[must_use]
     pub fn uniform_buffer(&self) -> &wgpu::Buffer {
         &self.uniform_buffer
     }
 
     /// Returns the position buffer.
-    #[must_use] 
+    #[must_use]
     pub fn position_buffer(&self) -> &wgpu::Buffer {
         &self.vertex_buffer
     }
 
     /// Returns the normal buffer.
-    #[must_use] 
+    #[must_use]
     pub fn normal_buffer(&self) -> &wgpu::Buffer {
         &self.normal_buffer
     }
 
     /// Returns the barycentric buffer.
-    #[must_use] 
+    #[must_use]
     pub fn barycentric_buffer(&self) -> &wgpu::Buffer {
         &self.barycentric_buffer
     }
 
     /// Returns the color buffer.
-    #[must_use] 
+    #[must_use]
     pub fn color_buffer(&self) -> &wgpu::Buffer {
         &self.color_buffer
     }
 
     /// Returns the edge is real buffer.
-    #[must_use] 
+    #[must_use]
     pub fn edge_is_real_buffer(&self) -> &wgpu::Buffer {
         &self.edge_is_real_buffer
     }
 
     /// Returns the number of vertices (for non-indexed drawing).
-    #[must_use] 
+    #[must_use]
     pub fn vertex_count(&self) -> u32 {
         self.num_indices
     }

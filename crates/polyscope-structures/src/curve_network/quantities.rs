@@ -37,13 +37,13 @@ impl CurveNodeScalarQuantity {
     }
 
     /// Returns the scalar values.
-    #[must_use] 
+    #[must_use]
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Maps scalar values to colors using the colormap.
-    #[must_use] 
+    #[must_use]
     pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
@@ -58,7 +58,7 @@ impl CurveNodeScalarQuantity {
     }
 
     /// Gets the colormap name.
-    #[must_use] 
+    #[must_use]
     pub fn colormap_name(&self) -> &str {
         &self.colormap_name
     }
@@ -69,13 +69,13 @@ impl CurveNodeScalarQuantity {
     }
 
     /// Gets the range minimum.
-    #[must_use] 
+    #[must_use]
     pub fn range_min(&self) -> f32 {
         self.range_min
     }
 
     /// Gets the range maximum.
-    #[must_use] 
+    #[must_use]
     pub fn range_max(&self) -> f32 {
         self.range_max
     }
@@ -178,13 +178,13 @@ impl CurveEdgeScalarQuantity {
     }
 
     /// Returns the scalar values.
-    #[must_use] 
+    #[must_use]
     pub fn values(&self) -> &[f32] {
         &self.values
     }
 
     /// Maps scalar values to colors using the colormap.
-    #[must_use] 
+    #[must_use]
     pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
@@ -199,7 +199,7 @@ impl CurveEdgeScalarQuantity {
     }
 
     /// Gets the colormap name.
-    #[must_use] 
+    #[must_use]
     pub fn colormap_name(&self) -> &str {
         &self.colormap_name
     }
@@ -210,13 +210,13 @@ impl CurveEdgeScalarQuantity {
     }
 
     /// Gets the range minimum.
-    #[must_use] 
+    #[must_use]
     pub fn range_min(&self) -> f32 {
         self.range_min
     }
 
     /// Gets the range maximum.
-    #[must_use] 
+    #[must_use]
     pub fn range_max(&self) -> f32 {
         self.range_max
     }
@@ -310,7 +310,7 @@ impl CurveNodeColorQuantity {
     }
 
     /// Returns the colors.
-    #[must_use] 
+    #[must_use]
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }
@@ -394,7 +394,7 @@ impl CurveEdgeColorQuantity {
     }
 
     /// Returns the colors.
-    #[must_use] 
+    #[must_use]
     pub fn colors(&self) -> &[Vec3] {
         &self.colors
     }

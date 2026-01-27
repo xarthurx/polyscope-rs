@@ -53,7 +53,11 @@ fn main() {
     // Load the Stanford Bunny
     let (vertices, faces) = load_obj("assets/bunny.obj");
 
-    println!("Loaded bunny: {} vertices, {} faces", vertices.len(), faces.len());
+    println!(
+        "Loaded bunny: {} vertices, {} faces",
+        vertices.len(),
+        faces.len()
+    );
 
     let _mesh = polyscope::register_surface_mesh("bunny", vertices.clone(), faces);
 
@@ -65,7 +69,10 @@ fn main() {
 
         // Add vertex colors based on position
         let y_min = vertices.iter().map(|v| v.y).fold(f32::INFINITY, f32::min);
-        let y_max = vertices.iter().map(|v| v.y).fold(f32::NEG_INFINITY, f32::max);
+        let y_max = vertices
+            .iter()
+            .map(|v| v.y)
+            .fold(f32::NEG_INFINITY, f32::max);
         let vertex_colors: Vec<Vec3> = vertices
             .iter()
             .map(|v| {

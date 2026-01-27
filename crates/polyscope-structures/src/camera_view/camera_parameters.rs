@@ -13,7 +13,7 @@ pub struct CameraIntrinsics {
 
 impl CameraIntrinsics {
     /// Creates new camera intrinsics.
-    #[must_use] 
+    #[must_use]
     pub fn new(fov_vertical_degrees: f32, aspect_ratio: f32) -> Self {
         Self {
             fov_vertical_degrees,
@@ -22,7 +22,7 @@ impl CameraIntrinsics {
     }
 
     /// Creates intrinsics from horizontal `FoV` and aspect ratio.
-    #[must_use] 
+    #[must_use]
     pub fn from_horizontal_fov(fov_horizontal_degrees: f32, aspect_ratio: f32) -> Self {
         // Convert horizontal to vertical FoV: tan(v/2) = tan(h/2) / aspect
         let h_rad = fov_horizontal_degrees.to_radians();
@@ -34,7 +34,7 @@ impl CameraIntrinsics {
     }
 
     /// Creates default intrinsics (60° vertical `FoV`, 16:9 aspect).
-    #[must_use] 
+    #[must_use]
     pub fn default_intrinsics() -> Self {
         Self {
             fov_vertical_degrees: 60.0,
@@ -62,7 +62,7 @@ pub struct CameraExtrinsics {
 
 impl CameraExtrinsics {
     /// Creates new camera extrinsics from position and directions.
-    #[must_use] 
+    #[must_use]
     pub fn new(position: Vec3, look_dir: Vec3, up_dir: Vec3) -> Self {
         Self {
             position,
@@ -72,7 +72,7 @@ impl CameraExtrinsics {
     }
 
     /// Creates extrinsics with camera at origin looking down -Z.
-    #[must_use] 
+    #[must_use]
     pub fn default_extrinsics() -> Self {
         Self {
             position: Vec3::ZERO,
@@ -82,20 +82,20 @@ impl CameraExtrinsics {
     }
 
     /// Creates extrinsics for a camera looking at a target point.
-    #[must_use] 
+    #[must_use]
     pub fn look_at(position: Vec3, target: Vec3, up: Vec3) -> Self {
         let look_dir = (target - position).normalize();
         Self::new(position, look_dir, up)
     }
 
     /// Gets the right direction (look cross up).
-    #[must_use] 
+    #[must_use]
     pub fn right_dir(&self) -> Vec3 {
         self.look_dir.cross(self.up_dir).normalize()
     }
 
     /// Gets the camera frame as (look, up, right).
-    #[must_use] 
+    #[must_use]
     pub fn camera_frame(&self) -> (Vec3, Vec3, Vec3) {
         let right = self.right_dir();
         // Re-orthogonalize up
@@ -104,7 +104,7 @@ impl CameraExtrinsics {
     }
 
     /// Returns the view matrix (world to camera space).
-    #[must_use] 
+    #[must_use]
     pub fn view_matrix(&self) -> Mat4 {
         let (look, up, right) = self.camera_frame();
         // Camera looks down -Z in eye space
@@ -126,8 +126,7 @@ impl Default for CameraExtrinsics {
 }
 
 /// Combined camera parameters (intrinsics + extrinsics).
-#[derive(Debug, Clone, Copy)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct CameraParameters {
     /// Intrinsic parameters (`FoV`, aspect ratio).
     pub intrinsics: CameraIntrinsics,
@@ -137,7 +136,7 @@ pub struct CameraParameters {
 
 impl CameraParameters {
     /// Creates new camera parameters.
-    #[must_use] 
+    #[must_use]
     pub fn new(intrinsics: CameraIntrinsics, extrinsics: CameraExtrinsics) -> Self {
         Self {
             intrinsics,
@@ -146,7 +145,7 @@ impl CameraParameters {
     }
 
     /// Creates camera parameters from vectors.
-    #[must_use] 
+    #[must_use]
     pub fn from_vectors(
         position: Vec3,
         look_dir: Vec3,
@@ -161,7 +160,7 @@ impl CameraParameters {
     }
 
     /// Creates camera parameters for looking at a target.
-    #[must_use] 
+    #[must_use]
     pub fn look_at(
         position: Vec3,
         target: Vec3,
@@ -176,55 +175,55 @@ impl CameraParameters {
     }
 
     /// Gets the camera position.
-    #[must_use] 
+    #[must_use]
     pub fn position(&self) -> Vec3 {
         self.extrinsics.position
     }
 
     /// Gets the look direction.
-    #[must_use] 
+    #[must_use]
     pub fn look_dir(&self) -> Vec3 {
         self.extrinsics.look_dir
     }
 
     /// Gets the up direction.
-    #[must_use] 
+    #[must_use]
     pub fn up_dir(&self) -> Vec3 {
         self.extrinsics.up_dir
     }
 
     /// Gets the right direction.
-    #[must_use] 
+    #[must_use]
     pub fn right_dir(&self) -> Vec3 {
         self.extrinsics.right_dir()
     }
 
     /// Gets the camera frame as (look, up, right).
-    #[must_use] 
+    #[must_use]
     pub fn camera_frame(&self) -> (Vec3, Vec3, Vec3) {
         self.extrinsics.camera_frame()
     }
 
     /// Gets the vertical field of view in degrees.
-    #[must_use] 
+    #[must_use]
     pub fn fov_vertical_degrees(&self) -> f32 {
         self.intrinsics.fov_vertical_degrees
     }
 
     /// Gets the aspect ratio (width / height).
-    #[must_use] 
+    #[must_use]
     pub fn aspect_ratio(&self) -> f32 {
         self.intrinsics.aspect_ratio
     }
 
     /// Gets the view matrix.
-    #[must_use] 
+    #[must_use]
     pub fn view_matrix(&self) -> Mat4 {
         self.extrinsics.view_matrix()
     }
 
     /// Gets the projection matrix.
-    #[must_use] 
+    #[must_use]
     pub fn projection_matrix(&self, near: f32, far: f32) -> Mat4 {
         Mat4::perspective_rh(
             self.intrinsics.fov_vertical_degrees.to_radians(),
@@ -234,7 +233,6 @@ impl CameraParameters {
         )
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -82,7 +82,7 @@ impl SlicePlaneRenderData {
     /// * `device` - The wgpu device
     /// * `bind_group_layout` - The bind group layout
     /// * `camera_buffer` - The camera uniform buffer
-    #[must_use] 
+    #[must_use]
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -140,7 +140,7 @@ impl SlicePlaneRenderData {
     }
 
     /// Returns the bind group for rendering.
-    #[must_use] 
+    #[must_use]
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
@@ -156,7 +156,7 @@ impl SlicePlaneRenderData {
 }
 
 /// Creates the bind group layout for slice plane rendering.
-#[must_use] 
+#[must_use]
 pub fn create_slice_plane_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Slice Plane Bind Group Layout"),
@@ -188,7 +188,7 @@ pub fn create_slice_plane_bind_group_layout(device: &wgpu::Device) -> wgpu::Bind
 }
 
 /// Creates the render pipeline for slice plane visualization.
-#[must_use] 
+#[must_use]
 pub fn create_slice_plane_pipeline(
     device: &wgpu::Device,
     bind_group_layout: &wgpu::BindGroupLayout,

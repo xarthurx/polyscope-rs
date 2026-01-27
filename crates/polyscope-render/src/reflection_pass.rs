@@ -42,7 +42,7 @@ pub struct ReflectionPass {
 
 impl ReflectionPass {
     /// Creates a new reflection pass.
-    #[must_use] 
+    #[must_use]
     pub fn new(device: &wgpu::Device) -> Self {
         // Create reflection uniform buffer
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -101,13 +101,13 @@ impl ReflectionPass {
     }
 
     /// Returns the reflection bind group.
-    #[must_use] 
+    #[must_use]
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
 
     /// Returns the reflection bind group layout.
-    #[must_use] 
+    #[must_use]
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.bind_group_layout
     }

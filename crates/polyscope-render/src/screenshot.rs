@@ -4,13 +4,11 @@ use image::{ImageBuffer, Rgba};
 use std::path::Path;
 
 /// Options for taking screenshots.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ScreenshotOptions {
     /// Whether to use transparent background (PNG only).
     pub transparent_background: bool,
 }
-
 
 /// Saves raw BGRA pixel data to an image file.
 ///
@@ -43,8 +41,8 @@ pub fn save_image(
 
     // Create image buffer from converted RGBA data
     // Note: wgpu uses top-left origin, so no vertical flip needed
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, rgba_data)
-        .ok_or(ScreenshotError::InvalidImageData)?;
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
+        ImageBuffer::from_raw(width, height, rgba_data).ok_or(ScreenshotError::InvalidImageData)?;
 
     match extension.as_str() {
         "png" => {
@@ -80,8 +78,8 @@ pub fn save_to_buffer(data: &[u8], width: u32, height: u32) -> Result<Vec<u8>, S
     }
 
     // Note: wgpu uses top-left origin, so no vertical flip needed
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, rgba_data)
-        .ok_or(ScreenshotError::InvalidImageData)?;
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
+        ImageBuffer::from_raw(width, height, rgba_data).ok_or(ScreenshotError::InvalidImageData)?;
 
     let mut buffer = std::io::Cursor::new(Vec::new());
     img.write_to(&mut buffer, image::ImageFormat::Png)?;

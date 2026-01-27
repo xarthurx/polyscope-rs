@@ -6,7 +6,9 @@ use glam::{Mat4, Vec3};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{ColorMapRegistry, CurveNetworkRenderData, CurveNetworkUniforms, PointUniforms};
+use polyscope_render::{
+    ColorMapRegistry, CurveNetworkRenderData, CurveNetworkUniforms, PointUniforms,
+};
 
 pub use quantities::*;
 
@@ -104,55 +106,55 @@ impl CurveNetwork {
     }
 
     /// Returns the structure name.
-    #[must_use] 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Returns the number of nodes.
-    #[must_use] 
+    #[must_use]
     pub fn num_nodes(&self) -> usize {
         self.node_positions.len()
     }
 
     /// Returns the number of edges.
-    #[must_use] 
+    #[must_use]
     pub fn num_edges(&self) -> usize {
         self.edge_tail_inds.len()
     }
 
     /// Returns the node positions.
-    #[must_use] 
+    #[must_use]
     pub fn nodes(&self) -> &[Vec3] {
         &self.node_positions
     }
 
     /// Returns the edge tail indices.
-    #[must_use] 
+    #[must_use]
     pub fn edge_tail_inds(&self) -> &[u32] {
         &self.edge_tail_inds
     }
 
     /// Returns the edge tip indices.
-    #[must_use] 
+    #[must_use]
     pub fn edge_tip_inds(&self) -> &[u32] {
         &self.edge_tip_inds
     }
 
     /// Returns the edge centers.
-    #[must_use] 
+    #[must_use]
     pub fn edge_centers(&self) -> &[Vec3] {
         &self.edge_centers
     }
 
     /// Returns the node degrees.
-    #[must_use] 
+    #[must_use]
     pub fn node_degrees(&self) -> &[usize] {
         &self.node_degrees
     }
 
     /// Gets the base color.
-    #[must_use] 
+    #[must_use]
     pub fn color(&self) -> Vec3 {
         self.color
     }
@@ -164,13 +166,13 @@ impl CurveNetwork {
     }
 
     /// Gets the radius.
-    #[must_use] 
+    #[must_use]
     pub fn radius(&self) -> f32 {
         self.radius
     }
 
     /// Returns whether the radius is relative to scene scale.
-    #[must_use] 
+    #[must_use]
     pub fn radius_is_relative(&self) -> bool {
         self.radius_is_relative
     }
@@ -183,7 +185,7 @@ impl CurveNetwork {
     }
 
     /// Gets the material name.
-    #[must_use] 
+    #[must_use]
     pub fn material(&self) -> &str {
         &self.material
     }
@@ -195,7 +197,7 @@ impl CurveNetwork {
     }
 
     /// Gets the render mode (0 = line, 1 = tube).
-    #[must_use] 
+    #[must_use]
     pub fn render_mode(&self) -> u32 {
         self.render_mode
     }
@@ -258,7 +260,7 @@ impl CurveNetwork {
     }
 
     /// Returns the currently active node scalar quantity, if any.
-    #[must_use] 
+    #[must_use]
     pub fn active_node_scalar_quantity(&self) -> Option<&CurveNodeScalarQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -273,7 +275,7 @@ impl CurveNetwork {
     }
 
     /// Returns the currently active edge scalar quantity, if any.
-    #[must_use] 
+    #[must_use]
     pub fn active_edge_scalar_quantity(&self) -> Option<&CurveEdgeScalarQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -288,7 +290,7 @@ impl CurveNetwork {
     }
 
     /// Returns the currently active node color quantity, if any.
-    #[must_use] 
+    #[must_use]
     pub fn active_node_color_quantity(&self) -> Option<&CurveNodeColorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -303,7 +305,7 @@ impl CurveNetwork {
     }
 
     /// Returns the currently active edge color quantity, if any.
-    #[must_use] 
+    #[must_use]
     pub fn active_edge_color_quantity(&self) -> Option<&CurveEdgeColorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -388,7 +390,7 @@ impl CurveNetwork {
     }
 
     /// Returns the render data if initialized.
-    #[must_use] 
+    #[must_use]
     pub fn render_data(&self) -> Option<&CurveNetworkRenderData> {
         self.render_data.as_ref()
     }
@@ -419,11 +421,7 @@ impl CurveNetwork {
         camera_buffer: &wgpu::Buffer,
     ) {
         if let Some(render_data) = &mut self.render_data {
-            render_data.init_node_render_resources(
-                device,
-                point_bind_group_layout,
-                camera_buffer,
-            );
+            render_data.init_node_render_resources(device, point_bind_group_layout, camera_buffer);
         }
     }
 
@@ -574,14 +572,12 @@ impl Structure for CurveNetwork {
     }
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {
-        if !self.enabled {
-        }
+        if !self.enabled {}
         // TODO: Implement curve network rendering
     }
 
     fn draw_pick(&self, _ctx: &mut dyn RenderContext) {
-        if !self.enabled {
-        }
+        if !self.enabled {}
         // TODO: Implement curve network picking
     }
 

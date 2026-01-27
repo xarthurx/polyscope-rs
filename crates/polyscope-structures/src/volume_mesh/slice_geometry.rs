@@ -18,7 +18,7 @@ pub struct CellSliceResult {
 
 impl CellSliceResult {
     /// Creates an empty slice result (no intersection).
-    #[must_use] 
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             vertices: Vec::new(),
@@ -27,7 +27,7 @@ impl CellSliceResult {
     }
 
     /// Returns true if the slice produced a valid polygon.
-    #[must_use] 
+    #[must_use]
     pub fn has_intersection(&self) -> bool {
         self.vertices.len() >= 3
     }
@@ -45,7 +45,7 @@ impl CellSliceResult {
 ///
 /// # Returns
 /// A `CellSliceResult` containing 0, 3, or 4 vertices depending on the intersection.
-#[must_use] 
+#[must_use]
 pub fn slice_tet(
     v0: Vec3,
     v1: Vec3,
@@ -100,7 +100,7 @@ pub fn slice_tet(
 ///
 /// # Returns
 /// A `CellSliceResult` containing 0, 3-6 vertices depending on the intersection.
-#[must_use] 
+#[must_use]
 pub fn slice_hex(vertices: [Vec3; 8], plane_origin: Vec3, plane_normal: Vec3) -> CellSliceResult {
     // Standard decomposition of a hex into 5 tets
     // This decomposition is symmetric and works for any hex orientation
@@ -185,7 +185,9 @@ fn order_polygon_vertices(
         let angle_a = cross_a.dot(normal).atan2(ref_dir.dot(va));
         let angle_b = cross_b.dot(normal).atan2(ref_dir.dot(vb));
 
-        angle_a.partial_cmp(&angle_b).unwrap_or(std::cmp::Ordering::Equal)
+        angle_a
+            .partial_cmp(&angle_b)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
 
     // Reorder both vertices and interpolation data
@@ -279,10 +281,10 @@ mod tests {
         // Plane cuts through middle (two vertices on each side)
         // This should produce 4 intersection points (quad)
         let result = slice_tet(
-            Vec3::new(0.0, -1.0, 0.0),  // Below plane
-            Vec3::new(1.0, -1.0, 0.0),  // Below plane
-            Vec3::new(0.5, 1.0, 0.0),   // Above plane
-            Vec3::new(0.5, 1.0, 1.0),   // Above plane
+            Vec3::new(0.0, -1.0, 0.0), // Below plane
+            Vec3::new(1.0, -1.0, 0.0), // Below plane
+            Vec3::new(0.5, 1.0, 0.0),  // Above plane
+            Vec3::new(0.5, 1.0, 1.0),  // Above plane
             Vec3::ZERO,
             Vec3::Y,
         );
@@ -370,11 +372,7 @@ mod tests {
                 .vertices
                 .iter()
                 .any(|v| (*v - *corner).length() < 0.1);
-            assert!(
-                has_near,
-                "Expected vertex near corner {:?}",
-                corner
-            );
+            assert!(has_near, "Expected vertex near corner {:?}", corner);
         }
     }
 

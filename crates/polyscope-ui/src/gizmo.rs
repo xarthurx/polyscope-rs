@@ -22,7 +22,7 @@ impl Default for TransformGizmo {
 
 impl TransformGizmo {
     /// Creates a new transform gizmo.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             gizmo: Gizmo::default(),
@@ -139,7 +139,7 @@ impl TransformGizmo {
     }
 
     /// Decomposes a Mat4 into translation, rotation (Euler degrees), and scale.
-    #[must_use] 
+    #[must_use]
     pub fn decompose_transform(matrix: Mat4) -> (Vec3, Vec3, Vec3) {
         let (scale, rotation, translation) = matrix.to_scale_rotation_translation();
         let euler = rotation.to_euler(glam::EulerRot::XYZ);
@@ -152,7 +152,7 @@ impl TransformGizmo {
     }
 
     /// Composes a Mat4 from translation, rotation (Euler degrees), and scale.
-    #[must_use] 
+    #[must_use]
     pub fn compose_transform(translation: Vec3, euler_degrees: Vec3, scale: Vec3) -> Mat4 {
         let rotation = Quat::from_euler(
             glam::EulerRot::XYZ,

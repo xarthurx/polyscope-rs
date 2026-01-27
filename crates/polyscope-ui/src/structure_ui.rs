@@ -199,7 +199,11 @@ pub fn build_curve_network_ui(
     ui.horizontal(|ui| {
         ui.label("Radius:");
         if ui
-            .add(egui::DragValue::new(radius).speed(0.001).range(0.001..=10.0))
+            .add(
+                egui::DragValue::new(radius)
+                    .speed(0.001)
+                    .range(0.001..=10.0),
+            )
             .changed()
         {
             changed = true;

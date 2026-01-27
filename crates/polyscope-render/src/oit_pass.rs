@@ -11,7 +11,7 @@ pub struct OitCompositePass {
 
 impl OitCompositePass {
     /// Creates a new OIT composite pass.
-    #[must_use] 
+    #[must_use]
     pub fn new(device: &wgpu::Device, output_format: wgpu::TextureFormat) -> Self {
         let shader_source = include_str!("shaders/oit_composite.wgsl");
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -116,7 +116,7 @@ impl OitCompositePass {
     }
 
     /// Creates a bind group for the OIT composite pass.
-    #[must_use] 
+    #[must_use]
     pub fn create_bind_group(
         &self,
         device: &wgpu::Device,

@@ -76,9 +76,7 @@ fn generate_tet_cube(size: f32, subdivisions: usize) -> (Vec<Vec3>, Vec<[u32; 4]
     }
 
     // Helper to get vertex index
-    let idx = |ix: usize, iy: usize, iz: usize| -> u32 {
-        (iz * n * n + iy * n + ix) as u32
-    };
+    let idx = |ix: usize, iy: usize, iz: usize| -> u32 { (iz * n * n + iy * n + ix) as u32 };
 
     // Generate tetrahedra (5 tets per cube)
     let mut tets = Vec::new();
@@ -119,7 +117,11 @@ fn main() {
 
     // 1. Load and register the Stanford Bunny (surface mesh)
     let (bunny_verts, bunny_faces) = load_obj("assets/bunny.obj");
-    println!("Loaded bunny: {} vertices, {} faces", bunny_verts.len(), bunny_faces.len());
+    println!(
+        "Loaded bunny: {} vertices, {} faces",
+        bunny_verts.len(),
+        bunny_faces.len()
+    );
 
     let _bunny = polyscope::register_surface_mesh("bunny", bunny_verts.clone(), bunny_faces);
 
@@ -155,7 +157,11 @@ fn main() {
     let (tet_verts, tets) = generate_tet_cube(0.06, 3);
     let tet_verts: Vec<Vec3> = tet_verts.iter().map(|v| *v + tet_offset).collect();
 
-    println!("Created tet mesh: {} vertices, {} tets", tet_verts.len(), tets.len());
+    println!(
+        "Created tet mesh: {} vertices, {} tets",
+        tet_verts.len(),
+        tets.len()
+    );
 
     let tet_handle = polyscope::register_tet_mesh("tet_cube", tet_verts.clone(), tets);
 

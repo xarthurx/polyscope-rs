@@ -359,7 +359,11 @@ impl App {
                 let hit = ray_origin + ray_dir * t;
 
                 // Compute local plane axes (match visualization orientation)
-                let up = if normal.dot(Vec3::Y).abs() < 0.99 { Vec3::Y } else { Vec3::Z };
+                let up = if normal.dot(Vec3::Y).abs() < 0.99 {
+                    Vec3::Y
+                } else {
+                    Vec3::Z
+                };
                 let y_axis = up.cross(normal).normalize();
                 let z_axis = normal.cross(y_axis).normalize();
 
@@ -369,8 +373,7 @@ impl App {
                 let size = plane.plane_size();
 
                 if y.abs() <= size && z.abs() <= size {
-                    let is_better =
-                        best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                    let is_better = best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
                     if is_better {
                         best_hit = Some((plane.name().to_string(), t));
                     }
@@ -446,18 +449,22 @@ impl App {
                             let v0 = world_verts[tri[0] as usize];
                             let v1 = world_verts[tri[1] as usize];
                             let v2 = world_verts[tri[2] as usize];
-                            if let Some(t) = self.ray_intersect_triangle(ray_origin, ray_dir, v0, v1, v2) {
+                            if let Some(t) =
+                                self.ray_intersect_triangle(ray_origin, ray_dir, v0, v1, v2)
+                            {
                                 hit_t = Some(hit_t.map_or(t, |best| best.min(t)));
                             }
                         }
 
                         if let Some(t) = hit_t {
-                            let is_better = best_hit
-                                .as_ref()
-                                .map_or(true, |(_, _, best_t)| t < *best_t);
+                            let is_better =
+                                best_hit.as_ref().map_or(true, |(_, _, best_t)| t < *best_t);
                             if is_better {
-                                best_hit =
-                                    Some((structure.type_name().to_string(), structure.name().to_string(), t));
+                                best_hit = Some((
+                                    structure.type_name().to_string(),
+                                    structure.name().to_string(),
+                                    t,
+                                ));
                             }
                         }
                     }
@@ -480,18 +487,22 @@ impl App {
                             let v0 = world_positions[tri[0] as usize];
                             let v1 = world_positions[tri[1] as usize];
                             let v2 = world_positions[tri[2] as usize];
-                            if let Some(t) = self.ray_intersect_triangle(ray_origin, ray_dir, v0, v1, v2) {
+                            if let Some(t) =
+                                self.ray_intersect_triangle(ray_origin, ray_dir, v0, v1, v2)
+                            {
                                 hit_t = Some(hit_t.map_or(t, |best| best.min(t)));
                             }
                         }
 
                         if let Some(t) = hit_t {
-                            let is_better = best_hit
-                                .as_ref()
-                                .map_or(true, |(_, _, best_t)| t < *best_t);
+                            let is_better =
+                                best_hit.as_ref().map_or(true, |(_, _, best_t)| t < *best_t);
                             if is_better {
-                                best_hit =
-                                    Some((structure.type_name().to_string(), structure.name().to_string(), t));
+                                best_hit = Some((
+                                    structure.type_name().to_string(),
+                                    structure.name().to_string(),
+                                    t,
+                                ));
                             }
                         }
                     }
@@ -596,9 +607,7 @@ impl App {
 
         // Update slice plane uniforms
         crate::with_context(|ctx| {
-            engine.update_slice_plane_uniforms(
-                ctx.slice_planes().map(SlicePlaneUniforms::from),
-            );
+            engine.update_slice_plane_uniforms(ctx.slice_planes().map(SlicePlaneUniforms::from));
         });
 
         // Initialize GPU resources for any uninitialized point clouds and vector quantities
@@ -621,7 +630,8 @@ impl App {
 
                         // Initialize pick resources (after render data)
                         if pc.pick_bind_group().is_none() && pc.render_data().is_some() {
-                            let structure_id = engine.assign_structure_id("PointCloud", &structure_name);
+                            let structure_id =
+                                engine.assign_structure_id("PointCloud", &structure_name);
                             pc.init_pick_resources(
                                 &engine.device,
                                 engine.pick_bind_group_layout(),
@@ -679,8 +689,11 @@ impl App {
                             );
                         }
                         // Check what needs initialization
-                        let needs_tube = cn.render_data().is_some_and(|rd| !rd.has_tube_resources());
-                        let needs_node = cn.render_data().is_some_and(|rd| !rd.has_node_render_resources());
+                        let needs_tube =
+                            cn.render_data().is_some_and(|rd| !rd.has_tube_resources());
+                        let needs_node = cn
+                            .render_data()
+                            .is_some_and(|rd| !rd.has_node_render_resources());
 
                         // Initialize tube resources if not already done
                         if needs_tube {
@@ -810,11 +823,12 @@ impl App {
 
         // Render pick pass (GPU picking)
         {
-            let mut encoder = engine
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("pick pass encoder"),
-                });
+            let mut encoder =
+                engine
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("pick pass encoder"),
+                    });
 
             if let Some(mut pick_pass) = engine.begin_pick_pass(&mut encoder) {
                 // Draw point clouds to pick buffer
@@ -1047,7 +1061,9 @@ impl App {
         // Common gizmo setup - check if pointer is over UI panel
         const LEFT_PANEL_WIDTH: f32 = 320.0;
         let pointer_over_ui = egui.context.input(|i| {
-            i.pointer.hover_pos().is_some_and(|pos| pos.x <= LEFT_PANEL_WIDTH)
+            i.pointer
+                .hover_pos()
+                .is_some_and(|pos| pos.x <= LEFT_PANEL_WIDTH)
         });
 
         // Get camera matrices from engine - MUST match what's used for 3D rendering
@@ -1098,7 +1114,8 @@ impl App {
 
                         // Get old values
                         let old_translation = glam::Vec3::from(self.selection_info.translation);
-                        let old_rotation_deg = glam::Vec3::from(self.selection_info.rotation_degrees);
+                        let old_rotation_deg =
+                            glam::Vec3::from(self.selection_info.rotation_degrees);
                         let old_scale = glam::Vec3::from(self.selection_info.scale);
                         let world_centroid = glam::Vec3::from(self.selection_info.centroid);
 
@@ -1111,7 +1128,8 @@ impl App {
                             old_rotation_deg.y.to_radians(),
                             old_rotation_deg.z.to_radians(),
                         );
-                        let local_centroid = old_rotation.inverse() * (world_centroid - old_translation) / old_scale;
+                        let local_centroid =
+                            old_rotation.inverse() * (world_centroid - old_translation) / old_scale;
 
                         // Convert new rotation to quaternion
                         let new_rotation = glam::Quat::from_euler(
@@ -1131,11 +1149,13 @@ impl App {
                         let (new_translation, new_centroid) = if gizmo_moved {
                             // User translated: new world_centroid = new_gizmo_pos
                             let new_world_centroid = new_gizmo_pos;
-                            let new_trans = new_world_centroid - new_rotation * (local_centroid * new_scale);
+                            let new_trans =
+                                new_world_centroid - new_rotation * (local_centroid * new_scale);
                             (new_trans, new_world_centroid)
                         } else {
                             // User rotated/scaled only: keep world_centroid fixed
-                            let new_trans = world_centroid - new_rotation * (local_centroid * new_scale);
+                            let new_trans =
+                                world_centroid - new_rotation * (local_centroid * new_scale);
                             (new_trans, world_centroid)
                         };
 
@@ -1157,19 +1177,36 @@ impl App {
                             if let Some((type_name, name)) = ctx.selected_structure() {
                                 if let Some(structure) = ctx.registry.get(type_name, name) {
                                     if type_name == "PointCloud" {
-                                        if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
-                                            pc.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                                        if let Some(pc) =
+                                            structure.as_any().downcast_ref::<PointCloud>()
+                                        {
+                                            pc.update_gpu_buffers(
+                                                &engine.queue,
+                                                &engine.color_maps,
+                                            );
                                         }
                                     } else if type_name == "SurfaceMesh" {
-                                        if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                            mesh.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                                        if let Some(mesh) =
+                                            structure.as_any().downcast_ref::<SurfaceMesh>()
+                                        {
+                                            mesh.update_gpu_buffers(
+                                                &engine.queue,
+                                                &engine.color_maps,
+                                            );
                                         }
                                     } else if type_name == "CurveNetwork" {
-                                        if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
-                                            cn.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                                        if let Some(cn) =
+                                            structure.as_any().downcast_ref::<CurveNetwork>()
+                                        {
+                                            cn.update_gpu_buffers(
+                                                &engine.queue,
+                                                &engine.color_maps,
+                                            );
                                         }
                                     } else if type_name == "VolumeMesh" {
-                                        if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                                        if let Some(vm) =
+                                            structure.as_any().downcast_ref::<VolumeMesh>()
+                                        {
                                             vm.update_gpu_buffers(&engine.queue);
                                         }
                                     }
@@ -1331,8 +1368,7 @@ impl App {
         // HDR texture is always available for scene rendering
         // Update tone mapping uniforms - use passthrough values if disabled
         // Get SSAO settings from global options
-        let ssao_enabled =
-            polyscope_core::with_context(|ctx| ctx.options.ssao.enabled);
+        let ssao_enabled = polyscope_core::with_context(|ctx| ctx.options.ssao.enabled);
         if self.tone_mapping_settings.enabled {
             engine.update_tone_mapping(
                 self.tone_mapping_settings.exposure,
@@ -1402,9 +1438,8 @@ impl App {
             (engine.shadow_pipeline(), engine.shadow_map_pass())
         {
             // Compute light matrix from scene bounds
-            let (scene_center, scene_radius) = crate::with_context(|ctx| {
-                (ctx.center(), ctx.length_scale * 5.0)
-            });
+            let (scene_center, scene_radius) =
+                crate::with_context(|ctx| (ctx.center(), ctx.length_scale * 5.0));
             let light_dir = glam::Vec3::new(0.5, -1.0, 0.3).normalize();
             let light_matrix = polyscope_render::ShadowMapPass::compute_light_matrix(
                 scene_center,
@@ -1444,7 +1479,10 @@ impl App {
         // Render slice plane visualizations FIRST (before scene geometry)
         // This allows scene geometry to properly occlude the slice planes
         let (slice_planes, length_scale_for_planes) = crate::with_context(|ctx| {
-            (ctx.slice_planes().cloned().collect::<Vec<_>>(), ctx.length_scale)
+            (
+                ctx.slice_planes().cloned().collect::<Vec<_>>(),
+                ctx.length_scale,
+            )
         });
         engine.render_slice_planes_with_clear(
             &mut encoder,
@@ -1455,7 +1493,9 @@ impl App {
 
         // Main render pass - always render scene to HDR texture
         // Get fresh reference to hdr_view after slice plane rendering
-        let hdr_view = engine.hdr_view().expect("HDR texture should always be available");
+        let hdr_view = engine
+            .hdr_view()
+            .expect("HDR texture should always be available");
         {
             // All scene content renders to HDR texture for consistent format
             let scene_view = hdr_view;
@@ -1636,12 +1676,14 @@ impl App {
                     }
                 });
             }
-        }  // End of main render pass scope
+        } // End of main render pass scope
 
         // Surface mesh render pass with MRT (HDR color + normal G-buffer for SSAO)
         if let Some(pipeline) = &engine.mesh_pipeline {
             let hdr_view = engine.hdr_view().expect("HDR view should be available");
-            let normal_view = engine.normal_view().expect("Normal view should be available");
+            let normal_view = engine
+                .normal_view()
+                .expect("Normal view should be available");
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Surface Mesh Pass"),
@@ -1663,7 +1705,10 @@ impl App {
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.5, g: 0.5, b: 1.0, a: 0.0, // a=0 means no valid geometry
+                                r: 0.5,
+                                g: 0.5,
+                                b: 1.0,
+                                a: 0.0, // a=0 means no valid geometry
                             }),
                             store: wgpu::StoreOp::Store,
                         },
@@ -1852,9 +1897,9 @@ impl App {
         if self.appearance_settings.transparency_mode == 2 {
             // Check if there are any surface meshes to render
             let has_surface_meshes = crate::with_context(|ctx| {
-                ctx.registry.iter().any(|s| {
-                    s.is_enabled() && s.type_name() == "SurfaceMesh"
-                })
+                ctx.registry
+                    .iter()
+                    .any(|s| s.is_enabled() && s.type_name() == "SurfaceMesh")
             });
 
             if has_surface_meshes {
@@ -1914,7 +1959,8 @@ impl App {
                                 continue;
                             }
                             if structure.type_name() == "SurfaceMesh" {
-                                if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>()
+                                {
                                     // Render ALL surface meshes through OIT
                                     // This handles both transparent and opaque meshes,
                                     // avoiding z-fighting on overlapping geometry
@@ -1942,20 +1988,21 @@ impl App {
                         oit_reveal_view,
                     );
 
-                    let mut composite_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("OIT Composite Pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: hdr_view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load, // Keep opaque content
-                                store: wgpu::StoreOp::Store,
-                            },
-                            depth_slice: None,
-                        })],
-                        depth_stencil_attachment: None,
-                        ..Default::default()
-                    });
+                    let mut composite_pass =
+                        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("OIT Composite Pass"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: hdr_view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Load, // Keep opaque content
+                                    store: wgpu::StoreOp::Store,
+                                },
+                                depth_slice: None,
+                            })],
+                            depth_stencil_attachment: None,
+                            ..Default::default()
+                        });
 
                     oit_composite.draw(&mut composite_pass, &oit_bind_group);
                 }
@@ -2192,11 +2239,12 @@ impl App {
             GroundPlaneMode::ShadowOnly => 1u32,
             GroundPlaneMode::Tile | GroundPlaneMode::TileReflection => 2u32,
         };
-        let screenshot_reflection_intensity = if self.ground_plane.mode == GroundPlaneMode::TileReflection {
-            self.ground_plane.reflection_intensity
-        } else {
-            0.0
-        };
+        let screenshot_reflection_intensity =
+            if self.ground_plane.mode == GroundPlaneMode::TileReflection {
+                self.ground_plane.reflection_intensity
+            } else {
+                0.0
+            };
         engine.render_ground_plane(
             &mut encoder,
             &screenshot_view,
@@ -2276,26 +2324,24 @@ impl ApplicationHandler for App {
         // ALWAYS track physical mouse button state, even if egui consumes the event.
         // This prevents the mouse state from getting "stuck" when egui intercepts events.
         match &event {
-            WindowEvent::MouseInput { state, button, .. } => {
-                match (button, state) {
-                    (MouseButton::Left, ElementState::Pressed) => {
-                        self.left_mouse_down = true;
-                        self.last_click_pos = Some(self.mouse_pos);
-                        self.drag_distance = 0.0;
-                    }
-                    (MouseButton::Left, ElementState::Released) => {
-                        self.left_mouse_down = false;
-                    }
-                    (MouseButton::Right, ElementState::Pressed) => {
-                        self.right_mouse_down = true;
-                        self.drag_distance = 0.0;
-                    }
-                    (MouseButton::Right, ElementState::Released) => {
-                        self.right_mouse_down = false;
-                    }
-                    _ => {}
+            WindowEvent::MouseInput { state, button, .. } => match (button, state) {
+                (MouseButton::Left, ElementState::Pressed) => {
+                    self.left_mouse_down = true;
+                    self.last_click_pos = Some(self.mouse_pos);
+                    self.drag_distance = 0.0;
                 }
-            }
+                (MouseButton::Left, ElementState::Released) => {
+                    self.left_mouse_down = false;
+                }
+                (MouseButton::Right, ElementState::Pressed) => {
+                    self.right_mouse_down = true;
+                    self.drag_distance = 0.0;
+                }
+                (MouseButton::Right, ElementState::Released) => {
+                    self.right_mouse_down = false;
+                }
+                _ => {}
+            },
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.shift_down = modifiers.state().shift_key();
             }
@@ -2354,7 +2400,8 @@ impl ApplicationHandler for App {
                     // Left drag rotation: blocked when gizmo is active
                     let is_rotate = self.left_mouse_down && !self.shift_down && !egui_using_pointer;
                     // Left+Shift pan: blocked when gizmo is active
-                    let is_left_pan = self.left_mouse_down && self.shift_down && !egui_using_pointer;
+                    let is_left_pan =
+                        self.left_mouse_down && self.shift_down && !egui_using_pointer;
                     // Right drag pan: always works regardless of selection/gizmo
                     let is_right_pan = self.right_mouse_down;
 
@@ -2363,8 +2410,7 @@ impl ApplicationHandler for App {
                             .camera
                             .orbit(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
                     } else if is_left_pan || is_right_pan {
-                        let scale =
-                            engine.camera.position.distance(engine.camera.target) * 0.002;
+                        let scale = engine.camera.position.distance(engine.camera.target) * 0.002;
                         engine
                             .camera
                             .pan(-delta_x as f32 * scale, delta_y as f32 * scale);
@@ -2394,7 +2440,10 @@ impl ApplicationHandler for App {
                     // But allow clicks through - egui_using_pointer can be true even for simple clicks
                     // when gizmo is visible, so we only skip if it was actually a drag operation
                     if egui_using_pointer && self.drag_distance >= DRAG_THRESHOLD {
-                        log::debug!("[CLICK DEBUG] EARLY RETURN: egui was dragging (drag_distance={:.2})", self.drag_distance);
+                        log::debug!(
+                            "[CLICK DEBUG] EARLY RETURN: egui was dragging (drag_distance={:.2})",
+                            self.drag_distance
+                        );
                         self.last_click_pos = None;
                         return;
                     }
@@ -2403,10 +2452,8 @@ impl ApplicationHandler for App {
                     if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
                         log::debug!("[CLICK DEBUG] Processing click in 3D viewport");
                         if let Some(engine) = &self.engine {
-                            let click_screen = glam::Vec2::new(
-                                self.mouse_pos.0 as f32,
-                                self.mouse_pos.1 as f32,
-                            );
+                            let click_screen =
+                                glam::Vec2::new(self.mouse_pos.0 as f32, self.mouse_pos.1 as f32);
 
                             let ray = self.screen_ray(
                                 click_screen,
@@ -2446,8 +2493,8 @@ impl ApplicationHandler for App {
                             log::debug!("[CLICK DEBUG] structure_hit: {structure_hit:?}");
 
                             // GPU picking for point clouds, refined with ray distance
-                            let gpu_picked = self
-                                .gpu_pick_at(self.mouse_pos.0 as u32, self.mouse_pos.1 as u32);
+                            let gpu_picked =
+                                self.gpu_pick_at(self.mouse_pos.0 as u32, self.mouse_pos.1 as u32);
                             log::debug!("[CLICK DEBUG] gpu_picked: {gpu_picked:?}");
                             let point_hit = gpu_picked.and_then(|(type_name, name, idx)| {
                                 if type_name == "PointCloud" {
@@ -2461,7 +2508,11 @@ impl ApplicationHandler for App {
 
                             enum ClickHit {
                                 Plane(String),
-                                Structure { type_name: String, name: String, element_index: u32 },
+                                Structure {
+                                    type_name: String,
+                                    name: String,
+                                    element_index: u32,
+                                },
                             }
 
                             let mut best_hit: Option<(ClickHit, f32)> = None;
@@ -2510,14 +2561,23 @@ impl ApplicationHandler for App {
                                     crate::deselect_structure();
                                     self.select_slice_plane_by_name(plane_name);
                                 }
-                                Some((ClickHit::Structure { type_name, name, element_index }, t)) => {
+                                Some((
+                                    ClickHit::Structure {
+                                        type_name,
+                                        name,
+                                        element_index,
+                                    },
+                                    t,
+                                )) => {
                                     log::debug!("[CLICK DEBUG] Hit structure '{type_name}::{name}' element {element_index} at t={t}");
                                     self.selected_element_index = Some(*element_index);
                                     self.deselect_slice_plane_selection();
 
                                     let element_type = match type_name.as_str() {
                                         "PointCloud" => polyscope_render::PickElementType::Point,
-                                        "SurfaceMesh" | "VolumeMesh" => polyscope_render::PickElementType::Face,
+                                        "SurfaceMesh" | "VolumeMesh" => {
+                                            polyscope_render::PickElementType::Face
+                                        }
                                         "CurveNetwork" => polyscope_render::PickElementType::Edge,
                                         _ => polyscope_render::PickElementType::None,
                                     };

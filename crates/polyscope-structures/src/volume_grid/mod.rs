@@ -77,51 +77,51 @@ impl VolumeGrid {
     }
 
     /// Returns the number of nodes in each dimension.
-    #[must_use] 
+    #[must_use]
     pub fn node_dim(&self) -> UVec3 {
         self.node_dim
     }
 
     /// Returns the number of cells in each dimension.
-    #[must_use] 
+    #[must_use]
     pub fn cell_dim(&self) -> UVec3 {
         self.node_dim.saturating_sub(UVec3::ONE)
     }
 
     /// Returns the total number of nodes.
-    #[must_use] 
+    #[must_use]
     pub fn num_nodes(&self) -> u64 {
         u64::from(self.node_dim.x) * u64::from(self.node_dim.y) * u64::from(self.node_dim.z)
     }
 
     /// Returns the total number of cells.
-    #[must_use] 
+    #[must_use]
     pub fn num_cells(&self) -> u64 {
         let cell_dim = self.cell_dim();
         u64::from(cell_dim.x) * u64::from(cell_dim.y) * u64::from(cell_dim.z)
     }
 
     /// Returns the minimum bound.
-    #[must_use] 
+    #[must_use]
     pub fn bound_min(&self) -> Vec3 {
         self.bound_min
     }
 
     /// Returns the maximum bound.
-    #[must_use] 
+    #[must_use]
     pub fn bound_max(&self) -> Vec3 {
         self.bound_max
     }
 
     /// Returns the grid spacing (distance between adjacent nodes).
-    #[must_use] 
+    #[must_use]
     pub fn grid_spacing(&self) -> Vec3 {
         let cell_dim = self.cell_dim().as_vec3();
         (self.bound_max - self.bound_min) / cell_dim.max(Vec3::ONE)
     }
 
     /// Flattens a 3D node index to a linear index.
-    #[must_use] 
+    #[must_use]
     pub fn flatten_node_index(&self, i: u32, j: u32, k: u32) -> u64 {
         u64::from(i)
             + (u64::from(j) * u64::from(self.node_dim.x))
@@ -129,7 +129,7 @@ impl VolumeGrid {
     }
 
     /// Unflattens a linear node index to a 3D index.
-    #[must_use] 
+    #[must_use]
     pub fn unflatten_node_index(&self, idx: u64) -> UVec3 {
         let x = idx % u64::from(self.node_dim.x);
         let y = (idx / u64::from(self.node_dim.x)) % u64::from(self.node_dim.y);
@@ -138,7 +138,7 @@ impl VolumeGrid {
     }
 
     /// Returns the world position of a node at the given 3D index.
-    #[must_use] 
+    #[must_use]
     pub fn position_of_node(&self, i: u32, j: u32, k: u32) -> Vec3 {
         let cell_dim = self.cell_dim().as_vec3().max(Vec3::ONE);
         let t = Vec3::new(i as f32, j as f32, k as f32) / cell_dim;
@@ -146,7 +146,7 @@ impl VolumeGrid {
     }
 
     /// Gets the grid color.
-    #[must_use] 
+    #[must_use]
     pub fn color(&self) -> Vec3 {
         self.color
     }
@@ -158,7 +158,7 @@ impl VolumeGrid {
     }
 
     /// Gets the edge color.
-    #[must_use] 
+    #[must_use]
     pub fn edge_color(&self) -> Vec3 {
         self.edge_color
     }
@@ -170,7 +170,7 @@ impl VolumeGrid {
     }
 
     /// Gets the edge width.
-    #[must_use] 
+    #[must_use]
     pub fn edge_width(&self) -> f32 {
         self.edge_width
     }
@@ -256,7 +256,7 @@ impl VolumeGrid {
     }
 
     /// Returns the render data if available.
-    #[must_use] 
+    #[must_use]
     pub fn render_data(&self) -> Option<&CurveNetworkRenderData> {
         self.render_data.as_ref()
     }

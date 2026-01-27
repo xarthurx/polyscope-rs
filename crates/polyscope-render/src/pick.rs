@@ -47,7 +47,7 @@ pub struct PickResult {
 /// - R contains bits 16-23
 /// - G contains bits 8-15
 /// - B contains bits 0-7
-#[must_use] 
+#[must_use]
 pub fn color_to_index(r: u8, g: u8, b: u8) -> u32 {
     (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b)
 }
@@ -56,19 +56,19 @@ pub fn color_to_index(r: u8, g: u8, b: u8) -> u32 {
 ///
 /// Uses 12 bits for structure ID (max 4096) and 12 bits for element ID (max 4096).
 /// Layout: R[7:0] = struct[11:4], G[7:4] = struct[3:0], G[3:0] = elem[11:8], B[7:0] = elem[7:0]
-#[must_use] 
+#[must_use]
 pub fn encode_pick_id(structure_id: u16, element_id: u16) -> [u8; 3] {
     let s = structure_id & 0xFFF; // 12 bits max
     let e = element_id & 0xFFF; // 12 bits max
     [
-        (s >> 4) as u8,                        // R: struct bits 11-4
-        (((s & 0xF) << 4) | (e >> 8)) as u8,   // G: struct bits 3-0 + elem bits 11-8
-        (e & 0xFF) as u8,                      // B: elem bits 7-0
+        (s >> 4) as u8,                      // R: struct bits 11-4
+        (((s & 0xF) << 4) | (e >> 8)) as u8, // G: struct bits 3-0 + elem bits 11-8
+        (e & 0xFF) as u8,                    // B: elem bits 7-0
     ]
 }
 
 /// Decodes RGB pick color back to structure ID and element ID.
-#[must_use] 
+#[must_use]
 pub fn decode_pick_id(r: u8, g: u8, b: u8) -> (u16, u16) {
     let structure_id = (u16::from(r) << 4) | (u16::from(g) >> 4);
     let element_id = (u16::from(g & 0xF) << 8) | u16::from(b);
@@ -104,7 +104,7 @@ impl Default for PickUniforms {
 /// - R contains bits 16-23
 /// - G contains bits 8-15
 /// - B contains bits 0-7
-#[must_use] 
+#[must_use]
 pub fn index_to_color(index: u32) -> [u8; 3] {
     [
         ((index >> 16) & 0xFF) as u8,

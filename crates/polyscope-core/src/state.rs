@@ -68,7 +68,7 @@ impl Default for Context {
 
 impl Context {
     /// Computes the center of the bounding box.
-    #[must_use] 
+    #[must_use]
     pub fn center(&self) -> Vec3 {
         (self.bounding_box.0 + self.bounding_box.1) * 0.5
     }
@@ -104,7 +104,7 @@ impl Context {
     }
 
     /// Gets a group by name.
-    #[must_use] 
+    #[must_use]
     pub fn get_group(&self, name: &str) -> Option<&Group> {
         self.groups.get(name)
     }
@@ -120,15 +120,18 @@ impl Context {
     }
 
     /// Returns true if a group with the given name exists.
-    #[must_use] 
+    #[must_use]
     pub fn has_group(&self, name: &str) -> bool {
         self.groups.contains_key(name)
     }
 
     /// Returns all group names.
-    #[must_use] 
+    #[must_use]
     pub fn group_names(&self) -> Vec<&str> {
-        self.groups.keys().map(std::string::String::as_str).collect()
+        self.groups
+            .keys()
+            .map(std::string::String::as_str)
+            .collect()
     }
 
     /// Checks if a structure should be visible based on its group membership.
@@ -136,7 +139,7 @@ impl Context {
     /// A structure is visible if:
     /// - It's not in any group, or
     /// - All of its ancestor groups are enabled
-    #[must_use] 
+    #[must_use]
     pub fn is_structure_visible_in_groups(&self, type_name: &str, name: &str) -> bool {
         // Find all groups that contain this structure
         for group in self.groups.values() {
@@ -182,7 +185,7 @@ impl Context {
     }
 
     /// Gets a slice plane by name.
-    #[must_use] 
+    #[must_use]
     pub fn get_slice_plane(&self, name: &str) -> Option<&SlicePlane> {
         self.slice_planes.get(name)
     }
@@ -198,19 +201,22 @@ impl Context {
     }
 
     /// Returns true if a slice plane with the given name exists.
-    #[must_use] 
+    #[must_use]
     pub fn has_slice_plane(&self, name: &str) -> bool {
         self.slice_planes.contains_key(name)
     }
 
     /// Returns all slice plane names.
-    #[must_use] 
+    #[must_use]
     pub fn slice_plane_names(&self) -> Vec<&str> {
-        self.slice_planes.keys().map(std::string::String::as_str).collect()
+        self.slice_planes
+            .keys()
+            .map(std::string::String::as_str)
+            .collect()
     }
 
     /// Returns the number of slice planes.
-    #[must_use] 
+    #[must_use]
     pub fn num_slice_planes(&self) -> usize {
         self.slice_planes.len()
     }
@@ -242,7 +248,7 @@ impl Context {
     }
 
     /// Returns the currently selected structure, if any.
-    #[must_use] 
+    #[must_use]
     pub fn selected_structure(&self) -> Option<(&str, &str)> {
         self.selected_structure
             .as_ref()
@@ -250,7 +256,7 @@ impl Context {
     }
 
     /// Returns whether a structure is selected.
-    #[must_use] 
+    #[must_use]
     pub fn has_selection(&self) -> bool {
         self.selected_structure.is_some()
     }
@@ -268,19 +274,19 @@ impl Context {
     }
 
     /// Returns the currently selected slice plane name, if any.
-    #[must_use] 
+    #[must_use]
     pub fn selected_slice_plane(&self) -> Option<&str> {
         self.selected_slice_plane.as_deref()
     }
 
     /// Returns whether a slice plane is selected.
-    #[must_use] 
+    #[must_use]
     pub fn has_slice_plane_selection(&self) -> bool {
         self.selected_slice_plane.is_some()
     }
 
     /// Returns the gizmo configuration.
-    #[must_use] 
+    #[must_use]
     pub fn gizmo(&self) -> &GizmoConfig {
         &self.gizmo_config
     }

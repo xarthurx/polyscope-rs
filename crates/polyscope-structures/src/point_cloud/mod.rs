@@ -46,13 +46,13 @@ impl PointCloud {
     }
 
     /// Returns the number of points.
-    #[must_use] 
+    #[must_use]
     pub fn num_points(&self) -> usize {
         self.points.len()
     }
 
     /// Returns the points.
-    #[must_use] 
+    #[must_use]
     pub fn points(&self) -> &[Vec3] {
         &self.points
     }
@@ -105,7 +105,7 @@ impl PointCloud {
     }
 
     /// Returns the render data if initialized.
-    #[must_use] 
+    #[must_use]
     pub fn render_data(&self) -> Option<&PointCloudRenderData> {
         self.render_data.as_ref()
     }
@@ -159,7 +159,7 @@ impl PointCloud {
     }
 
     /// Returns the pick bind group if initialized.
-    #[must_use] 
+    #[must_use]
     pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
         self.pick_bind_group.as_ref()
     }
@@ -182,7 +182,7 @@ impl PointCloud {
     }
 
     /// Gets the point radius.
-    #[must_use] 
+    #[must_use]
     pub fn point_radius(&self) -> f32 {
         self.point_radius
     }
@@ -193,13 +193,13 @@ impl PointCloud {
     }
 
     /// Gets the base color.
-    #[must_use] 
+    #[must_use]
     pub fn base_color(&self) -> Vec3 {
         self.base_color
     }
 
     /// Returns the currently active color quantity, if any.
-    #[must_use] 
+    #[must_use]
     pub fn active_color_quantity(&self) -> Option<&PointCloudColorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -214,7 +214,7 @@ impl PointCloud {
     }
 
     /// Returns the currently active scalar quantity, if any.
-    #[must_use] 
+    #[must_use]
     pub fn active_scalar_quantity(&self) -> Option<&PointCloudScalarQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -229,7 +229,7 @@ impl PointCloud {
     }
 
     /// Returns the currently active vector quantity, if any.
-    #[must_use] 
+    #[must_use]
     pub fn active_vector_quantity(&self) -> Option<&PointCloudVectorQuantity> {
         use polyscope_core::quantity::QuantityKind;
 
@@ -401,14 +401,12 @@ impl Structure for PointCloud {
     }
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {
-        if !self.enabled {
-        }
+        if !self.enabled {}
         // TODO: Implement point cloud rendering
     }
 
     fn draw_pick(&self, _ctx: &mut dyn RenderContext) {
-        if !self.enabled {
-        }
+        if !self.enabled {}
         // TODO: Implement point cloud picking
     }
 

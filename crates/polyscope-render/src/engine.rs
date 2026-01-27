@@ -1549,16 +1549,16 @@ impl RenderEngine {
                     push_constant_ranges: &[],
                 });
 
-        let compute_pipeline = self
-            .device
-            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                label: Some("Curve Network Tube Compute Pipeline"),
-                layout: Some(&compute_pipeline_layout),
-                module: &compute_shader,
-                entry_point: Some("main"),
-                compilation_options: Default::default(),
-                cache: None,
-            });
+        let compute_pipeline =
+            self.device
+                .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                    label: Some("Curve Network Tube Compute Pipeline"),
+                    layout: Some(&compute_pipeline_layout),
+                    module: &compute_shader,
+                    entry_point: Some("main"),
+                    compilation_options: Default::default(),
+                    cache: None,
+                });
 
         // Render shader
         let render_shader_source = include_str!("shaders/curve_network_tube.wgsl");
@@ -1626,7 +1626,10 @@ impl RenderEngine {
             self.device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Curve Network Tube Render Pipeline Layout"),
-                    bind_group_layouts: &[&render_bind_group_layout, &self.slice_plane_bind_group_layout],
+                    bind_group_layouts: &[
+                        &render_bind_group_layout,
+                        &self.slice_plane_bind_group_layout,
+                    ],
                     push_constant_ranges: &[],
                 });
 
@@ -1772,13 +1775,13 @@ impl RenderEngine {
                     ],
                 });
 
-        let pipeline_layout =
-            self.device
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Shadow Pipeline Layout"),
-                    bind_group_layouts: &[&bind_group_layout],
-                    push_constant_ranges: &[],
-                });
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Shadow Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         let pipeline = self
             .device
@@ -1811,7 +1814,7 @@ impl RenderEngine {
                     depth_compare: wgpu::CompareFunction::Less,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState {
-                        constant: 2,     // Bias to prevent shadow acne
+                        constant: 2, // Bias to prevent shadow acne
                         slope_scale: 2.0,
                         clamp: 0.0,
                     },
@@ -2114,7 +2117,8 @@ impl RenderEngine {
         reflection_intensity: f32,
     ) {
         // Check if camera is in orthographic mode
-        let is_orthographic = self.camera.projection_mode == crate::camera::ProjectionMode::Orthographic;
+        let is_orthographic =
+            self.camera.projection_mode == crate::camera::ProjectionMode::Orthographic;
         if !enabled {
             return;
         }

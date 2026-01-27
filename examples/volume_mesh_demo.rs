@@ -77,12 +77,7 @@ fn load_mesh_file(path: &str) -> Option<(Vec<Vec3>, Vec<[u32; 4]>)> {
                                 .collect();
                             if parts.len() >= 4 {
                                 // MEDIT uses 1-based indexing
-                                tets.push([
-                                    parts[0] - 1,
-                                    parts[1] - 1,
-                                    parts[2] - 1,
-                                    parts[3] - 1,
-                                ]);
+                                tets.push([parts[0] - 1, parts[1] - 1, parts[2] - 1, parts[3] - 1]);
                             }
                         }
                     }
@@ -100,18 +95,22 @@ fn load_mesh_file(path: &str) -> Option<(Vec<Vec3>, Vec<[u32; 4]>)> {
 
 /// Generate a subdivided octahedron tet mesh.
 /// This creates a nice spherical-ish shape with clear interior structure.
-fn generate_subdivided_octahedron(center: Vec3, radius: f32, subdivisions: u32) -> (Vec<Vec3>, Vec<[u32; 4]>) {
+fn generate_subdivided_octahedron(
+    center: Vec3,
+    radius: f32,
+    subdivisions: u32,
+) -> (Vec<Vec3>, Vec<[u32; 4]>) {
     let mut vertices = Vec::new();
     let mut tets = Vec::new();
 
     // Start with octahedron vertices (6 vertices)
     let oct_verts = [
-        Vec3::new(0.0, 1.0, 0.0),   // top
-        Vec3::new(0.0, -1.0, 0.0),  // bottom
-        Vec3::new(1.0, 0.0, 0.0),   // +x
-        Vec3::new(-1.0, 0.0, 0.0),  // -x
-        Vec3::new(0.0, 0.0, 1.0),   // +z
-        Vec3::new(0.0, 0.0, -1.0),  // -z
+        Vec3::new(0.0, 1.0, 0.0),  // top
+        Vec3::new(0.0, -1.0, 0.0), // bottom
+        Vec3::new(1.0, 0.0, 0.0),  // +x
+        Vec3::new(-1.0, 0.0, 0.0), // -x
+        Vec3::new(0.0, 0.0, 1.0),  // +z
+        Vec3::new(0.0, 0.0, -1.0), // -z
     ];
 
     // Add center
@@ -124,8 +123,14 @@ fn generate_subdivided_octahedron(center: Vec3, radius: f32, subdivisions: u32) 
 
     // 8 faces of octahedron, each creates a tet with center
     let oct_faces = [
-        [1, 3, 5], [1, 5, 4], [1, 4, 6], [1, 6, 3],  // top 4
-        [2, 5, 3], [2, 4, 5], [2, 6, 4], [2, 3, 6],  // bottom 4
+        [1, 3, 5],
+        [1, 5, 4],
+        [1, 4, 6],
+        [1, 6, 3], // top 4
+        [2, 5, 3],
+        [2, 4, 5],
+        [2, 6, 4],
+        [2, 3, 6], // bottom 4
     ];
 
     // Create base tets from center to each face
@@ -227,9 +232,21 @@ fn generate_bunny_tets(center: Vec3, scale: f32) -> (Vec<Vec3>, Vec<[u32; 4]>) {
         let ear_center_x = head_center.x + ear_x * scale;
 
         // Ear base vertices (triangle)
-        vertices.push(Vec3::new(ear_center_x - 0.1 * scale, ear_base_y, head_center.z));
-        vertices.push(Vec3::new(ear_center_x + 0.1 * scale, ear_base_y, head_center.z));
-        vertices.push(Vec3::new(ear_center_x, ear_base_y, head_center.z - 0.1 * scale));
+        vertices.push(Vec3::new(
+            ear_center_x - 0.1 * scale,
+            ear_base_y,
+            head_center.z,
+        ));
+        vertices.push(Vec3::new(
+            ear_center_x + 0.1 * scale,
+            ear_base_y,
+            head_center.z,
+        ));
+        vertices.push(Vec3::new(
+            ear_center_x,
+            ear_base_y,
+            head_center.z - 0.1 * scale,
+        ));
         // Ear tip
         vertices.push(Vec3::new(ear_center_x, ear_tip_y, head_center.z));
 
@@ -408,15 +425,20 @@ fn main() {
     });
 
     // Also create a hex grid to demonstrate hex mesh support
-    let (hex_vertices, hexes) =
-        generate_hex_grid(Vec3::new(extent.x * 1.5, 0.0, 0.0), Vec3::splat(1.0), (3, 3, 3));
+    let (hex_vertices, hexes) = generate_hex_grid(
+        Vec3::new(extent.x * 1.5, 0.0, 0.0),
+        Vec3::splat(1.0),
+        (3, 3, 3),
+    );
 
     let hex_mesh = polyscope::register_hex_mesh("hex_grid", hex_vertices.clone(), hexes.clone());
     hex_mesh.set_color(Vec3::new(0.8, 0.5, 0.2));
     hex_mesh.set_edge_width(1.0);
 
     // Add cell scalar to hex mesh
-    let hex_cell_ids: Vec<f32> = (0..hexes.len()).map(|i| i as f32 / hexes.len() as f32).collect();
+    let hex_cell_ids: Vec<f32> = (0..hexes.len())
+        .map(|i| i as f32 / hexes.len() as f32)
+        .collect();
 
     polyscope::with_volume_mesh("hex_grid", |mesh| {
         mesh.add_cell_scalar_quantity("cell_id", hex_cell_ids);
@@ -427,8 +449,17 @@ fn main() {
     println!("================");
     println!();
     println!("Structures:");
-    println!("  - {}: {} vertices, {} tets", mesh_name, tet_vertices.len(), tets.len());
-    println!("  - hex_grid: {} vertices, {} hexes", hex_vertices.len(), hexes.len());
+    println!(
+        "  - {}: {} vertices, {} tets",
+        mesh_name,
+        tet_vertices.len(),
+        tets.len()
+    );
+    println!(
+        "  - hex_grid: {} vertices, {} hexes",
+        hex_vertices.len(),
+        hexes.len()
+    );
     println!();
     println!("Quantities on {}:", mesh_name);
     println!("  - height (vertex scalar): Y-coordinate normalized");

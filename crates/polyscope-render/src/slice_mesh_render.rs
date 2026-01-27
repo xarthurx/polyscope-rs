@@ -41,7 +41,7 @@ impl SliceMeshRenderData {
     /// * `vertices` - Vertex positions (3 per triangle)
     /// * `normals` - Vertex normals (3 per triangle)
     /// * `colors` - Vertex colors (3 per triangle)
-    #[must_use] 
+    #[must_use]
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
@@ -239,25 +239,25 @@ impl SliceMeshRenderData {
     }
 
     /// Returns the bind group for rendering.
-    #[must_use] 
+    #[must_use]
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
 
     /// Returns the index buffer for rendering.
-    #[must_use] 
+    #[must_use]
     pub fn index_buffer(&self) -> &wgpu::Buffer {
         &self.index_buffer
     }
 
     /// Returns the number of indices to draw.
-    #[must_use] 
+    #[must_use]
     pub fn num_indices(&self) -> u32 {
         self.num_indices
     }
 
     /// Returns true if the slice mesh is empty.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.num_indices == 0
     }

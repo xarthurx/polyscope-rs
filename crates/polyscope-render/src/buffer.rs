@@ -16,7 +16,7 @@ pub fn create_vertex_buffer<T: bytemuck::Pod>(
 }
 
 /// Creates an index buffer from data.
-#[must_use] 
+#[must_use]
 pub fn create_index_buffer(
     device: &wgpu::Device,
     data: &[u32],

@@ -21,7 +21,7 @@ pub struct ShaderBuilder {
 
 impl ShaderBuilder {
     /// Creates a new shader builder.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             vertex_source: None,

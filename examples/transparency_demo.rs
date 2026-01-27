@@ -53,10 +53,7 @@ fn create_cube() -> (Vec<Vec3>, Vec<glam::UVec3>) {
 
 /// Transform vertices by translating and scaling.
 fn transform_vertices(vertices: &[Vec3], translation: Vec3, scale: f32) -> Vec<Vec3> {
-    vertices
-        .iter()
-        .map(|v| *v * scale + translation)
-        .collect()
+    vertices.iter().map(|v| *v * scale + translation).collect()
 }
 
 fn main() {
