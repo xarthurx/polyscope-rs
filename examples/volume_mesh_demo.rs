@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 //! Volume mesh demonstration showcasing tet and hex mesh visualization.
 //!
 //! This demo showcases:
@@ -7,7 +12,7 @@
 //! - Vertex and cell color quantities
 //! - Loading tet meshes from MEDIT .mesh format
 //!
-//! Run with: cargo run --example volume_mesh_demo
+//! Run with: cargo run --example `volume_mesh_demo`
 //!
 //! To use with custom models (e.g., Armadillo):
 //! 1. Download a .mesh file (MEDIT format) and place in assets/
@@ -40,7 +45,7 @@ use std::path::Path;
 fn load_mesh_file(path: &str) -> Option<(Vec<Vec3>, Vec<[u32; 4]>)> {
     let file = File::open(path).ok()?;
     let reader = BufReader::new(file);
-    let mut lines = reader.lines().filter_map(|l| l.ok()).peekable();
+    let mut lines = reader.lines().map_while(Result::ok).peekable();
 
     let mut vertices = Vec::new();
     let mut tets = Vec::new();
@@ -303,6 +308,7 @@ fn generate_hex_grid(
     (vertices, hexes)
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     env_logger::init();
     polyscope::init().expect("Failed to initialize polyscope");
@@ -310,16 +316,13 @@ fn main() {
     // Try to load a custom mesh, or use procedural generation
     let mesh_path = "assets/armadillo.mesh";
     let (tet_vertices, tets, mesh_name) = if Path::new(mesh_path).exists() {
-        match load_mesh_file(mesh_path) {
-            Some((v, t)) => {
-                println!("Loaded mesh: {} vertices, {} tets", v.len(), t.len());
-                (v, t, "custom_mesh")
-            }
-            None => {
-                println!("Failed to parse {}, using procedural mesh", mesh_path);
-                let (v, t) = generate_bunny_tets(Vec3::ZERO, 1.0);
-                (v, t, "tet_bunny")
-            }
+        if let Some((v, t)) = load_mesh_file(mesh_path) {
+            println!("Loaded mesh: {} vertices, {} tets", v.len(), t.len());
+            (v, t, "custom_mesh")
+        } else {
+            println!("Failed to parse {mesh_path}, using procedural mesh");
+            let (v, t) = generate_bunny_tets(Vec3::ZERO, 1.0);
+            (v, t, "tet_bunny")
         }
     } else {
         println!("No custom mesh found. Generating procedural tet meshes...");
@@ -398,7 +401,7 @@ fn main() {
         .collect();
 
     // Normalize cell volumes for visualization
-    let max_vol = cell_volumes.iter().cloned().fold(0.0f32, f32::max);
+    let max_vol = cell_volumes.iter().copied().fold(0.0f32, f32::max);
     let cell_volumes_normalized: Vec<f32> = cell_volumes.iter().map(|v| v / max_vol).collect();
 
     polyscope::with_volume_mesh(mesh_name, |mesh| {
@@ -461,7 +464,7 @@ fn main() {
         hexes.len()
     );
     println!();
-    println!("Quantities on {}:", mesh_name);
+    println!("Quantities on {mesh_name}:");
     println!("  - height (vertex scalar): Y-coordinate normalized");
     println!("  - distance_from_center (vertex scalar): distance from centroid");
     println!("  - position_color (vertex color): RGB from XYZ position");

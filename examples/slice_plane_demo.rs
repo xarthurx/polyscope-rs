@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 //! Slice Plane Demo
 //!
 //! Demonstrates slice plane functionality with different structure types:
@@ -11,7 +16,7 @@
 //! - Interactive gizmo control for plane positioning
 //! - Multiple slice planes
 //!
-//! Run with: cargo run --example slice_plane_demo
+//! Run with: cargo run --example `slice_plane_demo`
 
 use glam::Vec3;
 

@@ -1,13 +1,18 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 //! Transparency demo demonstrating order-independent transparency rendering.
 //!
 //! This example creates overlapping transparent meshes to show how the
 //! Weighted Blended OIT algorithm renders transparent surfaces correctly
 //! regardless of render order.
 //!
-//! Run with: cargo run --example transparency_demo
+//! Run with: cargo run --example `transparency_demo`
 //!
 //! Controls:
-//! - Change transparency mode in Appearance settings (WeightedBlended recommended)
+//! - Change transparency mode in Appearance settings (`WeightedBlended` recommended)
 //! - Adjust mesh transparency via the Opacity slider in each mesh's settings
 
 use glam::Vec3;

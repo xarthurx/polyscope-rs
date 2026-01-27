@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 //! Demo showing camera view visualization in polyscope-rs.
 
 use polyscope::{self, CameraExtrinsics, CameraIntrinsics, CameraParameters, Vec3};

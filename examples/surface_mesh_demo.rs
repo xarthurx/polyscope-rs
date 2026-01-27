@@ -1,6 +1,11 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 //! Surface mesh demonstration using the Stanford Bunny.
 //!
-//! Run with: cargo run --example surface_mesh_demo
+//! Run with: cargo run --example `surface_mesh_demo`
 
 use glam::Vec3;
 

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 //! Demo application showcasing Phase 4 UI integration.
 //!
 //! This demo creates a sphere of points with scalar, color, and vector quantities
@@ -8,7 +13,9 @@
 //! - Selection panel (left-click to select, right-click to clear)
 //! - Camera controls (orbit, pan, zoom)
 
-use polyscope::*;
+use polyscope::{
+    init, register_point_cloud, show, shutdown, with_context_mut, HasQuantities, Result, Vec3,
+};
 use polyscope_structures::PointCloud;
 
 fn main() -> Result<()> {
@@ -66,7 +73,7 @@ fn main() -> Result<()> {
     // Print usage instructions
     println!("=== polyscope-rs Phase 4 Demo ===");
     println!();
-    println!("Created sphere with {} points", num_points);
+    println!("Created sphere with {num_points} points");
     println!();
     println!("Quantities available:");
     println!("  - latitude (scalar): z-coordinate mapped to colormap");

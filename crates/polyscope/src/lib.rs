@@ -66,6 +66,11 @@
 #![allow(clippy::many_single_char_names)]
 // Configuration structs may have many boolean fields.
 #![allow(clippy::struct_excessive_bools)]
+// #[must_use] design: Setter methods intentionally omit #[must_use] since
+// the mutation happens in-place; the &Self return is just for chaining convenience.
+#![allow(clippy::must_use_candidate)]
+// Documentation formatting: Backtick linting is too strict for doc comments.
+#![allow(clippy::doc_markdown)]
 
 mod app;
 
@@ -341,7 +346,6 @@ impl PointCloudHandle {
     }
 
     /// Adds a scalar quantity to this point cloud.
-    #[must_use]
     pub fn add_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
         with_context_mut(|ctx| {
             if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name) {
@@ -354,7 +358,6 @@ impl PointCloudHandle {
     }
 
     /// Adds a vector quantity to this point cloud.
-    #[must_use]
     pub fn add_vector_quantity(&self, name: &str, vectors: Vec<Vec3>) -> &Self {
         with_context_mut(|ctx| {
             if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name) {
@@ -367,7 +370,6 @@ impl PointCloudHandle {
     }
 
     /// Adds a color quantity to this point cloud.
-    #[must_use]
     pub fn add_color_quantity(&self, name: &str, colors: Vec<Vec3>) -> &Self {
         with_context_mut(|ctx| {
             if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name) {
@@ -531,7 +533,6 @@ impl CurveNetworkHandle {
     }
 
     /// Sets the base color.
-    #[must_use]
     pub fn set_color(&self, color: Vec3) -> &Self {
         with_curve_network(&self.name, |cn| {
             cn.set_color(color);
@@ -540,7 +541,6 @@ impl CurveNetworkHandle {
     }
 
     /// Sets the radius.
-    #[must_use]
     pub fn set_radius(&self, radius: f32, is_relative: bool) -> &Self {
         with_curve_network(&self.name, |cn| {
             cn.set_radius(radius, is_relative);
@@ -549,7 +549,6 @@ impl CurveNetworkHandle {
     }
 
     /// Sets the material.
-    #[must_use]
     pub fn set_material(&self, material: &str) -> &Self {
         with_curve_network(&self.name, |cn| {
             cn.set_material(material);
@@ -649,7 +648,6 @@ impl CameraViewHandle {
     }
 
     /// Sets the widget color.
-    #[must_use]
     pub fn set_color(&self, color: Vec3) -> &Self {
         with_camera_view(&self.name, |cv| {
             cv.set_color(color);
@@ -658,7 +656,6 @@ impl CameraViewHandle {
     }
 
     /// Sets the widget focal length.
-    #[must_use]
     pub fn set_widget_focal_length(&self, length: f32, is_relative: bool) -> &Self {
         with_camera_view(&self.name, |cv| {
             cv.set_widget_focal_length(length, is_relative);
@@ -667,7 +664,6 @@ impl CameraViewHandle {
     }
 
     /// Sets the widget thickness.
-    #[must_use]
     pub fn set_widget_thickness(&self, thickness: f32) -> &Self {
         with_camera_view(&self.name, |cv| {
             cv.set_widget_thickness(thickness);
@@ -676,7 +672,6 @@ impl CameraViewHandle {
     }
 
     /// Updates the camera parameters.
-    #[must_use]
     pub fn set_params(&self, params: CameraParameters) -> &Self {
         with_camera_view(&self.name, |cv| {
             cv.set_params(params);
@@ -777,7 +772,6 @@ impl VolumeGridHandle {
     }
 
     /// Sets the edge color.
-    #[must_use]
     pub fn set_edge_color(&self, color: Vec3) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.set_edge_color(color);
@@ -786,7 +780,6 @@ impl VolumeGridHandle {
     }
 
     /// Sets the edge width.
-    #[must_use]
     pub fn set_edge_width(&self, width: f32) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.set_edge_width(width);
@@ -795,7 +788,6 @@ impl VolumeGridHandle {
     }
 
     /// Adds a node scalar quantity.
-    #[must_use]
     pub fn add_node_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.add_node_scalar_quantity(name, values);
@@ -804,7 +796,6 @@ impl VolumeGridHandle {
     }
 
     /// Adds a cell scalar quantity.
-    #[must_use]
     pub fn add_cell_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.add_cell_scalar_quantity(name, values);
@@ -934,7 +925,6 @@ impl VolumeMeshHandle {
     }
 
     /// Sets the base color.
-    #[must_use]
     pub fn set_color(&self, color: Vec3) -> &Self {
         with_volume_mesh(&self.name, |vm| {
             vm.set_color(color);
@@ -943,7 +933,6 @@ impl VolumeMeshHandle {
     }
 
     /// Sets the interior color.
-    #[must_use]
     pub fn set_interior_color(&self, color: Vec3) -> &Self {
         with_volume_mesh(&self.name, |vm| {
             vm.set_interior_color(color);
@@ -952,7 +941,6 @@ impl VolumeMeshHandle {
     }
 
     /// Sets the edge color.
-    #[must_use]
     pub fn set_edge_color(&self, color: Vec3) -> &Self {
         with_volume_mesh(&self.name, |vm| {
             vm.set_edge_color(color);
@@ -961,7 +949,6 @@ impl VolumeMeshHandle {
     }
 
     /// Sets the edge width.
-    #[must_use]
     pub fn set_edge_width(&self, width: f32) -> &Self {
         with_volume_mesh(&self.name, |vm| {
             vm.set_edge_width(width);
@@ -1118,7 +1105,6 @@ impl GroupHandle {
     }
 
     /// Sets whether this group is enabled (visible).
-    #[must_use]
     pub fn set_enabled(&self, enabled: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1138,7 +1124,6 @@ impl GroupHandle {
     }
 
     /// Sets whether child details are shown in UI.
-    #[must_use]
     pub fn set_show_child_details(&self, show: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1149,7 +1134,6 @@ impl GroupHandle {
     }
 
     /// Adds a point cloud to this group.
-    #[must_use]
     pub fn add_point_cloud(&self, pc_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1160,7 +1144,6 @@ impl GroupHandle {
     }
 
     /// Adds a surface mesh to this group.
-    #[must_use]
     pub fn add_surface_mesh(&self, mesh_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1171,7 +1154,6 @@ impl GroupHandle {
     }
 
     /// Adds a curve network to this group.
-    #[must_use]
     pub fn add_curve_network(&self, cn_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1182,7 +1164,6 @@ impl GroupHandle {
     }
 
     /// Adds a volume mesh to this group.
-    #[must_use]
     pub fn add_volume_mesh(&self, vm_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1193,7 +1174,6 @@ impl GroupHandle {
     }
 
     /// Adds a volume grid to this group.
-    #[must_use]
     pub fn add_volume_grid(&self, vg_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1204,7 +1184,6 @@ impl GroupHandle {
     }
 
     /// Adds a camera view to this group.
-    #[must_use]
     pub fn add_camera_view(&self, cv_name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1215,7 +1194,6 @@ impl GroupHandle {
     }
 
     /// Removes a structure from this group.
-    #[must_use]
     pub fn remove_structure(&self, type_name: &str, name: &str) -> &Self {
         with_context_mut(|ctx| {
             if let Some(group) = ctx.get_group_mut(&self.name) {
@@ -1226,7 +1204,6 @@ impl GroupHandle {
     }
 
     /// Adds a child group to this group.
-    #[must_use]
     pub fn add_child_group(&self, child_name: &str) -> &Self {
         with_context_mut(|ctx| {
             // Set parent on child group
@@ -1242,7 +1219,6 @@ impl GroupHandle {
     }
 
     /// Removes a child group from this group.
-    #[must_use]
     pub fn remove_child_group(&self, child_name: &str) -> &Self {
         with_context_mut(|ctx| {
             // Remove parent from child group
@@ -1370,7 +1346,6 @@ impl SlicePlaneHandle {
     }
 
     /// Sets the pose (origin and normal) of the slice plane.
-    #[must_use]
     pub fn set_pose(&self, origin: Vec3, normal: Vec3) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1381,7 +1356,6 @@ impl SlicePlaneHandle {
     }
 
     /// Sets the origin point of the plane.
-    #[must_use]
     pub fn set_origin(&self, origin: Vec3) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1401,7 +1375,6 @@ impl SlicePlaneHandle {
     }
 
     /// Sets the normal direction of the plane.
-    #[must_use]
     pub fn set_normal(&self, normal: Vec3) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1421,7 +1394,6 @@ impl SlicePlaneHandle {
     }
 
     /// Sets whether the slice plane is enabled.
-    #[must_use]
     pub fn set_enabled(&self, enabled: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1441,7 +1413,6 @@ impl SlicePlaneHandle {
     }
 
     /// Sets whether to draw the plane visualization.
-    #[must_use]
     pub fn set_draw_plane(&self, draw: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1461,7 +1432,6 @@ impl SlicePlaneHandle {
     }
 
     /// Sets whether to draw the widget.
-    #[must_use]
     pub fn set_draw_widget(&self, draw: bool) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1481,7 +1451,6 @@ impl SlicePlaneHandle {
     }
 
     /// Sets the color of the plane visualization.
-    #[must_use]
     pub fn set_color(&self, color: Vec3) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1501,7 +1470,6 @@ impl SlicePlaneHandle {
     }
 
     /// Sets the transparency of the plane visualization.
-    #[must_use]
     pub fn set_transparency(&self, transparency: f32) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {
@@ -1521,7 +1489,6 @@ impl SlicePlaneHandle {
     }
 
     /// Sets the size of the plane visualization (half-extent in each direction).
-    #[must_use]
     pub fn set_plane_size(&self, size: f32) -> &Self {
         with_context_mut(|ctx| {
             if let Some(plane) = ctx.get_slice_plane_mut(&self.name) {

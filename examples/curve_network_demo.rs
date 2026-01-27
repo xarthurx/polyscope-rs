@@ -1,6 +1,11 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
 //! Curve network demonstration.
 //!
-//! Run with: cargo run --example curve_network_demo
+//! Run with: cargo run --example `curve_network_demo`
 
 use glam::Vec3;
 use std::f32::consts::PI;
