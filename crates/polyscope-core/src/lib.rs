@@ -6,16 +6,6 @@
 //! - Global state management and structure registry
 //! - Configuration options and persistent values
 
-// Documentation lints - internal functions don't need exhaustive panic/error docs
-#![allow(clippy::missing_panics_doc)]
-#![allow(clippy::missing_errors_doc)]
-// Options structs legitimately have many boolean flags
-#![allow(clippy::struct_excessive_bools)]
-// Builder patterns return Self which doesn't need must_use
-#![allow(clippy::must_use_candidate)]
-// Field names like parent_group are descriptive
-#![allow(clippy::struct_field_names)]
-
 pub mod error;
 pub mod gizmo;
 pub mod ground_plane;
@@ -39,8 +29,8 @@ pub use pick::{PickResult, Pickable};
 pub use quantity::{Quantity, QuantityKind};
 pub use registry::Registry;
 pub use slice_plane::{SlicePlane, SlicePlaneUniforms, MAX_SLICE_PLANES};
-pub use ssao::SsaoConfig;
 pub use state::{with_context, with_context_mut, Context};
+pub use ssao::SsaoConfig;
 pub use structure::{HasQuantities, Structure};
 pub use tone_mapping::ToneMappingConfig;
 

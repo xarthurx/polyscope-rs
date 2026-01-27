@@ -8,22 +8,6 @@
 //! - Volume grids (implicit surfaces)
 //! - Camera views
 
-// Graphics code intentionally uses casts for indices, colors, and coordinates
-#![allow(clippy::cast_precision_loss)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::cast_sign_loss)]
-// Documentation lints - internal functions don't need exhaustive panic/error docs
-#![allow(clippy::missing_panics_doc)]
-#![allow(clippy::missing_errors_doc)]
-// Builder patterns return Self which doesn't need must_use
-#![allow(clippy::must_use_candidate)]
-// Trait implementations may not use all params
-#![allow(clippy::unused_self)]
-// Similar names are fine when they represent related concepts
-#![allow(clippy::similar_names)]
-// Large geometry functions
-#![allow(clippy::too_many_lines)]
-
 pub mod camera_view;
 pub mod curve_network;
 pub mod point_cloud;
