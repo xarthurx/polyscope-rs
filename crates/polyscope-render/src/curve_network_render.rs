@@ -9,6 +9,7 @@ use crate::point_cloud_render::PointUniforms;
 /// Layout must match WGSL CurveNetworkUniforms exactly (32 bytes).
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct CurveNetworkUniforms {
     /// Base color (RGBA)
     pub color: [f32; 4],

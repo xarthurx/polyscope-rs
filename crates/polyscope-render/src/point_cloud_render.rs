@@ -20,6 +20,7 @@ pub struct PointCloudRenderData {
 /// Uniforms for point cloud rendering.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct PointUniforms {
     pub model_matrix: [[f32; 4]; 4],
     pub point_radius: f32,

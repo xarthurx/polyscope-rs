@@ -75,6 +75,7 @@ pub fn decode_pick_id(r: u8, g: u8, b: u8) -> (u16, u16) {
 /// GPU uniforms for pick rendering.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct PickUniforms {
     /// The structure ID to encode in pick colors.
     pub structure_id: u32,

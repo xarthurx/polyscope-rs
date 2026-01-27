@@ -19,6 +19,7 @@ use crate::tone_mapping::ToneMapPass;
 /// Camera uniforms for GPU.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct CameraUniforms {
     pub view: [[f32; 4]; 4],
     pub proj: [[f32; 4]; 4],

@@ -223,6 +223,7 @@ impl Default for SlicePlane {
 /// GPU-compatible slice plane uniforms.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct SlicePlaneUniforms {
     /// Origin point of the plane.
     pub origin: [f32; 3],

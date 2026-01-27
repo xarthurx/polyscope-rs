@@ -8,6 +8,7 @@ use wgpu::util::DeviceExt;
 /// WGSL vec3<f32> has 16-byte alignment, requiring extra padding.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct MeshUniforms {
     /// Model transform matrix (must be first for alignment)
     pub model_matrix: [[f32; 4]; 4],

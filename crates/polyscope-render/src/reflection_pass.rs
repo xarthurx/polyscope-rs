@@ -6,6 +6,7 @@ use wgpu::util::DeviceExt;
 /// GPU representation of reflection uniforms.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct ReflectionUniforms {
     pub reflection_matrix: [[f32; 4]; 4],
     pub intensity: f32,

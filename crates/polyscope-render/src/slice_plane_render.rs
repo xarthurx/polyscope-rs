@@ -10,6 +10,7 @@ use wgpu::util::DeviceExt;
 /// Matches the shader's PlaneUniforms struct.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct PlaneRenderUniforms {
     /// Plane's object transform matrix.
     pub transform: [[f32; 4]; 4],

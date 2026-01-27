@@ -6,6 +6,7 @@ use wgpu::util::DeviceExt;
 /// GPU representation of SSAO uniforms.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct SsaoUniforms {
     pub proj: [[f32; 4]; 4],
     pub inv_proj: [[f32; 4]; 4],
@@ -37,6 +38,7 @@ impl Default for SsaoUniforms {
 /// SSAO blur uniforms.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct SsaoBlurUniforms {
     pub texel_size: [f32; 2],
     pub blur_scale: f32,
