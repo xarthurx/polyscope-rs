@@ -45,7 +45,10 @@ pub mod volume_mesh;
 
 pub use camera_view::{CameraExtrinsics, CameraIntrinsics, CameraParameters, CameraView};
 pub use curve_network::CurveNetwork;
-pub use floating::{FloatingColorImage, FloatingScalarImage, ImageOrigin};
+pub use floating::{
+    FloatingColorImage, FloatingColorRenderImage, FloatingDepthRenderImage,
+    FloatingRawColorImage, FloatingScalarImage, ImageOrigin,
+};
 pub use point_cloud::PointCloud;
 pub use surface_mesh::SurfaceMesh;
 pub use volume_grid::VolumeGrid;

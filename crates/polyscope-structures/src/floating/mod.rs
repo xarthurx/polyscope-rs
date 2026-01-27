@@ -5,9 +5,11 @@
 
 mod scalar_image;
 mod color_image;
+mod render_image;
 
 pub use scalar_image::*;
 pub use color_image::*;
+pub use render_image::*;
 
 /// Image origin convention.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
