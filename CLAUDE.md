@@ -71,10 +71,10 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 ### Structures (polyscope-structures)
 
 - `PointCloud` - Point set with scalar/vector/color quantities (full feature parity)
-- `SurfaceMesh` - Triangle mesh with vertex/face quantities (triangles full, polygons basic)
-- `CurveNetwork` - Edge network with node/edge quantities (full, tube rendering via compute shaders)
-- `VolumeMesh` - Tet/hex mesh with slice plane capping (full)
-- `VolumeGrid` - Regular 3D grid with node/cell quantities (basic isosurface)
+- `SurfaceMesh` - Triangle mesh with vertex/face scalar/color/vector quantities
+- `CurveNetwork` - Edge network with node/edge scalar/color/vector quantities, tube rendering via compute shaders
+- `VolumeMesh` - Tet/hex mesh with vertex/cell scalar/color/vector quantities, slice plane capping (full)
+- `VolumeGrid` - Regular 3D grid with node scalar quantities (missing: cell quantities, isosurface)
 - `CameraView` - Camera frustum visualization (full)
 
 ## Technology Stack
@@ -118,6 +118,25 @@ Shaders are written in WGSL (WebGPU Shading Language). Implemented shaders:
 - SSAO (Screen-Space Ambient Occlusion)
 - Slice plane visualization (grid pattern)
 - Volume mesh slice capping
+
+### Transparency (polyscope-render)
+
+Weighted Blended Order-Independent Transparency (OIT) is implemented via `OitPass` and `oit_composite.wgsl`. Surface meshes support `set_transparency()`.
+
+## Current Status
+
+- **Version:** 0.2.0
+- **Clippy:** Clean (zero warnings)
+- **Tests:** Passing
+- **Feature parity:** ~85% of C++ Polyscope 2.x
+
+### Missing Features (vs C++ Polyscope)
+- Parameterization quantities (UV visualization)
+- Intrinsic vector quantities
+- One-form quantities
+- Floating quantities (screen-space)
+- Full polygon mesh support (arbitrary polygons beyond triangles)
+- Color RGBA (currently RGB only)
 
 ## Reference
 

@@ -64,6 +64,31 @@ fn main() {
         faces.len()
     );
 
+    // Compute face normals for face vector quantity (before moving faces)
+    let face_normals: Vec<Vec3> = faces
+        .iter()
+        .map(|f| {
+            let v0 = vertices[f.x as usize];
+            let v1 = vertices[f.y as usize];
+            let v2 = vertices[f.z as usize];
+            let e1 = v1 - v0;
+            let e2 = v2 - v0;
+            e1.cross(e2).normalize_or_zero()
+        })
+        .collect();
+
+    // Compute per-vertex normals (area-weighted average of incident face normals)
+    let mut vertex_normals = vec![Vec3::ZERO; vertices.len()];
+    for (fi, f) in faces.iter().enumerate() {
+        let normal = face_normals[fi];
+        vertex_normals[f.x as usize] += normal;
+        vertex_normals[f.y as usize] += normal;
+        vertex_normals[f.z as usize] += normal;
+    }
+    for n in &mut vertex_normals {
+        *n = n.normalize_or_zero();
+    }
+
     let _mesh = polyscope::register_surface_mesh("bunny", vertices.clone(), faces);
 
     // Get handle and add quantities via with_mesh
@@ -87,12 +112,22 @@ fn main() {
             .collect();
         mesh.add_vertex_color_quantity("height_color", vertex_colors);
 
+        // Add vertex vector quantity (vertex normals)
+        mesh.add_vertex_vector_quantity("vertex normals", vertex_normals.clone());
+
+        // Add face vector quantity (face normals)
+        mesh.add_face_vector_quantity("face normals", face_normals.clone());
+
         // Set a nice surface color
         mesh.set_surface_color(Vec3::new(0.8, 0.6, 0.4));
     });
 
     println!("Surface mesh demo running...");
-    println!("Displaying the Stanford Bunny");
+    println!("Displaying the Stanford Bunny with quantities:");
+    println!("  - height: vertex scalar (Y coordinate)");
+    println!("  - height_color: vertex color (position-based)");
+    println!("  - vertex normals: vertex vector quantity");
+    println!("  - face normals: face vector quantity");
     println!();
     println!("Controls:");
     println!("  - Left drag: Orbit camera");

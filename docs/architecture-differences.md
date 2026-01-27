@@ -98,6 +98,22 @@ B[7:0] = elem_id[7:0]
 
 Supports up to 4,096 structures and 4,096 elements per structure.
 
+## Transparency Rendering
+
+### C++ Polyscope Approach
+Uses depth peeling or sorted rendering for order-independent transparency.
+
+### polyscope-rs Approach
+Uses **Weighted Blended Order-Independent Transparency (OIT)**:
+
+1. **Accumulation Pass**: Transparent fragments write weighted color and alpha to accumulation/reveal textures
+2. **Composite Pass**: Full-screen pass blends accumulated transparency over the opaque scene
+
+**Trade-offs:**
+- Single-pass approach (no multi-pass depth peeling)
+- Approximate but fast and artifact-free for most cases
+- Surface meshes support per-structure transparency via `set_transparency()`
+
 ## Shader Composition
 
 ### C++ Polyscope Approach
@@ -180,10 +196,10 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Structure | C++ Polyscope | polyscope-rs | Notes |
 |-----------|--------------|--------------|-------|
 | Point Cloud | ✅ Full | ✅ Full | Complete feature parity |
-| Surface Mesh | ✅ Full | ✅ Basic | Triangles supported, polygons basic |
-| Curve Network | ✅ Full | ✅ Full | Line, loop, segments; tube rendering via compute shaders |
+| Surface Mesh | ✅ Full | ✅ Most | Triangles full (vertex/face scalar/color/vector), polygons basic |
+| Curve Network | ✅ Full | ✅ Full | Line, loop, segments; tube rendering via compute shaders; node/edge scalar/color/vector quantities |
 | Volume Mesh | ✅ Full | ✅ Full | Tet/hex cells, quantities, interior face detection, slice capping |
-| Volume Grid | ✅ Full | ✅ Basic | Node/cell scalars, basic isosurface |
+| Volume Grid | ✅ Full | ✅ Basic | Node scalars only. Missing: cell quantities, isosurface rendering |
 | Camera View | ✅ Full | ✅ Full | Frustum visualization |
 | Floating Quantities | ✅ Full | ❌ Not yet | Screen-space quantities |
 
@@ -201,18 +217,19 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 
 ### Scene Features
 
-| Feature | C++ Polyscope | polyscope-rs |
-|---------|--------------|--------------|
-| Ground Plane | ✅ | ✅ |
-| Ground Shadows | ✅ | ✅ |
-| Ground Reflections | ✅ | ✅ |
-| Tone Mapping | ✅ | ✅ |
-| SSAO | ✅ | ✅ |
-| Slice Planes | ✅ | ✅ (max 4) |
-| Groups | ✅ | ✅ |
-| Gizmos | ✅ | ✅ |
+| Feature | C++ Polyscope | polyscope-rs | Notes |
+|---------|--------------|--------------|-------|
+| Ground Plane | ✅ | ✅ | Tile/Shadow/Reflection modes |
+| Ground Shadows | ✅ | ✅ | Shadow map with blur |
+| Ground Reflections | ✅ | ✅ | Stencil-based |
+| Tone Mapping | ✅ | ✅ | HDR pipeline |
+| SSAO | ✅ | ✅ | Screen-space ambient occlusion |
+| Transparency | ✅ | ✅ | Weighted Blended OIT |
+| Slice Planes | ✅ | ✅ | Max 4, with volume mesh capping |
+| Groups | ✅ | ✅ | Hierarchical |
+| Gizmos | ✅ | ✅ | Via egui (transform-gizmo-egui), not GPU-rendered |
 | Picking | ✅ | ✅ | GPU-based, element-level |
-| Screenshots | ✅ | ✅ |
+| Screenshots | ✅ | ✅ | PNG/JPEG, transparent background |
 
 ### Materials & Color Maps
 
@@ -327,9 +344,10 @@ with_point_cloud("my points", |pc| {
 
 The following C++ Polyscope features are not yet implemented but planned:
 
-1. **Transparency Rendering** - Order-independent transparency for translucent surfaces
-2. **Floating Quantities** - Screen-space data visualization
-3. **Parameterization Quantities** - UV coordinates visualization
-4. **Intrinsic Vectors** - Tangent-space vector visualization
-5. **One-Form Quantities** - Differential form visualization
-6. **Full Polygon Mesh Support** - Arbitrary polygons (not just triangles)
+1. **Floating Quantities** - Screen-space data visualization
+2. **Parameterization Quantities** - UV coordinates visualization
+3. **Intrinsic Vectors** - Tangent-space vector visualization
+4. **One-Form Quantities** - Differential form visualization
+5. **Full Polygon Mesh Support** - Arbitrary polygons (not just triangles)
+6. **Color RGBA** - Currently only RGB; alpha channel not supported
+7. **Color RGBA** - Currently only RGB; alpha channel not supported

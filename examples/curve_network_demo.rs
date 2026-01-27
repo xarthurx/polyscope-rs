@@ -22,11 +22,40 @@ fn main() {
         })
         .collect();
 
-    let _helix = polyscope::register_curve_network_line("helix", helix_nodes);
+    // Compute tangent vectors at each node (derivative of the helix parameterization)
+    let helix_tangents: Vec<Vec3> = (0..100)
+        .map(|i| {
+            let t = i as f32 * 0.1;
+            Vec3::new(-t.sin(), 0.1, t.cos()).normalize()
+        })
+        .collect();
+
+    let _helix = polyscope::register_curve_network_line("helix", helix_nodes.clone());
 
     polyscope::with_curve_network("helix", |c| {
         c.set_radius(0.02, true);
         c.set_color(Vec3::new(0.2, 0.8, 0.4));
+
+        // Add node vector quantity (tangent vectors)
+        c.add_node_vector_quantity("tangents", helix_tangents);
+
+        // Add edge vector quantity (edge directions)
+        let num_edges = c.num_edges();
+        let nodes = c.nodes().to_vec();
+        let tails = c.edge_tail_inds().to_vec();
+        let tips = c.edge_tip_inds().to_vec();
+        let edge_dirs: Vec<Vec3> = (0..num_edges)
+            .map(|i| {
+                let tail = nodes[tails[i] as usize];
+                let tip = nodes[tips[i] as usize];
+                (tip - tail).normalize_or_zero()
+            })
+            .collect();
+        c.add_edge_vector_quantity("edge directions", edge_dirs);
+
+        // Add node scalar quantity (height along helix)
+        let node_heights: Vec<f32> = nodes.iter().map(|n| n.y).collect();
+        c.add_node_scalar_quantity("height", node_heights);
     });
 
     // Create a circle as a loop
@@ -98,6 +127,9 @@ fn main() {
     println!("Curve network demo running...");
     println!("Displaying:");
     println!("  - Helix (green): Connected line curve");
+    println!("    - tangents: node vector quantity");
+    println!("    - edge directions: edge vector quantity");
+    println!("    - height: node scalar quantity");
     println!("  - Circle (red): Closed loop");
     println!("  - Grid (yellow): Explicit edges");
     println!("  - Segments (blue): Separate line segments");

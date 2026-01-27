@@ -26,7 +26,7 @@ Recommendations and thoughts are welcome in the [Discussions](https://github.com
 
 ## Project Status
 
-**Current Version:** 0.1.x (Alpha)
+**Current Version:** 0.2.0 (Alpha)
 
 **Feature Parity:** ~85% of C++ Polyscope 2.x
 
@@ -46,16 +46,19 @@ Recommendations and thoughts are welcome in the [Discussions](https://github.com
 | Slice Planes | ✅ Up to 4 planes |
 | Groups | ✅ Hierarchical |
 | Gizmos | ✅ Translate/Rotate/Scale |
+| Transparency | ✅ Weighted Blended OIT |
 | Tone Mapping | ✅ HDR pipeline |
 | SSAO | ✅ Ambient occlusion |
-| Screenshots | ✅ PNG export |
+| Screenshots | ✅ PNG/JPEG export |
 | Picking | ✅ Structure/Element |
 
-### What's In Progress
+### What's Not Yet Implemented
 
-- Transparency rendering
-- Parameterization quantities
-- Full polygon mesh support
+- Parameterization quantities (UV visualization)
+- Intrinsic vector / one-form quantities
+- Floating quantities (screen-space)
+- Full polygon mesh support (arbitrary polygons)
+- Color RGBA support (currently RGB only)
 
 See [docs/architecture-differences.md](docs/architecture-differences.md) for a detailed comparison with C++ Polyscope.
 
@@ -104,7 +107,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polyscope = "0.1"
+polyscope = "0.2"
 ```
 
 ## Architecture
@@ -169,8 +172,8 @@ This project is inspired by the original [Polyscope](https://github.com/nmwsharp
 
 Contributions are welcome! Key areas where help is needed:
 
-- Completing quantity types (parameterization, intrinsic vectors)
-- Improving transparency handling
-- Slice plane capping
+- Completing quantity types (parameterization, intrinsic vectors, one-forms)
+- Full polygon mesh support
+- Color RGBA support
 - Documentation and examples
 - Testing on different platforms

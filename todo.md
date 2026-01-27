@@ -15,10 +15,10 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 
 #### Structures
 - [x] **PointCloud** - Full feature parity with sphere impostors
-- [x] **SurfaceMesh** - Triangles with vertex/face quantities, flat/smooth shading
-- [x] **CurveNetwork** - Lines + tubes via compute shaders
-- [x] **VolumeMesh** - Tet/hex cells, interior face detection, slice capping
-- [x] **VolumeGrid** - Node/cell scalars, basic isosurface (marching cubes)
+- [x] **SurfaceMesh** - Triangles with vertex/face scalar/color/vector quantities, flat/smooth shading
+- [x] **CurveNetwork** - Lines + tubes via compute shaders, node/edge scalar/color/vector quantities
+- [x] **VolumeMesh** - Tet/hex cells, interior face detection, slice capping, vertex/cell scalar/color/vector quantities
+- [x] **VolumeGrid** - Node/cell scalars, wireframe bounding box visualization
 - [x] **CameraView** - Frustum visualization
 
 #### Scene Features
@@ -26,12 +26,13 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 - [x] Ground reflections
 - [x] SSAO (Screen-Space Ambient Occlusion)
 - [x] Tone mapping (multiple modes)
+- [x] Transparency (Weighted Blended OIT)
 - [x] Slice planes (up to 4) with gizmo manipulation
 - [x] Volume mesh slice capping with quantity interpolation
 - [x] Groups (structure organization)
-- [x] Transform gizmo (translate, rotate, scale - all modes combined)
+- [x] Transform gizmo (translate, rotate, scale via egui)
 - [x] GPU picking (pixel-perfect, element-level)
-- [x] Screenshots (PNG export)
+- [x] Screenshots (PNG/JPEG export, transparent background)
 
 #### Materials & Color Maps
 - [x] All 8 built-in materials (Clay, Wax, Candy, Flat, Mud, Ceramic, Jade, Normal)
@@ -39,52 +40,25 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 
 ---
 
-## In Progress
+## Planned Features (Tiered Priority)
 
-### Transparency Rendering
-Order-independent transparency for translucent surfaces. Required for:
-- Semi-transparent meshes
-- Overlapping structures visualization
-- Alpha-blended quantities
+### Tier 2 — Broader Feature Additions
 
----
+- [ ] **RGBA Color Quantities** - Currently only RGB colors supported; add alpha channel support for per-element transparency
+- [ ] **Full Polygon Mesh Support** - Arbitrary n-gon faces (not just triangles); proper triangulation for rendering and quantities
 
-## Planned Features (Priority Order)
+### Tier 3 — Advanced Quantity Types
 
-### High Priority
+- [ ] **Parameterization Quantities** - UV coordinates visualization, checker pattern, grid lines on UV space
+- [ ] **Intrinsic Vectors** - Tangent-space vector visualization, requires local coordinate frame computation
+- [ ] **One-Form Quantities** - Differential form visualization, edge-based data display
+- [ ] **Floating Quantities** - Screen-space data visualization, annotations, labels, billboards
 
-1. **Transparency Rendering**
-   - Depth peeling or weighted blended OIT
-   - Per-structure transparency setting
-   - Proper sorting for correct visual appearance
+### Tier 4 — Polish
 
-### Medium Priority
-
-2. **RGBA Color Quantities**
-   - Currently only RGB colors supported
-   - Add alpha channel support for per-element transparency
-
-3. **Floating Quantities**
-   - Screen-space data visualization
-   - Annotations, labels, billboards
-
-### Low Priority
-
-4. **Parameterization Quantities**
-   - UV coordinates visualization
-   - Checker pattern, grid lines on UV space
-
-5. **Intrinsic Vectors**
-   - Tangent-space vector visualization
-   - Requires local coordinate frame computation
-
-6. **One-Form Quantities**
-   - Differential form visualization
-   - Edge-based data display
-
-7. **Full Polygon Mesh Support**
-   - Arbitrary n-gon faces (not just triangles)
-   - Proper triangulation for rendering
+- [ ] More examples and documentation
+- [ ] Platform testing — macOS and WebGPU targets
+- [ ] Integration tests — visual regression testing beyond unit tests
 
 ---
 
@@ -102,8 +76,7 @@ Order-independent transparency for translucent surfaces. Required for:
 ## Known Limitations
 
 1. **Polygon Meshes**: Only triangles fully supported; arbitrary polygons need triangulation
-2. **Transparency**: No proper transparency rendering yet (simple alpha blending only)
-3. **Color Quantities**: RGB only, no alpha channel support
+2. **Color Quantities**: RGB only, no alpha channel support
 
 ---
 
