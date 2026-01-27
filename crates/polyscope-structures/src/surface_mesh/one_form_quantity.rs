@@ -151,16 +151,32 @@ impl MeshOneFormQuantity {
 }
 
 impl Quantity for MeshOneFormQuantity {
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { &self.structure_name }
-    fn kind(&self) -> QuantityKind { QuantityKind::Vector }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Vector
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn data_size(&self) -> usize { self.values.len() }
+    fn data_size(&self) -> usize {
+        self.values.len()
+    }
 }
 
 impl EdgeQuantity for MeshOneFormQuantity {}
@@ -184,9 +200,7 @@ mod tests {
 
     #[test]
     fn test_one_form_setters() {
-        let mut q = MeshOneFormQuantity::new(
-            "test", "mesh", vec![1.0], vec![true],
-        );
+        let mut q = MeshOneFormQuantity::new("test", "mesh", vec![1.0], vec![true]);
 
         q.set_length_scale(2.0);
         assert_eq!(q.length_scale(), 2.0);
@@ -228,10 +242,7 @@ mod tests {
 
     #[test]
     fn test_edge_vector_orientation_flip() {
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(2.0, 0.0, 0.0),
-        ];
+        let vertices = vec![Vec3::new(0.0, 0.0, 0.0), Vec3::new(2.0, 0.0, 0.0)];
         let edges: Vec<(u32, u32)> = vec![(0, 1)];
 
         // Orientation = false means flip direction
@@ -248,10 +259,7 @@ mod tests {
 
     #[test]
     fn test_edge_vector_negative_value() {
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(2.0, 0.0, 0.0),
-        ];
+        let vertices = vec![Vec3::new(0.0, 0.0, 0.0), Vec3::new(2.0, 0.0, 0.0)];
         let edges: Vec<(u32, u32)> = vec![(0, 1)];
 
         // Negative value with default orientation

@@ -1,7 +1,7 @@
 //! Intrinsic (tangent-space) vector quantities for surface meshes.
 
 use glam::{Vec2, Vec3};
-use polyscope_core::quantity::{Quantity, QuantityKind, VertexQuantity, FaceQuantity};
+use polyscope_core::quantity::{FaceQuantity, Quantity, QuantityKind, VertexQuantity};
 
 /// A vertex intrinsic vector quantity on a surface mesh.
 ///
@@ -10,10 +10,10 @@ use polyscope_core::quantity::{Quantity, QuantityKind, VertexQuantity, FaceQuant
 pub struct MeshVertexIntrinsicVectorQuantity {
     name: String,
     structure_name: String,
-    vectors: Vec<Vec2>,  // 2D tangent-space vectors
-    basis_x: Vec<Vec3>,  // Per-element X axis of tangent frame
-    basis_y: Vec<Vec3>,  // Per-element Y axis of tangent frame
-    n_sym: u32,          // Symmetry: 1=vector, 2=line, 4=cross
+    vectors: Vec<Vec2>, // 2D tangent-space vectors
+    basis_x: Vec<Vec3>, // Per-element X axis of tangent frame
+    basis_y: Vec<Vec3>, // Per-element Y axis of tangent frame
+    n_sym: u32,         // Symmetry: 1=vector, 2=line, 4=cross
     enabled: bool,
     length_scale: f32,
     radius: f32,
@@ -132,10 +132,8 @@ impl MeshVertexIntrinsicVectorQuantity {
                 let angle = k as f32 * std::f32::consts::TAU / self.n_sym as f32;
                 let cos_a = angle.cos();
                 let sin_a = angle.sin();
-                let rotated = Vec2::new(
-                    v2d.x * cos_a - v2d.y * sin_a,
-                    v2d.x * sin_a + v2d.y * cos_a,
-                );
+                let rotated =
+                    Vec2::new(v2d.x * cos_a - v2d.y * sin_a, v2d.x * sin_a + v2d.y * cos_a);
                 let world_vec = self.basis_x[i] * rotated.x + self.basis_y[i] * rotated.y;
                 result.push((i, world_vec));
             }
@@ -163,16 +161,32 @@ impl MeshVertexIntrinsicVectorQuantity {
 }
 
 impl Quantity for MeshVertexIntrinsicVectorQuantity {
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { &self.structure_name }
-    fn kind(&self) -> QuantityKind { QuantityKind::Vector }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Vector
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn data_size(&self) -> usize { self.vectors.len() }
+    fn data_size(&self) -> usize {
+        self.vectors.len()
+    }
 }
 
 impl VertexQuantity for MeshVertexIntrinsicVectorQuantity {}
@@ -301,10 +315,8 @@ impl MeshFaceIntrinsicVectorQuantity {
                 let angle = k as f32 * std::f32::consts::TAU / self.n_sym as f32;
                 let cos_a = angle.cos();
                 let sin_a = angle.sin();
-                let rotated = Vec2::new(
-                    v2d.x * cos_a - v2d.y * sin_a,
-                    v2d.x * sin_a + v2d.y * cos_a,
-                );
+                let rotated =
+                    Vec2::new(v2d.x * cos_a - v2d.y * sin_a, v2d.x * sin_a + v2d.y * cos_a);
                 let world_vec = self.basis_x[i] * rotated.x + self.basis_y[i] * rotated.y;
                 result.push((i, world_vec));
             }
@@ -332,16 +344,32 @@ impl MeshFaceIntrinsicVectorQuantity {
 }
 
 impl Quantity for MeshFaceIntrinsicVectorQuantity {
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { &self.structure_name }
-    fn kind(&self) -> QuantityKind { QuantityKind::Vector }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn structure_name(&self) -> &str {
+        &self.structure_name
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Vector
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn data_size(&self) -> usize { self.vectors.len() }
+    fn data_size(&self) -> usize {
+        self.vectors.len()
+    }
 }
 
 impl FaceQuantity for MeshFaceIntrinsicVectorQuantity {}
@@ -357,7 +385,11 @@ mod tests {
         let basis_y = vec![Vec3::Y, Vec3::Y];
 
         let q = MeshVertexIntrinsicVectorQuantity::new(
-            "tangent_field", "mesh", vectors, basis_x, basis_y,
+            "tangent_field",
+            "mesh",
+            vectors,
+            basis_x,
+            basis_y,
         );
 
         assert_eq!(q.name(), "tangent_field");
@@ -373,9 +405,8 @@ mod tests {
         let basis_x = vec![Vec3::X];
         let basis_y = vec![Vec3::Y];
 
-        let mut q = MeshVertexIntrinsicVectorQuantity::new(
-            "test", "mesh", vectors, basis_x, basis_y,
-        );
+        let mut q =
+            MeshVertexIntrinsicVectorQuantity::new("test", "mesh", vectors, basis_x, basis_y);
 
         q.set_n_sym(4);
         assert_eq!(q.n_sym(), 4);
@@ -397,9 +428,7 @@ mod tests {
         let basis_x = vec![Vec3::X, Vec3::X];
         let basis_y = vec![Vec3::Y, Vec3::Y];
 
-        let q = MeshVertexIntrinsicVectorQuantity::new(
-            "test", "mesh", vectors, basis_x, basis_y,
-        );
+        let q = MeshVertexIntrinsicVectorQuantity::new("test", "mesh", vectors, basis_x, basis_y);
 
         let world = q.compute_world_vectors();
         assert_eq!(world.len(), 2);
@@ -414,9 +443,7 @@ mod tests {
         let basis_x = vec![Vec3::Y];
         let basis_y = vec![Vec3::Z];
 
-        let q = MeshVertexIntrinsicVectorQuantity::new(
-            "test", "mesh", vectors, basis_x, basis_y,
-        );
+        let q = MeshVertexIntrinsicVectorQuantity::new("test", "mesh", vectors, basis_x, basis_y);
 
         let world = q.compute_world_vectors();
         assert!((world[0] - Vec3::Y).length() < 1e-5);
@@ -428,9 +455,7 @@ mod tests {
         let basis_x = vec![Vec3::X];
         let basis_y = vec![Vec3::Y];
 
-        let q = MeshVertexIntrinsicVectorQuantity::new(
-            "test", "mesh", vectors, basis_x, basis_y,
-        );
+        let q = MeshVertexIntrinsicVectorQuantity::new("test", "mesh", vectors, basis_x, basis_y);
 
         let sym = q.compute_symmetric_world_vectors();
         assert_eq!(sym.len(), 1); // 1 vector * 1 symmetry = 1
@@ -444,14 +469,13 @@ mod tests {
         let basis_x = vec![Vec3::X];
         let basis_y = vec![Vec3::Y];
 
-        let mut q = MeshVertexIntrinsicVectorQuantity::new(
-            "test", "mesh", vectors, basis_x, basis_y,
-        );
+        let mut q =
+            MeshVertexIntrinsicVectorQuantity::new("test", "mesh", vectors, basis_x, basis_y);
         q.set_n_sym(2);
 
         let sym = q.compute_symmetric_world_vectors();
         assert_eq!(sym.len(), 2); // 1 vector * 2 symmetry = 2
-        // First copy: original direction (+X)
+                                  // First copy: original direction (+X)
         assert!((sym[0].1 - Vec3::X).length() < 1e-5);
         // Second copy: 180 degree rotation (-X)
         assert!((sym[1].1 + Vec3::X).length() < 1e-5);
@@ -463,14 +487,13 @@ mod tests {
         let basis_x = vec![Vec3::X];
         let basis_y = vec![Vec3::Y];
 
-        let mut q = MeshVertexIntrinsicVectorQuantity::new(
-            "test", "mesh", vectors, basis_x, basis_y,
-        );
+        let mut q =
+            MeshVertexIntrinsicVectorQuantity::new("test", "mesh", vectors, basis_x, basis_y);
         q.set_n_sym(4);
 
         let sym = q.compute_symmetric_world_vectors();
         assert_eq!(sym.len(), 4); // 1 vector * 4 symmetry = 4
-        // 0 deg: +X
+                                  // 0 deg: +X
         assert!((sym[0].1 - Vec3::X).length() < 1e-5);
         // 90 deg: +Y
         assert!((sym[1].1 - Vec3::Y).length() < 1e-5);
@@ -486,9 +509,8 @@ mod tests {
         let basis_x = vec![Vec3::X];
         let basis_y = vec![Vec3::Y];
 
-        let q = MeshFaceIntrinsicVectorQuantity::new(
-            "face_tangent", "mesh", vectors, basis_x, basis_y,
-        );
+        let q =
+            MeshFaceIntrinsicVectorQuantity::new("face_tangent", "mesh", vectors, basis_x, basis_y);
 
         assert_eq!(q.name(), "face_tangent");
         assert_eq!(q.data_size(), 1);
@@ -501,9 +523,7 @@ mod tests {
         let basis_x = vec![Vec3::X];
         let basis_y = vec![Vec3::Y];
 
-        let q = MeshFaceIntrinsicVectorQuantity::new(
-            "test", "mesh", vectors, basis_x, basis_y,
-        );
+        let q = MeshFaceIntrinsicVectorQuantity::new("test", "mesh", vectors, basis_x, basis_y);
 
         let world = q.compute_world_vectors();
         let expected = Vec3::new(0.5, 0.5, 0.0);

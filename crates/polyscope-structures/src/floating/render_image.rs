@@ -13,20 +13,15 @@ pub struct FloatingDepthRenderImage {
     name: String,
     width: u32,
     height: u32,
-    depths: Vec<f32>,            // Radial distance from camera
-    normals: Option<Vec<Vec3>>,  // Optional world-space normals
+    depths: Vec<f32>,           // Radial distance from camera
+    normals: Option<Vec<Vec3>>, // Optional world-space normals
     origin: ImageOrigin,
     enabled: bool,
 }
 
 impl FloatingDepthRenderImage {
     /// Creates a new depth render image.
-    pub fn new(
-        name: impl Into<String>,
-        width: u32,
-        height: u32,
-        depths: Vec<f32>,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, width: u32, height: u32, depths: Vec<f32>) -> Self {
         Self {
             name: name.into(),
             width,
@@ -46,15 +41,21 @@ impl FloatingDepthRenderImage {
 
     /// Returns the image width.
     #[must_use]
-    pub fn width(&self) -> u32 { self.width }
+    pub fn width(&self) -> u32 {
+        self.width
+    }
 
     /// Returns the image height.
     #[must_use]
-    pub fn height(&self) -> u32 { self.height }
+    pub fn height(&self) -> u32 {
+        self.height
+    }
 
     /// Returns the depth values.
     #[must_use]
-    pub fn depths(&self) -> &[f32] { &self.depths }
+    pub fn depths(&self) -> &[f32] {
+        &self.depths
+    }
 
     /// Returns the normals, if set.
     #[must_use]
@@ -64,7 +65,9 @@ impl FloatingDepthRenderImage {
 
     /// Gets the image origin.
     #[must_use]
-    pub fn origin(&self) -> ImageOrigin { self.origin }
+    pub fn origin(&self) -> ImageOrigin {
+        self.origin
+    }
 
     /// Sets the image origin.
     pub fn set_origin(&mut self, origin: ImageOrigin) -> &mut Self {
@@ -91,16 +94,33 @@ impl FloatingDepthRenderImage {
 }
 
 impl Quantity for FloatingDepthRenderImage {
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { "" }
-    fn kind(&self) -> QuantityKind { QuantityKind::Other }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    #[allow(clippy::unnecessary_literal_bound)]
+    fn structure_name(&self) -> &str {
+        "" // No parent structure
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Other
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn data_size(&self) -> usize { self.depths.len() }
+    fn data_size(&self) -> usize {
+        self.depths.len()
+    }
 }
 
 /// A color render image (colored geometry from an external renderer).
@@ -112,7 +132,7 @@ pub struct FloatingColorRenderImage {
     width: u32,
     height: u32,
     depths: Vec<f32>,
-    colors: Vec<Vec3>,           // Per-pixel RGB
+    colors: Vec<Vec3>, // Per-pixel RGB
     normals: Option<Vec<Vec3>>,
     origin: ImageOrigin,
     enabled: bool,
@@ -147,19 +167,27 @@ impl FloatingColorRenderImage {
 
     /// Returns the image width.
     #[must_use]
-    pub fn width(&self) -> u32 { self.width }
+    pub fn width(&self) -> u32 {
+        self.width
+    }
 
     /// Returns the image height.
     #[must_use]
-    pub fn height(&self) -> u32 { self.height }
+    pub fn height(&self) -> u32 {
+        self.height
+    }
 
     /// Returns the depth values.
     #[must_use]
-    pub fn depths(&self) -> &[f32] { &self.depths }
+    pub fn depths(&self) -> &[f32] {
+        &self.depths
+    }
 
     /// Returns the pixel colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] { &self.colors }
+    pub fn colors(&self) -> &[Vec3] {
+        &self.colors
+    }
 
     /// Returns the normals, if set.
     #[must_use]
@@ -169,7 +197,9 @@ impl FloatingColorRenderImage {
 
     /// Gets the image origin.
     #[must_use]
-    pub fn origin(&self) -> ImageOrigin { self.origin }
+    pub fn origin(&self) -> ImageOrigin {
+        self.origin
+    }
 
     /// Sets the image origin.
     pub fn set_origin(&mut self, origin: ImageOrigin) -> &mut Self {
@@ -199,16 +229,33 @@ impl FloatingColorRenderImage {
 }
 
 impl Quantity for FloatingColorRenderImage {
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { "" }
-    fn kind(&self) -> QuantityKind { QuantityKind::Color }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    #[allow(clippy::unnecessary_literal_bound)]
+    fn structure_name(&self) -> &str {
+        "" // No parent structure
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Color
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn data_size(&self) -> usize { self.colors.len() }
+    fn data_size(&self) -> usize {
+        self.colors.len()
+    }
 }
 
 /// A raw color render image (direct display, no shading).
@@ -226,12 +273,7 @@ pub struct FloatingRawColorImage {
 
 impl FloatingRawColorImage {
     /// Creates a new raw color render image.
-    pub fn new(
-        name: impl Into<String>,
-        width: u32,
-        height: u32,
-        colors: Vec<Vec3>,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, width: u32, height: u32, colors: Vec<Vec3>) -> Self {
         Self {
             name: name.into(),
             width,
@@ -244,19 +286,27 @@ impl FloatingRawColorImage {
 
     /// Returns the image width.
     #[must_use]
-    pub fn width(&self) -> u32 { self.width }
+    pub fn width(&self) -> u32 {
+        self.width
+    }
 
     /// Returns the image height.
     #[must_use]
-    pub fn height(&self) -> u32 { self.height }
+    pub fn height(&self) -> u32 {
+        self.height
+    }
 
     /// Returns the pixel colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] { &self.colors }
+    pub fn colors(&self) -> &[Vec3] {
+        &self.colors
+    }
 
     /// Gets the image origin.
     #[must_use]
-    pub fn origin(&self) -> ImageOrigin { self.origin }
+    pub fn origin(&self) -> ImageOrigin {
+        self.origin
+    }
 
     /// Sets the image origin.
     pub fn set_origin(&mut self, origin: ImageOrigin) -> &mut Self {
@@ -276,16 +326,33 @@ impl FloatingRawColorImage {
 }
 
 impl Quantity for FloatingRawColorImage {
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { "" }
-    fn kind(&self) -> QuantityKind { QuantityKind::Color }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    #[allow(clippy::unnecessary_literal_bound)]
+    fn structure_name(&self) -> &str {
+        "" // No parent structure
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Color
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn data_size(&self) -> usize { self.colors.len() }
+    fn data_size(&self) -> usize {
+        self.colors.len()
+    }
 }
 
 #[cfg(test)]
@@ -320,10 +387,10 @@ mod tests {
         let depths = vec![1.0, f32::INFINITY, 0.0, -1.0];
         let img = FloatingDepthRenderImage::new("depth", 2, 2, depths);
 
-        assert!(img.has_depth(0, 0));   // 1.0 — valid
-        assert!(!img.has_depth(1, 0));  // inf — invalid
-        assert!(!img.has_depth(0, 1));  // 0.0 — invalid (not > 0)
-        assert!(!img.has_depth(1, 1));  // -1.0 — invalid
+        assert!(img.has_depth(0, 0)); // 1.0 — valid
+        assert!(!img.has_depth(1, 0)); // inf — invalid
+        assert!(!img.has_depth(0, 1)); // 0.0 — invalid (not > 0)
+        assert!(!img.has_depth(1, 1)); // -1.0 — invalid
     }
 
     #[test]

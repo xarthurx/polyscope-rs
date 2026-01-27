@@ -6,6 +6,7 @@ use polyscope_core::quantity::{
 };
 
 /// Simple HSV to RGB conversion helper.
+#[allow(clippy::many_single_char_names)]
 fn hsv_to_rgb(h: f32, s: f32, v: f32) -> Vec3 {
     let c = v * s;
     let x = c * (1.0 - ((h * 6.0) % 2.0 - 1.0).abs());
@@ -164,11 +165,7 @@ impl MeshVertexParameterizationQuantity {
                 let base = hsv_to_rgb(hue, 0.7, 0.9);
                 let u_cell = (uv.x / self.checker_size).floor() as i32;
                 let v_cell = (uv.y / self.checker_size).floor() as i32;
-                let dim = if (u_cell + v_cell) % 2 == 0 {
-                    1.0
-                } else {
-                    0.6
-                };
+                let dim = if (u_cell + v_cell) % 2 == 0 { 1.0 } else { 0.6 };
                 base * dim * (1.0 - (-r * 2.0).exp() * 0.5)
             })
             .collect()
@@ -182,8 +179,7 @@ impl MeshVertexParameterizationQuantity {
                 let angle = uv.y.atan2(uv.x);
                 let hue = (angle / std::f32::consts::TAU + 1.0) % 1.0;
                 let base = hsv_to_rgb(hue, 0.7, 0.9);
-                let stripe =
-                    ((r / self.checker_size).floor() as i32 % 2 == 0) as u32 as f32;
+                let stripe = f32::from(u8::from((r / self.checker_size).floor() as i32 % 2 == 0));
                 let dim = 0.6 + 0.4 * stripe;
                 base * dim
             })
@@ -366,11 +362,7 @@ impl MeshCornerParameterizationQuantity {
                     let base = hsv_to_rgb(hue, 0.7, 0.9);
                     let u_cell = (uv.x / self.checker_size).floor() as i32;
                     let v_cell = (uv.y / self.checker_size).floor() as i32;
-                    let dim = if (u_cell + v_cell) % 2 == 0 {
-                        1.0
-                    } else {
-                        0.6
-                    };
+                    let dim = if (u_cell + v_cell) % 2 == 0 { 1.0 } else { 0.6 };
                     let r = uv.length();
                     base * dim * (1.0 - (-r * 2.0).exp() * 0.5)
                 }
@@ -380,7 +372,7 @@ impl MeshCornerParameterizationQuantity {
                     let base = hsv_to_rgb(hue, 0.7, 0.9);
                     let r = uv.length();
                     let stripe =
-                        ((r / self.checker_size).floor() as i32 % 2 == 0) as u32 as f32;
+                        f32::from(u8::from((r / self.checker_size).floor() as i32 % 2 == 0));
                     let dim = 0.6 + 0.4 * stripe;
                     base * dim
                 }
@@ -447,7 +439,11 @@ mod tests {
 
     #[test]
     fn test_vertex_parameterization_creation() {
-        let coords = vec![Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0), Vec2::new(0.5, 1.0)];
+        let coords = vec![
+            Vec2::new(0.0, 0.0),
+            Vec2::new(1.0, 0.0),
+            Vec2::new(0.5, 1.0),
+        ];
         let q = MeshVertexParameterizationQuantity::new("uv", "mesh", coords);
 
         assert_eq!(q.name(), "uv");
@@ -539,7 +535,11 @@ mod tests {
     #[test]
     fn test_corner_parameterization_creation() {
         // 1 triangle = 3 corners
-        let coords = vec![Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0), Vec2::new(0.5, 1.0)];
+        let coords = vec![
+            Vec2::new(0.0, 0.0),
+            Vec2::new(1.0, 0.0),
+            Vec2::new(0.5, 1.0),
+        ];
         let q = MeshCornerParameterizationQuantity::new("uv_corners", "mesh", coords);
 
         assert_eq!(q.name(), "uv_corners");

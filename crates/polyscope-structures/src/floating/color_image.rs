@@ -19,12 +19,7 @@ pub struct FloatingColorImage {
 
 impl FloatingColorImage {
     /// Creates a new floating color image.
-    pub fn new(
-        name: impl Into<String>,
-        width: u32,
-        height: u32,
-        colors: Vec<Vec3>,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, width: u32, height: u32, colors: Vec<Vec3>) -> Self {
         Self {
             name: name.into(),
             width,
@@ -77,16 +72,33 @@ impl FloatingColorImage {
 }
 
 impl Quantity for FloatingColorImage {
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    fn name(&self) -> &str { &self.name }
-    fn structure_name(&self) -> &str { "" }
-    fn kind(&self) -> QuantityKind { QuantityKind::Color }
-    fn is_enabled(&self) -> bool { self.enabled }
-    fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    #[allow(clippy::unnecessary_literal_bound)]
+    fn structure_name(&self) -> &str {
+        "" // No parent structure
+    }
+    fn kind(&self) -> QuantityKind {
+        QuantityKind::Color
+    }
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
-    fn data_size(&self) -> usize { self.colors.len() }
+    fn data_size(&self) -> usize {
+        self.colors.len()
+    }
 }
 
 #[cfg(test)]

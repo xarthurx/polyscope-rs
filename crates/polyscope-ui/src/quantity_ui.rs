@@ -208,7 +208,11 @@ pub fn build_parameterization_quantity_ui(
             // Checker color 1
             ui.horizontal(|ui| {
                 ui.label("Color 1:");
-                let mut c = [checker_colors[0].x, checker_colors[0].y, checker_colors[0].z];
+                let mut c = [
+                    checker_colors[0].x,
+                    checker_colors[0].y,
+                    checker_colors[0].z,
+                ];
                 if ui.color_edit_button_rgb(&mut c).changed() {
                     checker_colors[0] = Vec3::new(c[0], c[1], c[2]);
                     changed = true;
@@ -218,7 +222,11 @@ pub fn build_parameterization_quantity_ui(
             // Checker color 2
             ui.horizontal(|ui| {
                 ui.label("Color 2:");
-                let mut c = [checker_colors[1].x, checker_colors[1].y, checker_colors[1].z];
+                let mut c = [
+                    checker_colors[1].x,
+                    checker_colors[1].y,
+                    checker_colors[1].z,
+                ];
                 if ui.color_edit_button_rgb(&mut c).changed() {
                     checker_colors[1] = Vec3::new(c[0], c[1], c[2]);
                     changed = true;

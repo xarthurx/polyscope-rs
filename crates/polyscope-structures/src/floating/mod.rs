@@ -3,13 +3,13 @@
 //! Floating quantities include images (scalar, color, depth-composited)
 //! that are displayed in the UI as standalone visualizations.
 
-mod scalar_image;
 mod color_image;
 mod render_image;
+mod scalar_image;
 
-pub use scalar_image::*;
 pub use color_image::*;
 pub use render_image::*;
+pub use scalar_image::*;
 
 /// Image origin convention.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

@@ -72,9 +72,10 @@ pub trait EdgeQuantity: Quantity {}
 pub trait CellQuantity: Quantity {}
 
 /// Visualization style for parameterization quantities.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ParamVizStyle {
     /// Two-color checker pattern over UV space.
+    #[default]
     Checker,
     /// Two-color grid lines over UV space.
     Grid,
@@ -82,12 +83,6 @@ pub enum ParamVizStyle {
     LocalCheck,
     /// Distance stripes over radial colormap centered at (0,0).
     LocalRad,
-}
-
-impl Default for ParamVizStyle {
-    fn default() -> Self {
-        Self::Checker
-    }
 }
 
 /// How to interpret UV coordinates.

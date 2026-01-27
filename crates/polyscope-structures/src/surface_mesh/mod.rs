@@ -591,9 +591,7 @@ impl SurfaceMesh {
                     .downcast_mut::<MeshFaceIntrinsicVectorQuantity>()
                 {
                     iq.build_egui_ui(ui);
-                } else if let Some(oq) = quantity
-                    .as_any_mut()
-                    .downcast_mut::<MeshOneFormQuantity>()
+                } else if let Some(oq) = quantity.as_any_mut().downcast_mut::<MeshOneFormQuantity>()
                 {
                     oq.build_egui_ui(ui);
                 }
@@ -683,8 +681,9 @@ impl SurfaceMesh {
 
         for q in &self.quantities {
             if q.is_enabled() && q.kind() == QuantityKind::Parameterization {
-                if let Some(pq) =
-                    q.as_any().downcast_ref::<MeshVertexParameterizationQuantity>()
+                if let Some(pq) = q
+                    .as_any()
+                    .downcast_ref::<MeshVertexParameterizationQuantity>()
                 {
                     return Some(pq);
                 }
@@ -702,8 +701,9 @@ impl SurfaceMesh {
 
         for q in &self.quantities {
             if q.is_enabled() && q.kind() == QuantityKind::Parameterization {
-                if let Some(pq) =
-                    q.as_any().downcast_ref::<MeshCornerParameterizationQuantity>()
+                if let Some(pq) = q
+                    .as_any()
+                    .downcast_ref::<MeshCornerParameterizationQuantity>()
                 {
                     return Some(pq);
                 }
@@ -773,8 +773,7 @@ impl SurfaceMesh {
         name: impl Into<String>,
         coords: Vec<Vec2>,
     ) -> &mut Self {
-        let quantity =
-            MeshVertexParameterizationQuantity::new(name, self.name.clone(), coords);
+        let quantity = MeshVertexParameterizationQuantity::new(name, self.name.clone(), coords);
         self.add_quantity(Box::new(quantity));
         self
     }
@@ -785,8 +784,7 @@ impl SurfaceMesh {
         name: impl Into<String>,
         coords: Vec<Vec2>,
     ) -> &mut Self {
-        let quantity =
-            MeshCornerParameterizationQuantity::new(name, self.name.clone(), coords);
+        let quantity = MeshCornerParameterizationQuantity::new(name, self.name.clone(), coords);
         self.add_quantity(Box::new(quantity));
         self
     }
