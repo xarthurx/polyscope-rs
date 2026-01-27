@@ -672,6 +672,79 @@ impl SurfaceMesh {
         None
     }
 
+    /// Returns the currently active vertex vector quantity (immutable), if any.
+    #[must_use]
+    pub fn active_vertex_vector_quantity(&self) -> Option<&MeshVertexVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any().downcast_ref::<MeshVertexVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active vertex vector quantity (mutable), if any.
+    pub fn active_vertex_vector_quantity_mut(&mut self) -> Option<&mut MeshVertexVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &mut self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any_mut().downcast_mut::<MeshVertexVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active face vector quantity (immutable), if any.
+    #[must_use]
+    pub fn active_face_vector_quantity(&self) -> Option<&MeshFaceVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any().downcast_ref::<MeshFaceVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns the currently active face vector quantity (mutable), if any.
+    pub fn active_face_vector_quantity_mut(&mut self) -> Option<&mut MeshFaceVectorQuantity> {
+        use polyscope_core::quantity::QuantityKind;
+
+        for q in &mut self.quantities {
+            if q.is_enabled() && q.kind() == QuantityKind::Vector {
+                if let Some(vq) = q.as_any_mut().downcast_mut::<MeshFaceVectorQuantity>() {
+                    return Some(vq);
+                }
+            }
+        }
+        None
+    }
+
+    /// Computes face centroids (center of each face).
+    #[must_use]
+    pub fn face_centroids(&self) -> Vec<Vec3> {
+        self.faces
+            .iter()
+            .map(|face| {
+                if face.is_empty() {
+                    return Vec3::ZERO;
+                }
+                let sum: Vec3 = face.iter().map(|&vi| self.vertices[vi as usize]).sum();
+                sum / face.len() as f32
+            })
+            .collect()
+    }
+
     /// Returns the currently active vertex parameterization quantity, if any.
     #[must_use]
     pub fn active_vertex_parameterization_quantity(
