@@ -3,14 +3,6 @@
 use glam::Vec3;
 use polyscope_core::quantity::{CellQuantity, Quantity, QuantityKind, VertexQuantity};
 
-/// Vector field visualization style.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum VectorStyle {
-    #[default]
-    Arrow,
-    Line,
-}
-
 /// A vector quantity defined at mesh vertices.
 pub struct VolumeMeshVertexVectorQuantity {
     name: String,
@@ -20,7 +12,6 @@ pub struct VolumeMeshVertexVectorQuantity {
     vector_length_scale: f32,
     vector_radius: f32,
     vector_color: Vec3,
-    style: VectorStyle,
 }
 
 impl VolumeMeshVertexVectorQuantity {
@@ -37,7 +28,6 @@ impl VolumeMeshVertexVectorQuantity {
             vector_length_scale: 1.0,
             vector_radius: 0.01,
             vector_color: Vec3::new(0.1, 0.1, 0.8),
-            style: VectorStyle::Arrow,
         }
     }
 
@@ -105,7 +95,6 @@ pub struct VolumeMeshCellVectorQuantity {
     vector_length_scale: f32,
     vector_radius: f32,
     vector_color: Vec3,
-    style: VectorStyle,
 }
 
 impl VolumeMeshCellVectorQuantity {
@@ -122,7 +111,6 @@ impl VolumeMeshCellVectorQuantity {
             vector_length_scale: 1.0,
             vector_radius: 0.01,
             vector_color: Vec3::new(0.1, 0.1, 0.8),
-            style: VectorStyle::Arrow,
         }
     }
 
