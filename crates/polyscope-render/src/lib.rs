@@ -10,6 +10,8 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
+// wgpu pipeline code uses Default::default() for struct update syntax
+#![allow(clippy::default_trait_access)]
 
 pub mod buffer;
 pub mod camera;
