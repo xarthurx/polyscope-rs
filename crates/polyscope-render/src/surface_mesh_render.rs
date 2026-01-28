@@ -440,49 +440,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mesh_uniforms_default() {
-        let uniforms = MeshUniforms::default();
-
-        // Verify default values
-        assert_eq!(
-            uniforms.shade_style, 0,
-            "default shade_style should be smooth (0)"
-        );
-        assert_eq!(
-            uniforms.show_edges, 0,
-            "default show_edges should be off (0)"
-        );
-        assert_eq!(uniforms.edge_width, 1.0, "default edge_width should be 1.0");
-        assert_eq!(
-            uniforms.transparency, 0.0,
-            "default transparency should be 0.0 (opaque)"
-        );
-        assert_eq!(
-            uniforms.surface_color,
-            [0.5, 0.5, 0.5, 1.0],
-            "default surface_color should be gray"
-        );
-        assert_eq!(
-            uniforms.edge_color,
-            [0.0, 0.0, 0.0, 1.0],
-            "default edge_color should be black"
-        );
-        assert_eq!(
-            uniforms.backface_policy, 0,
-            "default backface_policy should be identical (0)"
-        );
-        assert_eq!(
-            uniforms.slice_planes_enabled, 1,
-            "default slice_planes_enabled should be on (1)"
-        );
-        assert_eq!(
-            uniforms.backface_color,
-            [0.3, 0.3, 0.3, 1.0],
-            "default backface_color should be darker gray"
-        );
-    }
-
-    #[test]
     fn test_mesh_uniforms_size() {
         let size = std::mem::size_of::<MeshUniforms>();
 

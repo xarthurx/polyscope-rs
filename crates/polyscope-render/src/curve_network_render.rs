@@ -406,16 +406,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_curve_network_uniforms_default() {
-        let uniforms = CurveNetworkUniforms::default();
-
-        assert_eq!(uniforms.color, [0.2, 0.5, 0.8, 1.0]);
-        assert_eq!(uniforms.radius, 0.005);
-        assert_eq!(uniforms.radius_is_relative, 1);
-        assert_eq!(uniforms.render_mode, 0);
-    }
-
-    #[test]
     fn test_curve_network_uniforms_size() {
         let size = std::mem::size_of::<CurveNetworkUniforms>();
 

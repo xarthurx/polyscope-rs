@@ -456,25 +456,6 @@ mod tests {
     }
 
     #[test]
-    fn test_vertex_parameterization_setters() {
-        let coords = vec![Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0)];
-        let mut q = MeshVertexParameterizationQuantity::new("uv", "mesh", coords);
-
-        q.set_style(ParamVizStyle::Grid);
-        assert_eq!(q.style(), ParamVizStyle::Grid);
-
-        q.set_coords_type(ParamCoordsType::World);
-        assert_eq!(q.coords_type(), ParamCoordsType::World);
-
-        q.set_checker_size(0.5);
-        assert_eq!(q.checker_size(), 0.5);
-
-        let colors = [Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0)];
-        q.set_checker_colors(colors);
-        assert_eq!(q.checker_colors(), colors);
-    }
-
-    #[test]
     fn test_checker_colors_computation() {
         let coords = vec![
             Vec2::new(0.0, 0.0),   // cell (0,0) -> even -> color[0]

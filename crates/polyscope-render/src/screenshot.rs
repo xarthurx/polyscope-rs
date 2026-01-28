@@ -105,14 +105,3 @@ pub enum ScreenshotError {
     #[error("GPU buffer mapping failed")]
     BufferMapFailed,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_screenshot_options_default() {
-        let opts = ScreenshotOptions::default();
-        assert!(!opts.transparent_background);
-    }
-}

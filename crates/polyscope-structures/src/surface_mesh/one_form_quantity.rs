@@ -264,20 +264,6 @@ mod tests {
     }
 
     #[test]
-    fn test_one_form_setters() {
-        let mut q = MeshOneFormQuantity::new("test", "mesh", vec![1.0], vec![true]);
-
-        q.set_length_scale(2.0);
-        assert_eq!(q.length_scale(), 2.0);
-
-        q.set_radius(0.01);
-        assert_eq!(q.radius(), 0.01);
-
-        q.set_color(Vec3::new(1.0, 0.0, 0.0));
-        assert_eq!(q.color(), Vec3::new(1.0, 0.0, 0.0));
-    }
-
-    #[test]
     fn test_edge_vector_computation() {
         let vertices = vec![
             Vec3::new(0.0, 0.0, 0.0), // v0

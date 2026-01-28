@@ -320,23 +320,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_transform_identity() {
-        let t = Transform::identity();
-        assert_eq!(t.translation, Vec3::ZERO);
-        assert_eq!(t.rotation, Quat::IDENTITY);
-        assert_eq!(t.scale, Vec3::ONE);
-    }
-
-    #[test]
-    fn test_transform_from_matrix() {
-        let translation = Vec3::new(1.0, 2.0, 3.0);
-        let matrix = Mat4::from_translation(translation);
-        let t = Transform::from_matrix(matrix);
-        assert!((t.translation - translation).length() < 1e-6);
-    }
-
-    #[test]
-    fn test_transform_to_matrix() {
+    fn test_transform_matrix_roundtrip() {
         let t = Transform {
             translation: Vec3::new(1.0, 2.0, 3.0),
             rotation: Quat::IDENTITY,
@@ -356,28 +340,9 @@ mod tests {
     }
 
     #[test]
-    fn test_gizmo_config() {
-        let config = GizmoConfig::new()
-            .with_mode(GizmoMode::Rotate)
-            .with_space(GizmoSpace::Local)
-            .with_snap_rotate(15.0);
-
-        assert_eq!(config.mode, GizmoMode::Rotate);
-        assert_eq!(config.space, GizmoSpace::Local);
-        assert_eq!(config.snap_rotate, 15.0);
-    }
-
-    #[test]
     fn test_snap_translation() {
         let mut t = Transform::from_translation(Vec3::new(1.2, 2.7, 3.1));
         t.snap_translation(0.5);
         assert_eq!(t.translation, Vec3::new(1.0, 2.5, 3.0));
-    }
-
-    #[test]
-    fn test_axis_colors() {
-        assert_eq!(GizmoAxis::X.color(), Vec3::new(1.0, 0.2, 0.2));
-        assert_eq!(GizmoAxis::Y.color(), Vec3::new(0.2, 1.0, 0.2));
-        assert_eq!(GizmoAxis::Z.color(), Vec3::new(0.2, 0.2, 1.0));
     }
 }

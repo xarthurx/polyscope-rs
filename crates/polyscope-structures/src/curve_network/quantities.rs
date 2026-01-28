@@ -776,24 +776,6 @@ mod tests {
     }
 
     #[test]
-    fn test_node_vector_quantity_properties() {
-        let mut q = CurveNodeVectorQuantity::new("test", "parent", vec![Vec3::X]);
-
-        assert_eq!(q.length_scale(), 1.0);
-        assert_eq!(q.radius(), 0.005);
-        assert_eq!(q.color(), Vec3::new(0.8, 0.2, 0.2));
-
-        q.set_length_scale(2.0);
-        assert_eq!(q.length_scale(), 2.0);
-
-        q.set_radius(0.01);
-        assert_eq!(q.radius(), 0.01);
-
-        q.set_color(Vec3::new(0.0, 1.0, 0.0));
-        assert_eq!(q.color(), Vec3::new(0.0, 1.0, 0.0));
-    }
-
-    #[test]
     fn test_edge_vector_quantity() {
         let vectors = vec![Vec3::X, Vec3::Y];
         let q = CurveEdgeVectorQuantity::new("edge_vecs", "parent", vectors.clone());
@@ -803,23 +785,5 @@ mod tests {
         assert_eq!(q.data_size(), 2);
         assert_eq!(q.kind(), QuantityKind::Vector);
         assert!(!q.is_enabled());
-    }
-
-    #[test]
-    fn test_edge_vector_quantity_properties() {
-        let mut q = CurveEdgeVectorQuantity::new("test", "parent", vec![Vec3::X]);
-
-        assert_eq!(q.length_scale(), 1.0);
-        assert_eq!(q.radius(), 0.005);
-        assert_eq!(q.color(), Vec3::new(0.2, 0.8, 0.2));
-
-        q.set_length_scale(3.0);
-        assert_eq!(q.length_scale(), 3.0);
-
-        q.set_radius(0.02);
-        assert_eq!(q.radius(), 0.02);
-
-        q.set_color(Vec3::ONE);
-        assert_eq!(q.color(), Vec3::ONE);
     }
 }

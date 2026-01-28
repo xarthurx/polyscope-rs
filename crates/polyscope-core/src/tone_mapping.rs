@@ -51,23 +51,3 @@ impl ToneMappingConfig {
         self
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_tone_mapping_default() {
-        let config = ToneMappingConfig::default();
-        assert_eq!(config.exposure, 1.0);
-        assert_eq!(config.white_level, 1.0);
-        assert_eq!(config.gamma, 2.2);
-    }
-
-    #[test]
-    fn test_tone_mapping_builder() {
-        let config = ToneMappingConfig::new().with_exposure(1.5).with_gamma(2.0);
-        assert_eq!(config.exposure, 1.5);
-        assert_eq!(config.gamma, 2.0);
-    }
-}

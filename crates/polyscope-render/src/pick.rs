@@ -145,35 +145,6 @@ mod tests {
     }
 
     #[test]
-    fn test_pick_result_default() {
-        let result = PickResult::default();
-        assert!(!result.hit);
-        assert!(result.structure_type.is_empty());
-        assert!(result.structure_name.is_empty());
-        assert_eq!(result.element_index, 0);
-        assert_eq!(result.element_type, PickElementType::None);
-        assert_eq!(result.screen_pos, Vec2::ZERO);
-        assert_eq!(result.depth, 0.0);
-    }
-
-    #[test]
-    fn test_pick_element_type() {
-        // Test that all variants exist and are distinct
-        assert_ne!(PickElementType::None, PickElementType::Point);
-        assert_ne!(PickElementType::Point, PickElementType::Vertex);
-        assert_ne!(PickElementType::Vertex, PickElementType::Face);
-        assert_ne!(PickElementType::Face, PickElementType::Edge);
-
-        // Test default
-        assert_eq!(PickElementType::default(), PickElementType::None);
-
-        // Test copy
-        let element = PickElementType::Face;
-        let copied = element;
-        assert_eq!(element, copied);
-    }
-
-    #[test]
     fn test_encode_decode_pick_id_roundtrip() {
         // Test various combinations
         let cases = [

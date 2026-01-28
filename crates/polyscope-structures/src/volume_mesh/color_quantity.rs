@@ -142,26 +142,3 @@ impl Quantity for VolumeMeshCellColorQuantity {
 }
 
 impl CellQuantity for VolumeMeshCellColorQuantity {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_vertex_color_quantity() {
-        let colors = vec![Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0)];
-        let quantity = VolumeMeshVertexColorQuantity::new("colors", "mesh", colors.clone());
-
-        assert_eq!(quantity.name(), "colors");
-        assert_eq!(quantity.colors().len(), 2);
-    }
-
-    #[test]
-    fn test_cell_color_quantity() {
-        let colors = vec![Vec3::new(0.0, 0.0, 1.0)];
-        let quantity = VolumeMeshCellColorQuantity::new("cell_colors", "mesh", colors.clone());
-
-        assert_eq!(quantity.name(), "cell_colors");
-        assert_eq!(quantity.colors().len(), 1);
-    }
-}

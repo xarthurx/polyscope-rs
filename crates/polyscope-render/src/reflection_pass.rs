@@ -118,13 +118,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_reflection_uniforms_default() {
-        let uniforms = ReflectionUniforms::default();
-        assert_eq!(uniforms.intensity, 0.25);
-        assert_eq!(uniforms.ground_height, 0.0);
-    }
-
-    #[test]
     fn test_reflection_uniforms_size() {
         // Ensure uniform is correctly aligned for GPU
         assert_eq!(

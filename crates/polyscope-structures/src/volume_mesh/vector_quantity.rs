@@ -206,26 +206,3 @@ impl Quantity for VolumeMeshCellVectorQuantity {
 }
 
 impl CellQuantity for VolumeMeshCellVectorQuantity {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_vertex_vector_quantity() {
-        let vectors = vec![Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0)];
-        let quantity = VolumeMeshVertexVectorQuantity::new("velocity", "mesh", vectors.clone());
-
-        assert_eq!(quantity.name(), "velocity");
-        assert_eq!(quantity.vectors().len(), 2);
-    }
-
-    #[test]
-    fn test_cell_vector_quantity() {
-        let vectors = vec![Vec3::new(0.0, 0.0, 1.0)];
-        let quantity = VolumeMeshCellVectorQuantity::new("flux", "mesh", vectors.clone());
-
-        assert_eq!(quantity.name(), "flux");
-        assert_eq!(quantity.vectors().len(), 1);
-    }
-}

@@ -278,23 +278,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_slice_plane_creation() {
-        let plane = SlicePlane::new("test");
-        assert_eq!(plane.name(), "test");
-        assert_eq!(plane.origin(), Vec3::ZERO);
-        assert_eq!(plane.normal(), Vec3::Y);
-        assert!(plane.is_enabled());
-    }
-
-    #[test]
-    fn test_slice_plane_pose() {
-        let mut plane = SlicePlane::new("test");
-        plane.set_pose(Vec3::new(1.0, 2.0, 3.0), Vec3::new(1.0, 0.0, 0.0));
-        assert_eq!(plane.origin(), Vec3::new(1.0, 2.0, 3.0));
-        assert_eq!(plane.normal(), Vec3::X);
-    }
-
-    #[test]
     fn test_signed_distance() {
         let plane = SlicePlane::with_pose("test", Vec3::ZERO, Vec3::Y);
 

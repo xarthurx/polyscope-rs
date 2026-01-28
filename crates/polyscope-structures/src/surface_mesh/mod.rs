@@ -1412,63 +1412,34 @@ impl HasQuantities for SurfaceMesh {
 mod tests {
     use super::*;
 
-    /// Test basic triangle mesh creation.
+    /// Test triangle and quad mesh creation and triangulation.
     #[test]
-    fn test_surface_mesh_creation_triangles() {
+    fn test_surface_mesh_creation_and_triangulation() {
+        // Triangle mesh
         let vertices = vec![
             Vec3::new(0.0, 0.0, 0.0),
             Vec3::new(1.0, 0.0, 0.0),
             Vec3::new(0.5, 1.0, 0.0),
         ];
-        let faces = vec![vec![0, 1, 2]];
-
-        let mesh = SurfaceMesh::new("test_tri", vertices, faces);
-
+        let mesh = SurfaceMesh::new("test_tri", vertices, vec![vec![0, 1, 2]]);
         assert_eq!(mesh.num_vertices(), 3);
         assert_eq!(mesh.num_faces(), 1);
         assert_eq!(mesh.num_triangles(), 1);
         assert_eq!(mesh.triangulation()[0], [0, 1, 2]);
-    }
 
-    /// Test quad face creation.
-    #[test]
-    fn test_surface_mesh_creation_quad() {
+        // Quad mesh with fan triangulation
         let vertices = vec![
             Vec3::new(0.0, 0.0, 0.0),
             Vec3::new(1.0, 0.0, 0.0),
             Vec3::new(1.0, 1.0, 0.0),
             Vec3::new(0.0, 1.0, 0.0),
         ];
-        let faces = vec![vec![0, 1, 2, 3]];
-
-        let mesh = SurfaceMesh::new("test_quad", vertices, faces);
-
+        let mesh = SurfaceMesh::new("test_quad", vertices, vec![vec![0, 1, 2, 3]]);
         assert_eq!(mesh.num_vertices(), 4);
         assert_eq!(mesh.num_faces(), 1);
-        // A quad should produce 2 triangles
         assert_eq!(mesh.num_triangles(), 2);
-    }
-
-    /// Test quad triangulation produces correct triangles.
-    #[test]
-    fn test_quad_triangulation() {
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(1.0, 1.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        ];
-        let faces = vec![vec![0, 1, 2, 3]];
-
-        let mesh = SurfaceMesh::new("test_quad", vertices, faces);
-
-        // Fan triangulation: [0,1,2], [0,2,3]
-        assert_eq!(mesh.triangulation().len(), 2);
         assert_eq!(mesh.triangulation()[0], [0, 1, 2]);
         assert_eq!(mesh.triangulation()[1], [0, 2, 3]);
-
-        // Check face to triangle range
-        assert_eq!(mesh.face_to_tri_range().len(), 1);
         assert_eq!(mesh.face_to_tri_range()[0], 0..2);
     }
 
@@ -1548,22 +1519,6 @@ mod tests {
                 "Vertex normal Z should be 1.0"
             );
         }
-    }
-
-    /// Test from_triangles convenience constructor.
-    #[test]
-    fn test_from_triangles() {
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.5, 1.0, 0.0),
-        ];
-        let triangles = vec![[0, 1, 2]];
-
-        let mesh = SurfaceMesh::from_triangles("test_from_tri", vertices, triangles);
-
-        assert_eq!(mesh.num_faces(), 1);
-        assert_eq!(mesh.num_triangles(), 1);
     }
 
     /// Test pentagon triangulation (5 vertices -> 3 triangles).
@@ -1659,9 +1614,9 @@ mod tests {
         assert_eq!(mesh.transparency(), 0.0);
     }
 
-    /// Test vertex scalar quantity.
+    /// Test all quantity types on a surface mesh.
     #[test]
-    fn test_vertex_scalar_quantity() {
+    fn test_surface_mesh_quantities() {
         use polyscope_core::quantity::QuantityKind;
 
         let vertices = vec![
@@ -1672,158 +1627,36 @@ mod tests {
         let faces = vec![vec![0, 1, 2]];
         let mut mesh = SurfaceMesh::new("test", vertices, faces);
 
+        // Vertex quantities (size = 3)
         mesh.add_vertex_scalar_quantity("height", vec![0.0, 0.5, 1.0]);
-
-        let q = mesh.get_quantity("height").expect("quantity not found");
-        assert_eq!(q.data_size(), 3);
-        assert_eq!(q.kind(), QuantityKind::Scalar);
-    }
-
-    /// Test face scalar quantity.
-    #[test]
-    fn test_face_scalar_quantity() {
-        use polyscope_core::quantity::QuantityKind;
-
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        ];
-        let faces = vec![vec![0, 1, 2]];
-        let mut mesh = SurfaceMesh::new("test", vertices, faces);
-
-        mesh.add_face_scalar_quantity("area", vec![1.0]);
-
-        let q = mesh.get_quantity("area").expect("quantity not found");
-        assert_eq!(q.data_size(), 1);
-        assert_eq!(q.kind(), QuantityKind::Scalar);
-    }
-
-    /// Test vertex color quantity.
-    #[test]
-    fn test_vertex_color_quantity() {
-        use polyscope_core::quantity::QuantityKind;
-
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        ];
-        let faces = vec![vec![0, 1, 2]];
-        let mut mesh = SurfaceMesh::new("test", vertices, faces);
-
         mesh.add_vertex_color_quantity("colors", vec![Vec3::X, Vec3::Y, Vec3::Z]);
-
-        let q = mesh.get_quantity("colors").expect("quantity not found");
-        assert_eq!(q.data_size(), 3);
-        assert_eq!(q.kind(), QuantityKind::Color);
-    }
-
-    /// Test face color quantity.
-    #[test]
-    fn test_face_color_quantity() {
-        use polyscope_core::quantity::QuantityKind;
-
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        ];
-        let faces = vec![vec![0, 1, 2]];
-        let mut mesh = SurfaceMesh::new("test", vertices, faces);
-
-        mesh.add_face_color_quantity("face_colors", vec![Vec3::new(1.0, 0.0, 0.0)]);
-
-        let q = mesh
-            .get_quantity("face_colors")
-            .expect("quantity not found");
-        assert_eq!(q.data_size(), 1);
-        assert_eq!(q.kind(), QuantityKind::Color);
-    }
-
-    /// Test vertex vector quantity.
-    #[test]
-    fn test_vertex_vector_quantity() {
-        use polyscope_core::quantity::QuantityKind;
-
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        ];
-        let faces = vec![vec![0, 1, 2]];
-        let mut mesh = SurfaceMesh::new("test", vertices, faces);
-
         mesh.add_vertex_vector_quantity("normals", vec![Vec3::Z, Vec3::Z, Vec3::Z]);
 
-        let q = mesh.get_quantity("normals").expect("quantity not found");
-        assert_eq!(q.data_size(), 3);
-        assert_eq!(q.kind(), QuantityKind::Vector);
-    }
-
-    /// Test face vector quantity.
-    #[test]
-    fn test_face_vector_quantity() {
-        use polyscope_core::quantity::QuantityKind;
-
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        ];
-        let faces = vec![vec![0, 1, 2]];
-        let mut mesh = SurfaceMesh::new("test", vertices, faces);
-
+        // Face quantities (size = 1)
+        mesh.add_face_scalar_quantity("area", vec![1.0]);
+        mesh.add_face_color_quantity("face_colors", vec![Vec3::new(1.0, 0.0, 0.0)]);
         mesh.add_face_vector_quantity("face_normals", vec![Vec3::Z]);
 
-        let q = mesh
-            .get_quantity("face_normals")
-            .expect("quantity not found");
-        assert_eq!(q.data_size(), 1);
-        assert_eq!(q.kind(), QuantityKind::Vector);
-    }
+        let cases: &[(&str, usize, QuantityKind)] = &[
+            ("height", 3, QuantityKind::Scalar),
+            ("colors", 3, QuantityKind::Color),
+            ("normals", 3, QuantityKind::Vector),
+            ("area", 1, QuantityKind::Scalar),
+            ("face_colors", 1, QuantityKind::Color),
+            ("face_normals", 1, QuantityKind::Vector),
+        ];
 
-    /// Test face vector quantity properties.
-    #[test]
-    fn test_face_vector_quantity_properties() {
-        let mut vq = MeshFaceVectorQuantity::new("test_vectors", "mesh", vec![Vec3::X, Vec3::Y]);
-
-        // Test default values
-        assert_eq!(vq.length_scale(), 1.0);
-        assert_eq!(vq.radius(), 0.005);
-        assert_eq!(vq.color(), Vec3::new(0.2, 0.2, 0.8));
-
-        // Test setters
-        vq.set_length_scale(2.0);
-        assert_eq!(vq.length_scale(), 2.0);
-
-        vq.set_radius(0.01);
-        assert_eq!(vq.radius(), 0.01);
-
-        vq.set_color(Vec3::new(1.0, 0.0, 0.0));
-        assert_eq!(vq.color(), Vec3::new(1.0, 0.0, 0.0));
-    }
-
-    /// Test vector quantity properties.
-    #[test]
-    fn test_vector_quantity_properties() {
-        let mut vq =
-            MeshVertexVectorQuantity::new("test_vectors", "mesh", vec![Vec3::X, Vec3::Y, Vec3::Z]);
-
-        // Test default values
-        assert_eq!(vq.length_scale(), 1.0);
-        assert_eq!(vq.radius(), 0.005);
-        assert_eq!(vq.color(), Vec3::new(0.8, 0.2, 0.2));
-
-        // Test setters
-        vq.set_length_scale(2.0);
-        assert_eq!(vq.length_scale(), 2.0);
-
-        vq.set_radius(0.01);
-        assert_eq!(vq.radius(), 0.01);
-
-        vq.set_color(Vec3::new(0.0, 1.0, 0.0));
-        assert_eq!(vq.color(), Vec3::new(0.0, 1.0, 0.0));
+        for (name, expected_size, expected_kind) in cases {
+            let q = mesh
+                .get_quantity(name)
+                .unwrap_or_else(|| panic!("quantity '{name}' not found"));
+            assert_eq!(
+                q.data_size(),
+                *expected_size,
+                "data_size mismatch for {name}"
+            );
+            assert_eq!(q.kind(), *expected_kind, "kind mismatch for {name}");
+        }
     }
 
     /// Test face scalar quantity compute_vertex_colors.

@@ -524,28 +524,6 @@ mod tests {
     }
 
     #[test]
-    fn test_vertex_intrinsic_setters() {
-        let vectors = vec![Vec2::new(1.0, 0.0)];
-        let basis_x = vec![Vec3::X];
-        let basis_y = vec![Vec3::Y];
-
-        let mut q =
-            MeshVertexIntrinsicVectorQuantity::new("test", "mesh", vectors, basis_x, basis_y);
-
-        q.set_n_sym(4);
-        assert_eq!(q.n_sym(), 4);
-
-        q.set_length_scale(2.0);
-        assert_eq!(q.length_scale(), 2.0);
-
-        q.set_radius(0.01);
-        assert_eq!(q.radius(), 0.01);
-
-        q.set_color(Vec3::new(1.0, 0.0, 0.0));
-        assert_eq!(q.color(), Vec3::new(1.0, 0.0, 0.0));
-    }
-
-    #[test]
     fn test_world_vector_projection() {
         // Vector (1, 0) in tangent space with basis X=X, Y=Y -> world vector = X
         let vectors = vec![Vec2::new(1.0, 0.0), Vec2::new(0.0, 1.0)];

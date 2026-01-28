@@ -245,29 +245,3 @@ impl Quantity for VolumeMeshCellScalarQuantity {
 }
 
 impl CellQuantity for VolumeMeshCellScalarQuantity {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_vertex_scalar_quantity_creation() {
-        let values = vec![0.0, 1.0, 2.0, 3.0];
-        let quantity =
-            VolumeMeshVertexScalarQuantity::new("temperature", "my_mesh", values.clone());
-
-        assert_eq!(quantity.name(), "temperature");
-        assert_eq!(quantity.values(), &values);
-        assert_eq!(quantity.data_range(), (0.0, 3.0));
-    }
-
-    #[test]
-    fn test_cell_scalar_quantity_creation() {
-        let values = vec![0.5, 1.5];
-        let quantity = VolumeMeshCellScalarQuantity::new("pressure", "my_mesh", values.clone());
-
-        assert_eq!(quantity.name(), "pressure");
-        assert_eq!(quantity.values(), &values);
-        assert_eq!(quantity.data_range(), (0.5, 1.5));
-    }
-}

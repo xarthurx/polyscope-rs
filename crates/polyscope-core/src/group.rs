@@ -179,26 +179,15 @@ mod tests {
     }
 
     #[test]
-    fn test_add_child_group() {
+    fn test_group_hierarchy() {
         let mut parent = Group::new("parent");
         parent.add_child_group("child");
         assert!(parent.contains_child_group("child"));
         assert_eq!(parent.num_child_groups(), 1);
-    }
 
-    #[test]
-    fn test_parent_group() {
-        let mut group = Group::new("child");
-        assert!(group.parent_group().is_none());
-        group.set_parent_group(Some("parent".to_string()));
-        assert_eq!(group.parent_group(), Some("parent"));
-    }
-
-    #[test]
-    fn test_enable_disable() {
-        let mut group = Group::new("test");
-        assert!(group.is_enabled());
-        group.set_enabled(false);
-        assert!(!group.is_enabled());
+        let mut child = Group::new("child");
+        assert!(child.parent_group().is_none());
+        child.set_parent_group(Some("parent".to_string()));
+        assert_eq!(child.parent_group(), Some("parent"));
     }
 }

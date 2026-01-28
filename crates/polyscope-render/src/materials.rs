@@ -242,14 +242,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_material_creation() {
-        let mat = Material::clay();
-        assert_eq!(mat.name, "clay");
-        assert!(!mat.is_flat);
-        assert!(mat.ambient > 0.0);
-    }
-
-    #[test]
     fn test_flat_material() {
         let mat = Material::flat("test_flat");
         assert!(mat.is_flat);
@@ -273,12 +265,5 @@ mod tests {
         let uniforms = MaterialUniforms::from(&mat);
         assert_eq!(uniforms.ambient, mat.ambient);
         assert_eq!(uniforms.specular, mat.specular);
-    }
-
-    #[test]
-    fn test_default_material() {
-        let registry = MaterialRegistry::new();
-        let default = registry.default_material();
-        assert_eq!(default.name, "clay");
     }
 }

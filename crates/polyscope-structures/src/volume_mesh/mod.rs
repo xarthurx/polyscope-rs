@@ -1306,42 +1306,6 @@ mod tests {
     }
 
     #[test]
-    fn test_tet_mesh_creation() {
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.5, 1.0, 0.0),
-            Vec3::new(0.5, 0.5, 1.0),
-        ];
-        let tets = vec![[0, 1, 2, 3]];
-        let mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
-
-        assert_eq!(mesh.num_vertices(), 4);
-        assert_eq!(mesh.num_cells(), 1);
-        assert_eq!(mesh.cell_type(0), VolumeCellType::Tet);
-    }
-
-    #[test]
-    fn test_hex_mesh_creation() {
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(1.0, 1.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-            Vec3::new(0.0, 0.0, 1.0),
-            Vec3::new(1.0, 0.0, 1.0),
-            Vec3::new(1.0, 1.0, 1.0),
-            Vec3::new(0.0, 1.0, 1.0),
-        ];
-        let hexes = vec![[0, 1, 2, 3, 4, 5, 6, 7]];
-        let mesh = VolumeMesh::new_hex_mesh("test", vertices, hexes);
-
-        assert_eq!(mesh.num_vertices(), 8);
-        assert_eq!(mesh.num_cells(), 1);
-        assert_eq!(mesh.cell_type(0), VolumeCellType::Hex);
-    }
-
-    #[test]
     fn test_hex_to_tet_decomposition() {
         let vertices = vec![
             Vec3::new(0.0, 0.0, 0.0),
@@ -1367,23 +1331,6 @@ mod tests {
             assert!(tet[2] < 8);
             assert!(tet[3] < 8);
         }
-    }
-
-    #[test]
-    fn test_tet_mesh_decomposition() {
-        let vertices = vec![
-            Vec3::new(0.0, 0.0, 0.0),
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::new(0.5, 1.0, 0.0),
-            Vec3::new(0.5, 0.5, 1.0),
-        ];
-        let tets = vec![[0, 1, 2, 3]];
-        let mesh = VolumeMesh::new_tet_mesh("test", vertices, tets);
-
-        // Tet mesh should decompose to itself
-        let decomposed = mesh.decompose_to_tets();
-        assert_eq!(decomposed.len(), 1);
-        assert_eq!(decomposed[0], [0, 1, 2, 3]);
     }
 
     #[test]

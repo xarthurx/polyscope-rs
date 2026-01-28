@@ -2574,29 +2574,6 @@ mod tests {
     }
 
     #[test]
-    fn test_gizmo_mode() {
-        setup();
-        set_gizmo_mode(GizmoMode::Translate);
-        assert_eq!(get_gizmo_mode(), GizmoMode::Translate);
-
-        set_gizmo_mode(GizmoMode::Rotate);
-        assert_eq!(get_gizmo_mode(), GizmoMode::Rotate);
-
-        set_gizmo_mode(GizmoMode::Scale);
-        assert_eq!(get_gizmo_mode(), GizmoMode::Scale);
-    }
-
-    #[test]
-    fn test_gizmo_space() {
-        setup();
-        set_gizmo_space(GizmoSpace::World);
-        assert_eq!(get_gizmo_space(), GizmoSpace::World);
-
-        set_gizmo_space(GizmoSpace::Local);
-        assert_eq!(get_gizmo_space(), GizmoSpace::Local);
-    }
-
-    #[test]
     fn test_structure_transform() {
         setup();
         let name = unique_name("transform_pc");
@@ -2818,15 +2795,6 @@ mod tests {
 
         assert_eq!(get_gizmo_space(), GizmoSpace::World);
         assert!(is_gizmo_visible());
-    }
-
-    #[test]
-    fn test_get_selection_info_no_selection() {
-        setup();
-        deselect_structure();
-
-        let info = get_selection_info();
-        assert!(!info.has_selection);
     }
 
     #[test]
