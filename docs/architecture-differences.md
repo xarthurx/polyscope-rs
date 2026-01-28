@@ -392,6 +392,28 @@ set_ssao_radius(0.5);      // Sampling radius
 set_ssao_intensity(1.5);   // Effect strength
 ```
 
+### SSAA (Supersampling Anti-Aliasing)
+
+High-quality anti-aliasing by rendering at higher resolution and downsampling.
+
+**Implementation:**
+- Renders scene at 2x or 4x screen resolution
+- Box filter downsampling for smooth edges
+- All render targets (HDR, depth, normal, SSAO, OIT) scale with SSAA factor
+- Configurable via UI: 1x (off), 2x, or 4x
+
+**Files:**
+- `crates/polyscope-render/src/shaders/ssaa_downsample.wgsl` - Downsample shader
+- `crates/polyscope-render/src/ssaa_pass.rs` - SSAA render pass
+
+**Usage:**
+```rust
+// Enable 2x SSAA via global options
+polyscope_core::with_context_mut(|ctx| {
+    ctx.options.ssaa_factor = 2;
+});
+```
+
 ### Tube-Based Curve Network Picking
 
 Enhanced picking for curve networks using ray-cylinder intersection, making thin curves easier to select.

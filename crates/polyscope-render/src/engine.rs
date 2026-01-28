@@ -12,6 +12,7 @@ use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
 use crate::ground_plane::GroundPlaneRenderData;
 use crate::materials::MaterialRegistry;
+use crate::planar_shadow::PlanarShadowPass;
 use crate::shadow_map::ShadowMapPass;
 use crate::slice_plane_render::SlicePlaneRenderData;
 use crate::tone_mapping::ToneMapPass;
@@ -156,12 +157,22 @@ pub struct RenderEngine {
     mesh_oit_pipeline: Option<wgpu::RenderPipeline>,
     /// Tone mapping post-processing pass.
     tone_map_pass: Option<ToneMapPass>,
-    /// Shadow map pass for ground plane shadows.
+    /// SSAA (supersampling) pass for anti-aliasing.
+    ssaa_pass: Option<crate::ssaa_pass::SsaaPass>,
+    /// Current SSAA factor (1 = off, 2 = 2x, 4 = 4x).
+    ssaa_factor: u32,
+    /// Intermediate HDR texture for SSAA (screen resolution, used after downsampling).
+    ssaa_intermediate_texture: Option<wgpu::Texture>,
+    /// Intermediate HDR texture view.
+    ssaa_intermediate_view: Option<wgpu::TextureView>,
+    /// Shadow map pass for ground plane shadows (legacy, kept for compatibility).
     shadow_map_pass: Option<ShadowMapPass>,
     /// Shadow render pipeline (depth-only, renders objects from light's perspective).
     shadow_pipeline: Option<wgpu::RenderPipeline>,
     /// Shadow bind group layout for shadow pass rendering.
     shadow_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Planar shadow pass for screen-space ground plane shadows.
+    planar_shadow_pass: Option<crate::planar_shadow::PlanarShadowPass>,
     /// Reflection pass for ground plane reflections.
     reflection_pass: Option<crate::reflection_pass::ReflectionPass>,
     /// Stencil pipeline for ground plane reflection mask.
@@ -304,6 +315,11 @@ impl RenderEngine {
         // Create shadow map pass first (needed for bind group)
         let shadow_map_pass = ShadowMapPass::new(&device);
 
+        // Create planar shadow pass for screen-space shadows
+        let planar_shadow_pass = PlanarShadowPass::new(&device, width, height);
+        // Initialize blur textures to "no shadow" (all zeros)
+        planar_shadow_pass.clear_to_no_shadow(&queue);
+
         // Ground plane bind group layout (includes shadow bindings)
         let ground_plane_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -342,22 +358,22 @@ impl RenderEngine {
                         },
                         count: None,
                     },
-                    // Shadow map texture
+                    // Shadow texture (blurred planar shadow mask)
                     wgpu::BindGroupLayoutEntry {
                         binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Depth,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
                         count: None,
                     },
-                    // Shadow comparison sampler
+                    // Shadow sampler (linear filtering)
                     wgpu::BindGroupLayoutEntry {
                         binding: 4,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
                 ],
@@ -481,9 +497,14 @@ impl RenderEngine {
             oit_composite_pass: None,
             mesh_oit_pipeline: None,
             tone_map_pass: None,
+            ssaa_pass: None,
+            ssaa_factor: 1,
+            ssaa_intermediate_texture: None,
+            ssaa_intermediate_view: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
             shadow_bind_group_layout: None,
+            planar_shadow_pass: Some(planar_shadow_pass),
             reflection_pass: None,
             ground_stencil_pipeline: None,
             reflected_mesh_pipeline: None,
@@ -603,6 +624,11 @@ impl RenderEngine {
         // Create shadow map pass first (needed for bind group)
         let shadow_map_pass = ShadowMapPass::new(&device);
 
+        // Create planar shadow pass for screen-space shadows
+        let planar_shadow_pass = PlanarShadowPass::new(&device, width, height);
+        // Initialize blur textures to "no shadow" (all zeros)
+        planar_shadow_pass.clear_to_no_shadow(&queue);
+
         // Ground plane bind group layout (includes shadow bindings)
         let ground_plane_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -641,22 +667,22 @@ impl RenderEngine {
                         },
                         count: None,
                     },
-                    // Shadow map texture
+                    // Shadow texture (blurred planar shadow mask)
                     wgpu::BindGroupLayoutEntry {
                         binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Depth,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
                         count: None,
                     },
-                    // Shadow comparison sampler
+                    // Shadow sampler (linear filtering)
                     wgpu::BindGroupLayoutEntry {
                         binding: 4,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
                 ],
@@ -780,9 +806,14 @@ impl RenderEngine {
             oit_composite_pass: None,
             mesh_oit_pipeline: None,
             tone_map_pass: None,
+            ssaa_pass: None,
+            ssaa_factor: 1,
+            ssaa_intermediate_texture: None,
+            ssaa_intermediate_view: None,
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
             shadow_bind_group_layout: None,
+            planar_shadow_pass: Some(planar_shadow_pass),
             reflection_pass: None,
             ground_stencil_pipeline: None,
             reflected_mesh_pipeline: None,
@@ -833,21 +864,28 @@ impl RenderEngine {
             surface.configure(&self.device, &self.surface_config);
         }
 
+        // Calculate SSAA-scaled dimensions for render targets
+        let ssaa_width = width * self.ssaa_factor;
+        let ssaa_height = height * self.ssaa_factor;
+
         let (depth_texture, depth_view, depth_only_view) =
-            Self::create_depth_texture(&self.device, width, height);
+            Self::create_depth_texture(&self.device, ssaa_width, ssaa_height);
         self.depth_texture = depth_texture;
         self.depth_view = depth_view;
         self.depth_only_view = depth_only_view;
 
-        // Recreate HDR texture for tone mapping
+        // Recreate HDR texture for tone mapping (at SSAA resolution)
         self.create_hdr_texture();
 
-        // Recreate normal G-buffer for SSAO
+        // Recreate SSAA intermediate texture (at screen resolution)
+        self.create_ssaa_intermediate_texture();
+
+        // Recreate normal G-buffer for SSAO (at SSAA resolution)
         self.create_normal_texture();
 
-        // Resize SSAO pass and output texture
+        // Resize SSAO pass and output texture (at SSAA resolution)
         if let Some(ref mut ssao_pass) = self.ssao_pass {
-            ssao_pass.resize(&self.device, &self.queue, width, height);
+            ssao_pass.resize(&self.device, &self.queue, ssaa_width, ssaa_height);
         }
         self.create_ssao_output_texture();
 
@@ -1051,6 +1089,16 @@ impl RenderEngine {
     /// Gets the shadow map pass (if initialized).
     pub fn shadow_map_pass(&self) -> Option<&ShadowMapPass> {
         self.shadow_map_pass.as_ref()
+    }
+
+    /// Gets the planar shadow pass (if initialized).
+    pub fn planar_shadow_pass(&self) -> Option<&PlanarShadowPass> {
+        self.planar_shadow_pass.as_ref()
+    }
+
+    /// Gets the planar shadow pass mutably (if initialized).
+    pub fn planar_shadow_pass_mut(&mut self) -> Option<&mut PlanarShadowPass> {
+        self.planar_shadow_pass.as_mut()
     }
 
     /// Initializes the vector arrow render pipeline.
@@ -2137,20 +2185,24 @@ impl RenderEngine {
 
         // Initialize render data if needed
         if self.ground_plane_render_data.is_none() {
-            if let Some(ref shadow_pass) = self.shadow_map_pass {
+            if let (Some(ref shadow_pass), Some(ref planar_shadow)) =
+                (&self.shadow_map_pass, &self.planar_shadow_pass)
+            {
+                // Use planar shadow texture (with 4 blur iterations)
                 self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
                     &self.device,
                     &self.ground_plane_bind_group_layout,
                     &self.camera_buffer,
                     shadow_pass.light_buffer(),
-                    shadow_pass.depth_view(),
-                    shadow_pass.comparison_sampler(),
+                    planar_shadow.shadow_texture_view(4),
+                    planar_shadow.sampler(),
                 ));
             }
         }
 
-        // Get camera height
+        // Get camera height and viewport dimensions
         let camera_height = self.camera.position.y;
+        let viewport_dim = [self.width as f32, self.height as f32];
 
         if let Some(render_data) = &self.ground_plane_render_data {
             render_data.update(
@@ -2164,6 +2216,7 @@ impl RenderEngine {
                 shadow_mode,
                 is_orthographic,
                 reflection_intensity,
+                viewport_dim,
             );
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -2379,14 +2432,17 @@ impl RenderEngine {
 
         // Initialize render data if needed
         if self.ground_plane_render_data.is_none() {
-            if let Some(ref shadow_pass) = self.shadow_map_pass {
+            if let (Some(ref shadow_pass), Some(ref planar_shadow)) =
+                (&self.shadow_map_pass, &self.planar_shadow_pass)
+            {
+                // Use planar shadow texture (with 4 blur iterations)
                 self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
                     &self.device,
                     &self.ground_plane_bind_group_layout,
                     &self.camera_buffer,
                     shadow_pass.light_buffer(),
-                    shadow_pass.depth_view(),
-                    shadow_pass.comparison_sampler(),
+                    planar_shadow.shadow_texture_view(4),
+                    planar_shadow.sampler(),
                 ));
             }
         }
@@ -2399,6 +2455,7 @@ impl RenderEngine {
         let is_orthographic =
             self.camera.projection_mode == crate::camera::ProjectionMode::Orthographic;
         let camera_height = self.camera.position.y;
+        let viewport_dim = [self.width as f32, self.height as f32];
 
         // Update ground uniforms for stencil pass
         render_data.update(
@@ -2412,6 +2469,7 @@ impl RenderEngine {
             0,   // shadow_mode (unused in stencil)
             is_orthographic,
             0.0, // reflection_intensity (unused in stencil)
+            viewport_dim,
         );
 
         let view = self.hdr_view.as_ref().unwrap_or(color_view);
@@ -2653,25 +2711,41 @@ impl RenderEngine {
     fn init_tone_mapping(&mut self) {
         self.tone_map_pass = Some(ToneMapPass::new(&self.device, self.surface_config.format));
         self.create_hdr_texture();
+        self.create_ssaa_intermediate_texture();
         self.create_normal_texture();
         self.create_ssao_noise_texture();
         self.init_ssao_pass();
+        self.init_ssaa_pass();
     }
 
-    /// Initializes SSAO pass.
+    /// Initializes SSAO pass (at SSAA resolution).
     fn init_ssao_pass(&mut self) {
-        let ssao_pass = crate::ssao_pass::SsaoPass::new(&self.device, self.width, self.height);
+        let ssaa_width = self.width * self.ssaa_factor;
+        let ssaa_height = self.height * self.ssaa_factor;
+        let ssao_pass = crate::ssao_pass::SsaoPass::new(&self.device, ssaa_width, ssaa_height);
         self.ssao_pass = Some(ssao_pass);
         self.create_ssao_output_texture();
     }
 
+    /// Initializes SSAA pass.
+    fn init_ssaa_pass(&mut self) {
+        // SSAA pass downsamples to HDR format (same as tone mapping input)
+        self.ssaa_pass = Some(crate::ssaa_pass::SsaaPass::new(
+            &self.device,
+            wgpu::TextureFormat::Rgba16Float,
+        ));
+    }
+
     /// Creates the SSAO output texture (blurred result).
     fn create_ssao_output_texture(&mut self) {
+        let ssaa_width = self.width * self.ssaa_factor;
+        let ssaa_height = self.height * self.ssaa_factor;
+
         let ssao_output_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("SSAO Output Texture"),
             size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
+                width: ssaa_width,
+                height: ssaa_height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -2691,20 +2765,23 @@ impl RenderEngine {
 
     /// Ensures OIT (Order-Independent Transparency) textures exist and match viewport size.
     pub fn ensure_oit_textures(&mut self) {
+        let ssaa_width = self.width * self.ssaa_factor;
+        let ssaa_height = self.height * self.ssaa_factor;
+
         let needs_create = self.oit_accum_texture.is_none()
-            || self.oit_accum_texture.as_ref().map(wgpu::Texture::width) != Some(self.width)
-            || self.oit_accum_texture.as_ref().map(wgpu::Texture::height) != Some(self.height);
+            || self.oit_accum_texture.as_ref().map(wgpu::Texture::width) != Some(ssaa_width)
+            || self.oit_accum_texture.as_ref().map(wgpu::Texture::height) != Some(ssaa_height);
 
         if !needs_create {
             return;
         }
 
-        // Accumulation texture: RGBA16Float for weighted color accumulation
+        // Accumulation texture: RGBA16Float for weighted color accumulation (at SSAA resolution)
         let accum_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("OIT Accumulation Texture"),
             size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
+                width: ssaa_width,
+                height: ssaa_height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -2718,12 +2795,12 @@ impl RenderEngine {
             Some(accum_texture.create_view(&wgpu::TextureViewDescriptor::default()));
         self.oit_accum_texture = Some(accum_texture);
 
-        // Reveal texture: R8Unorm for transmittance product
+        // Reveal texture: R8Unorm for transmittance product (at SSAA resolution)
         let reveal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("OIT Reveal Texture"),
             size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
+                width: ssaa_width,
+                height: ssaa_height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -2876,13 +2953,16 @@ impl RenderEngine {
         }
     }
 
-    /// Creates the HDR intermediate texture for tone mapping.
+    /// Creates the HDR intermediate texture for tone mapping (at SSAA resolution).
     fn create_hdr_texture(&mut self) {
+        let ssaa_width = self.width * self.ssaa_factor;
+        let ssaa_height = self.height * self.ssaa_factor;
+
         let hdr_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("HDR Texture"),
             size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
+                width: ssaa_width,
+                height: ssaa_height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -2899,13 +2979,46 @@ impl RenderEngine {
         self.hdr_view = Some(hdr_view);
     }
 
-    /// Creates the normal G-buffer texture for SSAO.
-    fn create_normal_texture(&mut self) {
-        let normal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Normal G-Buffer"),
+    /// Creates the SSAA intermediate texture (at screen resolution, for downsampled result).
+    fn create_ssaa_intermediate_texture(&mut self) {
+        // Only needed when SSAA > 1
+        if self.ssaa_factor <= 1 {
+            self.ssaa_intermediate_texture = None;
+            self.ssaa_intermediate_view = None;
+            return;
+        }
+
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("SSAA Intermediate Texture"),
             size: wgpu::Extent3d {
                 width: self.width,
                 height: self.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba16Float, // HDR format
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.ssaa_intermediate_texture = Some(texture);
+        self.ssaa_intermediate_view = Some(view);
+    }
+
+    /// Creates the normal G-buffer texture for SSAO (at SSAA resolution).
+    fn create_normal_texture(&mut self) {
+        let ssaa_width = self.width * self.ssaa_factor;
+        let ssaa_height = self.height * self.ssaa_factor;
+
+        let normal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Normal G-Buffer"),
+            size: wgpu::Extent3d {
+                width: ssaa_width,
+                height: ssaa_height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -3083,23 +3196,125 @@ impl RenderEngine {
     }
 
     /// Renders the tone mapping pass from HDR to the output view.
+    /// Handles SSAA downsampling if enabled.
     /// Uses SSAO texture if available, otherwise uses a default white texture.
     pub fn render_tone_mapping(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         output_view: &wgpu::TextureView,
     ) {
-        if let (Some(tone_map), Some(hdr_view)) = (&self.tone_map_pass, &self.hdr_view) {
-            // Use SSAO output view if available, otherwise create a dummy white texture view
-            let ssao_view = self.ssao_output_view.as_ref().unwrap_or({
-                // This should not happen in practice since we always create SSAO output
-                // But as a fallback, we'll use the HDR view (which will be ignored anyway
-                // when ssao_enabled is false)
-                hdr_view
-            });
-            let bind_group = tone_map.create_bind_group(&self.device, hdr_view, ssao_view);
+        // Determine the input view for tone mapping
+        // If SSAA > 1, we need to downsample first to the intermediate texture
+        let tone_input_view = if self.ssaa_factor > 1 {
+            if let (Some(ssaa_pass), Some(hdr_view), Some(intermediate_view)) = (
+                &self.ssaa_pass,
+                &self.hdr_view,
+                &self.ssaa_intermediate_view,
+            ) {
+                // Downsample HDR from SSAA resolution to screen resolution
+                ssaa_pass.render_to_target(&self.device, encoder, hdr_view, intermediate_view);
+                intermediate_view
+            } else {
+                // Fallback if SSAA resources not available
+                self.hdr_view.as_ref().unwrap()
+            }
+        } else {
+            // No SSAA, use HDR directly
+            self.hdr_view.as_ref().unwrap()
+        };
+
+        if let Some(tone_map) = &self.tone_map_pass {
+            // Use SSAO output view if available
+            // Note: When SSAA > 1, SSAO is at high res but we're tone mapping at screen res
+            // For now, we disable SSAO blending when SSAA is active (SSAO is baked into HDR already)
+            let ssao_view = if self.ssaa_factor > 1 {
+                // SSAO was already applied at SSAA resolution, use dummy for tone mapping
+                tone_input_view
+            } else {
+                self.ssao_output_view.as_ref().unwrap_or(tone_input_view)
+            };
+            let bind_group = tone_map.create_bind_group(&self.device, tone_input_view, ssao_view);
             tone_map.render(encoder, output_view, &bind_group);
         }
+    }
+
+    /// Returns the current SSAA factor (1 = off, 2 = 2x, 4 = 4x).
+    #[must_use]
+    pub fn ssaa_factor(&self) -> u32 {
+        self.ssaa_factor
+    }
+
+    /// Sets the SSAA factor and recreates all SSAA-dependent render targets.
+    /// Valid values are 1 (off), 2 (2x SSAA), or 4 (4x SSAA).
+    /// Note: This does NOT reconfigure the surface - only internal textures are resized.
+    pub fn set_ssaa_factor(&mut self, factor: u32) {
+        let factor = factor.clamp(1, 4);
+        if factor != self.ssaa_factor {
+            self.ssaa_factor = factor;
+            // Update SSAA pass uniforms
+            if let Some(ssaa_pass) = &mut self.ssaa_pass {
+                ssaa_pass.set_ssaa_factor(&self.queue, factor);
+            }
+            // Recreate only SSAA-dependent textures (not the surface)
+            self.resize_ssaa_textures();
+        }
+    }
+
+    /// Resizes only SSAA-dependent textures without reconfiguring the surface.
+    /// Called when SSAA factor changes.
+    fn resize_ssaa_textures(&mut self) {
+        // Wait for all GPU work to complete before destroying textures
+        // This prevents destroying textures that are still referenced by in-flight commands
+        self.device.poll(wgpu::Maintain::Wait);
+
+        let ssaa_width = self.width * self.ssaa_factor;
+        let ssaa_height = self.height * self.ssaa_factor;
+
+        // Recreate depth texture at SSAA resolution
+        let (depth_texture, depth_view, depth_only_view) =
+            Self::create_depth_texture(&self.device, ssaa_width, ssaa_height);
+        self.depth_texture = depth_texture;
+        self.depth_view = depth_view;
+        self.depth_only_view = depth_only_view;
+
+        // Recreate HDR texture (at SSAA resolution)
+        self.create_hdr_texture();
+
+        // Recreate SSAA intermediate texture (at screen resolution)
+        self.create_ssaa_intermediate_texture();
+
+        // Recreate normal G-buffer (at SSAA resolution)
+        self.create_normal_texture();
+
+        // Resize SSAO pass and output texture (at SSAA resolution)
+        if let Some(ref mut ssao_pass) = self.ssao_pass {
+            ssao_pass.resize(&self.device, &self.queue, ssaa_width, ssaa_height);
+        }
+        self.create_ssao_output_texture();
+
+        // OIT textures will be recreated on demand via ensure_oit_textures()
+        // Clear them so they get recreated at the new size
+        self.oit_accum_texture = None;
+        self.oit_accum_view = None;
+        self.oit_reveal_texture = None;
+        self.oit_reveal_view = None;
+    }
+
+    /// Returns the SSAA intermediate texture view (screen resolution).
+    pub fn ssaa_intermediate_view(&self) -> Option<&wgpu::TextureView> {
+        self.ssaa_intermediate_view.as_ref()
+    }
+
+    /// Returns the render width at SSAA resolution.
+    #[must_use]
+    pub fn ssaa_width(&self) -> u32 {
+        self.width * self.ssaa_factor
+    }
+
+    /// Returns the render height at SSAA resolution.
+    #[must_use]
+    pub fn ssaa_height(&self) -> u32 {
+        self.height * self.ssaa_factor
     }
 
     /// Initializes reflection pass resources.

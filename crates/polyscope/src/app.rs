@@ -456,10 +456,8 @@ impl App {
         }
 
         if s < 0.0 {
-            s = 0.0;
             t = ray_dir.dot(a - ray_origin);
         } else if s > 1.0 {
-            s = 1.0;
             t = ray_dir.dot(b - ray_origin);
         }
 
@@ -1167,6 +1165,7 @@ impl App {
                     ctx.options.ssao.intensity = self.appearance_settings.ssao_intensity;
                     ctx.options.ssao.bias = self.appearance_settings.ssao_bias;
                     ctx.options.ssao.sample_count = self.appearance_settings.ssao_sample_count;
+                    ctx.options.ssaa_factor = self.appearance_settings.ssaa_factor;
                 });
             }
 
@@ -1577,6 +1576,13 @@ impl App {
         // End egui frame
         let egui_output = egui.end_frame(window);
 
+        // Apply SSAA factor if changed
+        // This only resizes internal textures, not the surface, so no frame skip needed
+        let ssaa_factor = polyscope_core::with_context(|ctx| ctx.options.ssaa_factor);
+        if engine.ssaa_factor() != ssaa_factor {
+            engine.set_ssaa_factor(ssaa_factor);
+        }
+
         // Now borrow surface for rendering
         let surface = engine.surface.as_ref().expect("surface checked above");
         let output = match surface.get_current_texture() {
@@ -1716,6 +1722,66 @@ impl App {
                     }
                 });
             }
+        }
+
+        // Planar shadow pass - render scene flattened onto ground plane
+        // This creates screen-space shadows that work correctly near the ground
+        if let (Some(shadow_pipeline), Some(shadow_map_pass), Some(planar_shadow_pass)) = (
+            engine.shadow_pipeline(),
+            engine.shadow_map_pass(),
+            engine.planar_shadow_pass(),
+        ) {
+            // Get ground height and camera matrices
+            let (ground_height, _scene_center, _length_scale) = crate::with_context(|ctx| {
+                let scene_min_y = ctx.bounding_box.0.y;
+                let height_offset = ctx.options.ground_plane_height;
+                let ground_h = scene_min_y - ctx.length_scale * 0.001 + height_offset;
+                (ground_h, ctx.center(), ctx.length_scale)
+            });
+
+            // Compute planar projection matrix
+            let planar_proj =
+                polyscope_render::PlanarShadowPass::compute_planar_projection_matrix(ground_height);
+
+            // Compute combined view-proj matrix for planar shadows
+            // This flattens geometry onto the ground plane before projecting to clip space
+            let view_proj = engine.camera.view_projection_matrix();
+            let planar_view_proj = view_proj * planar_proj;
+
+            // Update light uniforms with planar view-proj matrix
+            shadow_map_pass.update_light(
+                &engine.queue,
+                planar_view_proj,
+                glam::Vec3::new(0.0, -1.0, 0.0), // Light direction (unused for planar)
+            );
+
+            // Render to planar shadow depth buffer
+            {
+                let mut shadow_pass = planar_shadow_pass.begin_shadow_pass(&mut encoder);
+                shadow_pass.set_pipeline(shadow_pipeline);
+
+                // Render shadow-casting structures (SurfaceMesh only for now)
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                if let Some(shadow_bg) = mesh.shadow_bind_group() {
+                                    shadow_pass.set_bind_group(0, shadow_bg, &[]);
+                                    if let Some(rd) = mesh.render_data() {
+                                        shadow_pass.draw(0..rd.num_vertices(), 0..1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Process shadow: depth-to-mask conversion and blur
+            planar_shadow_pass.process_shadow(&engine.device, &mut encoder, &engine.queue, 4);
         }
 
         // Render slice plane visualizations FIRST (before scene geometry)

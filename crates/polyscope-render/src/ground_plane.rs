@@ -31,6 +31,10 @@ pub struct GroundPlaneUniforms {
     pub is_orthographic: u32,
     /// Reflection intensity (0.0 = no reflection/opaque ground, 1.0 = mirror)
     pub reflection_intensity: f32,
+    /// Viewport dimensions for screen-space shadow sampling
+    pub viewport_dim: [f32; 2],
+    /// Padding for alignment
+    pub _padding: [f32; 2],
 }
 
 impl Default for GroundPlaneUniforms {
@@ -48,6 +52,8 @@ impl Default for GroundPlaneUniforms {
             shadow_mode: 0, // No shadows by default
             is_orthographic: 0,
             reflection_intensity: 0.0, // No reflection by default
+            viewport_dim: [800.0, 600.0],
+            _padding: [0.0, 0.0],
         }
     }
 }
@@ -65,16 +71,16 @@ impl GroundPlaneRenderData {
     /// * `device` - The wgpu device
     /// * `bind_group_layout` - The bind group layout
     /// * `camera_buffer` - The camera uniform buffer
-    /// * `light_buffer` - The light uniform buffer (from `ShadowMapPass`)
-    /// * `shadow_depth_view` - The shadow map depth texture view
-    /// * `shadow_sampler` - The shadow comparison sampler
+    /// * `light_buffer` - The light uniform buffer (for backward compatibility)
+    /// * `shadow_texture_view` - The blurred planar shadow texture view
+    /// * `shadow_sampler` - The shadow texture sampler (linear filtering)
     #[must_use]
     pub fn new(
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
         light_buffer: &wgpu::Buffer,
-        shadow_depth_view: &wgpu::TextureView,
+        shadow_texture_view: &wgpu::TextureView,
         shadow_sampler: &wgpu::Sampler,
     ) -> Self {
         let uniforms = GroundPlaneUniforms::default();
@@ -103,7 +109,7 @@ impl GroundPlaneRenderData {
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: wgpu::BindingResource::TextureView(shadow_depth_view),
+                    resource: wgpu::BindingResource::TextureView(shadow_texture_view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 4,
@@ -131,6 +137,7 @@ impl GroundPlaneRenderData {
     /// * `shadow_mode` - Shadow mode: 0=none, `1=shadow_only`, `2=tile_with_shadow`
     /// * `is_orthographic` - Whether camera is in orthographic mode
     /// * `reflection_intensity` - Reflection intensity (0.0 = opaque, 1.0 = mirror)
+    /// * `viewport_dim` - Viewport dimensions (width, height) for screen-space sampling
     #[allow(clippy::too_many_arguments)]
     pub fn update(
         &self,
@@ -144,6 +151,7 @@ impl GroundPlaneRenderData {
         shadow_mode: u32,
         is_orthographic: bool,
         reflection_intensity: f32,
+        viewport_dim: [f32; 2],
     ) {
         // Compute ground height as offset from center
         // The shader computes: center + up_direction * height
@@ -171,6 +179,8 @@ impl GroundPlaneRenderData {
             shadow_mode,
             is_orthographic: u32::from(is_orthographic),
             reflection_intensity,
+            viewport_dim,
+            _padding: [0.0, 0.0],
         };
 
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));

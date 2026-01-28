@@ -1,6 +1,6 @@
 // Ground plane shader using vertices at infinity
 // Matches the original C++ Polyscope implementation
-// Extended with shadow map sampling support
+// Uses screen-space planar shadow sampling (like C++ Polyscope)
 
 struct CameraUniforms {
     view: mat4x4<f32>,
@@ -23,8 +23,11 @@ struct GroundUniforms {
     shadow_mode: u32,         // 0=none, 1=shadow_only, 2=tile_with_shadow
     is_orthographic: u32,     // 0=perspective, 1=orthographic
     reflection_intensity: f32, // Reflection intensity (0=opaque, 1=mirror)
+    viewport_dim: vec2<f32>,  // Viewport dimensions for screen-space sampling
+    _padding: vec2<f32>,
 }
 
+// Note: LightUniforms kept for backward compatibility but not used for planar shadows
 struct LightUniforms {
     view_proj: mat4x4<f32>,
     light_dir: vec4<f32>,
@@ -33,53 +36,32 @@ struct LightUniforms {
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(0) @binding(1) var<uniform> ground: GroundUniforms;
 @group(0) @binding(2) var<uniform> light: LightUniforms;
-@group(0) @binding(3) var shadow_map: texture_depth_2d;
-@group(0) @binding(4) var shadow_sampler: sampler_comparison;
+// Shadow texture is now a regular texture (blurred shadow mask from planar projection)
+@group(0) @binding(3) var shadow_texture: texture_2d<f32>;
+@group(0) @binding(4) var shadow_sampler: sampler;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) pos_world_homog: vec4<f32>,
 }
 
-// Shadow calculation function using PCF
-fn calculate_shadow(world_pos: vec3<f32>) -> f32 {
-    // Transform to light space
-    let light_space_pos = light.view_proj * vec4<f32>(world_pos, 1.0);
-    let proj_coords = light_space_pos.xyz / light_space_pos.w;
-
-    // Check if outside shadow map bounds
-    if (proj_coords.x < -1.0 || proj_coords.x > 1.0 ||
-        proj_coords.y < -1.0 || proj_coords.y > 1.0 ||
-        proj_coords.z < 0.0 || proj_coords.z > 1.0) {
-        return 0.0; // No shadow outside light frustum
-    }
-
-    // Convert from NDC [-1,1] to texture coords [0,1]
-    let shadow_uv = vec2<f32>(
-        proj_coords.x * 0.5 + 0.5,
-        -proj_coords.y * 0.5 + 0.5  // Flip Y for texture
+// Screen-space shadow sampling (like C++ Polyscope)
+// The shadow texture contains a blurred mask where:
+// - 1.0 = shadow (geometry was projected here)
+// - 0.0 = no shadow
+fn calculate_shadow_screen_space(screen_pos: vec4<f32>) -> f32 {
+    // Convert screen position to UV coordinates
+    // screen_pos.xy is in pixels, viewport_dim gives us the conversion
+    let screen_uv = vec2<f32>(
+        screen_pos.x / ground.viewport_dim.x,
+        screen_pos.y / ground.viewport_dim.y
     );
 
-    // Current depth from light's perspective
-    let current_depth = proj_coords.z;
+    // Sample the shadow texture
+    let shadow_val = textureSample(shadow_texture, shadow_sampler, screen_uv).r;
 
-    // PCF shadow sampling (3x3)
-    var shadow = 0.0;
-    let texel_size = 1.0 / 2048.0; // Shadow map resolution
-
-    for (var x = -1; x <= 1; x++) {
-        for (var y = -1; y <= 1; y++) {
-            let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
-            shadow += textureSampleCompare(
-                shadow_map,
-                shadow_sampler,
-                shadow_uv + offset,
-                current_depth - 0.005 // Bias to prevent shadow acne
-            );
-        }
-    }
-
-    return shadow / 9.0;
+    // Apply power function to soften edges (like C++ Polyscope)
+    return pow(clamp(shadow_val, 0.0, 1.0), 0.25);
 }
 
 // Ground plane geometry: center vertex + 4 vertices at infinity (perspective)
@@ -156,13 +138,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         dot(ground.basis_y.xyz, scaled_coord)
     );
 
-    // Calculate shadow if shadow mode is enabled
-    var shadow_factor = 1.0;
+    // Calculate shadow using screen-space sampling if shadow mode is enabled
+    var shadow_val = 0.0;
     if (ground.shadow_mode > 0u) {
-        let shadow = calculate_shadow(world_pos);
-        // shadow is 1.0 where lit, 0.0 where in shadow
-        // We want shadow_factor to be 1.0 where lit, (1.0 - darkness) where shadowed
-        shadow_factor = mix(1.0 - ground.shadow_darkness, 1.0, shadow);
+        shadow_val = calculate_shadow_screen_space(in.position);
     }
 
     // Shadow-only mode: just draw the shadow as a transparent overlay
@@ -178,9 +157,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             discard;
         }
 
-        // In shadow-only mode, calculate how much shadow to show
-        let shadow = calculate_shadow(world_pos);
-        let shadow_amount = (1.0 - shadow) * ground.shadow_darkness * fade_factor;
+        // shadow_val is 1.0 where shadow, 0.0 where no shadow
+        let shadow_amount = shadow_val * ground.shadow_darkness * fade_factor;
 
         if (shadow_amount < 0.01) {
             discard;
@@ -219,6 +197,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let half_vec = normalize(light_dir + eye_dir);
     let n_dot_h = max(dot(normal_camera, half_vec), 0.0);
     let specular = 0.25 * pow(n_dot_h, 12.0);
+
+    // Compute shadow factor from shadow_val
+    // shadow_val is 1.0 where shadow, 0.0 where no shadow
+    // shadow_factor should be 1.0 where lit, (1.0 - darkness) where shadowed
+    let shadow_factor = mix(1.0, 1.0 - ground.shadow_darkness, shadow_val);
 
     // Apply lighting and shadow
     var lit_color = ground_color * diffuse * shadow_factor + vec3<f32>(1.0, 1.0, 1.0) * specular * shadow_factor;

@@ -30,18 +30,19 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 }
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> @location(0) f32 {
     // 5-tap Gaussian blur weights
     let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
 
-    var result = textureSample(input_texture, input_sampler, in.uv) * weights[0];
+    // Sample center pixel (use .r for single-channel texture)
+    var result = textureSample(input_texture, input_sampler, in.uv).r * weights[0];
 
     let offset = uniforms.direction * uniforms.texel_size;
 
     for (var i = 1; i < 5; i++) {
         let sample_offset = offset * f32(i);
-        result += textureSample(input_texture, input_sampler, in.uv + sample_offset) * weights[i];
-        result += textureSample(input_texture, input_sampler, in.uv - sample_offset) * weights[i];
+        result += textureSample(input_texture, input_sampler, in.uv + sample_offset).r * weights[i];
+        result += textureSample(input_texture, input_sampler, in.uv - sample_offset).r * weights[i];
     }
 
     return result;
