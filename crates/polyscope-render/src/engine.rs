@@ -3052,7 +3052,8 @@ impl RenderEngine {
         // Create bind groups
         let ssao_bind_group =
             ssao_pass.create_ssao_bind_group(&self.device, depth_view, normal_view, noise_view);
-        let blur_bind_group = ssao_pass.create_blur_bind_group(&self.device);
+        // Blur bind group now includes depth view for edge-aware bilateral filtering
+        let blur_bind_group = ssao_pass.create_blur_bind_group(&self.device, depth_view);
 
         // Render SSAO pass
         ssao_pass.render_ssao(encoder, &ssao_bind_group);

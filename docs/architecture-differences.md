@@ -232,7 +232,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Ground Shadows | ✅ | ✅ | Shadow map with blur |
 | Ground Reflections | ✅ | ✅ | Stencil-based |
 | Tone Mapping | ✅ | ✅ | HDR pipeline |
-| SSAO | ✅ | ✅ | Screen-space ambient occlusion |
+| SSAO | ❌ | ✅ | polyscope-rs only feature |
 | Transparency | ✅ | ✅ | Weighted Blended OIT |
 | Slice Planes | ✅ | ✅ | Max 4, with volume mesh capping |
 | Groups | ✅ | ✅ | Hierarchical |
@@ -357,3 +357,50 @@ The following C++ Polyscope features are not yet implemented but planned:
 2. **Color RGBA** - Currently only RGB; alpha channel not supported
 
 All major quantity types are now implemented, including parameterization, intrinsic vectors, and one-forms with full GPU rendering.
+
+---
+
+## Additional Features (polyscope-rs only)
+
+The following features are unique to polyscope-rs and not available in C++ Polyscope:
+
+### SSAO (Screen-Space Ambient Occlusion)
+
+Real-time ambient occlusion post-processing effect that adds soft shadows in corners and crevices for improved depth perception.
+
+**Implementation:**
+- Classic Crytek-style hemisphere sampling with 32 well-distributed samples
+- Edge-aware improvements to handle sharp geometry (cube corners, hard edges):
+  - Normal discontinuity detection to reduce AO at geometric edges
+  - Per-sample normal weighting to prevent AO bleeding across different surfaces
+- Depth-aware bilateral blur for smooth results while preserving edges
+- Configurable parameters: radius, intensity, bias, sample count
+
+**Files:**
+- `crates/polyscope-render/src/shaders/ssao.wgsl` - Main SSAO shader
+- `crates/polyscope-render/src/shaders/ssao_blur.wgsl` - Bilateral blur shader
+- `crates/polyscope-render/src/ssao_pass.rs` - Render pass setup
+- `crates/polyscope-core/src/ssao.rs` - Configuration struct
+
+**Usage:**
+```rust
+// Enable SSAO
+set_ssao_enabled(true);
+
+// Adjust parameters (optional)
+set_ssao_radius(0.5);      // Sampling radius
+set_ssao_intensity(1.5);   // Effect strength
+```
+
+### Tube-Based Curve Network Picking
+
+Enhanced picking for curve networks using ray-cylinder intersection, making thin curves easier to select.
+
+**Implementation:**
+- Dedicated pick shader (`pick_curve_tube.wgsl`) using ray-cylinder intersection
+- Automatically uses tube radius or a minimum pick radius for better hit detection
+- Falls back to line-based picking when tube rendering is disabled
+
+**Files:**
+- `crates/polyscope-render/src/shaders/pick_curve_tube.wgsl` - Tube pick shader
+- `crates/polyscope-render/src/pick.rs` - `TubePickUniforms` struct

@@ -42,7 +42,8 @@ impl Default for SsaoUniforms {
 pub struct SsaoBlurUniforms {
     pub texel_size: [f32; 2],
     pub blur_scale: f32,
-    pub _padding: f32,
+    /// Controls edge preservation (higher = sharper edges preserved)
+    pub blur_sharpness: f32,
 }
 
 /// SSAO pass resources.
@@ -173,11 +174,12 @@ impl SsaoPass {
             cache: None,
         });
 
-        // Blur bind group layout
+        // Blur bind group layout - now includes depth texture for edge-aware blurring
         let blur_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("SSAO Blur Bind Group Layout"),
                 entries: &[
+                    // SSAO texture (binding 0)
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
@@ -188,14 +190,27 @@ impl SsaoPass {
                         },
                         count: None,
                     },
+                    // Depth texture (binding 1) - for edge-aware bilateral blur
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Depth,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    // Sampler (binding 2)
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
+                    // Uniforms (binding 3)
                     wgpu::BindGroupLayoutEntry {
-                        binding: 2,
+                        binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
@@ -255,7 +270,7 @@ impl SsaoPass {
             contents: bytemuck::cast_slice(&[SsaoBlurUniforms {
                 texel_size: [1.0 / width as f32, 1.0 / height as f32],
                 blur_scale: 1.0,
-                _padding: 0.0,
+                blur_sharpness: 50.0, // Edge preservation strength
             }]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
@@ -330,7 +345,7 @@ impl SsaoPass {
             bytemuck::cast_slice(&[SsaoBlurUniforms {
                 texel_size: [1.0 / width as f32, 1.0 / height as f32],
                 blur_scale: 1.0,
-                _padding: 0.0,
+                blur_sharpness: 50.0,
             }]),
         );
     }
@@ -404,8 +419,13 @@ impl SsaoPass {
     }
 
     /// Creates a bind group for the blur pass.
+    /// The depth_view is used for edge-aware bilateral blurring.
     #[must_use]
-    pub fn create_blur_bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
+    pub fn create_blur_bind_group(
+        &self,
+        device: &wgpu::Device,
+        depth_view: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("SSAO Blur Bind Group"),
             layout: &self.blur_bind_group_layout,
@@ -416,10 +436,14 @@ impl SsaoPass {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    resource: wgpu::BindingResource::TextureView(depth_view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
                     resource: self.blur_uniform_buffer.as_entire_binding(),
                 },
             ],

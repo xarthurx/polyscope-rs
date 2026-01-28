@@ -1,98 +1,58 @@
 // SSAO (Screen Space Ambient Occlusion) shader
-// Samples depth buffer in hemisphere around each pixel to estimate occlusion
+// Classic Crytek-style SSAO with improvements for edge handling
 
 struct SsaoUniforms {
-    // Projection matrix for depth reconstruction
     proj: mat4x4<f32>,
     inv_proj: mat4x4<f32>,
-    // SSAO parameters
     radius: f32,
     bias: f32,
     intensity: f32,
     sample_count: u32,
-    // Screen dimensions for noise tiling
     screen_width: f32,
     screen_height: f32,
     _padding: vec2<f32>,
 }
 
-// Hemisphere sample kernel (precomputed, oriented along +Z)
-// Well-distributed samples using cosine-weighted hemisphere sampling
-// More samples near the center (higher weight areas) for quality
-const KERNEL_SIZE: u32 = 64u;
-var<private> kernel: array<vec3<f32>, 64> = array<vec3<f32>, 64>(
-    // Ring 1 - close samples (scale 0.1-0.2)
-    vec3<f32>(0.08, 0.00, 0.10),
-    vec3<f32>(0.00, 0.08, 0.10),
-    vec3<f32>(-0.08, 0.00, 0.10),
-    vec3<f32>(0.00, -0.08, 0.10),
-    vec3<f32>(0.06, 0.06, 0.12),
-    vec3<f32>(-0.06, 0.06, 0.12),
-    vec3<f32>(0.06, -0.06, 0.12),
-    vec3<f32>(-0.06, -0.06, 0.12),
-    // Ring 2 - medium-close samples (scale 0.2-0.3)
-    vec3<f32>(0.15, 0.00, 0.15),
-    vec3<f32>(0.00, 0.15, 0.15),
-    vec3<f32>(-0.15, 0.00, 0.15),
-    vec3<f32>(0.00, -0.15, 0.15),
-    vec3<f32>(0.12, 0.12, 0.18),
-    vec3<f32>(-0.12, 0.12, 0.18),
-    vec3<f32>(0.12, -0.12, 0.18),
-    vec3<f32>(-0.12, -0.12, 0.18),
-    // Ring 3 - medium samples (scale 0.3-0.4)
-    vec3<f32>(0.25, 0.00, 0.20),
-    vec3<f32>(0.18, 0.18, 0.22),
-    vec3<f32>(0.00, 0.25, 0.20),
-    vec3<f32>(-0.18, 0.18, 0.22),
-    vec3<f32>(-0.25, 0.00, 0.20),
-    vec3<f32>(-0.18, -0.18, 0.22),
-    vec3<f32>(0.00, -0.25, 0.20),
-    vec3<f32>(0.18, -0.18, 0.22),
-    // Ring 4 - medium-far samples (scale 0.4-0.5)
-    vec3<f32>(0.30, 0.00, 0.25),
-    vec3<f32>(0.22, 0.22, 0.28),
-    vec3<f32>(0.00, 0.30, 0.25),
-    vec3<f32>(-0.22, 0.22, 0.28),
-    vec3<f32>(-0.30, 0.00, 0.25),
-    vec3<f32>(-0.22, -0.22, 0.28),
-    vec3<f32>(0.00, -0.30, 0.25),
-    vec3<f32>(0.22, -0.22, 0.28),
-    // Ring 5 - far samples (scale 0.5-0.6)
-    vec3<f32>(0.38, 0.00, 0.30),
-    vec3<f32>(0.27, 0.27, 0.32),
-    vec3<f32>(0.00, 0.38, 0.30),
-    vec3<f32>(-0.27, 0.27, 0.32),
-    vec3<f32>(-0.38, 0.00, 0.30),
-    vec3<f32>(-0.27, -0.27, 0.32),
-    vec3<f32>(0.00, -0.38, 0.30),
-    vec3<f32>(0.27, -0.27, 0.32),
-    // Ring 6 - farther samples (scale 0.6-0.7)
-    vec3<f32>(0.45, 0.00, 0.35),
-    vec3<f32>(0.32, 0.32, 0.38),
-    vec3<f32>(0.00, 0.45, 0.35),
-    vec3<f32>(-0.32, 0.32, 0.38),
-    vec3<f32>(-0.45, 0.00, 0.35),
-    vec3<f32>(-0.32, -0.32, 0.38),
-    vec3<f32>(0.00, -0.45, 0.35),
-    vec3<f32>(0.32, -0.32, 0.38),
-    // Ring 7 - outer samples (scale 0.7-0.85)
-    vec3<f32>(0.52, 0.00, 0.40),
-    vec3<f32>(0.37, 0.37, 0.42),
-    vec3<f32>(0.00, 0.52, 0.40),
-    vec3<f32>(-0.37, 0.37, 0.42),
-    vec3<f32>(-0.52, 0.00, 0.40),
-    vec3<f32>(-0.37, -0.37, 0.42),
-    vec3<f32>(0.00, -0.52, 0.40),
-    vec3<f32>(0.37, -0.37, 0.42),
-    // Ring 8 - outermost samples (scale 0.85-1.0)
-    vec3<f32>(0.60, 0.00, 0.45),
-    vec3<f32>(0.42, 0.42, 0.48),
-    vec3<f32>(0.00, 0.60, 0.45),
-    vec3<f32>(-0.42, 0.42, 0.48),
-    vec3<f32>(-0.60, 0.00, 0.45),
-    vec3<f32>(-0.42, -0.42, 0.48),
-    vec3<f32>(0.00, -0.60, 0.45),
-    vec3<f32>(0.42, -0.42, 0.48),
+// 32 well-distributed hemisphere samples (sufficient for good quality)
+// Samples are in tangent space with Z pointing up (along normal)
+const KERNEL_SIZE: u32 = 32u;
+var<private> kernel: array<vec3<f32>, 32> = array<vec3<f32>, 32>(
+    // Inner samples (close to center, high contribution)
+    vec3<f32>( 0.05,  0.02,  0.05),
+    vec3<f32>(-0.04,  0.05,  0.06),
+    vec3<f32>( 0.03, -0.06,  0.04),
+    vec3<f32>(-0.02, -0.04,  0.07),
+    vec3<f32>( 0.08,  0.04,  0.08),
+    vec3<f32>(-0.07,  0.06,  0.05),
+    vec3<f32>( 0.05, -0.08,  0.06),
+    vec3<f32>(-0.06, -0.05,  0.09),
+    // Middle samples
+    vec3<f32>( 0.12,  0.03,  0.10),
+    vec3<f32>(-0.08,  0.11,  0.08),
+    vec3<f32>( 0.10, -0.09,  0.11),
+    vec3<f32>(-0.11, -0.07,  0.09),
+    vec3<f32>( 0.06,  0.14,  0.12),
+    vec3<f32>(-0.13,  0.05,  0.10),
+    vec3<f32>( 0.09, -0.12,  0.13),
+    vec3<f32>(-0.07, -0.14,  0.11),
+    // Outer samples (farther, lower weight)
+    vec3<f32>( 0.18,  0.08,  0.15),
+    vec3<f32>(-0.12,  0.17,  0.14),
+    vec3<f32>( 0.15, -0.14,  0.16),
+    vec3<f32>(-0.17, -0.10,  0.13),
+    vec3<f32>( 0.10,  0.20,  0.18),
+    vec3<f32>(-0.19,  0.09,  0.15),
+    vec3<f32>( 0.14, -0.18,  0.17),
+    vec3<f32>(-0.11, -0.19,  0.16),
+    // Outermost samples
+    vec3<f32>( 0.24,  0.12,  0.20),
+    vec3<f32>(-0.16,  0.23,  0.19),
+    vec3<f32>( 0.21, -0.18,  0.22),
+    vec3<f32>(-0.23, -0.14,  0.18),
+    vec3<f32>( 0.14,  0.26,  0.24),
+    vec3<f32>(-0.25,  0.13,  0.21),
+    vec3<f32>( 0.19, -0.24,  0.23),
+    vec3<f32>(-0.15, -0.25,  0.22),
 );
 
 @group(0) @binding(0) var depth_texture: texture_depth_2d;
@@ -106,7 +66,6 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
 }
 
-// Fullscreen triangle
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;
@@ -117,44 +76,75 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     return out;
 }
 
-// Reconstruct view-space position from depth and UV
+// Reconstruct view-space position from depth
 fn view_pos_from_depth(uv: vec2<f32>, depth: f32) -> vec3<f32> {
-    // Convert UV to clip space
-    let clip = vec4<f32>(uv * 2.0 - 1.0, depth, 1.0);
-    // Unproject to view space
-    let view = uniforms.inv_proj * clip;
+    let ndc = vec4<f32>(uv * 2.0 - 1.0, depth, 1.0);
+    let view = uniforms.inv_proj * ndc;
     return view.xyz / view.w;
+}
+
+// Decode normal from texture sample
+fn decode_normal(sample: vec4<f32>) -> vec3<f32> {
+    return normalize(sample.xyz * 2.0 - 1.0);
+}
+
+// Detect geometric edges by checking normal discontinuity in neighborhood
+fn compute_edge_factor(uv: vec2<f32>, center_normal: vec3<f32>) -> f32 {
+    let texel = vec2<f32>(1.0 / uniforms.screen_width, 1.0 / uniforms.screen_height);
+
+    // Sample normals in a cross pattern
+    let n_left = textureSample(normal_texture, tex_sampler, uv + vec2<f32>(-texel.x, 0.0));
+    let n_right = textureSample(normal_texture, tex_sampler, uv + vec2<f32>(texel.x, 0.0));
+    let n_up = textureSample(normal_texture, tex_sampler, uv + vec2<f32>(0.0, -texel.y));
+    let n_down = textureSample(normal_texture, tex_sampler, uv + vec2<f32>(0.0, texel.y));
+
+    // Compute how much the normal changes across neighboring pixels
+    var max_dot = 1.0;
+    if (n_left.a > 0.5) {
+        max_dot = min(max_dot, dot(center_normal, decode_normal(n_left)));
+    }
+    if (n_right.a > 0.5) {
+        max_dot = min(max_dot, dot(center_normal, decode_normal(n_right)));
+    }
+    if (n_up.a > 0.5) {
+        max_dot = min(max_dot, dot(center_normal, decode_normal(n_up)));
+    }
+    if (n_down.a > 0.5) {
+        max_dot = min(max_dot, dot(center_normal, decode_normal(n_down)));
+    }
+
+    // max_dot = 1.0 means smooth surface, max_dot < 0.7 means sharp edge (>45 degrees)
+    // Return factor: 1.0 for smooth areas, reduced for edges
+    // Threshold at ~60 degrees (cos(60) = 0.5)
+    return smoothstep(0.3, 0.8, max_dot);
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let texel_size = vec2<f32>(1.0 / uniforms.screen_width, 1.0 / uniforms.screen_height);
-
-    // Sample depth and normal
     let depth = textureSample(depth_texture, tex_sampler, in.uv);
     if (depth >= 1.0) {
-        // Sky/background - no occlusion
         return vec4<f32>(1.0);
     }
 
     let normal_sample = textureSample(normal_texture, tex_sampler, in.uv);
-
-    // Skip pixels without valid geometry (alpha=0 means ground plane or other non-mesh surfaces)
     if (normal_sample.a < 0.5) {
         return vec4<f32>(1.0);
     }
 
-    let normal = normalize(normal_sample.xyz * 2.0 - 1.0); // Decode from [0,1] to [-1,1]
+    // Normal in view space (decode from [0,1] to [-1,1])
+    let normal = decode_normal(normal_sample);
 
-    // Reconstruct view-space position
+    // Detect if we're at a geometric edge (sharp corner/edge of cube, etc.)
+    let edge_factor = compute_edge_factor(in.uv, normal);
+
+    // Fragment position in view space
     let frag_pos = view_pos_from_depth(in.uv, depth);
 
-    // Sample noise for random rotation (tile across screen)
+    // Random rotation from noise texture
     let noise_scale = vec2<f32>(uniforms.screen_width / 4.0, uniforms.screen_height / 4.0);
-    let noise_uv = in.uv * noise_scale;
-    let random_vec = textureSample(noise_texture, tex_sampler, noise_uv).xyz * 2.0 - 1.0;
+    let random_vec = textureSample(noise_texture, tex_sampler, in.uv * noise_scale).xyz * 2.0 - 1.0;
 
-    // Create TBN matrix to orient hemisphere along normal
+    // Gram-Schmidt to create orthonormal TBN basis
     let tangent = normalize(random_vec - normal * dot(random_vec, normal));
     let bitangent = cross(normal, tangent);
     let tbn = mat3x3<f32>(tangent, bitangent, normal);
@@ -162,54 +152,71 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Accumulate occlusion
     var occlusion = 0.0;
     let sample_count = min(uniforms.sample_count, KERNEL_SIZE);
-
-    // Depth discontinuity threshold - reject samples that cross geometric edges
-    // Using a relative threshold based on radius to handle varying scene scales
-    let depth_threshold = uniforms.radius * 3.0;
+    let radius = uniforms.radius;
 
     for (var i = 0u; i < sample_count; i++) {
-        // Get sample position in view space
-        let sample_dir = tbn * kernel[i];
-        let sample_pos = frag_pos + sample_dir * uniforms.radius;
+        // Sample position in view space
+        let sample_offset = tbn * kernel[i];
+        let sample_pos = frag_pos + sample_offset * radius;
 
-        // Project sample to screen space
-        let offset = uniforms.proj * vec4<f32>(sample_pos, 1.0);
-        let offset_uv = (offset.xy / offset.w) * 0.5 + 0.5;
+        // Project to screen space
+        let proj_sample = uniforms.proj * vec4<f32>(sample_pos, 1.0);
+        var sample_uv = (proj_sample.xy / proj_sample.w) * 0.5 + 0.5;
+        sample_uv.y = 1.0 - sample_uv.y;
 
-        // Sample depth at this position
-        let sample_depth = textureSample(depth_texture, tex_sampler, vec2<f32>(offset_uv.x, 1.0 - offset_uv.y));
-        let sample_view_pos = view_pos_from_depth(vec2<f32>(offset_uv.x, 1.0 - offset_uv.y), sample_depth);
-
-        // Depth difference between center and sample
-        let depth_diff = abs(frag_pos.z - sample_view_pos.z);
-
-        // Skip samples that cross geometric edges (large depth discontinuity)
-        // This prevents false occlusion at sharp corners and edges
-        if (depth_diff > depth_threshold) {
+        // Bounds check
+        if (sample_uv.x < 0.0 || sample_uv.x > 1.0 || sample_uv.y < 0.0 || sample_uv.y > 1.0) {
             continue;
         }
 
-        // Range check with quadratic falloff - more aggressive rejection of distant samples
-        // This reduces artifacts where samples graze geometry edges
-        let range_factor = depth_diff / uniforms.radius;
-        let range_check = 1.0 - clamp(range_factor * range_factor, 0.0, 1.0);
+        // Get actual depth at sample location
+        let sample_depth = textureSample(depth_texture, tex_sampler, sample_uv);
+        if (sample_depth >= 1.0) {
+            continue;
+        }
 
-        // Only count occlusion if sample is behind the expected position
-        // Using angle-dependent bias: steeper angles need more bias
-        let view_dir = normalize(-frag_pos);
-        let angle_factor = 1.0 - abs(dot(normal, view_dir));
-        let adaptive_bias = uniforms.bias * (1.0 + angle_factor * 2.0);
+        // Get the normal at the sample location for edge-aware weighting
+        let sample_normal_tex = textureSample(normal_texture, tex_sampler, sample_uv);
 
-        if (sample_view_pos.z >= sample_pos.z + adaptive_bias) {
-            occlusion += range_check;
+        let sample_view_pos = view_pos_from_depth(sample_uv, sample_depth);
+
+        // Range check: is the actual surface within our sampling radius?
+        let depth_diff = abs(frag_pos.z - sample_view_pos.z);
+        let range_check = smoothstep(0.0, 1.0, radius / (depth_diff + 0.001));
+
+        // Normal-based weight: reduce contribution when sampling across different surfaces
+        // This prevents dark halos at edges where samples hit the adjacent face
+        var normal_weight = 1.0;
+        if (sample_normal_tex.a > 0.5) {
+            let sample_normal = decode_normal(sample_normal_tex);
+            let ndot = dot(normal, sample_normal);
+            // If normals differ significantly (different faces), reduce contribution
+            // cos(60°) = 0.5, cos(90°) = 0
+            normal_weight = smoothstep(-0.2, 0.7, ndot);
+        }
+
+        // Occlusion check: is the actual surface closer than expected?
+        let expected_z = sample_pos.z;
+        let actual_z = sample_view_pos.z;
+
+        // If actual surface is closer (less negative / more positive) than expected, it occludes
+        if (actual_z >= expected_z + uniforms.bias) {
+            occlusion += range_check * normal_weight;
         }
     }
 
-    // Average and invert
-    occlusion = 1.0 - (occlusion / f32(sample_count));
+    // Normalize
+    occlusion = occlusion / f32(sample_count);
 
-    // Apply intensity with softer curve to prevent over-darkening
-    occlusion = pow(occlusion, uniforms.intensity * 0.8 + 0.2);
+    // Apply edge factor to reduce AO at sharp geometric edges
+    // This prevents the concentrated black areas at cube corners
+    occlusion *= edge_factor;
 
-    return vec4<f32>(occlusion, occlusion, occlusion, 1.0);
+    // Convert to visibility (1 = fully visible, 0 = fully occluded)
+    var visibility = 1.0 - occlusion;
+
+    // Apply intensity - higher intensity = darker shadows
+    visibility = pow(visibility, uniforms.intensity);
+
+    return vec4<f32>(visibility, visibility, visibility, 1.0);
 }
