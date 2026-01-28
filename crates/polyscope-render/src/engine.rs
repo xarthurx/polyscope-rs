@@ -194,6 +194,12 @@ pub struct RenderEngine {
     pick_buffer_size: (u32, u32),
     /// Pick pipeline for point clouds.
     point_pick_pipeline: Option<wgpu::RenderPipeline>,
+    /// Pick pipeline for curve networks (line mode).
+    curve_network_pick_pipeline: Option<wgpu::RenderPipeline>,
+    /// Pick pipeline for curve networks (tube mode) - uses ray-cylinder intersection.
+    curve_network_tube_pick_pipeline: Option<wgpu::RenderPipeline>,
+    /// Tube pick bind group layout.
+    curve_network_tube_pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Pick bind group layout (shared across pick pipelines).
     pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
 }
@@ -492,6 +498,9 @@ impl RenderEngine {
             pick_staging_buffer: None,
             pick_buffer_size: (0, 0),
             point_pick_pipeline: None,
+            curve_network_pick_pipeline: None,
+            curve_network_tube_pick_pipeline: None,
+            curve_network_tube_pick_bind_group_layout: None,
             pick_bind_group_layout: None,
         };
 
@@ -788,6 +797,9 @@ impl RenderEngine {
             pick_staging_buffer: None,
             pick_buffer_size: (0, 0),
             point_pick_pipeline: None,
+            curve_network_pick_pipeline: None,
+            curve_network_tube_pick_pipeline: None,
+            curve_network_tube_pick_bind_group_layout: None,
             pick_bind_group_layout: None,
         };
 
@@ -3399,6 +3411,220 @@ impl RenderEngine {
         self.point_pick_pipeline
             .as_ref()
             .expect("pick pipeline not initialized")
+    }
+
+    /// Gets the curve network pick pipeline.
+    pub fn curve_network_pick_pipeline(&self) -> &wgpu::RenderPipeline {
+        self.curve_network_pick_pipeline
+            .as_ref()
+            .expect("curve network pick pipeline not initialized")
+    }
+
+    /// Initializes the curve network pick pipeline.
+    pub fn init_curve_network_pick_pipeline(&mut self) {
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("CurveNetwork Pick Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("shaders/pick_curve.wgsl").into()),
+            });
+
+        // Reuse the pick bind group layout from point cloud pick
+        let bind_group_layout = self
+            .pick_bind_group_layout
+            .as_ref()
+            .expect("pick bind group layout not initialized");
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("CurveNetwork Pick Pipeline Layout"),
+                bind_group_layouts: &[bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("CurveNetwork Pick Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        blend: None, // No blending for pick buffer
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::LineList,
+                    ..wgpu::PrimitiveState::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24Plus,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.curve_network_pick_pipeline = Some(pipeline);
+    }
+
+    /// Returns whether the curve network pick pipeline is initialized.
+    pub fn has_curve_network_pick_pipeline(&self) -> bool {
+        self.curve_network_pick_pipeline.is_some()
+    }
+
+    /// Initializes the curve network tube pick pipeline (uses ray-cylinder intersection).
+    pub fn init_curve_network_tube_pick_pipeline(&mut self) {
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("CurveNetwork Tube Pick Shader"),
+                source: wgpu::ShaderSource::Wgsl(
+                    include_str!("shaders/pick_curve_tube.wgsl").into(),
+                ),
+            });
+
+        // Create bind group layout for tube picking
+        let bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("CurveNetwork Tube Pick Bind Group Layout"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Pick uniforms (structure_id, radius, min_pick_radius)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Edge vertices (for raycast)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("CurveNetwork Tube Pick Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("CurveNetwork Tube Pick Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[
+                        // Generated vertex buffer layout (same as tube render)
+                        wgpu::VertexBufferLayout {
+                            array_stride: 32, // vec4<f32> position + vec4<u32> edge_id_and_vertex_id
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &[
+                                wgpu::VertexAttribute {
+                                    format: wgpu::VertexFormat::Float32x4,
+                                    offset: 0,
+                                    shader_location: 0,
+                                },
+                                wgpu::VertexAttribute {
+                                    format: wgpu::VertexFormat::Uint32x4,
+                                    offset: 16,
+                                    shader_location: 1,
+                                },
+                            ],
+                        },
+                    ],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        blend: None, // No blending for pick buffer
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..wgpu::PrimitiveState::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24Plus,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.curve_network_tube_pick_pipeline = Some(pipeline);
+        self.curve_network_tube_pick_bind_group_layout = Some(bind_group_layout);
+    }
+
+    /// Returns whether the curve network tube pick pipeline is initialized.
+    pub fn has_curve_network_tube_pick_pipeline(&self) -> bool {
+        self.curve_network_tube_pick_pipeline.is_some()
+    }
+
+    /// Gets the curve network tube pick pipeline.
+    pub fn curve_network_tube_pick_pipeline(&self) -> &wgpu::RenderPipeline {
+        self.curve_network_tube_pick_pipeline
+            .as_ref()
+            .expect("curve network tube pick pipeline not initialized")
+    }
+
+    /// Gets the curve network tube pick bind group layout.
+    pub fn curve_network_tube_pick_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.curve_network_tube_pick_bind_group_layout
+            .as_ref()
+            .expect("curve network tube pick bind group layout not initialized")
     }
 
     /// Reads the pick buffer at (x, y) and returns the decoded structure/element.

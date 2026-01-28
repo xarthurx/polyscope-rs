@@ -98,6 +98,32 @@ impl Default for PickUniforms {
     }
 }
 
+/// GPU uniforms for tube-based curve network pick rendering.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
+pub struct TubePickUniforms {
+    /// The structure ID to encode in pick colors.
+    pub structure_id: u32,
+    /// Tube radius for ray-cylinder intersection.
+    pub radius: f32,
+    /// Minimum pick radius - ensures curves are always clickable even when very thin.
+    pub min_pick_radius: f32,
+    /// Padding to align to 16 bytes.
+    pub _padding: f32,
+}
+
+impl Default for TubePickUniforms {
+    fn default() -> Self {
+        Self {
+            structure_id: 0,
+            radius: 0.01,
+            min_pick_radius: 0.02, // Default minimum pick radius for easier selection
+            _padding: 0.0,
+        }
+    }
+}
+
 /// Encodes an index as a pick color.
 ///
 /// Returns [R, G, B] where:

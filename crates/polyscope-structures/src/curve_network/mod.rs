@@ -7,8 +7,10 @@ use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
 use polyscope_render::{
-    ColorMapRegistry, CurveNetworkRenderData, CurveNetworkUniforms, PointUniforms,
+    ColorMapRegistry, CurveNetworkRenderData, CurveNetworkUniforms, PickUniforms, PointUniforms,
+    TubePickUniforms,
 };
+use wgpu::util::DeviceExt;
 
 pub use quantities::*;
 
@@ -47,6 +49,15 @@ pub struct CurveNetwork {
 
     // GPU resources
     render_data: Option<CurveNetworkRenderData>,
+
+    // GPU picking resources (line mode)
+    pick_uniform_buffer: Option<wgpu::Buffer>,
+    pick_bind_group: Option<wgpu::BindGroup>,
+    structure_id: u16,
+
+    // GPU picking resources (tube mode) - uses ray-cylinder intersection
+    tube_pick_uniform_buffer: Option<wgpu::Buffer>,
+    tube_pick_bind_group: Option<wgpu::BindGroup>,
 }
 
 impl CurveNetwork {
@@ -75,6 +86,11 @@ impl CurveNetwork {
             node_radius_autoscale: true,
             edge_radius_autoscale: true,
             render_data: None,
+            pick_uniform_buffer: None,
+            pick_bind_group: None,
+            structure_id: 0,
+            tube_pick_uniform_buffer: None,
+            tube_pick_bind_group: None,
         };
         cn.recompute_geometry();
         cn
@@ -457,11 +473,157 @@ impl CurveNetwork {
         }
     }
 
+    /// Initializes GPU resources for pick rendering.
+    pub fn init_pick_resources(
+        &mut self,
+        device: &wgpu::Device,
+        pick_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        structure_id: u16,
+    ) {
+        self.structure_id = structure_id;
+
+        // Create pick uniform buffer
+        let pick_uniforms = PickUniforms {
+            structure_id: u32::from(structure_id),
+            point_radius: self.radius, // Used as line_width in shader
+            _padding: [0.0; 2],
+        };
+        let pick_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("curve network pick uniforms"),
+            contents: bytemuck::cast_slice(&[pick_uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        // Create pick bind group (reuses edge_vertex_buffer from render_data)
+        if let Some(render_data) = &self.render_data {
+            let pick_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("curve network pick bind group"),
+                layout: pick_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: camera_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: pick_uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: render_data.edge_vertex_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+            self.pick_bind_group = Some(pick_bind_group);
+        }
+
+        self.pick_uniform_buffer = Some(pick_uniform_buffer);
+    }
+
+    /// Returns the pick bind group if initialized.
+    #[must_use]
+    pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.pick_bind_group.as_ref()
+    }
+
+    /// Updates pick uniforms (e.g., when radius changes).
+    pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let pick_uniforms = PickUniforms {
+                structure_id: u32::from(self.structure_id),
+                point_radius: self.radius,
+                _padding: [0.0; 2],
+            };
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[pick_uniforms]));
+        }
+
+        // Also update tube pick uniforms if initialized
+        if let Some(buffer) = &self.tube_pick_uniform_buffer {
+            let tube_pick_uniforms = TubePickUniforms {
+                structure_id: u32::from(self.structure_id),
+                radius: self.radius,
+                min_pick_radius: 0.02, // Fixed minimum for easier selection
+                _padding: 0.0,
+            };
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[tube_pick_uniforms]));
+        }
+    }
+
+    /// Initializes GPU resources for tube-based pick rendering.
+    /// This uses ray-cylinder intersection for more accurate picking of tube-rendered curves.
+    pub fn init_tube_pick_resources(
+        &mut self,
+        device: &wgpu::Device,
+        tube_pick_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+    ) {
+        // Create tube pick uniform buffer
+        let tube_pick_uniforms = TubePickUniforms {
+            structure_id: u32::from(self.structure_id),
+            radius: self.radius,
+            min_pick_radius: 0.02, // Minimum pick radius for easier selection
+            _padding: 0.0,
+        };
+        let tube_pick_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("curve network tube pick uniforms"),
+                contents: bytemuck::cast_slice(&[tube_pick_uniforms]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+        // Create tube pick bind group (reuses edge_vertex_buffer from render_data)
+        if let Some(render_data) = &self.render_data {
+            let tube_pick_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("curve network tube pick bind group"),
+                layout: tube_pick_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: camera_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: tube_pick_uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: render_data.edge_vertex_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+            self.tube_pick_bind_group = Some(tube_pick_bind_group);
+        }
+
+        self.tube_pick_uniform_buffer = Some(tube_pick_uniform_buffer);
+    }
+
+    /// Returns the tube pick bind group if initialized.
+    #[must_use]
+    pub fn tube_pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.tube_pick_bind_group.as_ref()
+    }
+
+    /// Returns whether tube pick resources are initialized.
+    #[must_use]
+    pub fn has_tube_pick_resources(&self) -> bool {
+        self.tube_pick_bind_group.is_some()
+    }
+
     /// Updates GPU buffers based on current state.
     pub fn update_gpu_buffers(&self, queue: &wgpu::Queue, color_maps: &ColorMapRegistry) {
         let Some(render_data) = &self.render_data else {
             return;
         };
+
+        // Apply object transform to positions before sending to GPU.
+        let transformed_nodes: Vec<Vec3> = self
+            .node_positions
+            .iter()
+            .map(|p| (self.transform * p.extend(1.0)).truncate())
+            .collect();
+        render_data.update_node_positions(queue, &transformed_nodes);
+        render_data.update_edge_vertices(queue, &transformed_nodes, &self.edge_tail_inds, &self.edge_tip_inds);
 
         let uniforms = CurveNetworkUniforms {
             color: [self.color.x, self.color.y, self.color.z, 1.0],

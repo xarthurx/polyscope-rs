@@ -21,8 +21,8 @@ impl Default for SsaoConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            radius: 0.5,
-            intensity: 1.5, // Slightly higher for more visible effect
+            radius: 0.3,    // Smaller radius reduces edge artifacts on simple geometry
+            intensity: 1.0, // Linear intensity avoids amplifying edge darkening
             bias: 0.025,
             sample_count: 32, // Higher quality by default
         }

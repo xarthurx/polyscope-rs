@@ -424,6 +424,48 @@ impl App {
         }
     }
 
+    fn ray_segment_closest_t(
+        &self,
+        ray_origin: Vec3,
+        ray_dir: Vec3,
+        a: Vec3,
+        b: Vec3,
+    ) -> Option<f32> {
+        let v = b - a;
+        let c = v.dot(v);
+        if c < 1e-12 {
+            let t = ray_dir.dot(a - ray_origin);
+            return (t >= 0.0).then_some(t);
+        }
+
+        let w0 = ray_origin - a;
+        let a_dot = ray_dir.dot(ray_dir);
+        let b_dot = ray_dir.dot(v);
+        let d = ray_dir.dot(w0);
+        let e = v.dot(w0);
+        let denom = a_dot * c - b_dot * b_dot;
+
+        let mut s;
+        let mut t;
+        if denom.abs() < 1e-8 {
+            s = 0.0;
+            t = ray_dir.dot(a - ray_origin);
+        } else {
+            s = (b_dot * d - a_dot * e) / denom;
+            t = (b_dot * e - c * d) / denom;
+        }
+
+        if s < 0.0 {
+            s = 0.0;
+            t = ray_dir.dot(a - ray_origin);
+        } else if s > 1.0 {
+            s = 1.0;
+            t = ray_dir.dot(b - ray_origin);
+        }
+
+        (t >= 0.0).then_some(t)
+    }
+
     fn pick_structure_at_ray(
         &self,
         ray_origin: Vec3,
@@ -550,6 +592,34 @@ impl App {
             } else {
                 None
             }
+        })
+    }
+
+    fn pick_curve_network_edge_at_ray(
+        &self,
+        ray_origin: Vec3,
+        ray_dir: Vec3,
+        name: &str,
+        element_index: u32,
+    ) -> Option<f32> {
+        crate::with_context(|ctx| {
+            let structure = ctx.registry.get("CurveNetwork", name)?;
+            let cn = structure.as_any().downcast_ref::<CurveNetwork>()?;
+            let edge_idx = element_index as usize;
+            if edge_idx >= cn.edge_tail_inds().len() {
+                return None;
+            }
+            let tail_idx = cn.edge_tail_inds()[edge_idx] as usize;
+            let tip_idx = cn.edge_tip_inds()[edge_idx] as usize;
+            if tail_idx >= cn.nodes().len() || tip_idx >= cn.nodes().len() {
+                return None;
+            }
+
+            let model = structure.transform();
+            let tail = (model * cn.nodes()[tail_idx].extend(1.0)).truncate();
+            let tip = (model * cn.nodes()[tip_idx].extend(1.0)).truncate();
+
+            self.ray_segment_closest_t(ray_origin, ray_dir, tail, tip)
         })
     }
 
@@ -784,6 +854,36 @@ impl App {
                                 engine.camera_buffer(),
                             );
                         }
+
+                        // Initialize pick resources (after render data)
+                        if cn.pick_bind_group().is_none() && cn.render_data().is_some() {
+                            // Initialize curve network pick pipeline if not done
+                            if !engine.has_curve_network_pick_pipeline() {
+                                engine.init_curve_network_pick_pipeline();
+                            }
+                            let structure_id =
+                                engine.assign_structure_id("CurveNetwork", cn.name());
+                            cn.init_pick_resources(
+                                &engine.device,
+                                engine.pick_bind_group_layout(),
+                                engine.camera_buffer(),
+                                structure_id,
+                            );
+                        }
+
+                        // Initialize tube pick resources (for tube render mode)
+                        // This provides a larger clickable area using ray-cylinder intersection
+                        if !cn.has_tube_pick_resources() && cn.render_data().is_some() {
+                            // Initialize tube pick pipeline if not done
+                            if !engine.has_curve_network_tube_pick_pipeline() {
+                                engine.init_curve_network_tube_pick_pipeline();
+                            }
+                            cn.init_tube_pick_resources(
+                                &engine.device,
+                                engine.curve_network_tube_pick_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
                     }
                 }
 
@@ -952,8 +1052,54 @@ impl App {
                     }
                 });
 
-                // Note: SurfaceMesh and CurveNetwork pick rendering would go here
-                // once their pick pipelines are created
+                // Draw curve networks to pick buffer
+                // Use tube picking (ray-cylinder) for all curve networks for better hit detection
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        if structure.type_name() == "CurveNetwork" {
+                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                                let Some(render_data) = cn.render_data() else {
+                                    continue;
+                                };
+
+                                // Use tube picking when available - provides larger clickable area
+                                if engine.has_curve_network_tube_pick_pipeline()
+                                    && cn.tube_pick_bind_group().is_some()
+                                    && render_data.generated_vertex_buffer.is_some()
+                                {
+                                    // Use tube-based picking (ray-cylinder intersection)
+                                    pick_pass.set_pipeline(engine.curve_network_tube_pick_pipeline());
+                                    pick_pass
+                                        .set_bind_group(0, cn.tube_pick_bind_group().unwrap(), &[]);
+                                    pick_pass.set_vertex_buffer(
+                                        0,
+                                        render_data
+                                            .generated_vertex_buffer
+                                            .as_ref()
+                                            .unwrap()
+                                            .slice(..),
+                                    );
+                                    // 36 vertices per edge (bounding box triangles)
+                                    pick_pass.draw(0..render_data.num_edges * 36, 0..1);
+                                } else if engine.has_curve_network_pick_pipeline() {
+                                    // Fallback to line-based picking
+                                    if let Some(pick_bind_group) = cn.pick_bind_group() {
+                                        pick_pass.set_pipeline(engine.curve_network_pick_pipeline());
+                                        pick_pass.set_bind_group(0, pick_bind_group, &[]);
+                                        // 2 vertices per edge (LineList topology)
+                                        pick_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Note: SurfaceMesh pick rendering would go here
+                // once its pick pipeline is created
             }
 
             engine.queue.submit(std::iter::once(encoder.finish()));
@@ -1514,10 +1660,8 @@ impl App {
                     if !structure.is_enabled() {
                         continue;
                     }
-                    if structure.type_name() == "CurveNetwork" {
-                        if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
-                            if cn.render_mode() == 1 {
-                                // Tube mode
+                        if structure.type_name() == "CurveNetwork" {
+                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
                                 if let Some(render_data) = cn.render_data() {
                                     if let Some(compute_bg) = &render_data.compute_bind_group {
                                         compute_pass.set_bind_group(0, compute_bg, &[]);
@@ -1527,7 +1671,6 @@ impl App {
                                 }
                             }
                         }
-                    }
                 }
             });
         }
@@ -2747,15 +2890,23 @@ impl ApplicationHandler for App {
                             let gpu_picked =
                                 self.gpu_pick_at(self.mouse_pos.0 as u32, self.mouse_pos.1 as u32);
                             log::debug!("[CLICK DEBUG] gpu_picked: {gpu_picked:?}");
-                            let point_hit = gpu_picked.and_then(|(type_name, name, idx)| {
+                            let mut point_hit: Option<(String, u32, f32)> = None;
+                            let mut curve_hit: Option<(String, u32, f32)> = None;
+                            if let Some((type_name, name, idx)) = gpu_picked {
                                 if type_name == "PointCloud" {
-                                    self.pick_point_cloud_at_ray(ray_origin, ray_dir, &name, idx)
-                                        .map(|t| (name, idx, t))
-                                } else {
-                                    None
+                                    point_hit = self
+                                        .pick_point_cloud_at_ray(ray_origin, ray_dir, &name, idx)
+                                        .map(|t| (name, idx, t));
+                                } else if type_name == "CurveNetwork" {
+                                    curve_hit = self
+                                        .pick_curve_network_edge_at_ray(
+                                            ray_origin, ray_dir, &name, idx,
+                                        )
+                                        .map(|t| (name, idx, t));
                                 }
-                            });
+                            }
                             log::debug!("[CLICK DEBUG] point_hit: {point_hit:?}");
+                            log::debug!("[CLICK DEBUG] curve_hit: {curve_hit:?}");
 
                             enum ClickHit {
                                 Plane(String),
@@ -2794,6 +2945,21 @@ impl ApplicationHandler for App {
                                     best_hit = Some((
                                         ClickHit::Structure {
                                             type_name: "PointCloud".to_string(),
+                                            name,
+                                            element_index: idx,
+                                        },
+                                        t,
+                                    ));
+                                }
+                            }
+
+                            if let Some((name, idx, t)) = curve_hit {
+                                let is_better =
+                                    best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                if is_better {
+                                    best_hit = Some((
+                                        ClickHit::Structure {
+                                            type_name: "CurveNetwork".to_string(),
                                             name,
                                             element_index: idx,
                                         },

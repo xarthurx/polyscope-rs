@@ -71,7 +71,7 @@ pub use materials::{Material, MaterialRegistry, MaterialUniforms};
 pub use oit_pass::OitCompositePass;
 pub use pick::{
     color_to_index, decode_pick_id, encode_pick_id, index_to_color, PickElementType, PickResult,
-    PickUniforms,
+    PickUniforms, TubePickUniforms,
 };
 pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use reflection::{ground_reflection_matrix, reflection_matrix};

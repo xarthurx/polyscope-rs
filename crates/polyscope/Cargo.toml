@@ -56,5 +56,17 @@ path = "../../examples/slice_plane_demo.rs"
 name = "transparency_demo"
 path = "../../examples/transparency_demo.rs"
 
+[[example]]
+name = "point_cloud_demo"
+path = "../../examples/point_cloud_demo.rs"
+
+[[example]]
+name = "groups_and_gizmos_demo"
+path = "../../examples/groups_and_gizmos_demo.rs"
+
+[[example]]
+name = "ground_plane_demo"
+path = "../../examples/ground_plane_demo.rs"
+
 [lints]
 workspace = true

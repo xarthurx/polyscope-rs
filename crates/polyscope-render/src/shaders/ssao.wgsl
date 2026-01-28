@@ -163,6 +163,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var occlusion = 0.0;
     let sample_count = min(uniforms.sample_count, KERNEL_SIZE);
 
+    // Depth discontinuity threshold - reject samples that cross geometric edges
+    // Using a relative threshold based on radius to handle varying scene scales
+    let depth_threshold = uniforms.radius * 3.0;
+
     for (var i = 0u; i < sample_count; i++) {
         // Get sample position in view space
         let sample_dir = tbn * kernel[i];
@@ -176,9 +180,27 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let sample_depth = textureSample(depth_texture, tex_sampler, vec2<f32>(offset_uv.x, 1.0 - offset_uv.y));
         let sample_view_pos = view_pos_from_depth(vec2<f32>(offset_uv.x, 1.0 - offset_uv.y), sample_depth);
 
-        // Range check and accumulate
-        let range_check = smoothstep(0.0, 1.0, uniforms.radius / abs(frag_pos.z - sample_view_pos.z));
-        if (sample_view_pos.z >= sample_pos.z + uniforms.bias) {
+        // Depth difference between center and sample
+        let depth_diff = abs(frag_pos.z - sample_view_pos.z);
+
+        // Skip samples that cross geometric edges (large depth discontinuity)
+        // This prevents false occlusion at sharp corners and edges
+        if (depth_diff > depth_threshold) {
+            continue;
+        }
+
+        // Range check with quadratic falloff - more aggressive rejection of distant samples
+        // This reduces artifacts where samples graze geometry edges
+        let range_factor = depth_diff / uniforms.radius;
+        let range_check = 1.0 - clamp(range_factor * range_factor, 0.0, 1.0);
+
+        // Only count occlusion if sample is behind the expected position
+        // Using angle-dependent bias: steeper angles need more bias
+        let view_dir = normalize(-frag_pos);
+        let angle_factor = 1.0 - abs(dot(normal, view_dir));
+        let adaptive_bias = uniforms.bias * (1.0 + angle_factor * 2.0);
+
+        if (sample_view_pos.z >= sample_pos.z + adaptive_bias) {
             occlusion += range_check;
         }
     }
@@ -186,8 +208,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Average and invert
     occlusion = 1.0 - (occlusion / f32(sample_count));
 
-    // Apply intensity
-    occlusion = pow(occlusion, uniforms.intensity);
+    // Apply intensity with softer curve to prevent over-darkening
+    occlusion = pow(occlusion, uniforms.intensity * 0.8 + 0.2);
 
     return vec4<f32>(occlusion, occlusion, occlusion, 1.0);
 }
