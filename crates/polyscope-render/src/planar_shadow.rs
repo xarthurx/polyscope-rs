@@ -68,10 +68,6 @@ pub struct PlanarShadowPass {
 
 impl PlanarShadowPass {
     /// Creates a new planar shadow pass.
-    ///
-    /// Note: The blur textures are initialized to zero (no shadow) but you should
-    /// call `clear_to_no_shadow()` with a queue to ensure they're properly cleared
-    /// before first use.
     #[must_use]
     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
         // Use half resolution for performance (shadows are blurry anyway)
@@ -110,8 +106,7 @@ impl PlanarShadowPass {
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::R8Unorm, // Single channel for shadow mask
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                    | wgpu::TextureUsages::TEXTURE_BINDING
-                    | wgpu::TextureUsages::COPY_DST,
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             })
         };
@@ -131,7 +126,7 @@ impl PlanarShadowPass {
             ..Default::default()
         });
 
-        // Depth-to-mask bind group layout (no sampler, uses textureLoad)
+        // Depth-to-mask bind group layout
         let depth_to_mask_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Depth to Mask Bind Group Layout"),
@@ -145,6 +140,13 @@ impl PlanarShadowPass {
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
+                        count: None,
+                    },
+                    // Sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
                 ],
@@ -449,10 +451,16 @@ impl PlanarShadowPass {
         let depth_to_mask_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Depth to Mask Bind Group"),
             layout: &self.depth_to_mask_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&self.shadow_depth_view),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&self.shadow_depth_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.linear_sampler),
+                },
+            ],
         });
 
         {
@@ -465,7 +473,6 @@ impl PlanarShadowPass {
                         load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                         store: wgpu::StoreOp::Store,
                     },
-                    depth_slice: None,
                 })],
                 depth_stencil_attachment: None,
                 ..Default::default()
@@ -526,7 +533,6 @@ impl PlanarShadowPass {
                             load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                             store: wgpu::StoreOp::Store,
                         },
-                        depth_slice: None,
                     })],
                     depth_stencil_attachment: None,
                     ..Default::default()
@@ -578,35 +584,5 @@ impl PlanarShadowPass {
     #[must_use]
     pub fn sampler(&self) -> &wgpu::Sampler {
         &self.linear_sampler
-    }
-
-    /// Clears the blur textures to "no shadow" (all zeros).
-    ///
-    /// This should be called once after creation and whenever the textures are resized.
-    pub fn clear_to_no_shadow(&self, queue: &wgpu::Queue) {
-        // Create a buffer of zeros (no shadow = 0.0 in R8Unorm)
-        let zero_data = vec![0u8; (self.width * self.height) as usize];
-
-        for texture in &self.blur_textures {
-            queue.write_texture(
-                wgpu::TexelCopyTextureInfo {
-                    texture,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                &zero_data,
-                wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(self.width),
-                    rows_per_image: Some(self.height),
-                },
-                wgpu::Extent3d {
-                    width: self.width,
-                    height: self.height,
-                    depth_or_array_layers: 1,
-                },
-            );
-        }
     }
 }

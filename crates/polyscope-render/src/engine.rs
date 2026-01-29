@@ -12,7 +12,6 @@ use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
 use crate::ground_plane::GroundPlaneRenderData;
 use crate::materials::MaterialRegistry;
-use crate::planar_shadow::PlanarShadowPass;
 use crate::shadow_map::ShadowMapPass;
 use crate::slice_plane_render::SlicePlaneRenderData;
 use crate::tone_mapping::ToneMapPass;
@@ -165,14 +164,12 @@ pub struct RenderEngine {
     ssaa_intermediate_texture: Option<wgpu::Texture>,
     /// Intermediate HDR texture view.
     ssaa_intermediate_view: Option<wgpu::TextureView>,
-    /// Shadow map pass for ground plane shadows (legacy, kept for compatibility).
+    /// Shadow map pass for ground plane shadows.
     shadow_map_pass: Option<ShadowMapPass>,
     /// Shadow render pipeline (depth-only, renders objects from light's perspective).
     shadow_pipeline: Option<wgpu::RenderPipeline>,
     /// Shadow bind group layout for shadow pass rendering.
     shadow_bind_group_layout: Option<wgpu::BindGroupLayout>,
-    /// Planar shadow pass for screen-space ground plane shadows.
-    planar_shadow_pass: Option<crate::planar_shadow::PlanarShadowPass>,
     /// Reflection pass for ground plane reflections.
     reflection_pass: Option<crate::reflection_pass::ReflectionPass>,
     /// Stencil pipeline for ground plane reflection mask.
@@ -181,6 +178,14 @@ pub struct RenderEngine {
     reflected_mesh_pipeline: Option<wgpu::RenderPipeline>,
     /// Bind group layout for reflected mesh (includes reflection uniforms).
     reflected_mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Pipeline for rendering reflected point clouds.
+    reflected_point_cloud_pipeline: Option<wgpu::RenderPipeline>,
+    /// Bind group layout for reflected point cloud.
+    reflected_point_cloud_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Pipeline for rendering reflected curve networks.
+    reflected_curve_network_pipeline: Option<wgpu::RenderPipeline>,
+    /// Bind group layout for reflected curve network.
+    reflected_curve_network_bind_group_layout: Option<wgpu::BindGroupLayout>,
 
     // Pick system - structure ID management
     /// Map from (`type_name`, name) to structure pick ID.
@@ -315,11 +320,6 @@ impl RenderEngine {
         // Create shadow map pass first (needed for bind group)
         let shadow_map_pass = ShadowMapPass::new(&device);
 
-        // Create planar shadow pass for screen-space shadows
-        let planar_shadow_pass = PlanarShadowPass::new(&device, width, height);
-        // Initialize blur textures to "no shadow" (all zeros)
-        planar_shadow_pass.clear_to_no_shadow(&queue);
-
         // Ground plane bind group layout (includes shadow bindings)
         let ground_plane_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -358,22 +358,22 @@ impl RenderEngine {
                         },
                         count: None,
                     },
-                    // Shadow texture (blurred planar shadow mask)
+                    // Shadow map texture
                     wgpu::BindGroupLayoutEntry {
                         binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            sample_type: wgpu::TextureSampleType::Depth,
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
                         count: None,
                     },
-                    // Shadow sampler (linear filtering)
+                    // Shadow comparison sampler
                     wgpu::BindGroupLayoutEntry {
                         binding: 4,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
                         count: None,
                     },
                 ],
@@ -504,11 +504,14 @@ impl RenderEngine {
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
             shadow_bind_group_layout: None,
-            planar_shadow_pass: Some(planar_shadow_pass),
             reflection_pass: None,
             ground_stencil_pipeline: None,
             reflected_mesh_pipeline: None,
             reflected_mesh_bind_group_layout: None,
+            reflected_point_cloud_pipeline: None,
+            reflected_point_cloud_bind_group_layout: None,
+            reflected_curve_network_pipeline: None,
+            reflected_curve_network_bind_group_layout: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
@@ -532,9 +535,12 @@ impl RenderEngine {
         engine.create_curve_network_tube_pipelines();
         engine.create_shadow_pipeline();
         engine.init_tone_mapping();
+        engine.init_ssaa_pass();
         engine.init_reflection_pass();
         engine.create_ground_stencil_pipeline();
         engine.create_reflected_mesh_pipeline();
+        engine.create_reflected_point_cloud_pipeline();
+        engine.create_reflected_curve_network_pipeline();
         engine.init_pick_pipeline();
 
         Ok(engine)
@@ -624,11 +630,6 @@ impl RenderEngine {
         // Create shadow map pass first (needed for bind group)
         let shadow_map_pass = ShadowMapPass::new(&device);
 
-        // Create planar shadow pass for screen-space shadows
-        let planar_shadow_pass = PlanarShadowPass::new(&device, width, height);
-        // Initialize blur textures to "no shadow" (all zeros)
-        planar_shadow_pass.clear_to_no_shadow(&queue);
-
         // Ground plane bind group layout (includes shadow bindings)
         let ground_plane_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -667,22 +668,22 @@ impl RenderEngine {
                         },
                         count: None,
                     },
-                    // Shadow texture (blurred planar shadow mask)
+                    // Shadow map texture
                     wgpu::BindGroupLayoutEntry {
                         binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            sample_type: wgpu::TextureSampleType::Depth,
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
                         count: None,
                     },
-                    // Shadow sampler (linear filtering)
+                    // Shadow comparison sampler
                     wgpu::BindGroupLayoutEntry {
                         binding: 4,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
                         count: None,
                     },
                 ],
@@ -813,11 +814,14 @@ impl RenderEngine {
             shadow_map_pass: Some(shadow_map_pass),
             shadow_pipeline: None,
             shadow_bind_group_layout: None,
-            planar_shadow_pass: Some(planar_shadow_pass),
             reflection_pass: None,
             ground_stencil_pipeline: None,
             reflected_mesh_pipeline: None,
             reflected_mesh_bind_group_layout: None,
+            reflected_point_cloud_pipeline: None,
+            reflected_point_cloud_bind_group_layout: None,
+            reflected_curve_network_pipeline: None,
+            reflected_curve_network_bind_group_layout: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
@@ -841,9 +845,12 @@ impl RenderEngine {
         engine.create_curve_network_tube_pipelines();
         engine.create_shadow_pipeline();
         engine.init_tone_mapping();
+        engine.init_ssaa_pass();
         engine.init_reflection_pass();
         engine.create_ground_stencil_pipeline();
         engine.create_reflected_mesh_pipeline();
+        engine.create_reflected_point_cloud_pipeline();
+        engine.create_reflected_curve_network_pipeline();
         engine.init_pick_pipeline();
 
         Ok(engine)
@@ -864,7 +871,7 @@ impl RenderEngine {
             surface.configure(&self.device, &self.surface_config);
         }
 
-        // Calculate SSAA-scaled dimensions for render targets
+        // Calculate SSAA-scaled dimensions
         let ssaa_width = width * self.ssaa_factor;
         let ssaa_height = height * self.ssaa_factor;
 
@@ -875,19 +882,21 @@ impl RenderEngine {
         self.depth_only_view = depth_only_view;
 
         // Recreate HDR texture for tone mapping (at SSAA resolution)
-        self.create_hdr_texture();
-
-        // Recreate SSAA intermediate texture (at screen resolution)
-        self.create_ssaa_intermediate_texture();
+        self.create_hdr_texture_with_size(ssaa_width, ssaa_height);
 
         // Recreate normal G-buffer for SSAO (at SSAA resolution)
-        self.create_normal_texture();
+        self.create_normal_texture_with_size(ssaa_width, ssaa_height);
 
         // Resize SSAO pass and output texture (at SSAA resolution)
         if let Some(ref mut ssao_pass) = self.ssao_pass {
             ssao_pass.resize(&self.device, &self.queue, ssaa_width, ssaa_height);
         }
-        self.create_ssao_output_texture();
+        self.create_ssao_output_texture_with_size(ssaa_width, ssaa_height);
+
+        // Recreate intermediate texture for SSAA downsampling
+        if self.ssaa_factor > 1 {
+            self.create_ssaa_intermediate_texture();
+        }
 
         self.camera.set_aspect_ratio(width as f32 / height as f32);
     }
@@ -1089,16 +1098,6 @@ impl RenderEngine {
     /// Gets the shadow map pass (if initialized).
     pub fn shadow_map_pass(&self) -> Option<&ShadowMapPass> {
         self.shadow_map_pass.as_ref()
-    }
-
-    /// Gets the planar shadow pass (if initialized).
-    pub fn planar_shadow_pass(&self) -> Option<&PlanarShadowPass> {
-        self.planar_shadow_pass.as_ref()
-    }
-
-    /// Gets the planar shadow pass mutably (if initialized).
-    pub fn planar_shadow_pass_mut(&mut self) -> Option<&mut PlanarShadowPass> {
-        self.planar_shadow_pass.as_mut()
     }
 
     /// Initializes the vector arrow render pipeline.
@@ -2112,7 +2111,7 @@ impl RenderEngine {
                 }),
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleList,
-                    cull_mode: Some(wgpu::Face::Front), // Cull front faces (they become back after reflection)
+                    cull_mode: None, // No culling for reflections (VolumeMesh may have inconsistent winding)
                     ..wgpu::PrimitiveState::default()
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
@@ -2144,6 +2143,309 @@ impl RenderEngine {
         ));
 
         self.reflected_mesh_bind_group_layout = Some(mesh_bind_group_layout);
+    }
+
+    fn create_reflected_point_cloud_pipeline(&mut self) {
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Reflected Point Cloud Shader"),
+                source: wgpu::ShaderSource::Wgsl(
+                    include_str!("shaders/reflected_point_sphere.wgsl").into(),
+                ),
+            });
+
+        let Some(reflection_pass) = &self.reflection_pass else {
+            return;
+        };
+
+        // Bind group layout for group 0 (point cloud data)
+        let point_bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Reflected Point Cloud Bind Group Layout 0"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Point uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Point positions
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Point colors
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Reflected Point Cloud Pipeline Layout"),
+                bind_group_layouts: &[&point_bind_group_layout, reflection_pass.bind_group_layout()],
+                push_constant_ranges: &[],
+            });
+
+        self.reflected_point_cloud_pipeline = Some(self.device.create_render_pipeline(
+            &wgpu::RenderPipelineDescriptor {
+                label: Some("Reflected Point Cloud Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::SrcAlpha,
+                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                operation: wgpu::BlendOperation::Add,
+                            },
+                            alpha: wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::One,
+                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                operation: wgpu::BlendOperation::Add,
+                            },
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..wgpu::PrimitiveState::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24PlusStencil8,
+                    depth_write_enabled: false,
+                    depth_compare: wgpu::CompareFunction::Always,
+                    stencil: wgpu::StencilState {
+                        front: wgpu::StencilFaceState {
+                            compare: wgpu::CompareFunction::Equal,
+                            fail_op: wgpu::StencilOperation::Keep,
+                            depth_fail_op: wgpu::StencilOperation::Keep,
+                            pass_op: wgpu::StencilOperation::Keep,
+                        },
+                        back: wgpu::StencilFaceState {
+                            compare: wgpu::CompareFunction::Equal,
+                            fail_op: wgpu::StencilOperation::Keep,
+                            depth_fail_op: wgpu::StencilOperation::Keep,
+                            pass_op: wgpu::StencilOperation::Keep,
+                        },
+                        read_mask: 0xFF,
+                        write_mask: 0x00,
+                    },
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            },
+        ));
+
+        self.reflected_point_cloud_bind_group_layout = Some(point_bind_group_layout);
+    }
+
+    fn create_reflected_curve_network_pipeline(&mut self) {
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Reflected Curve Network Shader"),
+                source: wgpu::ShaderSource::Wgsl(
+                    include_str!("shaders/reflected_curve_network_tube.wgsl").into(),
+                ),
+            });
+
+        let Some(reflection_pass) = &self.reflection_pass else {
+            return;
+        };
+
+        // Bind group layout for group 0 (curve network data)
+        let curve_bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Reflected Curve Network Bind Group Layout 0"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Curve network uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Edge vertices
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Edge colors
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Reflected Curve Network Pipeline Layout"),
+                bind_group_layouts: &[&curve_bind_group_layout, reflection_pass.bind_group_layout()],
+                push_constant_ranges: &[],
+            });
+
+        // Vertex buffer layout for tube bounding box
+        let vertex_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                // position (vec4)
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: 0,
+                    shader_location: 0,
+                },
+                // edge_id_and_vertex_id (vec4<u32>)
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Uint32x4,
+                    offset: 16,
+                    shader_location: 1,
+                },
+            ],
+        };
+
+        self.reflected_curve_network_pipeline = Some(self.device.create_render_pipeline(
+            &wgpu::RenderPipelineDescriptor {
+                label: Some("Reflected Curve Network Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[vertex_buffer_layout],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::SrcAlpha,
+                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                operation: wgpu::BlendOperation::Add,
+                            },
+                            alpha: wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::One,
+                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                operation: wgpu::BlendOperation::Add,
+                            },
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    cull_mode: None, // No culling for tubes
+                    ..wgpu::PrimitiveState::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24PlusStencil8,
+                    depth_write_enabled: false, // Don't write depth for reflections
+                    depth_compare: wgpu::CompareFunction::Always, // Always pass depth test, stencil does the masking
+                    stencil: wgpu::StencilState {
+                        front: wgpu::StencilFaceState {
+                            compare: wgpu::CompareFunction::Equal,
+                            fail_op: wgpu::StencilOperation::Keep,
+                            depth_fail_op: wgpu::StencilOperation::Keep,
+                            pass_op: wgpu::StencilOperation::Keep,
+                        },
+                        back: wgpu::StencilFaceState {
+                            compare: wgpu::CompareFunction::Equal,
+                            fail_op: wgpu::StencilOperation::Keep,
+                            depth_fail_op: wgpu::StencilOperation::Keep,
+                            pass_op: wgpu::StencilOperation::Keep,
+                        },
+                        read_mask: 0xFF,
+                        write_mask: 0x00,
+                    },
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            },
+        ));
+
+        self.reflected_curve_network_bind_group_layout = Some(curve_bind_group_layout);
     }
 
     /// Renders the ground plane.
@@ -2185,24 +2487,20 @@ impl RenderEngine {
 
         // Initialize render data if needed
         if self.ground_plane_render_data.is_none() {
-            if let (Some(ref shadow_pass), Some(ref planar_shadow)) =
-                (&self.shadow_map_pass, &self.planar_shadow_pass)
-            {
-                // Use planar shadow texture (with 4 blur iterations)
+            if let Some(ref shadow_pass) = self.shadow_map_pass {
                 self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
                     &self.device,
                     &self.ground_plane_bind_group_layout,
                     &self.camera_buffer,
                     shadow_pass.light_buffer(),
-                    planar_shadow.shadow_texture_view(4),
-                    planar_shadow.sampler(),
+                    shadow_pass.depth_view(),
+                    shadow_pass.comparison_sampler(),
                 ));
             }
         }
 
-        // Get camera height and viewport dimensions
+        // Get camera height
         let camera_height = self.camera.position.y;
-        let viewport_dim = [self.width as f32, self.height as f32];
 
         if let Some(render_data) = &self.ground_plane_render_data {
             render_data.update(
@@ -2216,7 +2514,6 @@ impl RenderEngine {
                 shadow_mode,
                 is_orthographic,
                 reflection_intensity,
-                viewport_dim,
             );
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -2432,17 +2729,14 @@ impl RenderEngine {
 
         // Initialize render data if needed
         if self.ground_plane_render_data.is_none() {
-            if let (Some(ref shadow_pass), Some(ref planar_shadow)) =
-                (&self.shadow_map_pass, &self.planar_shadow_pass)
-            {
-                // Use planar shadow texture (with 4 blur iterations)
+            if let Some(ref shadow_pass) = self.shadow_map_pass {
                 self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
                     &self.device,
                     &self.ground_plane_bind_group_layout,
                     &self.camera_buffer,
                     shadow_pass.light_buffer(),
-                    planar_shadow.shadow_texture_view(4),
-                    planar_shadow.sampler(),
+                    shadow_pass.depth_view(),
+                    shadow_pass.comparison_sampler(),
                 ));
             }
         }
@@ -2455,7 +2749,6 @@ impl RenderEngine {
         let is_orthographic =
             self.camera.projection_mode == crate::camera::ProjectionMode::Orthographic;
         let camera_height = self.camera.position.y;
-        let viewport_dim = [self.width as f32, self.height as f32];
 
         // Update ground uniforms for stencil pass
         render_data.update(
@@ -2469,7 +2762,6 @@ impl RenderEngine {
             0,   // shadow_mode (unused in stencil)
             is_orthographic,
             0.0, // reflection_intensity (unused in stencil)
-            viewport_dim,
         );
 
         let view = self.hdr_view.as_ref().unwrap_or(color_view);
@@ -2711,41 +3003,25 @@ impl RenderEngine {
     fn init_tone_mapping(&mut self) {
         self.tone_map_pass = Some(ToneMapPass::new(&self.device, self.surface_config.format));
         self.create_hdr_texture();
-        self.create_ssaa_intermediate_texture();
         self.create_normal_texture();
         self.create_ssao_noise_texture();
         self.init_ssao_pass();
-        self.init_ssaa_pass();
     }
 
-    /// Initializes SSAO pass (at SSAA resolution).
+    /// Initializes SSAO pass.
     fn init_ssao_pass(&mut self) {
-        let ssaa_width = self.width * self.ssaa_factor;
-        let ssaa_height = self.height * self.ssaa_factor;
-        let ssao_pass = crate::ssao_pass::SsaoPass::new(&self.device, ssaa_width, ssaa_height);
+        let ssao_pass = crate::ssao_pass::SsaoPass::new(&self.device, self.width, self.height);
         self.ssao_pass = Some(ssao_pass);
         self.create_ssao_output_texture();
     }
 
-    /// Initializes SSAA pass.
-    fn init_ssaa_pass(&mut self) {
-        // SSAA pass downsamples to HDR format (same as tone mapping input)
-        self.ssaa_pass = Some(crate::ssaa_pass::SsaaPass::new(
-            &self.device,
-            wgpu::TextureFormat::Rgba16Float,
-        ));
-    }
-
     /// Creates the SSAO output texture (blurred result).
     fn create_ssao_output_texture(&mut self) {
-        let ssaa_width = self.width * self.ssaa_factor;
-        let ssaa_height = self.height * self.ssaa_factor;
-
         let ssao_output_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("SSAO Output Texture"),
             size: wgpu::Extent3d {
-                width: ssaa_width,
-                height: ssaa_height,
+                width: self.width,
+                height: self.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -2763,25 +3039,189 @@ impl RenderEngine {
         self.ssao_output_view = Some(ssao_output_view);
     }
 
-    /// Ensures OIT (Order-Independent Transparency) textures exist and match viewport size.
-    pub fn ensure_oit_textures(&mut self) {
+    /// Initializes SSAA (supersampling) pass.
+    fn init_ssaa_pass(&mut self) {
+        self.ssaa_pass = Some(crate::ssaa_pass::SsaaPass::new(
+            &self.device,
+            self.surface_config.format,
+        ));
+    }
+
+    /// Returns the current SSAA factor (1 = off, 2 = 2x, 4 = 4x).
+    #[must_use]
+    pub fn ssaa_factor(&self) -> u32 {
+        self.ssaa_factor
+    }
+
+    /// Sets the SSAA factor and recreates render textures at the new resolution.
+    /// Valid values are 1 (off), 2 (2x supersampling), or 4 (4x supersampling).
+    pub fn set_ssaa_factor(&mut self, factor: u32) {
+        let factor = factor.clamp(1, 4);
+        if factor == self.ssaa_factor {
+            return;
+        }
+
+        // Wait for any in-flight GPU work before destroying textures
+        let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
+
+        self.ssaa_factor = factor;
+
+        // Update SSAA pass uniform
+        if let Some(ref mut ssaa_pass) = self.ssaa_pass {
+            ssaa_pass.set_ssaa_factor(&self.queue, factor);
+        }
+
+        // Recreate all resolution-dependent textures at SSAA resolution
+        self.recreate_ssaa_textures();
+    }
+
+    /// Recreates all resolution-dependent textures at SSAA resolution.
+    fn recreate_ssaa_textures(&mut self) {
         let ssaa_width = self.width * self.ssaa_factor;
         let ssaa_height = self.height * self.ssaa_factor;
 
+        // Recreate depth texture at SSAA resolution
+        let (depth_texture, depth_view, depth_only_view) =
+            Self::create_depth_texture(&self.device, ssaa_width, ssaa_height);
+        self.depth_texture = depth_texture;
+        self.depth_view = depth_view;
+        self.depth_only_view = depth_only_view;
+
+        // Recreate HDR texture at SSAA resolution
+        self.create_hdr_texture_with_size(ssaa_width, ssaa_height);
+
+        // Recreate normal G-buffer at SSAA resolution
+        self.create_normal_texture_with_size(ssaa_width, ssaa_height);
+
+        // Recreate SSAO output at SSAA resolution
+        self.create_ssao_output_texture_with_size(ssaa_width, ssaa_height);
+
+        // Resize SSAO pass
+        if let Some(ref mut ssao_pass) = self.ssao_pass {
+            ssao_pass.resize(&self.device, &self.queue, ssaa_width, ssaa_height);
+        }
+
+        // Create intermediate texture for downsampling (at screen resolution)
+        if self.ssaa_factor > 1 {
+            self.create_ssaa_intermediate_texture();
+        } else {
+            self.ssaa_intermediate_texture = None;
+            self.ssaa_intermediate_view = None;
+        }
+    }
+
+    /// Creates the intermediate texture for SSAA downsampling (at screen resolution).
+    fn create_ssaa_intermediate_texture(&mut self) {
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("SSAA Intermediate Texture"),
+            size: wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.ssaa_intermediate_texture = Some(texture);
+        self.ssaa_intermediate_view = Some(view);
+    }
+
+    /// Creates HDR texture at specified size.
+    fn create_hdr_texture_with_size(&mut self, width: u32, height: u32) {
+        let hdr_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("HDR Render Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let hdr_view = hdr_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.hdr_texture = Some(hdr_texture);
+        self.hdr_view = Some(hdr_view);
+    }
+
+    /// Creates normal G-buffer texture at specified size.
+    fn create_normal_texture_with_size(&mut self, width: u32, height: u32) {
+        let normal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Normal G-Buffer Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let normal_view = normal_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.normal_texture = Some(normal_texture);
+        self.normal_view = Some(normal_view);
+    }
+
+    /// Creates SSAO output texture at specified size.
+    fn create_ssao_output_texture_with_size(&mut self, width: u32, height: u32) {
+        let ssao_output_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("SSAO Output Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let ssao_output_view =
+            ssao_output_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.ssao_output_texture = Some(ssao_output_texture);
+        self.ssao_output_view = Some(ssao_output_view);
+    }
+
+    /// Returns the render dimensions (accounting for SSAA).
+    #[must_use]
+    pub fn render_dimensions(&self) -> (u32, u32) {
+        (self.width * self.ssaa_factor, self.height * self.ssaa_factor)
+    }
+
+    /// Ensures OIT (Order-Independent Transparency) textures exist and match viewport size.
+    pub fn ensure_oit_textures(&mut self) {
         let needs_create = self.oit_accum_texture.is_none()
-            || self.oit_accum_texture.as_ref().map(wgpu::Texture::width) != Some(ssaa_width)
-            || self.oit_accum_texture.as_ref().map(wgpu::Texture::height) != Some(ssaa_height);
+            || self.oit_accum_texture.as_ref().map(wgpu::Texture::width) != Some(self.width)
+            || self.oit_accum_texture.as_ref().map(wgpu::Texture::height) != Some(self.height);
 
         if !needs_create {
             return;
         }
 
-        // Accumulation texture: RGBA16Float for weighted color accumulation (at SSAA resolution)
+        // Accumulation texture: RGBA16Float for weighted color accumulation
         let accum_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("OIT Accumulation Texture"),
             size: wgpu::Extent3d {
-                width: ssaa_width,
-                height: ssaa_height,
+                width: self.width,
+                height: self.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -2795,12 +3235,12 @@ impl RenderEngine {
             Some(accum_texture.create_view(&wgpu::TextureViewDescriptor::default()));
         self.oit_accum_texture = Some(accum_texture);
 
-        // Reveal texture: R8Unorm for transmittance product (at SSAA resolution)
+        // Reveal texture: R8Unorm for transmittance product
         let reveal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("OIT Reveal Texture"),
             size: wgpu::Extent3d {
-                width: ssaa_width,
-                height: ssaa_height,
+                width: self.width,
+                height: self.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -2953,16 +3393,13 @@ impl RenderEngine {
         }
     }
 
-    /// Creates the HDR intermediate texture for tone mapping (at SSAA resolution).
+    /// Creates the HDR intermediate texture for tone mapping.
     fn create_hdr_texture(&mut self) {
-        let ssaa_width = self.width * self.ssaa_factor;
-        let ssaa_height = self.height * self.ssaa_factor;
-
         let hdr_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("HDR Texture"),
             size: wgpu::Extent3d {
-                width: ssaa_width,
-                height: ssaa_height,
+                width: self.width,
+                height: self.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -2979,46 +3416,13 @@ impl RenderEngine {
         self.hdr_view = Some(hdr_view);
     }
 
-    /// Creates the SSAA intermediate texture (at screen resolution, for downsampled result).
-    fn create_ssaa_intermediate_texture(&mut self) {
-        // Only needed when SSAA > 1
-        if self.ssaa_factor <= 1 {
-            self.ssaa_intermediate_texture = None;
-            self.ssaa_intermediate_view = None;
-            return;
-        }
-
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("SSAA Intermediate Texture"),
-            size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float, // HDR format
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        self.ssaa_intermediate_texture = Some(texture);
-        self.ssaa_intermediate_view = Some(view);
-    }
-
-    /// Creates the normal G-buffer texture for SSAO (at SSAA resolution).
+    /// Creates the normal G-buffer texture for SSAO.
     fn create_normal_texture(&mut self) {
-        let ssaa_width = self.width * self.ssaa_factor;
-        let ssaa_height = self.height * self.ssaa_factor;
-
         let normal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Normal G-Buffer"),
             size: wgpu::Extent3d {
-                width: ssaa_width,
-                height: ssaa_height,
+                width: self.width,
+                height: self.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -3196,125 +3600,41 @@ impl RenderEngine {
     }
 
     /// Renders the tone mapping pass from HDR to the output view.
-    /// Handles SSAA downsampling if enabled.
     /// Uses SSAO texture if available, otherwise uses a default white texture.
+    ///
+    /// When SSAA is enabled (factor > 1):
+    /// 1. Downsamples HDR (SSAA res) → intermediate HDR (screen res)
+    /// 2. Tone maps intermediate HDR → output LDR
+    ///
+    /// Note: When SSAA is enabled, SSAO is disabled to avoid resolution mismatch.
     pub fn render_tone_mapping(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         output_view: &wgpu::TextureView,
     ) {
-        // Determine the input view for tone mapping
-        // If SSAA > 1, we need to downsample first to the intermediate texture
-        let tone_input_view = if self.ssaa_factor > 1 {
-            if let (Some(ssaa_pass), Some(hdr_view), Some(intermediate_view)) = (
-                &self.ssaa_pass,
-                &self.hdr_view,
-                &self.ssaa_intermediate_view,
-            ) {
-                // Downsample HDR from SSAA resolution to screen resolution
-                ssaa_pass.render_to_target(&self.device, encoder, hdr_view, intermediate_view);
-                intermediate_view
-            } else {
-                // Fallback if SSAA resources not available
-                self.hdr_view.as_ref().unwrap()
-            }
-        } else {
-            // No SSAA, use HDR directly
-            self.hdr_view.as_ref().unwrap()
-        };
+        if let (Some(tone_map), Some(hdr_view)) = (&self.tone_map_pass, &self.hdr_view) {
+            // If SSAA is enabled, first downsample HDR, then tone map
+            if self.ssaa_factor > 1 {
+                if let (Some(intermediate_view), Some(ssaa_pass)) =
+                    (&self.ssaa_intermediate_view, &self.ssaa_pass)
+                {
+                    // Step 1: Downsample HDR (SSAA res) -> intermediate HDR (screen res)
+                    ssaa_pass.render_to_target(&self.device, encoder, hdr_view, intermediate_view);
 
-        if let Some(tone_map) = &self.tone_map_pass {
-            // Use SSAO output view if available
-            // Note: When SSAA > 1, SSAO is at high res but we're tone mapping at screen res
-            // For now, we disable SSAO blending when SSAA is active (SSAO is baked into HDR already)
-            let ssao_view = if self.ssaa_factor > 1 {
-                // SSAO was already applied at SSAA resolution, use dummy for tone mapping
-                tone_input_view
-            } else {
-                self.ssao_output_view.as_ref().unwrap_or(tone_input_view)
-            };
-            let bind_group = tone_map.create_bind_group(&self.device, tone_input_view, ssao_view);
+                    // Step 2: Tone map intermediate HDR -> output LDR
+                    // SSAO is disabled during SSAA (would need separate downsampling)
+                    let bind_group =
+                        tone_map.create_bind_group(&self.device, intermediate_view, intermediate_view);
+                    tone_map.render(encoder, output_view, &bind_group);
+                    return;
+                }
+            }
+
+            // No SSAA - tone map directly from HDR to output with SSAO
+            let ssao_view = self.ssao_output_view.as_ref().unwrap_or(hdr_view);
+            let bind_group = tone_map.create_bind_group(&self.device, hdr_view, ssao_view);
             tone_map.render(encoder, output_view, &bind_group);
         }
-    }
-
-    /// Returns the current SSAA factor (1 = off, 2 = 2x, 4 = 4x).
-    #[must_use]
-    pub fn ssaa_factor(&self) -> u32 {
-        self.ssaa_factor
-    }
-
-    /// Sets the SSAA factor and recreates all SSAA-dependent render targets.
-    /// Valid values are 1 (off), 2 (2x SSAA), or 4 (4x SSAA).
-    /// Note: This does NOT reconfigure the surface - only internal textures are resized.
-    pub fn set_ssaa_factor(&mut self, factor: u32) {
-        let factor = factor.clamp(1, 4);
-        if factor != self.ssaa_factor {
-            self.ssaa_factor = factor;
-            // Update SSAA pass uniforms
-            if let Some(ssaa_pass) = &mut self.ssaa_pass {
-                ssaa_pass.set_ssaa_factor(&self.queue, factor);
-            }
-            // Recreate only SSAA-dependent textures (not the surface)
-            self.resize_ssaa_textures();
-        }
-    }
-
-    /// Resizes only SSAA-dependent textures without reconfiguring the surface.
-    /// Called when SSAA factor changes.
-    fn resize_ssaa_textures(&mut self) {
-        // Wait for all GPU work to complete before destroying textures
-        // This prevents destroying textures that are still referenced by in-flight commands
-        self.device.poll(wgpu::Maintain::Wait);
-
-        let ssaa_width = self.width * self.ssaa_factor;
-        let ssaa_height = self.height * self.ssaa_factor;
-
-        // Recreate depth texture at SSAA resolution
-        let (depth_texture, depth_view, depth_only_view) =
-            Self::create_depth_texture(&self.device, ssaa_width, ssaa_height);
-        self.depth_texture = depth_texture;
-        self.depth_view = depth_view;
-        self.depth_only_view = depth_only_view;
-
-        // Recreate HDR texture (at SSAA resolution)
-        self.create_hdr_texture();
-
-        // Recreate SSAA intermediate texture (at screen resolution)
-        self.create_ssaa_intermediate_texture();
-
-        // Recreate normal G-buffer (at SSAA resolution)
-        self.create_normal_texture();
-
-        // Resize SSAO pass and output texture (at SSAA resolution)
-        if let Some(ref mut ssao_pass) = self.ssao_pass {
-            ssao_pass.resize(&self.device, &self.queue, ssaa_width, ssaa_height);
-        }
-        self.create_ssao_output_texture();
-
-        // OIT textures will be recreated on demand via ensure_oit_textures()
-        // Clear them so they get recreated at the new size
-        self.oit_accum_texture = None;
-        self.oit_accum_view = None;
-        self.oit_reveal_texture = None;
-        self.oit_reveal_view = None;
-    }
-
-    /// Returns the SSAA intermediate texture view (screen resolution).
-    pub fn ssaa_intermediate_view(&self) -> Option<&wgpu::TextureView> {
-        self.ssaa_intermediate_view.as_ref()
-    }
-
-    /// Returns the render width at SSAA resolution.
-    #[must_use]
-    pub fn ssaa_width(&self) -> u32 {
-        self.width * self.ssaa_factor
-    }
-
-    /// Returns the render height at SSAA resolution.
-    #[must_use]
-    pub fn ssaa_height(&self) -> u32 {
-        self.height * self.ssaa_factor
     }
 
     /// Initializes reflection pass resources.
@@ -3403,6 +3723,118 @@ impl RenderEngine {
         render_pass.set_bind_group(1, reflection.bind_group(), &[]);
         render_pass.set_stencil_reference(1); // Test against stencil value 1
         render_pass.draw(0..vertex_count, 0..1);
+    }
+
+    /// Creates a bind group for reflected point cloud rendering.
+    pub fn create_reflected_point_cloud_bind_group(
+        &self,
+        point_render_data: &crate::point_cloud_render::PointCloudRenderData,
+    ) -> Option<wgpu::BindGroup> {
+        let layout = self.reflected_point_cloud_bind_group_layout.as_ref()?;
+
+        Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Reflected Point Cloud Bind Group"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: point_render_data.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: point_render_data.position_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: point_render_data.color_buffer.as_entire_binding(),
+                },
+            ],
+        }))
+    }
+
+    /// Renders a single reflected point cloud.
+    pub fn render_reflected_point_cloud(
+        &self,
+        render_pass: &mut wgpu::RenderPass,
+        point_bind_group: &wgpu::BindGroup,
+        point_count: u32,
+    ) {
+        let Some(pipeline) = &self.reflected_point_cloud_pipeline else {
+            return;
+        };
+        let Some(reflection) = &self.reflection_pass else {
+            return;
+        };
+
+        render_pass.set_pipeline(pipeline);
+        render_pass.set_bind_group(0, point_bind_group, &[]);
+        render_pass.set_bind_group(1, reflection.bind_group(), &[]);
+        render_pass.set_stencil_reference(1);
+        // 6 vertices per point (billboard quad as 2 triangles)
+        render_pass.draw(0..6, 0..point_count);
+    }
+
+    /// Creates a bind group for reflected curve network rendering.
+    pub fn create_reflected_curve_network_bind_group(
+        &self,
+        curve_render_data: &crate::curve_network_render::CurveNetworkRenderData,
+    ) -> Option<wgpu::BindGroup> {
+        let layout = self.reflected_curve_network_bind_group_layout.as_ref()?;
+
+        Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Reflected Curve Network Bind Group"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: curve_render_data.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: curve_render_data.edge_vertex_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: curve_render_data.edge_color_buffer.as_entire_binding(),
+                },
+            ],
+        }))
+    }
+
+    /// Renders a single reflected curve network (tube mode).
+    pub fn render_reflected_curve_network(
+        &self,
+        render_pass: &mut wgpu::RenderPass,
+        curve_bind_group: &wgpu::BindGroup,
+        curve_render_data: &crate::curve_network_render::CurveNetworkRenderData,
+    ) {
+        let Some(pipeline) = &self.reflected_curve_network_pipeline else {
+            return;
+        };
+        let Some(reflection) = &self.reflection_pass else {
+            return;
+        };
+        let Some(tube_vertex_buffer) = &curve_render_data.generated_vertex_buffer else {
+            return;
+        };
+
+        // 36 vertices per edge (tube geometry)
+        let tube_vertex_count = curve_render_data.num_edges * 36;
+
+        render_pass.set_pipeline(pipeline);
+        render_pass.set_bind_group(0, curve_bind_group, &[]);
+        render_pass.set_bind_group(1, reflection.bind_group(), &[]);
+        render_pass.set_vertex_buffer(0, tube_vertex_buffer.slice(..));
+        render_pass.set_stencil_reference(1);
+        render_pass.draw(0..tube_vertex_count, 0..1);
     }
 
     /// Returns the depth texture view.

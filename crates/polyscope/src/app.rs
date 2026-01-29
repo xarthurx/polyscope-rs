@@ -456,8 +456,10 @@ impl App {
         }
 
         if s < 0.0 {
+            s = 0.0;
             t = ray_dir.dot(a - ray_origin);
         } else if s > 1.0 {
+            s = 1.0;
             t = ray_dir.dot(b - ray_origin);
         }
 
@@ -1135,6 +1137,7 @@ impl App {
         let mut camera_changed = false;
         let mut scene_extents_changed = false;
         let mut screenshot_requested = false;
+        let mut ssaa_changed = false;
 
         polyscope_ui::build_left_panel(&egui.context, |ui| {
             let view_action = polyscope_ui::build_controls_section(ui, &mut bg_color);
@@ -1167,6 +1170,9 @@ impl App {
                     ctx.options.ssao.sample_count = self.appearance_settings.ssao_sample_count;
                     ctx.options.ssaa_factor = self.appearance_settings.ssaa_factor;
                 });
+
+                // Mark SSAA as changed (will apply outside closure)
+                ssaa_changed = true;
             }
 
             // Tone mapping settings panel
@@ -1566,6 +1572,11 @@ impl App {
             crate::set_auto_compute_extents(self.scene_extents.auto_compute);
         }
 
+        // Apply SSAA settings if changed
+        if ssaa_changed && engine.ssaa_factor() != self.appearance_settings.ssaa_factor {
+            engine.set_ssaa_factor(self.appearance_settings.ssaa_factor);
+        }
+
         // Queue screenshot request from UI button (will be processed after render)
         if screenshot_requested {
             let filename = format!("screenshot_{:04}.png", self.screenshot_counter);
@@ -1575,13 +1586,6 @@ impl App {
 
         // End egui frame
         let egui_output = egui.end_frame(window);
-
-        // Apply SSAA factor if changed
-        // This only resizes internal textures, not the surface, so no frame skip needed
-        let ssaa_factor = polyscope_core::with_context(|ctx| ctx.options.ssaa_factor);
-        if engine.ssaa_factor() != ssaa_factor {
-            engine.set_ssaa_factor(ssaa_factor);
-        }
 
         // Now borrow surface for rendering
         let surface = engine.surface.as_ref().expect("surface checked above");
@@ -1722,66 +1726,6 @@ impl App {
                     }
                 });
             }
-        }
-
-        // Planar shadow pass - render scene flattened onto ground plane
-        // This creates screen-space shadows that work correctly near the ground
-        if let (Some(shadow_pipeline), Some(shadow_map_pass), Some(planar_shadow_pass)) = (
-            engine.shadow_pipeline(),
-            engine.shadow_map_pass(),
-            engine.planar_shadow_pass(),
-        ) {
-            // Get ground height and camera matrices
-            let (ground_height, _scene_center, _length_scale) = crate::with_context(|ctx| {
-                let scene_min_y = ctx.bounding_box.0.y;
-                let height_offset = ctx.options.ground_plane_height;
-                let ground_h = scene_min_y - ctx.length_scale * 0.001 + height_offset;
-                (ground_h, ctx.center(), ctx.length_scale)
-            });
-
-            // Compute planar projection matrix
-            let planar_proj =
-                polyscope_render::PlanarShadowPass::compute_planar_projection_matrix(ground_height);
-
-            // Compute combined view-proj matrix for planar shadows
-            // This flattens geometry onto the ground plane before projecting to clip space
-            let view_proj = engine.camera.view_projection_matrix();
-            let planar_view_proj = view_proj * planar_proj;
-
-            // Update light uniforms with planar view-proj matrix
-            shadow_map_pass.update_light(
-                &engine.queue,
-                planar_view_proj,
-                glam::Vec3::new(0.0, -1.0, 0.0), // Light direction (unused for planar)
-            );
-
-            // Render to planar shadow depth buffer
-            {
-                let mut shadow_pass = planar_shadow_pass.begin_shadow_pass(&mut encoder);
-                shadow_pass.set_pipeline(shadow_pipeline);
-
-                // Render shadow-casting structures (SurfaceMesh only for now)
-                crate::with_context(|ctx| {
-                    for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
-                            continue;
-                        }
-                        if structure.type_name() == "SurfaceMesh" {
-                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                if let Some(shadow_bg) = mesh.shadow_bind_group() {
-                                    shadow_pass.set_bind_group(0, shadow_bg, &[]);
-                                    if let Some(rd) = mesh.render_data() {
-                                        shadow_pass.draw(0..rd.num_vertices(), 0..1);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Process shadow: depth-to-mask conversion and blur
-            planar_shadow_pass.process_shadow(&engine.device, &mut encoder, &engine.queue, 4);
         }
 
         // Render slice plane visualizations FIRST (before scene geometry)
@@ -2199,12 +2143,13 @@ impl App {
                     ..Default::default()
                 });
 
-                // Render each visible surface mesh reflected
+                // Render each visible structure reflected
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
                         if !structure.is_enabled() {
                             continue;
                         }
+                        // SurfaceMesh
                         if structure.type_name() == "SurfaceMesh" {
                             if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
                                 if let Some(mesh_data) = mesh.render_data() {
@@ -2215,6 +2160,56 @@ impl App {
                                             &mut render_pass,
                                             &bind_group,
                                             mesh_data.vertex_count(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        // VolumeMesh (uses SurfaceMeshRenderData)
+                        if structure.type_name() == "VolumeMesh" {
+                            if let Some(vol_mesh) =
+                                structure.as_any().downcast_ref::<VolumeMesh>()
+                            {
+                                if let Some(mesh_data) = vol_mesh.render_data() {
+                                    if let Some(bind_group) =
+                                        engine.create_reflected_mesh_bind_group(mesh_data)
+                                    {
+                                        engine.render_reflected_mesh(
+                                            &mut render_pass,
+                                            &bind_group,
+                                            mesh_data.vertex_count(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        // PointCloud
+                        if structure.type_name() == "PointCloud" {
+                            if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                                if let Some(pc_data) = pc.render_data() {
+                                    if let Some(bind_group) =
+                                        engine.create_reflected_point_cloud_bind_group(pc_data)
+                                    {
+                                        engine.render_reflected_point_cloud(
+                                            &mut render_pass,
+                                            &bind_group,
+                                            pc_data.num_points,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        // CurveNetwork
+                        if structure.type_name() == "CurveNetwork" {
+                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                                if let Some(cn_data) = cn.render_data() {
+                                    if let Some(bind_group) =
+                                        engine.create_reflected_curve_network_bind_group(cn_data)
+                                    {
+                                        engine.render_reflected_curve_network(
+                                            &mut render_pass,
+                                            &bind_group,
+                                            cn_data,
                                         );
                                     }
                                 }

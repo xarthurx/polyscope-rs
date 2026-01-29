@@ -71,9 +71,9 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     // Apply reflection matrix
     let reflected_position = (reflection.reflection_matrix * vec4<f32>(world_position, 1.0)).xyz;
 
-    // Transform and flip normal for reflected geometry
+    // Transform normal through model, then reflect through reflection plane
     let world_normal = normalize((mesh_uniforms.model * vec4<f32>(local_normal, 0.0)).xyz);
-    let reflected_normal = -world_normal; // Flip for reflection
+    let reflected_normal = normalize((reflection.reflection_matrix * vec4<f32>(world_normal, 0.0)).xyz);
 
     out.clip_position = camera.view_proj * vec4<f32>(reflected_position, 1.0);
     out.world_position = reflected_position;

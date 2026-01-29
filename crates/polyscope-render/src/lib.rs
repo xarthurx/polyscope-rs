@@ -48,7 +48,6 @@ pub mod ground_plane;
 pub mod materials;
 pub mod oit_pass;
 pub mod pick;
-pub mod planar_shadow;
 pub mod point_cloud_render;
 pub mod reflection;
 pub mod reflection_pass;
@@ -80,7 +79,6 @@ pub use reflection::{ground_reflection_matrix, reflection_matrix};
 pub use reflection_pass::{ReflectionPass, ReflectionUniforms};
 pub use screenshot::{save_image, save_to_buffer, ScreenshotError, ScreenshotOptions};
 pub use shader::{ShaderBuilder, ShaderProgram};
-pub use planar_shadow::PlanarShadowPass;
 pub use shadow_map::{LightUniforms, ShadowMapPass, SHADOW_MAP_SIZE};
 pub use slice_mesh_render::SliceMeshRenderData;
 pub use slice_plane_render::{
