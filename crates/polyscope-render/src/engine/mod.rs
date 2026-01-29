@@ -1,5 +1,11 @@
 //! The main rendering engine.
 
+mod pick;
+mod pipelines;
+mod postprocessing;
+mod rendering;
+mod textures;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -382,7 +388,7 @@ impl RenderEngine {
         // Ground plane shader
         let ground_plane_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Ground Plane Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/ground_plane.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/ground_plane.wgsl").into()),
         });
 
         // Ground plane pipeline layout
@@ -692,7 +698,7 @@ impl RenderEngine {
         // Ground plane shader
         let ground_plane_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Ground Plane Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/ground_plane.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/ground_plane.wgsl").into()),
         });
 
         // Ground plane pipeline layout
@@ -935,7 +941,7 @@ impl RenderEngine {
 
     /// Initializes the point cloud render pipeline.
     pub fn init_point_pipeline(&mut self) {
-        let shader_source = include_str!("shaders/point_sphere.wgsl");
+        let shader_source = include_str!("../shaders/point_sphere.wgsl");
         let shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -1102,7 +1108,7 @@ impl RenderEngine {
 
     /// Initializes the vector arrow render pipeline.
     pub fn init_vector_pipeline(&mut self) {
-        let shader_source = include_str!("shaders/vector_arrow.wgsl");
+        let shader_source = include_str!("../shaders/vector_arrow.wgsl");
         let shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -1232,7 +1238,7 @@ impl RenderEngine {
 
     /// Creates the surface mesh render pipeline.
     fn create_mesh_pipeline(&mut self) {
-        let shader_source = include_str!("shaders/surface_mesh.wgsl");
+        let shader_source = include_str!("../shaders/surface_mesh.wgsl");
         let shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -1397,7 +1403,7 @@ impl RenderEngine {
 
     /// Creates the curve network edge render pipeline (line rendering).
     fn create_curve_network_edge_pipeline(&mut self) {
-        let shader_source = include_str!("shaders/curve_network_edge.wgsl");
+        let shader_source = include_str!("../shaders/curve_network_edge.wgsl");
         let shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -1536,7 +1542,7 @@ impl RenderEngine {
     /// Creates the curve network tube pipelines (compute and render).
     fn create_curve_network_tube_pipelines(&mut self) {
         // Compute shader
-        let compute_shader_source = include_str!("shaders/curve_network_tube_compute.wgsl");
+        let compute_shader_source = include_str!("../shaders/curve_network_tube_compute.wgsl");
         let compute_shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -1617,7 +1623,7 @@ impl RenderEngine {
                 });
 
         // Render shader
-        let render_shader_source = include_str!("shaders/curve_network_tube.wgsl");
+        let render_shader_source = include_str!("../shaders/curve_network_tube.wgsl");
         let render_shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -1778,7 +1784,7 @@ impl RenderEngine {
 
     /// Creates the shadow render pipeline (depth-only, for rendering objects from light's perspective).
     fn create_shadow_pipeline(&mut self) {
-        let shader_source = include_str!("shaders/shadow_map.wgsl");
+        let shader_source = include_str!("../shaders/shadow_map.wgsl");
         let shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -1901,7 +1907,7 @@ impl RenderEngine {
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("Ground Stencil Shader"),
                 source: wgpu::ShaderSource::Wgsl(
-                    include_str!("shaders/ground_stencil.wgsl").into(),
+                    include_str!("../shaders/ground_stencil.wgsl").into(),
                 ),
             });
 
@@ -1974,7 +1980,7 @@ impl RenderEngine {
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("Reflected Mesh Shader"),
                 source: wgpu::ShaderSource::Wgsl(
-                    include_str!("shaders/reflected_mesh.wgsl").into(),
+                    include_str!("../shaders/reflected_mesh.wgsl").into(),
                 ),
             });
 
@@ -2151,7 +2157,7 @@ impl RenderEngine {
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("Reflected Point Cloud Shader"),
                 source: wgpu::ShaderSource::Wgsl(
-                    include_str!("shaders/reflected_point_sphere.wgsl").into(),
+                    include_str!("../shaders/reflected_point_sphere.wgsl").into(),
                 ),
             });
 
@@ -2292,7 +2298,7 @@ impl RenderEngine {
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("Reflected Curve Network Shader"),
                 source: wgpu::ShaderSource::Wgsl(
-                    include_str!("shaders/reflected_curve_network_tube.wgsl").into(),
+                    include_str!("../shaders/reflected_curve_network_tube.wgsl").into(),
                 ),
             });
 
@@ -3294,7 +3300,7 @@ impl RenderEngine {
             self.create_mesh_pipeline();
         }
 
-        let shader_source = include_str!("shaders/surface_mesh_oit.wgsl");
+        let shader_source = include_str!("../shaders/surface_mesh_oit.wgsl");
         let shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -3948,7 +3954,7 @@ impl RenderEngine {
 
     /// Initializes the pick pipeline for point clouds.
     fn init_pick_pipeline(&mut self) {
-        let shader_source = include_str!("shaders/pick.wgsl");
+        let shader_source = include_str!("../shaders/pick.wgsl");
         let shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -4074,7 +4080,7 @@ impl RenderEngine {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("CurveNetwork Pick Shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("shaders/pick_curve.wgsl").into()),
+                source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/pick_curve.wgsl").into()),
             });
 
         // Reuse the pick bind group layout from point cloud pick
@@ -4143,7 +4149,7 @@ impl RenderEngine {
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("CurveNetwork Tube Pick Shader"),
                 source: wgpu::ShaderSource::Wgsl(
-                    include_str!("shaders/pick_curve_tube.wgsl").into(),
+                    include_str!("../shaders/pick_curve_tube.wgsl").into(),
                 ),
             });
 
