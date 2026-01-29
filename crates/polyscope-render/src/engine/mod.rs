@@ -67,7 +67,7 @@ pub struct RenderEngine {
     /// Depth texture view.
     pub depth_view: wgpu::TextureView,
     /// Depth-only texture view (for SSAO sampling, excludes stencil aspect).
-    depth_only_view: wgpu::TextureView,
+    pub(crate) depth_only_view: wgpu::TextureView,
     /// Material registry.
     pub materials: MaterialRegistry,
     /// Color map registry.
@@ -97,133 +97,133 @@ pub struct RenderEngine {
     /// Surface mesh render pipeline.
     pub mesh_pipeline: Option<wgpu::RenderPipeline>,
     /// Mesh bind group layout.
-    mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Curve network edge render pipeline (line rendering).
     pub curve_network_edge_pipeline: Option<wgpu::RenderPipeline>,
     /// Curve network edge bind group layout.
-    curve_network_edge_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) curve_network_edge_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Curve network tube render pipeline (cylinder impostor rendering).
     pub curve_network_tube_pipeline: Option<wgpu::RenderPipeline>,
     /// Curve network tube compute pipeline (generates bounding box geometry).
     pub curve_network_tube_compute_pipeline: Option<wgpu::ComputePipeline>,
     /// Curve network tube render bind group layout.
-    curve_network_tube_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) curve_network_tube_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Curve network tube compute bind group layout.
-    curve_network_tube_compute_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) curve_network_tube_compute_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Ground plane render pipeline.
-    ground_plane_pipeline: wgpu::RenderPipeline,
+    pub(crate) ground_plane_pipeline: wgpu::RenderPipeline,
     /// Ground plane bind group layout.
-    ground_plane_bind_group_layout: wgpu::BindGroupLayout,
+    pub(crate) ground_plane_bind_group_layout: wgpu::BindGroupLayout,
     /// Ground plane render data (lazily initialized).
-    ground_plane_render_data: Option<GroundPlaneRenderData>,
+    pub(crate) ground_plane_render_data: Option<GroundPlaneRenderData>,
     /// Slice plane visualization pipeline.
-    slice_plane_vis_pipeline: wgpu::RenderPipeline,
+    pub(crate) slice_plane_vis_pipeline: wgpu::RenderPipeline,
     /// Slice plane visualization bind group layout.
-    slice_plane_vis_bind_group_layout: wgpu::BindGroupLayout,
+    pub(crate) slice_plane_vis_bind_group_layout: wgpu::BindGroupLayout,
     /// Slice plane render data (per-plane, lazily initialized).
-    slice_plane_render_data: Vec<SlicePlaneRenderData>,
+    pub(crate) slice_plane_render_data: Vec<SlicePlaneRenderData>,
     /// Screenshot capture texture (lazily initialized).
-    screenshot_texture: Option<wgpu::Texture>,
+    pub(crate) screenshot_texture: Option<wgpu::Texture>,
     /// Screenshot capture buffer (lazily initialized).
-    screenshot_buffer: Option<wgpu::Buffer>,
+    pub(crate) screenshot_buffer: Option<wgpu::Buffer>,
     /// Screenshot HDR texture for rendering (lazily initialized).
-    screenshot_hdr_texture: Option<wgpu::Texture>,
+    pub(crate) screenshot_hdr_texture: Option<wgpu::Texture>,
     /// Screenshot HDR texture view.
-    screenshot_hdr_view: Option<wgpu::TextureView>,
+    pub(crate) screenshot_hdr_view: Option<wgpu::TextureView>,
     /// HDR intermediate texture for tone mapping.
-    hdr_texture: Option<wgpu::Texture>,
+    pub(crate) hdr_texture: Option<wgpu::Texture>,
     /// HDR texture view.
-    hdr_view: Option<wgpu::TextureView>,
+    pub(crate) hdr_view: Option<wgpu::TextureView>,
     /// Normal G-buffer texture for SSAO.
-    normal_texture: Option<wgpu::Texture>,
+    pub(crate) normal_texture: Option<wgpu::Texture>,
     /// Normal G-buffer texture view.
-    normal_view: Option<wgpu::TextureView>,
+    pub(crate) normal_view: Option<wgpu::TextureView>,
     /// SSAO noise texture (4x4 random rotation vectors).
-    ssao_noise_texture: Option<wgpu::Texture>,
+    pub(crate) ssao_noise_texture: Option<wgpu::Texture>,
     /// SSAO noise texture view.
-    ssao_noise_view: Option<wgpu::TextureView>,
+    pub(crate) ssao_noise_view: Option<wgpu::TextureView>,
     /// SSAO pass.
-    ssao_pass: Option<crate::ssao_pass::SsaoPass>,
+    pub(crate) ssao_pass: Option<crate::ssao_pass::SsaoPass>,
     /// SSAO output texture (blurred result).
-    ssao_output_texture: Option<wgpu::Texture>,
+    pub(crate) ssao_output_texture: Option<wgpu::Texture>,
     /// SSAO output texture view.
-    ssao_output_view: Option<wgpu::TextureView>,
+    pub(crate) ssao_output_view: Option<wgpu::TextureView>,
     /// OIT accumulation texture (`RGBA16Float`) - stores weighted color sum.
-    oit_accum_texture: Option<wgpu::Texture>,
+    pub(crate) oit_accum_texture: Option<wgpu::Texture>,
     /// OIT accumulation texture view.
-    oit_accum_view: Option<wgpu::TextureView>,
+    pub(crate) oit_accum_view: Option<wgpu::TextureView>,
     /// OIT reveal texture (`R8Unorm`) - stores transmittance product.
-    oit_reveal_texture: Option<wgpu::Texture>,
+    pub(crate) oit_reveal_texture: Option<wgpu::Texture>,
     /// OIT reveal texture view.
-    oit_reveal_view: Option<wgpu::TextureView>,
+    pub(crate) oit_reveal_view: Option<wgpu::TextureView>,
     /// OIT composite pass.
-    oit_composite_pass: Option<crate::oit_pass::OitCompositePass>,
+    pub(crate) oit_composite_pass: Option<crate::oit_pass::OitCompositePass>,
     /// Surface mesh OIT accumulation pipeline.
-    mesh_oit_pipeline: Option<wgpu::RenderPipeline>,
+    pub(crate) mesh_oit_pipeline: Option<wgpu::RenderPipeline>,
     /// Tone mapping post-processing pass.
-    tone_map_pass: Option<ToneMapPass>,
+    pub(crate) tone_map_pass: Option<ToneMapPass>,
     /// SSAA (supersampling) pass for anti-aliasing.
-    ssaa_pass: Option<crate::ssaa_pass::SsaaPass>,
+    pub(crate) ssaa_pass: Option<crate::ssaa_pass::SsaaPass>,
     /// Current SSAA factor (1 = off, 2 = 2x, 4 = 4x).
-    ssaa_factor: u32,
+    pub(crate) ssaa_factor: u32,
     /// Intermediate HDR texture for SSAA (screen resolution, used after downsampling).
-    ssaa_intermediate_texture: Option<wgpu::Texture>,
+    pub(crate) ssaa_intermediate_texture: Option<wgpu::Texture>,
     /// Intermediate HDR texture view.
-    ssaa_intermediate_view: Option<wgpu::TextureView>,
+    pub(crate) ssaa_intermediate_view: Option<wgpu::TextureView>,
     /// Shadow map pass for ground plane shadows.
-    shadow_map_pass: Option<ShadowMapPass>,
+    pub(crate) shadow_map_pass: Option<ShadowMapPass>,
     /// Shadow render pipeline (depth-only, renders objects from light's perspective).
-    shadow_pipeline: Option<wgpu::RenderPipeline>,
+    pub(crate) shadow_pipeline: Option<wgpu::RenderPipeline>,
     /// Shadow bind group layout for shadow pass rendering.
-    shadow_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) shadow_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Reflection pass for ground plane reflections.
-    reflection_pass: Option<crate::reflection_pass::ReflectionPass>,
+    pub(crate) reflection_pass: Option<crate::reflection_pass::ReflectionPass>,
     /// Stencil pipeline for ground plane reflection mask.
-    ground_stencil_pipeline: Option<wgpu::RenderPipeline>,
+    pub(crate) ground_stencil_pipeline: Option<wgpu::RenderPipeline>,
     /// Pipeline for rendering reflected surface meshes.
-    reflected_mesh_pipeline: Option<wgpu::RenderPipeline>,
+    pub(crate) reflected_mesh_pipeline: Option<wgpu::RenderPipeline>,
     /// Bind group layout for reflected mesh (includes reflection uniforms).
-    reflected_mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) reflected_mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Pipeline for rendering reflected point clouds.
-    reflected_point_cloud_pipeline: Option<wgpu::RenderPipeline>,
+    pub(crate) reflected_point_cloud_pipeline: Option<wgpu::RenderPipeline>,
     /// Bind group layout for reflected point cloud.
-    reflected_point_cloud_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) reflected_point_cloud_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Pipeline for rendering reflected curve networks.
-    reflected_curve_network_pipeline: Option<wgpu::RenderPipeline>,
+    pub(crate) reflected_curve_network_pipeline: Option<wgpu::RenderPipeline>,
     /// Bind group layout for reflected curve network.
-    reflected_curve_network_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) reflected_curve_network_bind_group_layout: Option<wgpu::BindGroupLayout>,
 
     // Pick system - structure ID management
     /// Map from (`type_name`, name) to structure pick ID.
-    structure_id_map: HashMap<(String, String), u16>,
+    pub(crate) structure_id_map: HashMap<(String, String), u16>,
     /// Reverse map from structure pick ID to (`type_name`, name).
-    structure_id_reverse: HashMap<u16, (String, String)>,
+    pub(crate) structure_id_reverse: HashMap<u16, (String, String)>,
     /// Next available structure ID (0 is reserved for background).
-    next_structure_id: u16,
+    pub(crate) next_structure_id: u16,
 
     // Pick system - GPU resources
     /// Pick color texture for element selection.
-    pick_texture: Option<wgpu::Texture>,
+    pub(crate) pick_texture: Option<wgpu::Texture>,
     /// Pick color texture view.
-    pick_texture_view: Option<wgpu::TextureView>,
+    pub(crate) pick_texture_view: Option<wgpu::TextureView>,
     /// Pick depth texture.
-    pick_depth_texture: Option<wgpu::Texture>,
+    pub(crate) pick_depth_texture: Option<wgpu::Texture>,
     /// Pick depth texture view.
-    pick_depth_view: Option<wgpu::TextureView>,
+    pub(crate) pick_depth_view: Option<wgpu::TextureView>,
     /// Staging buffer for pick pixel readback.
-    pick_staging_buffer: Option<wgpu::Buffer>,
+    pub(crate) pick_staging_buffer: Option<wgpu::Buffer>,
     /// Current size of pick buffers (for resize detection).
-    pick_buffer_size: (u32, u32),
+    pub(crate) pick_buffer_size: (u32, u32),
     /// Pick pipeline for point clouds.
-    point_pick_pipeline: Option<wgpu::RenderPipeline>,
+    pub(crate) point_pick_pipeline: Option<wgpu::RenderPipeline>,
     /// Pick pipeline for curve networks (line mode).
-    curve_network_pick_pipeline: Option<wgpu::RenderPipeline>,
+    pub(crate) curve_network_pick_pipeline: Option<wgpu::RenderPipeline>,
     /// Pick pipeline for curve networks (tube mode) - uses ray-cylinder intersection.
-    curve_network_tube_pick_pipeline: Option<wgpu::RenderPipeline>,
+    pub(crate) curve_network_tube_pick_pipeline: Option<wgpu::RenderPipeline>,
     /// Tube pick bind group layout.
-    curve_network_tube_pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) curve_network_tube_pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Pick bind group layout (shared across pick pipelines).
-    pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    pub(crate) pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
 }
 
 impl RenderEngine {
