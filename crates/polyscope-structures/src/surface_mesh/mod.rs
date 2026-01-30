@@ -9,7 +9,7 @@ pub use one_form_quantity::*;
 pub use parameterization_quantity::*;
 pub use quantities::*;
 
-use glam::{Mat4, Vec2, Vec3};
+use glam::{Mat4, Vec2, Vec3, Vec4};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
@@ -66,11 +66,11 @@ pub struct SurfaceMesh {
     material: String,
     shade_style: ShadeStyle,
     edge_width: f32,
-    edge_color: Vec3,
+    edge_color: Vec4,
     show_edges: bool,
     backface_policy: BackfacePolicy,
-    backface_color: Vec3,
-    surface_color: Vec3,
+    backface_color: Vec4,
+    surface_color: Vec4,
     transparency: f32,
 
     // GPU resources
@@ -105,11 +105,11 @@ impl SurfaceMesh {
             material: "clay".to_string(),
             shade_style: ShadeStyle::default(),
             edge_width: 1.0,
-            edge_color: Vec3::ZERO,
+            edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
             show_edges: false,
             backface_policy: BackfacePolicy::default(),
-            backface_color: Vec3::new(0.3, 0.3, 0.3),
-            surface_color: Vec3::new(0.5, 0.5, 0.8),
+            backface_color: Vec4::new(0.3, 0.3, 0.3, 1.0),
+            surface_color: Vec4::new(0.5, 0.5, 0.8, 1.0),
             transparency: 0.0, // 0.0 = fully opaque, 1.0 = fully transparent
 
             render_data: None,
@@ -252,13 +252,13 @@ impl SurfaceMesh {
 
     /// Gets the edge color.
     #[must_use]
-    pub fn edge_color(&self) -> Vec3 {
+    pub fn edge_color(&self) -> Vec4 {
         self.edge_color
     }
 
     /// Sets the edge color.
     pub fn set_edge_color(&mut self, color: Vec3) {
-        self.edge_color = color;
+        self.edge_color = color.extend(1.0);
     }
 
     /// Gets whether edges are shown.
@@ -285,24 +285,24 @@ impl SurfaceMesh {
 
     /// Gets the backface color.
     #[must_use]
-    pub fn backface_color(&self) -> Vec3 {
+    pub fn backface_color(&self) -> Vec4 {
         self.backface_color
     }
 
     /// Sets the backface color.
     pub fn set_backface_color(&mut self, color: Vec3) {
-        self.backface_color = color;
+        self.backface_color = color.extend(1.0);
     }
 
     /// Gets the surface color.
     #[must_use]
-    pub fn surface_color(&self) -> Vec3 {
+    pub fn surface_color(&self) -> Vec4 {
         self.surface_color
     }
 
     /// Sets the surface color.
     pub fn set_surface_color(&mut self, color: Vec3) {
-        self.surface_color = color;
+        self.surface_color = color.extend(1.0);
     }
 
     /// Gets the transparency (1.0 = opaque, 0.0 = fully transparent).
@@ -495,11 +495,7 @@ impl SurfaceMesh {
     /// Builds the egui UI for this surface mesh.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
         let mut shade_style = self.shade_style as u32;
-        let mut color = [
-            self.surface_color.x,
-            self.surface_color.y,
-            self.surface_color.z,
-        ];
+        let mut color = [self.surface_color.x, self.surface_color.y, self.surface_color.z];
         let mut transparency = self.transparency;
         let mut show_edges = self.show_edges;
         let mut edge_width = self.edge_width;
@@ -525,11 +521,11 @@ impl SurfaceMesh {
                 1 => ShadeStyle::Flat,
                 _ => ShadeStyle::TriFlat,
             };
-            self.surface_color = Vec3::new(color[0], color[1], color[2]);
+            self.surface_color = Vec4::new(color[0], color[1], color[2], self.surface_color.w);
             self.transparency = transparency;
             self.show_edges = show_edges;
             self.edge_width = edge_width;
-            self.edge_color = Vec3::new(edge_color[0], edge_color[1], edge_color[2]);
+            self.edge_color = Vec4::new(edge_color[0], edge_color[1], edge_color[2], self.edge_color.w);
             self.backface_policy = match backface_policy {
                 0 => BackfacePolicy::Identical,
                 1 => BackfacePolicy::Different,
@@ -1207,24 +1203,14 @@ impl SurfaceMesh {
             show_edges: u32::from(self.show_edges),
             edge_width: self.edge_width,
             transparency: self.transparency,
-            surface_color: [
-                self.surface_color.x,
-                self.surface_color.y,
-                self.surface_color.z,
-                1.0,
-            ],
-            edge_color: [self.edge_color.x, self.edge_color.y, self.edge_color.z, 1.0],
+            surface_color: self.surface_color.to_array(),
+            edge_color: self.edge_color.to_array(),
             backface_policy: self.backface_policy as u32,
             slice_planes_enabled: 1,
             _pad1: [0.0; 2],
             _pad2: [0.0; 3],
             _pad3: 0.0,
-            backface_color: [
-                self.backface_color.x,
-                self.backface_color.y,
-                self.backface_color.z,
-                1.0,
-            ],
+            backface_color: self.backface_color.to_array(),
         };
         render_data.update_uniforms(queue, &uniforms);
 
@@ -1260,7 +1246,8 @@ impl SurfaceMesh {
             render_data.update_colors(queue, &vertex_colors, &self.triangulation);
         } else if let Some(cq) = self.active_vertex_color_quantity() {
             // Direct vertex color quantity
-            render_data.update_colors(queue, cq.colors(), &self.triangulation);
+            let colors_rgb: Vec<Vec3> = cq.colors().iter().map(|c| c.truncate()).collect();
+            render_data.update_colors(queue, &colors_rgb, &self.triangulation);
         } else if let Some(cq) = self.active_face_color_quantity() {
             // Face color expanded to vertices
             let colors = cq.compute_vertex_colors(&self.faces, self.vertices.len());
@@ -1607,13 +1594,13 @@ mod tests {
         assert_eq!(mesh.edge_width(), 2.0);
 
         mesh.set_edge_color(Vec3::new(1.0, 0.0, 0.0));
-        assert_eq!(mesh.edge_color(), Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(mesh.edge_color(), Vec4::new(1.0, 0.0, 0.0, 1.0));
 
         mesh.set_surface_color(Vec3::new(0.0, 1.0, 0.0));
-        assert_eq!(mesh.surface_color(), Vec3::new(0.0, 1.0, 0.0));
+        assert_eq!(mesh.surface_color(), Vec4::new(0.0, 1.0, 0.0, 1.0));
 
         mesh.set_backface_color(Vec3::new(0.0, 0.0, 1.0));
-        assert_eq!(mesh.backface_color(), Vec3::new(0.0, 0.0, 1.0));
+        assert_eq!(mesh.backface_color(), Vec4::new(0.0, 0.0, 1.0, 1.0));
 
         mesh.set_transparency(0.5);
         assert_eq!(mesh.transparency(), 0.5);

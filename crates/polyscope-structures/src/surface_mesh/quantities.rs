@@ -1,6 +1,6 @@
 //! Surface mesh quantity implementations.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use polyscope_core::quantity::{FaceQuantity, Quantity, QuantityKind, VertexQuantity};
 use polyscope_render::{ColorMap, VectorRenderData, VectorUniforms};
 
@@ -292,7 +292,7 @@ impl FaceQuantity for MeshFaceScalarQuantity {}
 pub struct MeshVertexColorQuantity {
     name: String,
     structure_name: String,
-    colors: Vec<Vec3>,
+    colors: Vec<Vec4>,
     enabled: bool,
 }
 
@@ -306,14 +306,14 @@ impl MeshVertexColorQuantity {
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
-            colors,
+            colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
             enabled: false,
         }
     }
 
     /// Returns the colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 
@@ -367,7 +367,7 @@ impl VertexQuantity for MeshVertexColorQuantity {}
 pub struct MeshFaceColorQuantity {
     name: String,
     structure_name: String,
-    colors: Vec<Vec3>,
+    colors: Vec<Vec4>,
     enabled: bool,
 }
 
@@ -381,14 +381,14 @@ impl MeshFaceColorQuantity {
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
-            colors,
+            colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
             enabled: false,
         }
     }
 
     /// Returns the colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 
@@ -399,7 +399,7 @@ impl MeshFaceColorQuantity {
         let mut colors = vec![Vec3::splat(0.5); num_vertices];
 
         for (face_idx, face) in faces.iter().enumerate() {
-            let color = self.colors[face_idx];
+            let color = self.colors[face_idx].truncate();
             for &vi in face {
                 colors[vi as usize] = color;
             }
@@ -462,7 +462,7 @@ pub struct MeshVertexVectorQuantity {
     enabled: bool,
     length_scale: f32,
     radius: f32,
-    color: Vec3,
+    color: Vec4,
     render_data: Option<VectorRenderData>,
 }
 
@@ -480,7 +480,7 @@ impl MeshVertexVectorQuantity {
             enabled: false,
             length_scale: 1.0,
             radius: 0.005,
-            color: Vec3::new(0.8, 0.2, 0.2),
+            color: Vec4::new(0.8, 0.2, 0.2, 1.0),
             render_data: None,
         }
     }
@@ -515,13 +515,13 @@ impl MeshVertexVectorQuantity {
 
     /// Gets the color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the color.
     pub fn set_color(&mut self, c: Vec3) {
-        self.color = c;
+        self.color = c.extend(1.0);
     }
 
     /// Auto-scales length and radius based on the structure's bounding box diagonal
@@ -574,7 +574,7 @@ impl MeshVertexVectorQuantity {
                 length_scale: self.length_scale,
                 radius: self.radius,
                 _padding: [0.0; 2],
-                color: [self.color.x, self.color.y, self.color.z, 1.0],
+                color: self.color.to_array(),
             };
             render_data.update_uniforms(queue, &uniforms);
         }
@@ -592,7 +592,7 @@ impl MeshVertexVectorQuantity {
             &mut color,
         );
         if changed {
-            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
         }
         changed
     }
@@ -646,7 +646,7 @@ pub struct MeshFaceVectorQuantity {
     enabled: bool,
     length_scale: f32,
     radius: f32,
-    color: Vec3,
+    color: Vec4,
     render_data: Option<VectorRenderData>,
 }
 
@@ -664,7 +664,7 @@ impl MeshFaceVectorQuantity {
             enabled: false,
             length_scale: 1.0,
             radius: 0.005,
-            color: Vec3::new(0.2, 0.2, 0.8),
+            color: Vec4::new(0.2, 0.2, 0.8, 1.0),
             render_data: None,
         }
     }
@@ -699,13 +699,13 @@ impl MeshFaceVectorQuantity {
 
     /// Gets the color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the color.
     pub fn set_color(&mut self, c: Vec3) {
-        self.color = c;
+        self.color = c.extend(1.0);
     }
 
     /// Auto-scales length and radius based on the structure's bounding box diagonal
@@ -758,7 +758,7 @@ impl MeshFaceVectorQuantity {
                 length_scale: self.length_scale,
                 radius: self.radius,
                 _padding: [0.0; 2],
-                color: [self.color.x, self.color.y, self.color.z, 1.0],
+                color: self.color.to_array(),
             };
             render_data.update_uniforms(queue, &uniforms);
         }
@@ -776,7 +776,7 @@ impl MeshFaceVectorQuantity {
             &mut color,
         );
         if changed {
-            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
         }
         changed
     }

@@ -4,7 +4,7 @@
 //! representing integrated flux or circulation along the edge.
 //! It is rendered as vector arrows at edge midpoints.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use polyscope_core::quantity::{EdgeQuantity, Quantity, QuantityKind};
 use polyscope_render::{VectorRenderData, VectorUniforms};
 
@@ -21,7 +21,7 @@ pub struct MeshOneFormQuantity {
     enabled: bool,
     length_scale: f32,
     radius: f32,
-    color: Vec3,
+    color: Vec4,
     render_data: Option<VectorRenderData>,
 }
 
@@ -41,7 +41,7 @@ impl MeshOneFormQuantity {
             enabled: false,
             length_scale: 1.0,
             radius: 0.005,
-            color: Vec3::new(0.2, 0.7, 0.2),
+            color: Vec4::new(0.2, 0.7, 0.2, 1.0),
             render_data: None,
         }
     }
@@ -84,13 +84,13 @@ impl MeshOneFormQuantity {
 
     /// Gets the color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the color.
     pub fn set_color(&mut self, c: Vec3) -> &mut Self {
-        self.color = c;
+        self.color = c.extend(1.0);
         self
     }
 
@@ -191,7 +191,7 @@ impl MeshOneFormQuantity {
                 length_scale: self.length_scale,
                 radius: self.radius,
                 _padding: [0.0; 2],
-                color: [self.color.x, self.color.y, self.color.z, 1.0],
+                color: self.color.to_array(),
             };
             render_data.update_uniforms(queue, &uniforms);
         }
@@ -209,7 +209,7 @@ impl MeshOneFormQuantity {
             &mut color,
         );
         if changed {
-            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
         }
         changed
     }

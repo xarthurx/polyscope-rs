@@ -1,6 +1,6 @@
 //! Intrinsic (tangent-space) vector quantities for surface meshes.
 
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 use polyscope_core::quantity::{FaceQuantity, Quantity, QuantityKind, VertexQuantity};
 use polyscope_render::{VectorRenderData, VectorUniforms};
 
@@ -18,7 +18,7 @@ pub struct MeshVertexIntrinsicVectorQuantity {
     enabled: bool,
     length_scale: f32,
     radius: f32,
-    color: Vec3,
+    color: Vec4,
     render_data: Option<VectorRenderData>,
 }
 
@@ -41,7 +41,7 @@ impl MeshVertexIntrinsicVectorQuantity {
             enabled: false,
             length_scale: 1.0,
             radius: 0.005,
-            color: Vec3::new(0.8, 0.2, 0.8),
+            color: Vec4::new(0.8, 0.2, 0.8, 1.0),
             render_data: None,
         }
     }
@@ -102,13 +102,13 @@ impl MeshVertexIntrinsicVectorQuantity {
 
     /// Gets the color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the color.
     pub fn set_color(&mut self, c: Vec3) -> &mut Self {
-        self.color = c;
+        self.color = c.extend(1.0);
         self
     }
 
@@ -199,7 +199,7 @@ impl MeshVertexIntrinsicVectorQuantity {
                 length_scale: self.length_scale,
                 radius: self.radius,
                 _padding: [0.0; 2],
-                color: [self.color.x, self.color.y, self.color.z, 1.0],
+                color: self.color.to_array(),
             };
             render_data.update_uniforms(queue, &uniforms);
         }
@@ -218,7 +218,7 @@ impl MeshVertexIntrinsicVectorQuantity {
             &mut self.n_sym,
         );
         if changed {
-            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
         }
         changed
     }
@@ -268,7 +268,7 @@ pub struct MeshFaceIntrinsicVectorQuantity {
     enabled: bool,
     length_scale: f32,
     radius: f32,
-    color: Vec3,
+    color: Vec4,
     render_data: Option<VectorRenderData>,
 }
 
@@ -291,7 +291,7 @@ impl MeshFaceIntrinsicVectorQuantity {
             enabled: false,
             length_scale: 1.0,
             radius: 0.005,
-            color: Vec3::new(0.2, 0.8, 0.8),
+            color: Vec4::new(0.2, 0.8, 0.8, 1.0),
             render_data: None,
         }
     }
@@ -352,13 +352,13 @@ impl MeshFaceIntrinsicVectorQuantity {
 
     /// Gets the color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the color.
     pub fn set_color(&mut self, c: Vec3) -> &mut Self {
-        self.color = c;
+        self.color = c.extend(1.0);
         self
     }
 
@@ -442,7 +442,7 @@ impl MeshFaceIntrinsicVectorQuantity {
                 length_scale: self.length_scale,
                 radius: self.radius,
                 _padding: [0.0; 2],
-                color: [self.color.x, self.color.y, self.color.z, 1.0],
+                color: self.color.to_array(),
             };
             render_data.update_uniforms(queue, &uniforms);
         }
@@ -461,7 +461,7 @@ impl MeshFaceIntrinsicVectorQuantity {
             &mut self.n_sym,
         );
         if changed {
-            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
         }
         changed
     }
