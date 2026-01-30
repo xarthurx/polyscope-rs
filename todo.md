@@ -44,8 +44,13 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 
 ## Planned Features (Tiered Priority)
 
+### Bugs / Known Issues
+
+- [ ] **SSAA crash on factor change** — Switching SSAA from 1x to 2x/4x triggers a buffer size mismatch (`Buffer is bound with size 16 where the shader expects 32`). Root cause is in the shadow system re-implementation (commit `e7697cf`), which introduced a uniform buffer sizing bug that surfaces when textures are recreated. Blocked on engine.rs refactor.
+
 ### Tier 2 — Broader Feature Additions
 
+- [ ] **Matcap Material System** - Current materials use parametric Phong lighting (ambient/diffuse/specular/shininess scalars). C++ Polyscope uses texture-based matcap rendering (view-space normal → HDR texture lookup) which gives its distinctive visual quality. Gaps: (1) No matcap texture loading or rendering; (2) MaterialUniforms not wired to surface mesh / point cloud shaders; (3) Only CurveNetwork exposes `set_material()`; SurfaceMesh and PointCloud do not; (4) Missing `concrete` material; (5) No custom material loading API (`loadBlendableMaterial` / `loadStaticMaterial`).
 - [ ] **RGBA Color Quantities** - Currently only RGB colors supported; add alpha channel support for per-element transparency
 - [ ] **Full Polygon Mesh Support** - Arbitrary n-gon faces (not just triangles); proper triangulation for rendering and quantities
 
@@ -57,6 +62,12 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 - [x] **Floating Quantities** - Scalar images (colormap-based), color images (direct RGB), depth render images, color render images, and raw color images for screen-space data.
 
 All Tier 3 quantities have full GPU rendering pipelines (init/update/draw), auto-scaling, and egui UI controls.
+
+### Upstream Follow-ups (from C++ Polyscope)
+
+- [ ] **Double-click to set view center** — Port upstream commit 61fc32a
+- [ ] **Turntable orbit drift prevention** — Port upstream commit 129c680
+- [ ] **Drag & drop file callback** — Port upstream commit 0ff26c2
 
 ### Tier 4 — Polish
 
