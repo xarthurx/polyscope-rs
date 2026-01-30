@@ -18,7 +18,7 @@ use crate::camera::Camera;
 use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
 use crate::ground_plane::GroundPlaneRenderData;
-use crate::materials::MaterialRegistry;
+use crate::materials::{self, MatcapTextureSet, MaterialRegistry};
 use crate::shadow_map::ShadowMapPass;
 use crate::slice_plane_render::SlicePlaneRenderData;
 use crate::tone_mapping::ToneMapPass;
@@ -73,6 +73,10 @@ pub struct RenderEngine {
     pub materials: MaterialRegistry,
     /// Color map registry.
     pub color_maps: ColorMapRegistry,
+    /// Matcap bind group layout (Group 2: 4 textures + 1 sampler).
+    pub matcap_bind_group_layout: wgpu::BindGroupLayout,
+    /// Matcap texture sets keyed by material name.
+    pub matcap_textures: HashMap<String, MatcapTextureSet>,
     /// Main camera.
     pub camera: Camera,
     /// Current viewport width.
@@ -447,6 +451,11 @@ impl RenderEngine {
             wgpu::TextureFormat::Depth24PlusStencil8,
         );
 
+        // Create matcap bind group layout and load all matcap textures
+        let matcap_bind_group_layout = materials::create_matcap_bind_group_layout(&device);
+        let matcap_textures =
+            materials::init_matcap_textures(&device, &queue, &matcap_bind_group_layout);
+
         let mut engine = Self {
             instance,
             adapter,
@@ -459,6 +468,8 @@ impl RenderEngine {
             depth_only_view,
             materials: MaterialRegistry::new(),
             color_maps: ColorMapRegistry::new(),
+            matcap_bind_group_layout,
+            matcap_textures,
             camera,
             width,
             height,
@@ -757,6 +768,11 @@ impl RenderEngine {
             wgpu::TextureFormat::Depth24PlusStencil8,
         );
 
+        // Create matcap bind group layout and load all matcap textures
+        let matcap_bind_group_layout = materials::create_matcap_bind_group_layout(&device);
+        let matcap_textures =
+            materials::init_matcap_textures(&device, &queue, &matcap_bind_group_layout);
+
         let mut engine = Self {
             instance,
             adapter,
@@ -769,6 +785,8 @@ impl RenderEngine {
             depth_only_view,
             materials: MaterialRegistry::new(),
             color_maps: ColorMapRegistry::new(),
+            matcap_bind_group_layout,
+            matcap_textures,
             camera,
             width,
             height,

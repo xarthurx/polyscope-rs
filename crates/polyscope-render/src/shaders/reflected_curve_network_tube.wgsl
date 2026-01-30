@@ -30,6 +30,26 @@ struct ReflectionUniforms {
 @group(0) @binding(3) var<storage, read> edge_colors: array<vec4<f32>>;
 @group(1) @binding(0) var<uniform> reflection: ReflectionUniforms;
 
+// Matcap textures (Group 2)
+@group(2) @binding(0) var matcap_r: texture_2d<f32>;
+@group(2) @binding(1) var matcap_g: texture_2d<f32>;
+@group(2) @binding(2) var matcap_b: texture_2d<f32>;
+@group(2) @binding(3) var matcap_k: texture_2d<f32>;
+@group(2) @binding(4) var matcap_sampler: sampler;
+
+fn light_surface_matcap(normal: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
+    var n = normalize(normal);
+    n.y = -n.y;
+    n = n * 0.98;
+    let uv = n.xy * 0.5 + vec2<f32>(0.5);
+    let mat_r = textureSample(matcap_r, matcap_sampler, uv).rgb;
+    let mat_g = textureSample(matcap_g, matcap_sampler, uv).rgb;
+    let mat_b = textureSample(matcap_b, matcap_sampler, uv).rgb;
+    let mat_k = textureSample(matcap_k, matcap_sampler, uv).rgb;
+    return color.r * mat_r + color.g * mat_g
+         + color.b * mat_b + (1.0 - color.r - color.g - color.b) * mat_k;
+}
+
 struct VertexInput {
     @location(0) position: vec4<f32>,
     @location(1) edge_id_and_vertex_id: vec4<u32>,
@@ -165,20 +185,9 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         base_color = uniforms.color.rgb;
     }
 
-    // Simple lighting with flipped normal for reflection
-    let reflected_normal = vec3<f32>(hit_normal.x, -hit_normal.y, hit_normal.z);
-    let light_dir = normalize(vec3<f32>(1.0, 1.0, 1.0));
-    let view_dir = -ray_dir;
-
-    let ambient = 0.3;
-    let n_dot_l = max(dot(reflected_normal, light_dir), 0.0);
-    let diffuse = 0.6 * n_dot_l;
-
-    let half_vec = normalize(light_dir + view_dir);
-    let n_dot_h = max(dot(reflected_normal, half_vec), 0.0);
-    let specular = 0.3 * pow(n_dot_h, 32.0);
-
-    let lit_color = base_color * (ambient + diffuse) + vec3<f32>(1.0) * specular;
+    // Matcap lighting: transform world-space normal to view space
+    let view_normal = normalize((camera.view * vec4<f32>(hit_normal, 0.0)).xyz);
+    let lit_color = light_surface_matcap(view_normal, base_color);
 
     // Output with reflection intensity as alpha
     out.color = vec4<f32>(lit_color, reflection.intensity);

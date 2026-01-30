@@ -2,16 +2,39 @@
 
 use egui::Ui;
 
+/// Available material names for matcap rendering.
+const MATERIALS: &[&str] = &["clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal"];
+
+/// Builds a material selector ComboBox. Returns true if the material changed.
+pub fn build_material_selector(ui: &mut Ui, material: &mut String) -> bool {
+    let mut changed = false;
+    egui::ComboBox::from_label("Material")
+        .selected_text(material.as_str())
+        .show_ui(ui, |ui| {
+            for &mat in MATERIALS {
+                if ui.selectable_value(material, mat.to_string(), mat).changed() {
+                    changed = true;
+                }
+            }
+        });
+    changed
+}
+
 /// Builds UI for a point cloud.
 pub fn build_point_cloud_ui(
     ui: &mut Ui,
     num_points: usize,
     point_radius: &mut f32,
     base_color: &mut [f32; 3],
+    material: &mut String,
 ) -> bool {
     let mut changed = false;
 
     ui.label(format!("Points: {num_points}"));
+
+    if build_material_selector(ui, material) {
+        changed = true;
+    }
 
     ui.horizontal(|ui| {
         ui.label("Color:");
@@ -50,12 +73,17 @@ pub fn build_surface_mesh_ui(
     edge_width: &mut f32,
     edge_color: &mut [f32; 3],
     backface_policy: &mut u32,
+    material: &mut String,
 ) -> bool {
     let mut changed = false;
 
     ui.label(format!("Vertices: {num_vertices}"));
     ui.label(format!("Faces: {num_faces}"));
     ui.label(format!("Edges: {num_edges}"));
+
+    if build_material_selector(ui, material) {
+        changed = true;
+    }
 
     ui.separator();
 
@@ -164,11 +192,16 @@ pub fn build_curve_network_ui(
     radius_is_relative: &mut bool,
     color: &mut [f32; 3],
     render_mode: &mut u32,
+    material: &mut String,
 ) -> bool {
     let mut changed = false;
 
     ui.label(format!("Nodes: {num_nodes}"));
     ui.label(format!("Edges: {num_edges}"));
+
+    if build_material_selector(ui, material) {
+        changed = true;
+    }
 
     ui.separator();
 

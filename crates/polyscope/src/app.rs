@@ -13,7 +13,7 @@ use winit::{
 };
 
 use polyscope_core::slice_plane::SlicePlaneUniforms;
-use polyscope_core::{GroundPlaneConfig, GroundPlaneMode};
+use polyscope_core::{GroundPlaneConfig, GroundPlaneMode, Structure};
 use polyscope_render::{reflection, PickResult, RenderEngine};
 use polyscope_structures::{
     CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh,
@@ -1788,6 +1788,7 @@ impl App {
                             if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
                                 if let Some(render_data) = pc.render_data() {
                                     render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.set_bind_group(2, engine.matcap_bind_group_for(pc.material()), &[]);
                                     // 6 vertices per quad, num_points instances
                                     render_pass.draw(0..6, 0..render_data.num_points);
                                 }
@@ -1807,6 +1808,7 @@ impl App {
                         if !structure.is_enabled() {
                             continue;
                         }
+                        render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                         if structure.type_name() == "PointCloud" {
                             if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
                                 if let Some(vq) = pc.active_vector_quantity() {
@@ -1874,6 +1876,7 @@ impl App {
                         if !structure.is_enabled() {
                             continue;
                         }
+                        render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                         if structure.type_name() == "CurveNetwork" {
                             if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
                                 // Only render in line mode (0)
@@ -1927,6 +1930,7 @@ impl App {
                                             &render_data.tube_render_bind_group,
                                             &render_data.generated_vertex_buffer,
                                         ) {
+                                            render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                                             render_pass.set_bind_group(0, tube_bg, &[]);
                                             render_pass.set_vertex_buffer(0, gen_vb.slice(..));
                                             // 36 vertices per edge (12 triangles for bounding box)
@@ -1956,6 +1960,7 @@ impl App {
                                 if cn.render_mode() == 1 {
                                     if let Some(render_data) = cn.render_data() {
                                         if let Some(node_bg) = &render_data.node_render_bind_group {
+                                            render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                                             render_pass.set_bind_group(0, node_bg, &[]);
                                             // 6 vertices per quad, num_nodes instances
                                             render_pass.draw(0..6, 0..render_data.num_nodes);
@@ -2036,6 +2041,7 @@ impl App {
                                 continue;
                             }
                             if let Some(render_data) = mesh.render_data() {
+                                render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                                 render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                 render_pass.set_index_buffer(
                                     render_data.index_buffer.slice(..),
@@ -2049,6 +2055,7 @@ impl App {
                         if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
                             // Render exterior faces (includes cell culling when slice plane is active)
                             if let Some(render_data) = vm.render_data() {
+                                render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                                 render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                 render_pass.set_index_buffer(
                                     render_data.index_buffer.slice(..),
@@ -2160,6 +2167,7 @@ impl App {
                                             &mut render_pass,
                                             &bind_group,
                                             mesh_data.vertex_count(),
+                                            structure.material(),
                                         );
                                     }
                                 }
@@ -2178,6 +2186,7 @@ impl App {
                                             &mut render_pass,
                                             &bind_group,
                                             mesh_data.vertex_count(),
+                                            structure.material(),
                                         );
                                     }
                                 }
@@ -2194,6 +2203,7 @@ impl App {
                                             &mut render_pass,
                                             &bind_group,
                                             pc_data.num_points,
+                                            structure.material(),
                                         );
                                     }
                                 }
@@ -2210,6 +2220,7 @@ impl App {
                                             &mut render_pass,
                                             &bind_group,
                                             cn_data,
+                                            structure.material(),
                                         );
                                     }
                                 }
@@ -2307,6 +2318,7 @@ impl App {
                                     // This handles both transparent and opaque meshes,
                                     // avoiding z-fighting on overlapping geometry
                                     if let Some(render_data) = mesh.render_data() {
+                                        oit_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                                         oit_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                         oit_pass.set_index_buffer(
                                             render_data.index_buffer.slice(..),
@@ -2452,6 +2464,7 @@ impl App {
                         if structure.type_name() == "PointCloud" {
                             if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
                                 if let Some(render_data) = pc.render_data() {
+                                    render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                                     render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                     render_pass.draw(0..6, 0..render_data.num_points);
                                 }
@@ -2471,6 +2484,7 @@ impl App {
                         if !structure.is_enabled() {
                             continue;
                         }
+                        render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                         if structure.type_name() == "PointCloud" {
                             if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
                                 if let Some(vq) = pc.active_vector_quantity() {
@@ -2537,6 +2551,7 @@ impl App {
                         if structure.type_name() == "SurfaceMesh" {
                             if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
                                 if let Some(render_data) = mesh.render_data() {
+                                    render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                                     render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                     render_pass.set_index_buffer(
                                         render_data.index_buffer.slice(..),
@@ -2549,6 +2564,7 @@ impl App {
                         if structure.type_name() == "VolumeMesh" {
                             if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
                                 if let Some(render_data) = vm.render_data() {
+                                    render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                                     render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                                     render_pass.set_index_buffer(
                                         render_data.index_buffer.slice(..),
@@ -2572,6 +2588,7 @@ impl App {
                         if !structure.is_enabled() {
                             continue;
                         }
+                        render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
                         if structure.type_name() == "CurveNetwork" {
                             if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
                                 if let Some(render_data) = cn.render_data() {

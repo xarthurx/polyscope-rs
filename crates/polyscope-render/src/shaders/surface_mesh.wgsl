@@ -51,6 +51,27 @@ struct MeshUniforms {
 
 @group(1) @binding(0) var<uniform> slice_planes: SlicePlanesArray;
 
+// Matcap textures (Group 2)
+@group(2) @binding(0) var matcap_r: texture_2d<f32>;
+@group(2) @binding(1) var matcap_g: texture_2d<f32>;
+@group(2) @binding(2) var matcap_b: texture_2d<f32>;
+@group(2) @binding(3) var matcap_k: texture_2d<f32>;
+@group(2) @binding(4) var matcap_sampler: sampler;
+
+// Matcap lighting: view-space normal -> UV -> 4-channel weighted blend
+fn light_surface_matcap(normal: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
+    var n = normalize(normal);
+    n.y = -n.y; // flip Y for camera convention
+    n = n * 0.98; // scale to avoid edge artifacts
+    let uv = n.xy * 0.5 + vec2<f32>(0.5);
+    let mat_r = textureSample(matcap_r, matcap_sampler, uv).rgb;
+    let mat_g = textureSample(matcap_g, matcap_sampler, uv).rgb;
+    let mat_b = textureSample(matcap_b, matcap_sampler, uv).rgb;
+    let mat_k = textureSample(matcap_k, matcap_sampler, uv).rgb;
+    return color.r * mat_r + color.g * mat_g
+         + color.b * mat_b + (1.0 - color.r - color.g - color.b) * mat_k;
+}
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,
@@ -172,14 +193,9 @@ fn fs_main(
         normal = -normal;
     }
 
-    // Apply lighting: higher ambient (0.5) for brightness from all directions
-    // plus diffuse contribution from a directional light
-    let light_dir = normalize(vec3<f32>(0.3, 0.5, 1.0));
-    let ambient = 0.5;
-    let diffuse = 0.5 * max(dot(normal, light_dir), 0.0);
-    let lighting = ambient + diffuse;
-
-    var color = base_color * lighting;
+    // Apply matcap lighting: transform normal to view space, lookup matcap textures
+    let view_normal_for_matcap = normalize((camera.view * vec4<f32>(normal, 0.0)).xyz);
+    var color = light_surface_matcap(view_normal_for_matcap, base_color);
 
     // Wireframe: if show_edges, mix edge_color based on barycentric distance
     // Only draw edges marked as real (not internal triangulation edges)

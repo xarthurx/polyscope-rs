@@ -372,6 +372,7 @@ impl CurveNetwork {
             &mut radius_is_relative,
             &mut color,
             &mut render_mode,
+            &mut self.material,
         ) {
             self.color = Vec3::new(color[0], color[1], color[2]);
             self.radius = radius;
@@ -763,6 +764,14 @@ impl Structure for CurveNetwork {
 
     fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
+    }
+
+    fn material(&self) -> &str {
+        &self.material
+    }
+
+    fn set_material(&mut self, material_name: &str) {
+        self.material = material_name.to_string();
     }
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {

@@ -39,6 +39,14 @@ struct CurveNetworkUniforms {
 
 @group(1) @binding(0) var<uniform> slice_planes: SlicePlanesArray;
 
+// Matcap textures (Group 2) - declared for pipeline layout compatibility
+// Line rendering does not use matcap (no normals available)
+@group(2) @binding(0) var matcap_r: texture_2d<f32>;
+@group(2) @binding(1) var matcap_g: texture_2d<f32>;
+@group(2) @binding(2) var matcap_b: texture_2d<f32>;
+@group(2) @binding(3) var matcap_k: texture_2d<f32>;
+@group(2) @binding(4) var matcap_sampler: sampler;
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,

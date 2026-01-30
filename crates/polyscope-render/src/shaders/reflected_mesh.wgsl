@@ -46,6 +46,26 @@ struct ReflectionUniforms {
 @group(0) @binding(6) var<storage, read> edge_is_real: array<vec4<f32>>;
 @group(1) @binding(0) var<uniform> reflection: ReflectionUniforms;
 
+// Matcap textures (Group 2)
+@group(2) @binding(0) var matcap_r: texture_2d<f32>;
+@group(2) @binding(1) var matcap_g: texture_2d<f32>;
+@group(2) @binding(2) var matcap_b: texture_2d<f32>;
+@group(2) @binding(3) var matcap_k: texture_2d<f32>;
+@group(2) @binding(4) var matcap_sampler: sampler;
+
+fn light_surface_matcap(normal: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
+    var n = normalize(normal);
+    n.y = -n.y;
+    n = n * 0.98;
+    let uv = n.xy * 0.5 + vec2<f32>(0.5);
+    let mat_r = textureSample(matcap_r, matcap_sampler, uv).rgb;
+    let mat_g = textureSample(matcap_g, matcap_sampler, uv).rgb;
+    let mat_b = textureSample(matcap_b, matcap_sampler, uv).rgb;
+    let mat_k = textureSample(matcap_k, matcap_sampler, uv).rgb;
+    return color.r * mat_r + color.g * mat_g
+         + color.b * mat_b + (1.0 - color.r - color.g - color.b) * mat_k;
+}
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,
@@ -98,23 +118,13 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) front_facing: bool) -> @loca
         base_color = mesh_uniforms.surface_color.rgb;
     }
 
-    // Simple lighting
-    let light_dir = normalize(vec3<f32>(0.5, 1.0, 0.3));
-    let view_dir = normalize(camera.camera_pos - in.world_position);
-
     // Use flipped normal for front-facing test on reflected geometry
     // Since we flipped normals, front_facing logic is inverted
     let normal = select(-in.world_normal, in.world_normal, front_facing);
 
-    // Ambient + diffuse
-    let ambient = 0.3;
-    let diffuse = max(dot(normal, light_dir), 0.0) * 0.6;
-
-    // Specular
-    let half_vec = normalize(light_dir + view_dir);
-    let specular = pow(max(dot(normal, half_vec), 0.0), 32.0) * 0.2;
-
-    let final_color = base_color * (ambient + diffuse) + vec3<f32>(specular);
+    // Matcap lighting: transform normal to view space
+    let view_normal = normalize((camera.view * vec4<f32>(normal, 0.0)).xyz);
+    let final_color = light_surface_matcap(view_normal, base_color);
 
     // Output with reflection intensity as alpha
     // Standard alpha blending will do: reflection * intensity + ground * (1 - intensity)

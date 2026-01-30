@@ -77,6 +77,16 @@ pub trait Structure: Any + Send + Sync {
     fn reset_transform(&mut self) {
         self.set_transform(Mat4::IDENTITY);
     }
+
+    /// Returns the material name for this structure (e.g., "clay", "wax").
+    fn material(&self) -> &str {
+        "clay"
+    }
+
+    /// Sets the material for this structure by name.
+    fn set_material(&mut self, _material: &str) {
+        // Default no-op; structures that support materials override this
+    }
 }
 
 /// A structure that can have quantities attached to it.

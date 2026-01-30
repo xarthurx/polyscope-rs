@@ -63,6 +63,7 @@ pub struct SurfaceMesh {
     needs_recompute: bool,
 
     // Render options
+    material: String,
     shade_style: ShadeStyle,
     edge_width: f32,
     edge_color: Vec3,
@@ -101,6 +102,7 @@ impl SurfaceMesh {
             needs_recompute: true,
 
             // Default render options
+            material: "clay".to_string(),
             shade_style: ShadeStyle::default(),
             edge_width: 1.0,
             edge_color: Vec3::ZERO,
@@ -516,6 +518,7 @@ impl SurfaceMesh {
             &mut edge_width,
             &mut edge_color,
             &mut backface_policy,
+            &mut self.material,
         ) {
             self.shade_style = match shade_style {
                 0 => ShadeStyle::Smooth,
@@ -1353,6 +1356,14 @@ impl Structure for SurfaceMesh {
 
     fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
+    }
+
+    fn material(&self) -> &str {
+        &self.material
+    }
+
+    fn set_material(&mut self, material: &str) {
+        self.material = material.to_string();
     }
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {

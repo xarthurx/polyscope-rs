@@ -31,6 +31,26 @@ struct ReflectionUniforms {
 @group(0) @binding(3) var<storage, read> point_colors: array<vec3<f32>>;
 @group(1) @binding(0) var<uniform> reflection: ReflectionUniforms;
 
+// Matcap textures (Group 2)
+@group(2) @binding(0) var matcap_r: texture_2d<f32>;
+@group(2) @binding(1) var matcap_g: texture_2d<f32>;
+@group(2) @binding(2) var matcap_b: texture_2d<f32>;
+@group(2) @binding(3) var matcap_k: texture_2d<f32>;
+@group(2) @binding(4) var matcap_sampler: sampler;
+
+fn light_surface_matcap(normal: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
+    var n = normalize(normal);
+    n.y = -n.y;
+    n = n * 0.98;
+    let uv = n.xy * 0.5 + vec2<f32>(0.5);
+    let mat_r = textureSample(matcap_r, matcap_sampler, uv).rgb;
+    let mat_g = textureSample(matcap_g, matcap_sampler, uv).rgb;
+    let mat_b = textureSample(matcap_b, matcap_sampler, uv).rgb;
+    let mat_k = textureSample(matcap_k, matcap_sampler, uv).rgb;
+    return color.r * mat_r + color.g * mat_g
+         + color.b * mat_b + (1.0 - color.r - color.g - color.b) * mat_k;
+}
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) sphere_center_view: vec3<f32>,
@@ -120,14 +140,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let hit_point = ray_origin + t * ray_dir;
     let normal = normalize(hit_point - in.sphere_center_view);
 
-    // Simple directional lighting (flip normal for reflection)
-    let reflected_normal = vec3<f32>(normal.x, -normal.y, normal.z);
-    let light_dir = normalize(vec3<f32>(0.3, 0.5, 1.0));
-    let ambient = 0.3;
-    let diffuse = max(dot(reflected_normal, light_dir), 0.0) * 0.7;
-    let lighting = ambient + diffuse;
-
-    let color = in.point_color * lighting;
+    // Matcap lighting: normal is already in view space from ray-sphere intersection
+    let color = light_surface_matcap(normal, in.point_color);
 
     // Output with reflection intensity as alpha
     return vec4<f32>(color, reflection.intensity);

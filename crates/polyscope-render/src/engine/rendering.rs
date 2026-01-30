@@ -2,7 +2,22 @@ use super::RenderEngine;
 use crate::ground_plane::GroundPlaneRenderData;
 use crate::slice_plane_render::SlicePlaneRenderData;
 
+const DEFAULT_MATERIAL: &str = "clay";
+
 impl RenderEngine {
+    /// Returns the matcap bind group for the default material ("clay").
+    pub fn default_matcap_bind_group(&self) -> &wgpu::BindGroup {
+        &self.matcap_textures[DEFAULT_MATERIAL].bind_group
+    }
+
+    /// Returns the matcap bind group for a given material name.
+    /// Falls back to the default material if the name is not found.
+    pub fn matcap_bind_group_for(&self, material_name: &str) -> &wgpu::BindGroup {
+        &self.matcap_textures
+            .get(material_name)
+            .unwrap_or(&self.matcap_textures[DEFAULT_MATERIAL])
+            .bind_group
+    }
     /// Renders the ground plane.
     ///
     /// # Arguments
@@ -425,6 +440,7 @@ impl RenderEngine {
         render_pass: &mut wgpu::RenderPass,
         mesh_bind_group: &wgpu::BindGroup,
         vertex_count: u32,
+        material_name: &str,
     ) {
         let Some(pipeline) = &self.reflected_mesh_pipeline else {
             return;
@@ -436,6 +452,7 @@ impl RenderEngine {
         render_pass.set_pipeline(pipeline);
         render_pass.set_bind_group(0, mesh_bind_group, &[]);
         render_pass.set_bind_group(1, reflection.bind_group(), &[]);
+        render_pass.set_bind_group(2, self.matcap_bind_group_for(material_name), &[]);
         render_pass.set_stencil_reference(1); // Test against stencil value 1
         render_pass.draw(0..vertex_count, 0..1);
     }
@@ -477,6 +494,7 @@ impl RenderEngine {
         render_pass: &mut wgpu::RenderPass,
         point_bind_group: &wgpu::BindGroup,
         point_count: u32,
+        material_name: &str,
     ) {
         let Some(pipeline) = &self.reflected_point_cloud_pipeline else {
             return;
@@ -488,6 +506,7 @@ impl RenderEngine {
         render_pass.set_pipeline(pipeline);
         render_pass.set_bind_group(0, point_bind_group, &[]);
         render_pass.set_bind_group(1, reflection.bind_group(), &[]);
+        render_pass.set_bind_group(2, self.matcap_bind_group_for(material_name), &[]);
         render_pass.set_stencil_reference(1);
         // 6 vertices per point (billboard quad as 2 triangles)
         render_pass.draw(0..6, 0..point_count);
@@ -530,6 +549,7 @@ impl RenderEngine {
         render_pass: &mut wgpu::RenderPass,
         curve_bind_group: &wgpu::BindGroup,
         curve_render_data: &crate::curve_network_render::CurveNetworkRenderData,
+        material_name: &str,
     ) {
         let Some(pipeline) = &self.reflected_curve_network_pipeline else {
             return;
@@ -547,6 +567,7 @@ impl RenderEngine {
         render_pass.set_pipeline(pipeline);
         render_pass.set_bind_group(0, curve_bind_group, &[]);
         render_pass.set_bind_group(1, reflection.bind_group(), &[]);
+        render_pass.set_bind_group(2, self.matcap_bind_group_for(material_name), &[]);
         render_pass.set_vertex_buffer(0, tube_vertex_buffer.slice(..));
         render_pass.set_stencil_reference(1);
         render_pass.draw(0..tube_vertex_count, 0..1);

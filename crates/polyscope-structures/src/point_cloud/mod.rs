@@ -19,6 +19,7 @@ pub struct PointCloud {
     transform: Mat4,
     quantities: Vec<Box<dyn Quantity>>,
     render_data: Option<PointCloudRenderData>,
+    material: String,
     point_radius: f32,
     base_color: Vec3,
     // GPU picking resources
@@ -37,6 +38,7 @@ impl PointCloud {
             transform: Mat4::IDENTITY,
             quantities: Vec::new(),
             render_data: None,
+            material: "clay".to_string(),
             point_radius: 0.01,
             base_color: Vec3::new(0.2, 0.5, 0.8),
             pick_uniform_buffer: None,
@@ -262,7 +264,7 @@ impl PointCloud {
         let mut color = [self.base_color.x, self.base_color.y, self.base_color.z];
         let mut radius = self.point_radius;
 
-        if polyscope_ui::build_point_cloud_ui(ui, self.points.len(), &mut radius, &mut color) {
+        if polyscope_ui::build_point_cloud_ui(ui, self.points.len(), &mut radius, &mut color, &mut self.material) {
             self.base_color = Vec3::new(color[0], color[1], color[2]);
             self.point_radius = radius;
         }
@@ -398,6 +400,14 @@ impl Structure for PointCloud {
 
     fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
+    }
+
+    fn material(&self) -> &str {
+        &self.material
+    }
+
+    fn set_material(&mut self, material: &str) {
+        self.material = material.to_string();
     }
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {
