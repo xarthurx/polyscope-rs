@@ -53,7 +53,6 @@ This project is an experiment in **AI-driven software development**. I have limi
 ### What's Not Yet Implemented
 
 - Full polygon mesh support (arbitrary polygons)
-- Color RGBA support (currently RGB only)
 
 See [docs/architecture-differences.md](docs/architecture-differences.md) for a detailed comparison with C++ Polyscope.
 
@@ -173,6 +172,5 @@ This project is inspired by the original [Polyscope](https://github.com/nmwsharp
 Contributions are welcome! Key areas where help is needed:
 
 - Full polygon mesh support (arbitrary polygons)
-- Color RGBA support
 - Documentation and examples
 - Testing on different platforms (macOS, WebGPU)

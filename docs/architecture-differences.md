@@ -225,7 +225,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Scalar | ✅ | ✅ |
 | Vector | ✅ | ✅ |
 | Color (RGB) | ✅ | ✅ |
-| Color (RGBA) | ✅ | ⚠️ RGB only |
+| Color (RGBA) | ✅ | ✅ |
 | Parameterization | ✅ | ✅ |
 | Intrinsic Vector | ✅ | ✅ |
 | One Form | ✅ | ✅ |
@@ -376,9 +376,8 @@ with_point_cloud("my points", |pc| {
 The following C++ Polyscope features are not yet implemented but planned:
 
 1. **Full Polygon Mesh Support** - Arbitrary polygons (not just triangles)
-2. **Color RGBA** - Currently only RGB; alpha channel not supported
 
-All major quantity types are now implemented, including parameterization, intrinsic vectors, and one-forms with full GPU rendering.
+All major quantity types are now implemented, including parameterization, intrinsic vectors, one-forms, and RGBA color support with full GPU rendering.
 
 ---
 

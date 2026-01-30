@@ -168,7 +168,6 @@ All scene lighting uses **matcap (material capture)** textures, matching C++ Pol
 
 ### Missing Features (vs C++ Polyscope)
 - Full polygon mesh support (arbitrary polygons beyond triangles)
-- Color RGBA (currently RGB only)
 
 ### Vector Arrow Geometry
 
