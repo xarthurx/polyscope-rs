@@ -1,6 +1,6 @@
 //! Floating color image quantity.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use polyscope_core::quantity::{Quantity, QuantityKind};
 
 use super::ImageOrigin;
@@ -12,7 +12,7 @@ pub struct FloatingColorImage {
     name: String,
     width: u32,
     height: u32,
-    colors: Vec<Vec3>, // RGB per pixel
+    colors: Vec<Vec4>, // RGBA per pixel
     origin: ImageOrigin,
     enabled: bool,
 }
@@ -20,6 +20,7 @@ pub struct FloatingColorImage {
 impl FloatingColorImage {
     /// Creates a new floating color image.
     pub fn new(name: impl Into<String>, width: u32, height: u32, colors: Vec<Vec3>) -> Self {
+        let colors = colors.into_iter().map(|c| c.extend(1.0)).collect();
         Self {
             name: name.into(),
             width,
@@ -44,7 +45,7 @@ impl FloatingColorImage {
 
     /// Returns the pixel colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 
@@ -62,7 +63,7 @@ impl FloatingColorImage {
 
     /// Returns the pixel color at (x, y), accounting for image origin.
     #[must_use]
-    pub fn pixel(&self, x: u32, y: u32) -> Vec3 {
+    pub fn pixel(&self, x: u32, y: u32) -> Vec4 {
         let row = match self.origin {
             ImageOrigin::UpperLeft => y,
             ImageOrigin::LowerLeft => self.height - 1 - y,
@@ -132,10 +133,10 @@ mod tests {
         ];
         let img = FloatingColorImage::new("test", 2, 2, colors);
 
-        assert_eq!(img.pixel(0, 0), Vec3::new(1.0, 0.0, 0.0));
-        assert_eq!(img.pixel(1, 0), Vec3::new(0.0, 1.0, 0.0));
-        assert_eq!(img.pixel(0, 1), Vec3::new(0.0, 0.0, 1.0));
-        assert_eq!(img.pixel(1, 1), Vec3::new(1.0, 1.0, 1.0));
+        assert_eq!(img.pixel(0, 0), Vec4::new(1.0, 0.0, 0.0, 1.0));
+        assert_eq!(img.pixel(1, 0), Vec4::new(0.0, 1.0, 0.0, 1.0));
+        assert_eq!(img.pixel(0, 1), Vec4::new(0.0, 0.0, 1.0, 1.0));
+        assert_eq!(img.pixel(1, 1), Vec4::new(1.0, 1.0, 1.0, 1.0));
     }
 
     #[test]
@@ -150,9 +151,9 @@ mod tests {
         img.set_origin(ImageOrigin::LowerLeft);
 
         // LowerLeft: y=0 maps to bottom row (index 2,3)
-        assert_eq!(img.pixel(0, 0), Vec3::new(0.0, 0.0, 1.0));
-        assert_eq!(img.pixel(1, 0), Vec3::new(1.0, 1.0, 1.0));
-        assert_eq!(img.pixel(0, 1), Vec3::new(1.0, 0.0, 0.0));
-        assert_eq!(img.pixel(1, 1), Vec3::new(0.0, 1.0, 0.0));
+        assert_eq!(img.pixel(0, 0), Vec4::new(0.0, 0.0, 1.0, 1.0));
+        assert_eq!(img.pixel(1, 0), Vec4::new(1.0, 1.0, 1.0, 1.0));
+        assert_eq!(img.pixel(0, 1), Vec4::new(1.0, 0.0, 0.0, 1.0));
+        assert_eq!(img.pixel(1, 1), Vec4::new(0.0, 1.0, 0.0, 1.0));
     }
 }

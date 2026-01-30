@@ -4,7 +4,7 @@ mod camera_parameters;
 
 pub use camera_parameters::*;
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, Vec4};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
@@ -23,7 +23,7 @@ pub struct CameraView {
     quantities: Vec<Box<dyn Quantity>>,
 
     // Visualization parameters
-    color: Vec3,
+    color: Vec4,
     widget_focal_length: f32,
     widget_focal_length_is_relative: bool,
     widget_thickness: f32,
@@ -41,7 +41,7 @@ impl CameraView {
             enabled: true,
             transform: Mat4::IDENTITY,
             quantities: Vec::new(),
-            color: Vec3::new(0.0, 0.0, 0.0),
+            color: Vec4::new(0.0, 0.0, 0.0, 1.0),
             widget_focal_length: 0.05,
             widget_focal_length_is_relative: true,
             widget_thickness: 0.02,
@@ -84,13 +84,13 @@ impl CameraView {
 
     /// Gets the widget color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the widget color.
     pub fn set_color(&mut self, color: Vec3) -> &mut Self {
-        self.color = color;
+        self.color = color.extend(1.0);
         // Note: render_data will be refreshed on next frame
         self
     }
@@ -224,7 +224,7 @@ impl CameraView {
 
         // Update uniforms with our custom settings
         let uniforms = polyscope_render::CurveNetworkUniforms {
-            color: [self.color.x, self.color.y, self.color.z, 1.0],
+            color: self.color.to_array(),
             radius: self.compute_radius(length_scale),
             radius_is_relative: 0, // Absolute radius since we already computed it
             render_mode: 0,        // Lines

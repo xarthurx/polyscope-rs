@@ -1,6 +1,6 @@
 //! Render image floating quantities for depth-composited external renders.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use polyscope_core::quantity::{Quantity, QuantityKind};
 
 use super::ImageOrigin;
@@ -132,7 +132,7 @@ pub struct FloatingColorRenderImage {
     width: u32,
     height: u32,
     depths: Vec<f32>,
-    colors: Vec<Vec3>, // Per-pixel RGB
+    colors: Vec<Vec4>, // Per-pixel RGBA
     normals: Option<Vec<Vec3>>,
     origin: ImageOrigin,
     enabled: bool,
@@ -147,6 +147,7 @@ impl FloatingColorRenderImage {
         depths: Vec<f32>,
         colors: Vec<Vec3>,
     ) -> Self {
+        let colors = colors.into_iter().map(|c| c.extend(1.0)).collect();
         Self {
             name: name.into(),
             width,
@@ -185,7 +186,7 @@ impl FloatingColorRenderImage {
 
     /// Returns the pixel colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 
@@ -219,7 +220,7 @@ impl FloatingColorRenderImage {
 
     /// Returns the color at pixel (x, y).
     #[must_use]
-    pub fn color_at(&self, x: u32, y: u32) -> Vec3 {
+    pub fn color_at(&self, x: u32, y: u32) -> Vec4 {
         let row = match self.origin {
             ImageOrigin::UpperLeft => y,
             ImageOrigin::LowerLeft => self.height - 1 - y,
@@ -266,7 +267,7 @@ pub struct FloatingRawColorImage {
     name: String,
     width: u32,
     height: u32,
-    colors: Vec<Vec3>,
+    colors: Vec<Vec4>,
     origin: ImageOrigin,
     enabled: bool,
 }
@@ -274,6 +275,7 @@ pub struct FloatingRawColorImage {
 impl FloatingRawColorImage {
     /// Creates a new raw color render image.
     pub fn new(name: impl Into<String>, width: u32, height: u32, colors: Vec<Vec3>) -> Self {
+        let colors = colors.into_iter().map(|c| c.extend(1.0)).collect();
         Self {
             name: name.into(),
             width,
@@ -298,7 +300,7 @@ impl FloatingRawColorImage {
 
     /// Returns the pixel colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 
@@ -316,7 +318,7 @@ impl FloatingRawColorImage {
 
     /// Returns the color at pixel (x, y).
     #[must_use]
-    pub fn color_at(&self, x: u32, y: u32) -> Vec3 {
+    pub fn color_at(&self, x: u32, y: u32) -> Vec4 {
         let row = match self.origin {
             ImageOrigin::UpperLeft => y,
             ImageOrigin::LowerLeft => self.height - 1 - y,
