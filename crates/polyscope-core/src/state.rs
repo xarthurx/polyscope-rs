@@ -85,7 +85,22 @@ impl Context {
     }
 
     /// Updates the global bounding box and length scale from all structures.
+    ///
+    /// Respects the `auto_compute_scene_extents` option: when disabled, this
+    /// is a no-op and the user controls extents manually. Matches C++ Polyscope's
+    /// `updateStructureExtents()` guard behavior.
     pub fn update_extents(&mut self) {
+        if !self.options.auto_compute_scene_extents {
+            return;
+        }
+        self.recompute_extents();
+    }
+
+    /// Unconditionally recomputes extents from all registered structures.
+    ///
+    /// Called by `update_extents()` when auto-compute is enabled, and also
+    /// called directly when the user re-enables auto-compute.
+    pub fn recompute_extents(&mut self) {
         let mut min = Vec3::splat(f32::MAX);
         let mut max = Vec3::splat(f32::MIN);
         let mut has_extent = false;

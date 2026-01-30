@@ -89,9 +89,15 @@ pub fn get_scene_extents() -> polyscope_ui::SceneExtents {
 }
 
 /// Sets auto-compute scene extents option.
+///
+/// When re-enabling auto-compute, immediately recomputes extents from
+/// all registered structures (matching C++ Polyscope behavior).
 pub fn set_auto_compute_extents(auto: bool) {
     polyscope_core::state::with_context_mut(|ctx| {
         ctx.options.auto_compute_scene_extents = auto;
+        if auto {
+            ctx.recompute_extents();
+        }
     });
 }
 

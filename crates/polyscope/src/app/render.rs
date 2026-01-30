@@ -927,6 +927,16 @@ impl App {
         // Apply scene extents settings if changed
         if scene_extents_changed {
             crate::set_auto_compute_extents(self.scene_extents.auto_compute);
+            // When auto-compute is OFF, sync manual edits back to context
+            if !self.scene_extents.auto_compute {
+                polyscope_core::state::with_context_mut(|ctx| {
+                    ctx.length_scale = self.scene_extents.length_scale;
+                    ctx.bounding_box = (
+                        glam::Vec3::from_array(self.scene_extents.bbox_min),
+                        glam::Vec3::from_array(self.scene_extents.bbox_max),
+                    );
+                });
+            }
         }
 
         // Apply SSAA settings if changed

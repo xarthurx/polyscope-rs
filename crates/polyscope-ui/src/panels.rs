@@ -812,7 +812,7 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
 }
 
 /// Builds the scene extents section.
-/// Returns true if `auto_compute` changed.
+/// Returns true if any setting changed (auto-compute toggle or manual edits).
 pub fn build_scene_extents_section(ui: &mut Ui, extents: &mut SceneExtents) -> bool {
     let mut changed = false;
 
@@ -828,32 +828,68 @@ pub fn build_scene_extents_section(ui: &mut Ui, extents: &mut SceneExtents) -> b
 
             ui.separator();
 
-            // Display length scale (read-only)
-            ui.horizontal(|ui| {
-                ui.label("Length scale:");
-                ui.label(format!("{:.4}", extents.length_scale));
-            });
-
-            // Display bounding box (read-only)
-            ui.label("Bounding box:");
-            ui.indent("bbox", |ui| {
+            if extents.auto_compute {
+                // Auto-compute ON: read-only display
                 ui.horizontal(|ui| {
-                    ui.label("Min:");
-                    ui.label(format!(
-                        "({:.2}, {:.2}, {:.2})",
-                        extents.bbox_min[0], extents.bbox_min[1], extents.bbox_min[2]
-                    ));
+                    ui.label("Length scale:");
+                    ui.label(format!("{:.4}", extents.length_scale));
                 });
-                ui.horizontal(|ui| {
-                    ui.label("Max:");
-                    ui.label(format!(
-                        "({:.2}, {:.2}, {:.2})",
-                        extents.bbox_max[0], extents.bbox_max[1], extents.bbox_max[2]
-                    ));
-                });
-            });
 
-            // Compute center and size
+                ui.label("Bounding box:");
+                ui.indent("bbox", |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Min:");
+                        ui.label(format!(
+                            "({:.2}, {:.2}, {:.2})",
+                            extents.bbox_min[0], extents.bbox_min[1], extents.bbox_min[2]
+                        ));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Max:");
+                        ui.label(format!(
+                            "({:.2}, {:.2}, {:.2})",
+                            extents.bbox_max[0], extents.bbox_max[1], extents.bbox_max[2]
+                        ));
+                    });
+                });
+            } else {
+                // Auto-compute OFF: editable controls (matching C++ Polyscope)
+                ui.horizontal(|ui| {
+                    ui.label("Length scale:");
+                    if ui
+                        .add(
+                            DragValue::new(&mut extents.length_scale)
+                                .speed(0.01)
+                                .range(0.0001..=f32::MAX),
+                        )
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+
+                ui.label("Bounding box:");
+                ui.indent("bbox_edit", |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Min:");
+                        for val in &mut extents.bbox_min {
+                            if ui.add(DragValue::new(val).speed(0.01)).changed() {
+                                changed = true;
+                            }
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Max:");
+                        for val in &mut extents.bbox_max {
+                            if ui.add(DragValue::new(val).speed(0.01)).changed() {
+                                changed = true;
+                            }
+                        }
+                    });
+                });
+            }
+
+            // Compute center and display
             let center = [
                 (extents.bbox_min[0] + extents.bbox_max[0]) / 2.0,
                 (extents.bbox_min[1] + extents.bbox_max[1]) / 2.0,
