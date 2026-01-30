@@ -496,7 +496,194 @@ impl SurfaceMeshHandle {
         &self.name
     }
 
-    // TODO: Add quantity methods
+    // -- Appearance setters --
+
+    /// Sets the surface color.
+    pub fn set_surface_color(&self, color: Vec3) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.set_surface_color(color);
+        });
+        self
+    }
+
+    /// Sets the edge color.
+    pub fn set_edge_color(&self, color: Vec3) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.set_edge_color(color);
+        });
+        self
+    }
+
+    /// Sets the edge width.
+    pub fn set_edge_width(&self, width: f32) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.set_edge_width(width);
+        });
+        self
+    }
+
+    /// Sets whether edges are shown.
+    pub fn set_show_edges(&self, show: bool) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.set_show_edges(show);
+        });
+        self
+    }
+
+    /// Sets the backface color.
+    pub fn set_backface_color(&self, color: Vec3) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.set_backface_color(color);
+        });
+        self
+    }
+
+    /// Sets the transparency (0.0 = opaque, 1.0 = fully transparent).
+    pub fn set_transparency(&self, transparency: f32) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.set_transparency(transparency);
+        });
+        self
+    }
+
+    /// Sets the material.
+    pub fn set_material(&self, material: &str) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.set_material(material);
+        });
+        self
+    }
+
+    // -- Quantity methods --
+
+    /// Adds a vertex scalar quantity.
+    pub fn add_vertex_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_vertex_scalar_quantity(name, values);
+        });
+        self
+    }
+
+    /// Adds a face scalar quantity.
+    pub fn add_face_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_face_scalar_quantity(name, values);
+        });
+        self
+    }
+
+    /// Adds a vertex color quantity.
+    pub fn add_vertex_color_quantity(&self, name: &str, colors: Vec<Vec3>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_vertex_color_quantity(name, colors);
+        });
+        self
+    }
+
+    /// Adds a face color quantity.
+    pub fn add_face_color_quantity(&self, name: &str, colors: Vec<Vec3>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_face_color_quantity(name, colors);
+        });
+        self
+    }
+
+    /// Adds a vertex vector quantity (auto-scaled).
+    pub fn add_vertex_vector_quantity(&self, name: &str, vectors: Vec<Vec3>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_vertex_vector_quantity(name, vectors);
+        });
+        self
+    }
+
+    /// Adds a face vector quantity (auto-scaled).
+    pub fn add_face_vector_quantity(&self, name: &str, vectors: Vec<Vec3>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_face_vector_quantity(name, vectors);
+        });
+        self
+    }
+
+    /// Adds a vertex parameterization (UV) quantity.
+    pub fn add_vertex_parameterization_quantity(&self, name: &str, coords: Vec<Vec2>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_vertex_parameterization_quantity(name, coords);
+        });
+        self
+    }
+
+    /// Adds a corner parameterization (UV) quantity.
+    pub fn add_corner_parameterization_quantity(&self, name: &str, coords: Vec<Vec2>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_corner_parameterization_quantity(name, coords);
+        });
+        self
+    }
+
+    /// Adds a vertex intrinsic vector quantity with explicit tangent basis (auto-scaled).
+    pub fn add_vertex_intrinsic_vector_quantity(
+        &self,
+        name: &str,
+        vectors: Vec<Vec2>,
+        basis_x: Vec<Vec3>,
+        basis_y: Vec<Vec3>,
+    ) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_vertex_intrinsic_vector_quantity(name, vectors, basis_x, basis_y);
+        });
+        self
+    }
+
+    /// Adds a vertex intrinsic vector quantity with auto-computed tangent basis.
+    pub fn add_vertex_intrinsic_vector_quantity_auto(
+        &self,
+        name: &str,
+        vectors: Vec<Vec2>,
+    ) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_vertex_intrinsic_vector_quantity_auto(name, vectors);
+        });
+        self
+    }
+
+    /// Adds a face intrinsic vector quantity with explicit tangent basis (auto-scaled).
+    pub fn add_face_intrinsic_vector_quantity(
+        &self,
+        name: &str,
+        vectors: Vec<Vec2>,
+        basis_x: Vec<Vec3>,
+        basis_y: Vec<Vec3>,
+    ) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_face_intrinsic_vector_quantity(name, vectors, basis_x, basis_y);
+        });
+        self
+    }
+
+    /// Adds a face intrinsic vector quantity with auto-computed tangent basis.
+    pub fn add_face_intrinsic_vector_quantity_auto(
+        &self,
+        name: &str,
+        vectors: Vec<Vec2>,
+    ) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_face_intrinsic_vector_quantity_auto(name, vectors);
+        });
+        self
+    }
+
+    /// Adds a one-form quantity (edge-based differential form, auto-scaled).
+    pub fn add_one_form_quantity(
+        &self,
+        name: &str,
+        values: Vec<f32>,
+        orientations: Vec<bool>,
+    ) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_one_form_quantity(name, values, orientations);
+        });
+        self
+    }
 }
 
 /// Executes a closure with mutable access to a registered surface mesh.
