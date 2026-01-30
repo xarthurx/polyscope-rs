@@ -168,8 +168,10 @@ fn fs_main(
 
     // Use per-vertex color if non-zero (for quantities)
     let color_sum = in.vertex_color.r + in.vertex_color.g + in.vertex_color.b;
+    var per_element_alpha = 1.0;
     if (color_sum > 0.001) {
         base_color = in.vertex_color.rgb;
+        per_element_alpha = in.vertex_color.w;
     }
 
     // Calculate normal for lighting based on shade_style
@@ -219,7 +221,8 @@ fn fs_main(
     // Compute alpha from transparency
     // transparency of 0.0 means fully opaque (alpha = 1.0)
     // transparency of 1.0 means fully transparent (alpha = 0.0)
-    let alpha = 1.0 - mesh_uniforms.transparency;
+    // Per-element alpha from color quantities modulates structure-wide transparency
+    let alpha = (1.0 - mesh_uniforms.transparency) * per_element_alpha;
 
     // Skip nearly transparent fragments
     if (alpha < 0.001) {
