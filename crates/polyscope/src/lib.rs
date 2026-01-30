@@ -453,6 +453,36 @@ impl PointCloudHandle {
     }
 }
 
+/// Executes a closure with mutable access to a registered point cloud.
+///
+/// Returns `None` if the point cloud does not exist.
+pub fn with_point_cloud<F, R>(name: &str, f: F) -> Option<R>
+where
+    F: FnOnce(&mut PointCloud) -> R,
+{
+    with_context_mut(|ctx| {
+        ctx.registry
+            .get_mut("PointCloud", name)
+            .and_then(|s| s.as_any_mut().downcast_mut::<PointCloud>())
+            .map(f)
+    })
+}
+
+/// Executes a closure with immutable access to a registered point cloud.
+///
+/// Returns `None` if the point cloud does not exist.
+pub fn with_point_cloud_ref<F, R>(name: &str, f: F) -> Option<R>
+where
+    F: FnOnce(&PointCloud) -> R,
+{
+    with_context(|ctx| {
+        ctx.registry
+            .get("PointCloud", name)
+            .and_then(|s| s.as_any().downcast_ref::<PointCloud>())
+            .map(f)
+    })
+}
+
 /// Handle for a registered surface mesh.
 #[derive(Clone)]
 pub struct SurfaceMeshHandle {

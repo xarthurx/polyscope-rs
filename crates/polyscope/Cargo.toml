@@ -68,5 +68,9 @@ path = "../../examples/groups_and_gizmos_demo.rs"
 name = "ground_plane_demo"
 path = "../../examples/ground_plane_demo.rs"
 
+[[example]]
+name = "materials_demo"
+path = "../../examples/materials_demo.rs"
+
 [lints]
 workspace = true
