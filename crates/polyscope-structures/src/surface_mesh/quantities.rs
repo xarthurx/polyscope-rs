@@ -73,7 +73,7 @@ impl MeshVertexScalarQuantity {
 
     /// Maps scalar values to colors using the colormap.
     #[must_use]
-    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
+    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec4> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
 
@@ -81,7 +81,7 @@ impl MeshVertexScalarQuantity {
             .iter()
             .map(|&v| {
                 let t = (v - self.range_min) / range;
-                colormap.sample(t)
+                colormap.sample(t).extend(1.0)
             })
             .collect()
     }
@@ -216,15 +216,15 @@ impl MeshFaceScalarQuantity {
         faces: &[Vec<u32>],
         num_vertices: usize,
         colormap: &ColorMap,
-    ) -> Vec<Vec3> {
+    ) -> Vec<Vec4> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
 
-        let mut colors = vec![Vec3::splat(0.5); num_vertices];
+        let mut colors = vec![Vec4::splat(0.5); num_vertices];
 
         for (face_idx, face) in faces.iter().enumerate() {
             let t = (self.values[face_idx] - self.range_min) / range;
-            let color = colormap.sample(t);
+            let color = colormap.sample(t).extend(1.0);
             for &vi in face {
                 colors[vi as usize] = color;
             }
@@ -395,11 +395,11 @@ impl MeshFaceColorQuantity {
     /// Computes vertex colors by expanding face colors to all vertices of each face.
     /// For each vertex, uses the color of the last face it belongs to.
     #[must_use]
-    pub fn compute_vertex_colors(&self, faces: &[Vec<u32>], num_vertices: usize) -> Vec<Vec3> {
-        let mut colors = vec![Vec3::splat(0.5); num_vertices];
+    pub fn compute_vertex_colors(&self, faces: &[Vec<u32>], num_vertices: usize) -> Vec<Vec4> {
+        let mut colors = vec![Vec4::splat(0.5); num_vertices];
 
         for (face_idx, face) in faces.iter().enumerate() {
-            let color = self.colors[face_idx].truncate();
+            let color = self.colors[face_idx];
             for &vi in face {
                 colors[vi as usize] = color;
             }

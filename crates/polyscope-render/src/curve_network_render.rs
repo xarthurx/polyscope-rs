@@ -1,6 +1,6 @@
 //! Curve network GPU rendering resources.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 use crate::point_cloud_render::PointUniforms;
@@ -350,8 +350,8 @@ impl CurveNetworkRenderData {
     }
 
     /// Updates node colors.
-    pub fn update_node_colors(&self, queue: &wgpu::Queue, colors: &[Vec3]) {
-        let color_data: Vec<f32> = colors.iter().flat_map(|c| [c.x, c.y, c.z, 1.0]).collect();
+    pub fn update_node_colors(&self, queue: &wgpu::Queue, colors: &[Vec4]) {
+        let color_data: Vec<f32> = colors.iter().flat_map(|c| c.to_array()).collect();
         queue.write_buffer(
             &self.node_color_buffer,
             0,
@@ -360,8 +360,8 @@ impl CurveNetworkRenderData {
     }
 
     /// Updates edge colors.
-    pub fn update_edge_colors(&self, queue: &wgpu::Queue, colors: &[Vec3]) {
-        let color_data: Vec<f32> = colors.iter().flat_map(|c| [c.x, c.y, c.z, 1.0]).collect();
+    pub fn update_edge_colors(&self, queue: &wgpu::Queue, colors: &[Vec4]) {
+        let color_data: Vec<f32> = colors.iter().flat_map(|c| c.to_array()).collect();
         queue.write_buffer(
             &self.edge_color_buffer,
             0,

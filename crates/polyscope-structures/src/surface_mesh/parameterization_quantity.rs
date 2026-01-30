@@ -1,6 +1,6 @@
 //! Parameterization (UV) quantities for surface meshes.
 
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 use polyscope_core::quantity::{
     FaceQuantity, ParamCoordsType, ParamVizStyle, Quantity, QuantityKind, VertexQuantity,
 };
@@ -112,7 +112,7 @@ impl MeshVertexParameterizationQuantity {
 
     /// Compute per-vertex colors based on the current visualization style.
     #[must_use]
-    pub fn compute_colors(&self) -> Vec<Vec3> {
+    pub fn compute_colors(&self) -> Vec<Vec4> {
         match self.style {
             ParamVizStyle::Checker => self.compute_checker_colors(),
             ParamVizStyle::Grid => self.compute_grid_colors(),
@@ -121,22 +121,22 @@ impl MeshVertexParameterizationQuantity {
         }
     }
 
-    fn compute_checker_colors(&self) -> Vec<Vec3> {
+    fn compute_checker_colors(&self) -> Vec<Vec4> {
         self.coords
             .iter()
             .map(|uv| {
                 let u_cell = (uv.x / self.checker_size).floor() as i32;
                 let v_cell = (uv.y / self.checker_size).floor() as i32;
                 if (u_cell + v_cell) % 2 == 0 {
-                    self.checker_colors[0]
+                    self.checker_colors[0].extend(1.0)
                 } else {
-                    self.checker_colors[1]
+                    self.checker_colors[1].extend(1.0)
                 }
             })
             .collect()
     }
 
-    fn compute_grid_colors(&self) -> Vec<Vec3> {
+    fn compute_grid_colors(&self) -> Vec<Vec4> {
         self.coords
             .iter()
             .map(|uv| {
@@ -147,15 +147,15 @@ impl MeshVertexParameterizationQuantity {
                     || v_frac < self.grid_line_width
                     || v_frac > (1.0 - self.grid_line_width);
                 if on_line {
-                    self.checker_colors[1]
+                    self.checker_colors[1].extend(1.0)
                 } else {
-                    self.checker_colors[0]
+                    self.checker_colors[0].extend(1.0)
                 }
             })
             .collect()
     }
 
-    fn compute_local_check_colors(&self) -> Vec<Vec3> {
+    fn compute_local_check_colors(&self) -> Vec<Vec4> {
         self.coords
             .iter()
             .map(|uv| {
@@ -166,12 +166,12 @@ impl MeshVertexParameterizationQuantity {
                 let u_cell = (uv.x / self.checker_size).floor() as i32;
                 let v_cell = (uv.y / self.checker_size).floor() as i32;
                 let dim = if (u_cell + v_cell) % 2 == 0 { 1.0 } else { 0.6 };
-                base * dim * (1.0 - (-r * 2.0).exp() * 0.5)
+                (base * dim * (1.0 - (-r * 2.0).exp() * 0.5)).extend(1.0)
             })
             .collect()
     }
 
-    fn compute_local_rad_colors(&self) -> Vec<Vec3> {
+    fn compute_local_rad_colors(&self) -> Vec<Vec4> {
         self.coords
             .iter()
             .map(|uv| {
@@ -181,7 +181,7 @@ impl MeshVertexParameterizationQuantity {
                 let base = hsv_to_rgb(hue, 0.7, 0.9);
                 let stripe = f32::from(u8::from((r / self.checker_size).floor() as i32 % 2 == 0));
                 let dim = 0.6 + 0.4 * stripe;
-                base * dim
+                (base * dim).extend(1.0)
             })
             .collect()
     }
@@ -330,7 +330,7 @@ impl MeshCornerParameterizationQuantity {
     /// Compute per-corner colors based on the current visualization style.
     /// Returns one color per corner (same length as self.coords).
     #[must_use]
-    pub fn compute_colors(&self) -> Vec<Vec3> {
+    pub fn compute_colors(&self) -> Vec<Vec4> {
         self.coords
             .iter()
             .map(|uv| match self.style {
@@ -338,9 +338,9 @@ impl MeshCornerParameterizationQuantity {
                     let u_cell = (uv.x / self.checker_size).floor() as i32;
                     let v_cell = (uv.y / self.checker_size).floor() as i32;
                     if (u_cell + v_cell) % 2 == 0 {
-                        self.checker_colors[0]
+                        self.checker_colors[0].extend(1.0)
                     } else {
-                        self.checker_colors[1]
+                        self.checker_colors[1].extend(1.0)
                     }
                 }
                 ParamVizStyle::Grid => {
@@ -351,9 +351,9 @@ impl MeshCornerParameterizationQuantity {
                         || v_frac < self.grid_line_width
                         || v_frac > (1.0 - self.grid_line_width);
                     if on_line {
-                        self.checker_colors[1]
+                        self.checker_colors[1].extend(1.0)
                     } else {
-                        self.checker_colors[0]
+                        self.checker_colors[0].extend(1.0)
                     }
                 }
                 ParamVizStyle::LocalCheck => {
@@ -364,7 +364,7 @@ impl MeshCornerParameterizationQuantity {
                     let v_cell = (uv.y / self.checker_size).floor() as i32;
                     let dim = if (u_cell + v_cell) % 2 == 0 { 1.0 } else { 0.6 };
                     let r = uv.length();
-                    base * dim * (1.0 - (-r * 2.0).exp() * 0.5)
+                    (base * dim * (1.0 - (-r * 2.0).exp() * 0.5)).extend(1.0)
                 }
                 ParamVizStyle::LocalRad => {
                     let angle = uv.y.atan2(uv.x);
@@ -374,7 +374,7 @@ impl MeshCornerParameterizationQuantity {
                     let stripe =
                         f32::from(u8::from((r / self.checker_size).floor() as i32 % 2 == 0));
                     let dim = 0.6 + 0.4 * stripe;
-                    base * dim
+                    (base * dim).extend(1.0)
                 }
             })
             .collect()

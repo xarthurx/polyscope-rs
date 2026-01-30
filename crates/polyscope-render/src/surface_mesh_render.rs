@@ -1,6 +1,6 @@
 //! Surface mesh GPU rendering resources.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 /// Uniforms for surface mesh rendering.
@@ -295,13 +295,13 @@ impl SurfaceMeshRenderData {
 
     /// Updates the per-vertex color buffer with per-original-vertex colors.
     /// This expands the colors to match the per-triangle-vertex buffer layout.
-    pub fn update_colors(&self, queue: &wgpu::Queue, colors: &[Vec3], triangles: &[[u32; 3]]) {
+    pub fn update_colors(&self, queue: &wgpu::Queue, colors: &[Vec4], triangles: &[[u32; 3]]) {
         // Expand per-vertex colors to per-triangle-vertex
         let mut expanded_colors: Vec<f32> = Vec::with_capacity(triangles.len() * 3 * 4);
         for tri in triangles {
             for &vi in tri {
                 let c = colors[vi as usize];
-                expanded_colors.extend_from_slice(&[c.x, c.y, c.z, 1.0]);
+                expanded_colors.extend_from_slice(&[c.x, c.y, c.z, c.w]);
             }
         }
         queue.write_buffer(

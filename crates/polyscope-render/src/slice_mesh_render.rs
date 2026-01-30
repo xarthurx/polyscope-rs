@@ -2,7 +2,7 @@
 //!
 //! Renders the triangulated slice geometry using the surface mesh shader.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 use crate::surface_mesh_render::MeshUniforms;
@@ -48,7 +48,7 @@ impl SliceMeshRenderData {
         camera_buffer: &wgpu::Buffer,
         vertices: &[Vec3],
         normals: &[Vec3],
-        colors: &[Vec3],
+        colors: &[Vec4],
     ) -> Self {
         let num_vertices = vertices.len() as u32;
         let num_indices = num_vertices;
@@ -67,7 +67,7 @@ impl SliceMeshRenderData {
             normal_data.extend_from_slice(&[n.x, n.y, n.z, 0.0]);
 
             let c = colors[i];
-            color_data.extend_from_slice(&[c.x, c.y, c.z, 1.0]);
+            color_data.extend_from_slice(&c.to_array());
 
             // Barycentric coordinates for wireframe (cycle through triangle vertices)
             let bary = match i % 3 {
@@ -191,7 +191,7 @@ impl SliceMeshRenderData {
         camera_buffer: &wgpu::Buffer,
         vertices: &[Vec3],
         normals: &[Vec3],
-        colors: &[Vec3],
+        colors: &[Vec4],
     ) {
         // For simplicity, recreate if size differs (slice geometry can change significantly)
         let new_num_indices = vertices.len() as u32;
@@ -219,7 +219,7 @@ impl SliceMeshRenderData {
             normal_data.extend_from_slice(&[n.x, n.y, n.z, 0.0]);
 
             let c = colors[i];
-            color_data.extend_from_slice(&[c.x, c.y, c.z, 1.0]);
+            color_data.extend_from_slice(&c.to_array());
         }
 
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&position_data));

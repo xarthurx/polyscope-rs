@@ -44,7 +44,7 @@ impl PointCloudScalarQuantity {
 
     /// Maps scalar values to colors using the colormap.
     #[must_use]
-    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
+    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec4> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
 
@@ -52,7 +52,7 @@ impl PointCloudScalarQuantity {
             .iter()
             .map(|&v| {
                 let t = (v - self.range_min) / range;
-                colormap.sample(t)
+                colormap.sample(t).extend(1.0)
             })
             .collect()
     }
@@ -345,8 +345,7 @@ impl PointCloudColorQuantity {
 
     /// Applies this color quantity to the point cloud render data.
     pub fn apply_to_render_data(&self, queue: &wgpu::Queue, render_data: &PointCloudRenderData) {
-        let colors_rgb: Vec<Vec3> = self.colors.iter().map(|c| c.truncate()).collect();
-        render_data.update_colors(queue, &colors_rgb);
+        render_data.update_colors(queue, &self.colors);
     }
 
     /// Builds the egui UI for this color quantity.

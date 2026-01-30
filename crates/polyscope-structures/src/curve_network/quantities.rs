@@ -44,7 +44,7 @@ impl CurveNodeScalarQuantity {
 
     /// Maps scalar values to colors using the colormap.
     #[must_use]
-    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
+    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec4> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
 
@@ -52,7 +52,7 @@ impl CurveNodeScalarQuantity {
             .iter()
             .map(|&v| {
                 let t = (v - self.range_min) / range;
-                colormap.sample(t)
+                colormap.sample(t).extend(1.0)
             })
             .collect()
     }
@@ -185,7 +185,7 @@ impl CurveEdgeScalarQuantity {
 
     /// Maps scalar values to colors using the colormap.
     #[must_use]
-    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec3> {
+    pub fn compute_colors(&self, colormap: &ColorMap) -> Vec<Vec4> {
         let range = self.range_max - self.range_min;
         let range = if range.abs() < 1e-10 { 1.0 } else { range };
 
@@ -193,7 +193,7 @@ impl CurveEdgeScalarQuantity {
             .iter()
             .map(|&v| {
                 let t = (v - self.range_min) / range;
-                colormap.sample(t)
+                colormap.sample(t).extend(1.0)
             })
             .collect()
     }
@@ -317,8 +317,7 @@ impl CurveNodeColorQuantity {
 
     /// Applies this color quantity to the curve network render data.
     pub fn apply_to_render_data(&self, queue: &wgpu::Queue, render_data: &CurveNetworkRenderData) {
-        let colors_rgb: Vec<Vec3> = self.colors.iter().map(|c| c.truncate()).collect();
-        render_data.update_node_colors(queue, &colors_rgb);
+        render_data.update_node_colors(queue, &self.colors);
     }
 
     /// Builds the egui UI for this color quantity.
@@ -402,8 +401,7 @@ impl CurveEdgeColorQuantity {
 
     /// Applies this color quantity to the curve network render data.
     pub fn apply_to_render_data(&self, queue: &wgpu::Queue, render_data: &CurveNetworkRenderData) {
-        let colors_rgb: Vec<Vec3> = self.colors.iter().map(|c| c.truncate()).collect();
-        render_data.update_edge_colors(queue, &colors_rgb);
+        render_data.update_edge_colors(queue, &self.colors);
     }
 
     /// Builds the egui UI for this color quantity.

@@ -1003,7 +1003,7 @@ impl VolumeMesh {
 
             if slice.has_intersection() {
                 // Compute interpolated colors for each slice vertex
-                let slice_colors: Vec<Vec3> = if let Some(vc) = vertex_colors {
+                let slice_colors: Vec<Vec4> = if let Some(vc) = vertex_colors {
                     slice
                         .interpolation
                         .iter()
@@ -1012,11 +1012,11 @@ impl VolumeMesh {
                             let va_idx = cell[a as usize] as usize;
                             let vb_idx = cell[b as usize] as usize;
                             // Interpolate colors
-                            vc[va_idx].lerp(vc[vb_idx], t).truncate()
+                            vc[va_idx].lerp(vc[vb_idx], t)
                         })
                         .collect()
                 } else {
-                    vec![self.interior_color.truncate(); slice.vertices.len()]
+                    vec![self.interior_color; slice.vertices.len()]
                 };
 
                 // Triangulate the polygon (fan from first vertex)
@@ -1061,7 +1061,7 @@ pub struct SliceMeshData {
     /// Vertex normals (3 per triangle, all pointing along plane normal)
     pub normals: Vec<Vec3>,
     /// Vertex colors (3 per triangle, from interior color or interpolated quantity)
-    pub colors: Vec<Vec3>,
+    pub colors: Vec<Vec4>,
 }
 
 impl SliceMeshData {

@@ -1226,7 +1226,7 @@ impl SurfaceMesh {
             // Corner parameterization: compute per-corner colors, expand to per-vertex
             // (for now, treat as per-face by averaging corners)
             let corner_colors = pq.compute_colors();
-            let mut vertex_colors = vec![Vec3::splat(0.5); self.vertices.len()];
+            let mut vertex_colors = vec![Vec4::splat(0.5); self.vertices.len()];
             let mut counts = vec![0u32; self.vertices.len()];
             let mut corner_idx = 0;
             for face in &self.faces {
@@ -1246,8 +1246,7 @@ impl SurfaceMesh {
             render_data.update_colors(queue, &vertex_colors, &self.triangulation);
         } else if let Some(cq) = self.active_vertex_color_quantity() {
             // Direct vertex color quantity
-            let colors_rgb: Vec<Vec3> = cq.colors().iter().map(|c| c.truncate()).collect();
-            render_data.update_colors(queue, &colors_rgb, &self.triangulation);
+            render_data.update_colors(queue, cq.colors(), &self.triangulation);
         } else if let Some(cq) = self.active_face_color_quantity() {
             // Face color expanded to vertices
             let colors = cq.compute_vertex_colors(&self.faces, self.vertices.len());

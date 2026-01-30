@@ -1,6 +1,6 @@
 //! Point cloud GPU rendering resources.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 /// GPU resources for rendering a point cloud.
@@ -54,7 +54,7 @@ impl PointCloudRenderData {
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
         positions: &[Vec3],
-        colors: Option<&[Vec3]>,
+        colors: Option<&[Vec4]>,
     ) -> Self {
         let num_points = positions.len() as u32;
 
@@ -71,7 +71,7 @@ impl PointCloudRenderData {
 
         // Create color buffer (default white if not provided)
         let color_data: Vec<f32> = if let Some(colors) = colors {
-            colors.iter().flat_map(|c| [c.x, c.y, c.z, 1.0]).collect()
+            colors.iter().flat_map(|c| c.to_array()).collect()
         } else {
             vec![1.0; positions.len() * 4]
         };
@@ -123,8 +123,8 @@ impl PointCloudRenderData {
     }
 
     /// Updates the color buffer.
-    pub fn update_colors(&self, queue: &wgpu::Queue, colors: &[Vec3]) {
-        let color_data: Vec<f32> = colors.iter().flat_map(|c| [c.x, c.y, c.z, 1.0]).collect();
+    pub fn update_colors(&self, queue: &wgpu::Queue, colors: &[Vec4]) {
+        let color_data: Vec<f32> = colors.iter().flat_map(|c| c.to_array()).collect();
         queue.write_buffer(&self.color_buffer, 0, bytemuck::cast_slice(&color_data));
     }
 
