@@ -28,7 +28,7 @@ struct ReflectionUniforms {
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(0) @binding(1) var<uniform> point_uniforms: PointUniforms;
 @group(0) @binding(2) var<storage, read> point_positions: array<vec3<f32>>;
-@group(0) @binding(3) var<storage, read> point_colors: array<vec3<f32>>;
+@group(0) @binding(3) var<storage, read> point_colors: array<vec4<f32>>;
 @group(1) @binding(0) var<uniform> reflection: ReflectionUniforms;
 
 // Matcap textures (Group 2)
@@ -103,7 +103,7 @@ fn vs_main(
 
     // Get color
     if (point_uniforms.use_per_point_color == 1u) {
-        out.point_color = point_colors[instance_index];
+        out.point_color = point_colors[instance_index].xyz;
     } else {
         out.point_color = point_uniforms.base_color.rgb;
     }
