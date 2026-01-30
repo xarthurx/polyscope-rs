@@ -1,6 +1,6 @@
 //! Configuration options for polyscope.
 
-use glam::Vec3;
+use glam::Vec4;
 use serde::{Deserialize, Serialize};
 
 use crate::SsaoConfig;
@@ -27,7 +27,7 @@ pub struct Options {
     pub ground_plane_height: f32,
 
     /// Background color.
-    pub background_color: Vec3,
+    pub background_color: Vec4,
 
     /// Whether to enable transparency.
     pub transparency_enabled: bool,
@@ -54,7 +54,7 @@ impl Default for Options {
             ground_plane_enabled: true,
             ground_plane_mode: GroundPlaneMode::ShadowOnly,
             ground_plane_height: 0.0,
-            background_color: Vec3::new(1.0, 1.0, 1.0),
+            background_color: Vec4::new(1.0, 1.0, 1.0, 1.0),
             transparency_enabled: true,
             transparency_mode: TransparencyMode::Simple,
             ssaa_factor: 1,

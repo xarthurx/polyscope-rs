@@ -24,7 +24,7 @@ pub struct SlicePlane {
     /// Whether to draw a widget at the plane origin.
     draw_widget: bool,
     /// Color of the plane visualization.
-    color: Vec3,
+    color: Vec4,
     /// Transparency of the plane visualization (0.0 = fully transparent, 1.0 = opaque).
     transparency: f32,
     /// Size of the plane visualization (half-extent in each direction).
@@ -43,7 +43,7 @@ impl SlicePlane {
             enabled: true,
             draw_plane: true,
             draw_widget: true,
-            color: Vec3::new(0.5, 0.5, 0.5),
+            color: Vec4::new(0.5, 0.5, 0.5, 1.0),
             transparency: 0.5,
             plane_size: 0.05,
         }
@@ -58,7 +58,7 @@ impl SlicePlane {
             enabled: true,
             draw_plane: true,
             draw_widget: true,
-            color: Vec3::new(0.5, 0.5, 0.5),
+            color: Vec4::new(0.5, 0.5, 0.5, 1.0),
             transparency: 0.5,
             plane_size: 0.05,
         }
@@ -133,13 +133,13 @@ impl SlicePlane {
 
     /// Returns the color of the plane visualization.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the color of the plane visualization.
     pub fn set_color(&mut self, color: Vec3) {
-        self.color = color;
+        self.color = color.extend(1.0);
     }
 
     /// Returns the transparency of the plane visualization.
