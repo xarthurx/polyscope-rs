@@ -228,7 +228,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Structure | C++ Polyscope | polyscope-rs | Notes |
 |-----------|--------------|--------------|-------|
 | Point Cloud | ✅ Full | ✅ Full | Complete feature parity |
-| Surface Mesh | ✅ Full | ✅ Most | Triangles full (vertex/face scalar/color/vector/parameterization/intrinsic vector/one-form), polygons basic |
+| Surface Mesh | ✅ Full | ✅ Full | Triangles + arbitrary polygons, full quantity support (vertex/face scalar/color/vector/parameterization/intrinsic vector/one-form) |
 | Curve Network | ✅ Full | ✅ Full | Line, loop, segments; tube rendering via compute shaders; node/edge scalar/color/vector quantities |
 | Volume Mesh | ✅ Full | ✅ Full | Tet/hex cells, quantities, interior face detection, slice capping |
 | Volume Grid | ✅ Full | ✅ Basic | Node scalars only. Missing: cell quantities, isosurface rendering |
@@ -388,13 +388,7 @@ with_point_cloud("my points", |pc| {
 
 ---
 
-## Missing Features (Planned)
-
-The following C++ Polyscope features are not yet implemented but planned:
-
-1. **Full Polygon Mesh Support** - Arbitrary polygons (not just triangles)
-
-All major quantity types are now implemented, including parameterization, intrinsic vectors, one-forms, and RGBA color support with full GPU rendering.
+All major features and quantity types are now implemented, including arbitrary polygon meshes, parameterization, intrinsic vectors, one-forms, and RGBA color support with full GPU rendering.
 
 ---
 

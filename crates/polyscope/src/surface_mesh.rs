@@ -1,15 +1,72 @@
 use crate::{with_context, with_context_mut, SurfaceMesh, Vec2, Vec3, Vec4};
 use glam::UVec3;
 
+/// Trait for face data that can be converted to the internal polygon format.
+///
+/// Implemented for:
+/// - `Vec<UVec3>` — triangle-only meshes
+/// - `Vec<[u32; 3]>` — triangle-only meshes (array form)
+/// - `Vec<Vec<u32>>` — arbitrary polygon meshes (triangles, quads, pentagons, etc.)
+pub trait IntoFaceList {
+    /// Converts to the internal polygon face representation.
+    fn into_face_list(self) -> Vec<Vec<u32>>;
+}
+
+impl IntoFaceList for Vec<UVec3> {
+    fn into_face_list(self) -> Vec<Vec<u32>> {
+        self.into_iter().map(|f| vec![f.x, f.y, f.z]).collect()
+    }
+}
+
+impl IntoFaceList for Vec<[u32; 3]> {
+    fn into_face_list(self) -> Vec<Vec<u32>> {
+        self.into_iter().map(|f| f.to_vec()).collect()
+    }
+}
+
+impl IntoFaceList for Vec<Vec<u32>> {
+    fn into_face_list(self) -> Vec<Vec<u32>> {
+        self
+    }
+}
+
 /// Registers a surface mesh with polyscope.
+///
+/// Accepts any face format implementing [`IntoFaceList`]:
+/// - `Vec<UVec3>` or `Vec<[u32; 3]>` for triangle meshes
+/// - `Vec<Vec<u32>>` for arbitrary polygon meshes (triangles, quads, n-gons)
+///
+/// Polygonal faces are automatically fan-triangulated for rendering while
+/// preserving the original face structure for quantities and wireframe display.
+///
+/// # Panics
+///
+/// Panics if any face has fewer than 3 vertices or contains out-of-bounds
+/// vertex indices.
 pub fn register_surface_mesh(
     name: impl Into<String>,
     vertices: Vec<Vec3>,
-    faces: Vec<UVec3>,
+    faces: impl IntoFaceList,
 ) -> SurfaceMeshHandle {
     let name = name.into();
-    // Convert UVec3 faces to Vec<Vec<u32>> for the SurfaceMesh constructor
-    let faces: Vec<Vec<u32>> = faces.into_iter().map(|f| vec![f.x, f.y, f.z]).collect();
+    let faces = faces.into_face_list();
+    let n_verts = vertices.len();
+
+    // Validate faces
+    for (i, face) in faces.iter().enumerate() {
+        assert!(
+            face.len() >= 3,
+            "Face {i} has {} vertices (minimum 3 required)",
+            face.len()
+        );
+        for &idx in face {
+            assert!(
+                (idx as usize) < n_verts,
+                "Face {i} contains vertex index {idx} but mesh only has {n_verts} vertices"
+            );
+        }
+    }
+
     let mesh = SurfaceMesh::new(name.clone(), vertices, faces);
 
     with_context_mut(|ctx| {

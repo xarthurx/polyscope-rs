@@ -52,8 +52,6 @@ GPU data from structure geometry **must** be transformed by the model matrix. Wh
 
 - **Pretty mode non-linear opacity**: Depth peeling renders both faces of closed meshes, giving effective alpha = `2α - α²`. Matches C++ Polyscope. Transparency only becomes visible at low opacity values.
 - **Pretty mode f16 depth precision**: Min-depth uses `Rgba16Float` (WebGPU `R32Float` not blendable without `float32-blendable` feature). Requires epsilon `2e-3` in `surface_mesh_peel.wgsl` vs C++'s `1e-6` (24-bit depth). Closely spaced layers within 0.002 NDC depth may not be distinguished.
-- **Missing**: Full polygon mesh support (arbitrary polygons beyond triangles).
-
 ## Reference
 
 - **Local C++ Polyscope source**: `~/repo/polyscope` — always check for implementation details

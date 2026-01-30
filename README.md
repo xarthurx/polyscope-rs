@@ -22,14 +22,14 @@ This project is an experiment in **AI-driven software development**. I have limi
 
 **Current Version:** 0.2.0 (Alpha)
 
-**Feature Parity:** ~95% of C++ Polyscope 2.x
+**Feature Parity:** ~100% of C++ Polyscope 2.x
 
 ### What's Working
 
 | Feature | Status |
 |---------|--------|
 | Point Clouds | ✅ Full support |
-| Surface Meshes | ✅ Triangle meshes with full quantity support |
+| Surface Meshes | ✅ Triangles + arbitrary polygons, full quantity support |
 | Curve Networks | ✅ Full support |
 | Volume Meshes | ✅ Tet/Hex cells |
 | Volume Grids | ✅ Basic support |
@@ -49,10 +49,6 @@ This project is an experiment in **AI-driven software development**. I have limi
 | Intrinsic Vectors | ✅ Tangent-space with symmetry |
 | One-Forms | ✅ Edge-based differential forms |
 | Floating Quantities | ✅ Scalar/Color/Render images |
-
-### What's Not Yet Implemented
-
-- Full polygon mesh support (arbitrary polygons)
 
 See [docs/architecture-differences.md](docs/architecture-differences.md) for a detailed comparison with C++ Polyscope.
 
@@ -173,6 +169,5 @@ This project is inspired by the original [Polyscope](https://github.com/nmwsharp
 
 Contributions are welcome! Key areas where help is needed:
 
-- Full polygon mesh support (arbitrary polygons)
 - Documentation and examples
 - Testing on different platforms (macOS, WebGPU)
