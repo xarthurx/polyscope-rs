@@ -3,16 +3,16 @@
     clippy::cast_sign_loss,
     clippy::cast_precision_loss
 )]
-//! Transparency demo demonstrating order-independent transparency rendering.
+//! Transparency demo demonstrating depth-peeled transparency rendering.
 //!
 //! This example creates overlapping transparent meshes to show how the
-//! Weighted Blended OIT algorithm renders transparent surfaces correctly
+//! depth peeling algorithm renders transparent surfaces correctly
 //! regardless of render order.
 //!
 //! Run with: cargo run --example `transparency_demo`
 //!
 //! Controls:
-//! - Change transparency mode in Appearance settings (`WeightedBlended` recommended)
+//! - Change transparency mode in Appearance settings (`Pretty` recommended)
 //! - Adjust mesh transparency via the Opacity slider in each mesh's settings
 
 use glam::Vec3;
@@ -69,7 +69,7 @@ fn main() {
     let (cube_verts, cube_faces) = create_cube();
 
     // Create three overlapping transparent cubes with different colors
-    // Positioned to overlap so we can see the OIT effect
+    // Positioned to overlap so we can see the depth-peeling effect
 
     // Red cube (center-left)
     let red_verts = transform_vertices(&cube_verts, Vec3::new(-0.3, 0.0, 0.0), 1.0);
@@ -106,13 +106,13 @@ fn main() {
     println!("Transparency Demo");
     println!("==================");
     println!();
-    println!("This demo shows order-independent transparency (OIT) rendering.");
+    println!("This demo shows depth-peeled transparency (Pretty mode).");
     println!("Three overlapping transparent cubes (red, green, blue) are rendered");
     println!("in front of a gray opaque cube.");
     println!();
     println!("To see the difference between transparency modes:");
     println!("  1. Open the Appearance settings in the left panel");
-    println!("  2. Change 'Transparency' from 'Simple' to 'Weighted Blended'");
+    println!("  2. Change 'Transparency' from 'Simple' to 'Pretty'");
     println!("  3. Notice how the overlapping transparent surfaces blend correctly");
     println!();
     println!("Try adjusting individual mesh transparency:");

@@ -294,6 +294,7 @@ pub struct MeshVertexColorQuantity {
     structure_name: String,
     colors: Vec<Vec4>,
     enabled: bool,
+    has_transparency: bool,
 }
 
 impl MeshVertexColorQuantity {
@@ -308,6 +309,7 @@ impl MeshVertexColorQuantity {
             structure_name: structure_name.into(),
             colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
             enabled: false,
+            has_transparency: false,
         }
     }
 
@@ -317,11 +319,13 @@ impl MeshVertexColorQuantity {
         structure_name: impl Into<String>,
         colors: Vec<Vec4>,
     ) -> Self {
+        let has_transparency = colors.iter().any(|c| c.w < 0.999);
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
             colors,
             enabled: false,
+            has_transparency,
         }
     }
 
@@ -329,6 +333,12 @@ impl MeshVertexColorQuantity {
     #[must_use]
     pub fn colors(&self) -> &[Vec4] {
         &self.colors
+    }
+
+    /// Returns true if any color has alpha < 1.0.
+    #[must_use]
+    pub fn has_transparency(&self) -> bool {
+        self.has_transparency
     }
 
     /// Builds the egui UI for this quantity.
@@ -383,6 +393,7 @@ pub struct MeshFaceColorQuantity {
     structure_name: String,
     colors: Vec<Vec4>,
     enabled: bool,
+    has_transparency: bool,
 }
 
 impl MeshFaceColorQuantity {
@@ -397,6 +408,7 @@ impl MeshFaceColorQuantity {
             structure_name: structure_name.into(),
             colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
             enabled: false,
+            has_transparency: false,
         }
     }
 
@@ -406,11 +418,13 @@ impl MeshFaceColorQuantity {
         structure_name: impl Into<String>,
         colors: Vec<Vec4>,
     ) -> Self {
+        let has_transparency = colors.iter().any(|c| c.w < 0.999);
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
             colors,
             enabled: false,
+            has_transparency,
         }
     }
 
@@ -418,6 +432,12 @@ impl MeshFaceColorQuantity {
     #[must_use]
     pub fn colors(&self) -> &[Vec4] {
         &self.colors
+    }
+
+    /// Returns true if any color has alpha < 1.0.
+    #[must_use]
+    pub fn has_transparency(&self) -> bool {
+        self.has_transparency
     }
 
     /// Computes vertex colors by expanding face colors to all vertices of each face.

@@ -28,9 +28,11 @@ pub struct MeshUniforms {
     pub backface_policy: u32,
     /// Slice plane clipping enable: 0 = off, 1 = on
     pub slice_planes_enabled: u32,
-    /// Padding to align next vec3 to 16 bytes (WGSL vec3 alignment)
-    pub _pad1: [f32; 2],
-    /// Padding matching WGSL vec3 (12 bytes)
+    /// Use per-vertex colors (1) or surface color (0)
+    pub use_vertex_color: u32,
+    /// Padding to align to 16 bytes
+    pub _pad1: f32,
+    /// Padding matching WGSL layout (12 bytes)
     pub _pad2: [f32; 3],
     /// Padding to align vec4 to 16 bytes
     pub _pad3: f32,
@@ -77,7 +79,8 @@ impl Default for MeshUniforms {
             edge_color: [0.0, 0.0, 0.0, 1.0],    // black edges
             backface_policy: 0,                  // identical to front
             slice_planes_enabled: 1,
-            _pad1: [0.0; 2],
+            use_vertex_color: 0,
+            _pad1: 0.0,
             _pad2: [0.0; 3],
             _pad3: 0.0,
             backface_color: [0.3, 0.3, 0.3, 1.0], // darker gray
@@ -461,7 +464,8 @@ mod tests {
         // edge_color: 16 bytes ([f32; 4])
         // backface_policy: 4 bytes (u32)
         // slice_planes_enabled: 4 bytes (u32)
-        // _pad1: 8 bytes ([f32; 2])
+        // use_vertex_color: 4 bytes (u32)
+        // _pad1: 4 bytes (f32)
         // _pad2: 12 bytes ([f32; 3])
         // _pad3: 4 bytes (f32)
         // backface_color: 16 bytes ([f32; 4])

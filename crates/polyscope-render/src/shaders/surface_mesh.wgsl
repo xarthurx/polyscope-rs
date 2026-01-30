@@ -32,8 +32,8 @@ struct MeshUniforms {
     edge_color: vec4<f32>,
     backface_policy: u32,  // 0 = identical, 1 = different, 2 = custom, 3 = cull
     slice_planes_enabled: u32, // 0 = off, 1 = on
-    _pad1_0: f32,
-    _pad1_1: f32,
+    use_vertex_color: u32, // 0 = surface_color, 1 = per-vertex color
+    _pad1: f32,
     _pad2_0: f32,
     _pad2_1: f32,
     _pad2_2: f32,
@@ -160,11 +160,8 @@ fn fs_main(
         }
     }
 
-    // Use per-vertex color if non-zero (for quantities)
-    // Check if the color is non-default (not all zeros or very close to it)
-    let color_sum = in.vertex_color.r + in.vertex_color.g + in.vertex_color.b;
     var per_element_alpha = 1.0;
-    if (color_sum > 0.001) {
+    if (mesh_uniforms.use_vertex_color == 1u) {
         base_color = in.vertex_color.rgb;
         per_element_alpha = in.vertex_color.w;
     }
@@ -230,11 +227,15 @@ fn fs_main(
     // Per-element alpha from color quantities modulates structure-wide transparency
     let alpha = (1.0 - mesh_uniforms.transparency) * per_element_alpha;
 
+    if (alpha <= 0.0) {
+        discard;
+    }
+
     // Compute view-space normal for SSAO
     let view_normal = (camera.view * vec4<f32>(normal, 0.0)).xyz;
 
     var out: FragmentOutput;
     out.color = vec4<f32>(color, alpha);
-    out.normal = vec4<f32>(view_normal * 0.5 + 0.5, 1.0); // Encode to [0,1] range
+    out.normal = vec4<f32>(view_normal * 0.5 + 0.5, alpha); // Encode to [0,1] range
     return out;
 }

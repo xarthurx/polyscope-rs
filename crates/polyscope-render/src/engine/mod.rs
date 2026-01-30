@@ -101,6 +101,10 @@ pub struct RenderEngine {
     pub vector_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Surface mesh render pipeline.
     pub mesh_pipeline: Option<wgpu::RenderPipeline>,
+    /// Surface mesh transparent pipeline (no depth write).
+    pub mesh_transparent_pipeline: Option<wgpu::RenderPipeline>,
+    /// Surface mesh depth/normal-only pipeline (Pretty mode prepass).
+    pub mesh_depth_normal_pipeline: Option<wgpu::RenderPipeline>,
     /// Mesh bind group layout.
     pub(crate) mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Curve network edge render pipeline (line rendering).
@@ -153,18 +157,8 @@ pub struct RenderEngine {
     pub(crate) ssao_output_texture: Option<wgpu::Texture>,
     /// SSAO output texture view.
     pub(crate) ssao_output_view: Option<wgpu::TextureView>,
-    /// OIT accumulation texture (`RGBA16Float`) - stores weighted color sum.
-    pub(crate) oit_accum_texture: Option<wgpu::Texture>,
-    /// OIT accumulation texture view.
-    pub(crate) oit_accum_view: Option<wgpu::TextureView>,
-    /// OIT reveal texture (`R8Unorm`) - stores transmittance product.
-    pub(crate) oit_reveal_texture: Option<wgpu::Texture>,
-    /// OIT reveal texture view.
-    pub(crate) oit_reveal_view: Option<wgpu::TextureView>,
-    /// OIT composite pass.
-    pub(crate) oit_composite_pass: Option<crate::oit_pass::OitCompositePass>,
-    /// Surface mesh OIT accumulation pipeline.
-    pub(crate) mesh_oit_pipeline: Option<wgpu::RenderPipeline>,
+    /// Depth peeling transparency pass.
+    pub(crate) depth_peel_pass: Option<crate::depth_peel_pass::DepthPeelPass>,
     /// Tone mapping post-processing pass.
     pub(crate) tone_map_pass: Option<ToneMapPass>,
     /// SSAA (supersampling) pass for anti-aliasing.
@@ -482,6 +476,8 @@ impl RenderEngine {
             vector_pipeline: None,
             vector_bind_group_layout: None,
             mesh_pipeline: None,
+            mesh_transparent_pipeline: None,
+            mesh_depth_normal_pipeline: None,
             mesh_bind_group_layout: None,
             curve_network_edge_pipeline: None,
             curve_network_edge_bind_group_layout: None,
@@ -508,12 +504,7 @@ impl RenderEngine {
             ssao_pass: None,
             ssao_output_texture: None,
             ssao_output_view: None,
-            oit_accum_texture: None,
-            oit_accum_view: None,
-            oit_reveal_texture: None,
-            oit_reveal_view: None,
-            oit_composite_pass: None,
-            mesh_oit_pipeline: None,
+            depth_peel_pass: None,
             tone_map_pass: None,
             ssaa_pass: None,
             ssaa_factor: 1,
@@ -799,6 +790,8 @@ impl RenderEngine {
             vector_pipeline: None,
             vector_bind_group_layout: None,
             mesh_pipeline: None,
+            mesh_transparent_pipeline: None,
+            mesh_depth_normal_pipeline: None,
             mesh_bind_group_layout: None,
             curve_network_edge_pipeline: None,
             curve_network_edge_bind_group_layout: None,
@@ -825,12 +818,7 @@ impl RenderEngine {
             ssao_pass: None,
             ssao_output_texture: None,
             ssao_output_view: None,
-            oit_accum_texture: None,
-            oit_accum_view: None,
-            oit_reveal_texture: None,
-            oit_reveal_view: None,
-            oit_composite_pass: None,
-            mesh_oit_pipeline: None,
+            depth_peel_pass: None,
             tone_map_pass: None,
             ssaa_pass: None,
             ssaa_factor: 1,

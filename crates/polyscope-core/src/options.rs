@@ -35,6 +35,9 @@ pub struct Options {
     /// Transparency mode.
     pub transparency_mode: TransparencyMode,
 
+    /// Number of render passes for depth-peeling transparency (Pretty mode).
+    pub transparency_render_passes: u32,
+
     /// SSAA (supersampling) factor.
     pub ssaa_factor: u32,
 
@@ -57,6 +60,7 @@ impl Default for Options {
             background_color: Vec4::new(1.0, 1.0, 1.0, 1.0),
             transparency_enabled: true,
             transparency_mode: TransparencyMode::Simple,
+            transparency_render_passes: 8,
             ssaa_factor: 1,
             max_fps: 60,
             ssao: SsaoConfig::default(),
@@ -84,8 +88,8 @@ pub enum TransparencyMode {
     /// Simple transparency (order-dependent, default).
     #[default]
     Simple,
-    /// Weighted blended OIT - handles overlapping geometry correctly.
-    WeightedBlended,
+    /// Depth-peeled transparency - correct front-to-back ordering via multiple passes.
+    Pretty,
     /// No transparency.
     None,
 }

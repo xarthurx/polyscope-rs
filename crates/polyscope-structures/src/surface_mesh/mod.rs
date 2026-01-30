@@ -305,7 +305,7 @@ impl SurfaceMesh {
         self.surface_color = color.extend(1.0);
     }
 
-    /// Gets the transparency (1.0 = opaque, 0.0 = fully transparent).
+    /// Gets the transparency (0.0 = opaque, 1.0 = fully transparent).
     #[must_use]
     pub fn transparency(&self) -> f32 {
         self.transparency
@@ -1219,32 +1219,16 @@ impl SurfaceMesh {
         // Convert glam Mat4 to [[f32; 4]; 4] for GPU
         let model_matrix = self.transform.to_cols_array_2d();
 
-        let uniforms = MeshUniforms {
-            model_matrix,
-            shade_style: self.shade_style as u32,
-            show_edges: u32::from(self.show_edges),
-            edge_width: self.edge_width,
-            transparency: self.transparency,
-            surface_color: self.surface_color.to_array(),
-            edge_color: self.edge_color.to_array(),
-            backface_policy: self.backface_policy as u32,
-            slice_planes_enabled: 1,
-            _pad1: [0.0; 2],
-            _pad2: [0.0; 3],
-            _pad3: 0.0,
-            backface_color: self.backface_color.to_array(),
-        };
-        render_data.update_uniforms(queue, &uniforms);
-
-        // Update shadow model buffer if initialized
-        render_data.update_shadow_model(queue, model_matrix);
+        let mut use_vertex_color = false;
 
         // Apply quantity colors with priority:
         // vertex param > corner param > vertex color > face color > vertex scalar > face scalar > surface color
         if let Some(pq) = self.active_vertex_parameterization_quantity() {
+            use_vertex_color = true;
             let colors = pq.compute_colors();
             render_data.update_colors(queue, &colors, &self.triangulation);
         } else if let Some(pq) = self.active_corner_parameterization_quantity() {
+            use_vertex_color = true;
             // Corner parameterization: compute per-corner colors, expand to per-vertex
             // (for now, treat as per-face by averaging corners)
             let corner_colors = pq.compute_colors();
@@ -1267,19 +1251,23 @@ impl SurfaceMesh {
             }
             render_data.update_colors(queue, &vertex_colors, &self.triangulation);
         } else if let Some(cq) = self.active_vertex_color_quantity() {
+            use_vertex_color = true;
             // Direct vertex color quantity
             render_data.update_colors(queue, cq.colors(), &self.triangulation);
         } else if let Some(cq) = self.active_face_color_quantity() {
+            use_vertex_color = true;
             // Face color expanded to vertices
             let colors = cq.compute_vertex_colors(&self.faces, self.vertices.len());
             render_data.update_colors(queue, &colors, &self.triangulation);
         } else if let Some(sq) = self.active_vertex_scalar_quantity() {
+            use_vertex_color = true;
             // Vertex scalar mapped through colormap
             if let Some(colormap) = color_maps.get(sq.colormap_name()) {
                 let colors = sq.compute_colors(colormap);
                 render_data.update_colors(queue, &colors, &self.triangulation);
             }
         } else if let Some(sq) = self.active_face_scalar_quantity() {
+            use_vertex_color = true;
             // Face scalar mapped through colormap and expanded to vertices
             if let Some(colormap) = color_maps.get(sq.colormap_name()) {
                 let colors = sq.compute_vertex_colors(&self.faces, self.vertices.len(), colormap);
@@ -1289,6 +1277,27 @@ impl SurfaceMesh {
             // No quantity enabled - clear colors so shader uses surface_color
             render_data.clear_colors(queue);
         }
+
+        let uniforms = MeshUniforms {
+            model_matrix,
+            shade_style: self.shade_style as u32,
+            show_edges: u32::from(self.show_edges),
+            edge_width: self.edge_width,
+            transparency: self.transparency,
+            surface_color: self.surface_color.to_array(),
+            edge_color: self.edge_color.to_array(),
+            backface_policy: self.backface_policy as u32,
+            slice_planes_enabled: 1,
+            use_vertex_color: u32::from(use_vertex_color),
+            _pad1: 0.0,
+            _pad2: [0.0; 3],
+            _pad3: 0.0,
+            backface_color: self.backface_color.to_array(),
+        };
+        render_data.update_uniforms(queue, &uniforms);
+
+        // Update shadow model buffer if initialized
+        render_data.update_shadow_model(queue, model_matrix);
     }
 }
 

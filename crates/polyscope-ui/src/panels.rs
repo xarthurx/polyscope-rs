@@ -55,7 +55,7 @@ pub struct SceneExtents {
 /// Appearance settings for UI.
 #[derive(Debug, Clone)]
 pub struct AppearanceSettings {
-    /// Transparency mode (0=None, 1=Simple, 2=WeightedBlended)
+    /// Transparency mode (0=None, 1=Simple, 2=Pretty/DepthPeeling)
     pub transparency_mode: u32,
     /// SSAA factor (1, 2, or 4)
     pub ssaa_factor: u32,
@@ -876,7 +876,7 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
                 .selected_text(match settings.transparency_mode {
                     0 => "None",
                     1 => "Simple",
-                    _ => "Weighted Blended",
+                    _ => "Pretty",
                 })
                 .show_ui(ui, |ui| {
                     if ui
@@ -892,7 +892,7 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
                         changed = true;
                     }
                     if ui
-                        .selectable_value(&mut settings.transparency_mode, 2, "Weighted Blended")
+                        .selectable_value(&mut settings.transparency_mode, 2, "Pretty")
                         .changed()
                     {
                         changed = true;

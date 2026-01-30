@@ -21,8 +21,8 @@ struct MeshUniforms {
     edge_color: vec4<f32>,
     backface_policy: u32,
     slice_planes_enabled: u32,
-    _pad1_0: f32,
-    _pad1_1: f32,
+    use_vertex_color: u32,
+    _pad1: f32,
     _pad2_0: f32,
     _pad2_1: f32,
     _pad2_2: f32,
@@ -113,9 +113,9 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) front_facing: bool) -> @loca
     }
 
     // Get base color
-    var base_color = in.vertex_color.rgb;
-    if (in.vertex_color.a < 0.001) {
-        base_color = mesh_uniforms.surface_color.rgb;
+    var base_color = mesh_uniforms.surface_color.rgb;
+    if (mesh_uniforms.use_vertex_color == 1u) {
+        base_color = in.vertex_color.rgb;
     }
 
     // Use flipped normal for front-facing test on reflected geometry

@@ -124,6 +124,7 @@ Shaders are written in WGSL (WebGPU Shading Language). Implemented shaders:
 - SSAO (Screen-Space Ambient Occlusion)
 - Slice plane visualization (grid pattern)
 - Volume mesh slice capping
+- Depth peeling transparency (multi-pass front-to-back peeling with alpha-under composite)
 - Matcap lighting (all scene shaders use `light_surface_matcap()` via Group 2 bind group)
 - Reflected geometry (mesh, point cloud, curve network) with matcap lighting
 
@@ -145,7 +146,7 @@ Failure to do this causes quantities to stay frozen in place when the user moves
 
 ### Transparency (polyscope-render)
 
-Weighted Blended Order-Independent Transparency (OIT) is implemented via `OitPass` and `oit_composite.wgsl`. Surface meshes support `set_transparency()`.
+Depth peeling transparency is implemented via `DepthPeelPass` (`depth_peel_pass.rs`), matching C++ Polyscope's "Pretty" mode. The algorithm renders N geometry passes (default 8), each discarding fragments at or in front of the previous pass's depth, then composites layers front-to-back with alpha-under blending. Key files: `surface_mesh_peel.wgsl` (peel shader with min-depth discard), `composite_peel.wgsl` (alpha-under composite), `depth_update_peel.wgsl` (min-depth update via Max blend). Surface meshes support `set_transparency()`.
 
 ### Matcap Materials (polyscope-render)
 

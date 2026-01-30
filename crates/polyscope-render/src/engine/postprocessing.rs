@@ -311,93 +311,36 @@ impl RenderEngine {
         self.ssaa_intermediate_view = Some(view);
     }
 
-    /// Ensures OIT (Order-Independent Transparency) textures exist and match render resolution.
-    /// Uses SSAA-scaled dimensions so OIT textures match the depth buffer.
-    pub fn ensure_oit_textures(&mut self) {
+    /// Ensures the depth peel pass is initialized and matches render resolution.
+    pub fn ensure_depth_peel_pass(&mut self) {
         let (render_w, render_h) = self.render_dimensions();
-        let needs_create = self.oit_accum_texture.is_none()
-            || self.oit_accum_texture.as_ref().map(wgpu::Texture::width) != Some(render_w)
-            || self.oit_accum_texture.as_ref().map(wgpu::Texture::height) != Some(render_h);
 
-        if !needs_create {
-            return;
+        if self.mesh_bind_group_layout.is_none() {
+            self.create_mesh_pipeline();
         }
 
-        // Accumulation texture: RGBA16Float for weighted color accumulation
-        let accum_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("OIT Accumulation Texture"),
-            size: wgpu::Extent3d {
-                width: render_w,
-                height: render_h,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-        self.oit_accum_view =
-            Some(accum_texture.create_view(&wgpu::TextureViewDescriptor::default()));
-        self.oit_accum_texture = Some(accum_texture);
-
-        // Reveal texture: R8Unorm for transmittance product
-        let reveal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("OIT Reveal Texture"),
-            size: wgpu::Extent3d {
-                width: render_w,
-                height: render_h,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Unorm,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-        self.oit_reveal_view =
-            Some(reveal_texture.create_view(&wgpu::TextureViewDescriptor::default()));
-        self.oit_reveal_texture = Some(reveal_texture);
-    }
-
-    /// Returns the OIT accumulation texture view, if initialized.
-    pub fn oit_accum_view(&self) -> Option<&wgpu::TextureView> {
-        self.oit_accum_view.as_ref()
-    }
-
-    /// Returns the OIT reveal texture view, if initialized.
-    pub fn oit_reveal_view(&self) -> Option<&wgpu::TextureView> {
-        self.oit_reveal_view.as_ref()
-    }
-
-    /// Ensures OIT composite pass is initialized.
-    pub fn ensure_oit_pass(&mut self) {
-        if self.oit_composite_pass.is_none() {
-            // OIT composite renders to HDR texture (Rgba16Float), not swapchain
-            self.oit_composite_pass = Some(crate::oit_pass::OitCompositePass::new(
+        if let Some(ref mut pass) = self.depth_peel_pass {
+            pass.resize(&self.device, render_w, render_h);
+        } else {
+            self.depth_peel_pass = Some(crate::depth_peel_pass::DepthPeelPass::new(
                 &self.device,
-                wgpu::TextureFormat::Rgba16Float,
+                render_w,
+                render_h,
+                self.mesh_bind_group_layout.as_ref().unwrap(),
+                &self.slice_plane_bind_group_layout,
+                &self.matcap_bind_group_layout,
             ));
         }
     }
 
-    /// Returns the OIT composite pass, if initialized.
-    pub fn oit_composite_pass(&self) -> Option<&crate::oit_pass::OitCompositePass> {
-        self.oit_composite_pass.as_ref()
+    /// Returns the depth peel pass, if initialized.
+    pub fn depth_peel_pass(&self) -> Option<&crate::depth_peel_pass::DepthPeelPass> {
+        self.depth_peel_pass.as_ref()
     }
 
-    /// Returns the surface mesh OIT pipeline, if initialized.
-    pub fn mesh_oit_pipeline(&self) -> Option<&wgpu::RenderPipeline> {
-        self.mesh_oit_pipeline.as_ref()
-    }
-
-    /// Ensures the mesh OIT pipeline is created.
-    pub fn ensure_mesh_oit_pipeline(&mut self) {
-        if self.mesh_oit_pipeline.is_none() {
-            self.create_mesh_oit_pipeline();
-        }
+    /// Returns a mutable reference to the depth peel pass, if initialized.
+    pub fn depth_peel_pass_mut(&mut self) -> Option<&mut crate::depth_peel_pass::DepthPeelPass> {
+        self.depth_peel_pass.as_mut()
     }
 
     /// Returns the HDR texture view for rendering the scene.

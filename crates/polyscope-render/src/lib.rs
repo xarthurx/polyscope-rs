@@ -46,7 +46,7 @@ pub mod engine;
 pub mod error;
 pub mod ground_plane;
 pub mod materials;
-pub mod oit_pass;
+pub mod depth_peel_pass;
 pub mod pick;
 pub mod point_cloud_render;
 pub mod reflection;
@@ -69,7 +69,7 @@ pub use engine::RenderEngine;
 pub use error::{RenderError, RenderResult};
 pub use ground_plane::{GroundPlaneRenderData, GroundPlaneUniforms};
 pub use materials::{Material, MaterialRegistry, MaterialUniforms};
-pub use oit_pass::OitCompositePass;
+pub use depth_peel_pass::DepthPeelPass;
 pub use pick::{
     color_to_index, decode_pick_id, encode_pick_id, index_to_color, PickElementType, PickResult,
     PickUniforms, TubePickUniforms,

@@ -28,7 +28,7 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 - [x] Ground reflections
 - [x] SSAO (Screen-Space Ambient Occlusion)
 - [x] Tone mapping (multiple modes)
-- [x] Transparency (Weighted Blended OIT)
+- [x] Transparency (Depth Peeling / Pretty)
 - [x] Slice planes (up to 4) with gizmo manipulation
 - [x] Volume mesh slice capping with quantity interpolation
 - [x] Groups (structure organization)
@@ -52,7 +52,7 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 ### Tier 2 — Broader Feature Additions
 
 - [ ] **Matcap Material System** - Current materials use parametric Phong lighting (ambient/diffuse/specular/shininess scalars). C++ Polyscope uses texture-based matcap rendering (view-space normal → HDR texture lookup) which gives its distinctive visual quality. Gaps: (1) No matcap texture loading or rendering; (2) MaterialUniforms not wired to surface mesh / point cloud shaders; (3) Only CurveNetwork exposes `set_material()`; SurfaceMesh and PointCloud do not; (4) Missing `concrete` material; (5) No custom material loading API (`loadBlendableMaterial` / `loadStaticMaterial`).
-- [ ] **RGBA Color Quantities** - Currently only RGB colors supported; add alpha channel support for per-element transparency
+- [ ] **RGBA Color Quantities** - SurfaceMesh supports RGBA alpha; other structures still RGB-only
 - [ ] **Full Polygon Mesh Support** - Arbitrary n-gon faces (not just triangles); proper triangulation for rendering and quantities
 
 ### Tier 3 — Advanced Quantity Types
@@ -92,7 +92,7 @@ All Tier 3 quantities have full GPU rendering pipelines (init/update/draw), auto
 ## Known Limitations
 
 1. **Polygon Meshes**: Only triangles fully supported; arbitrary polygons need triangulation
-2. **Color Quantities**: RGB only, no alpha channel support
+2. **Color Quantities**: SurfaceMesh supports RGBA alpha; other structures RGB-only
 
 ---
 

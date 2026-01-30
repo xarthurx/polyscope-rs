@@ -127,7 +127,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     let normal_sample = textureSample(normal_texture, tex_sampler, in.uv);
-    if (normal_sample.a < 0.5) {
+    let coverage = normal_sample.a;
+    if (coverage <= 0.001) {
         return vec4<f32>(1.0);
     }
 
@@ -187,7 +188,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         // Normal-based weight: reduce contribution when sampling across different surfaces
         // This prevents dark halos at edges where samples hit the adjacent face
         var normal_weight = 1.0;
-        if (sample_normal_tex.a > 0.5) {
+        if (sample_normal_tex.a > 0.001) {
             let sample_normal = decode_normal(sample_normal_tex);
             let ndot = dot(normal, sample_normal);
             // If normals differ significantly (different faces), reduce contribution
@@ -206,7 +207,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // Normalize
-    occlusion = occlusion / f32(sample_count);
+    occlusion = (occlusion / f32(sample_count)) * coverage;
 
     // Apply edge factor to reduce AO at sharp geometric edges
     // This prevents the concentrated black areas at cube corners

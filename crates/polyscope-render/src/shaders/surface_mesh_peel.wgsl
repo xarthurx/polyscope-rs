@@ -1,5 +1,5 @@
-// Surface mesh OIT (Order-Independent Transparency) accumulation shader
-// Outputs weighted color to accumulation buffer and transmittance to reveal buffer.
+// Surface mesh depth-peeling shader
+// Same as surface_mesh.wgsl but discards fragments at or in front of the previous peel depth.
 
 struct CameraUniforms {
     view: mat4x4<f32>,
@@ -32,8 +32,8 @@ struct MeshUniforms {
     edge_color: vec4<f32>,
     backface_policy: u32,  // 0 = identical, 1 = different, 2 = custom, 3 = cull
     slice_planes_enabled: u32, // 0 = off, 1 = on
-    _pad1_0: f32,
-    _pad1_1: f32,
+    use_vertex_color: u32, // 0 = surface_color, 1 = per-vertex color
+    _pad1: f32,
     _pad2_0: f32,
     _pad2_1: f32,
     _pad2_2: f32,
@@ -58,10 +58,15 @@ struct MeshUniforms {
 @group(2) @binding(3) var matcap_k: texture_2d<f32>;
 @group(2) @binding(4) var matcap_sampler: sampler;
 
+// Depth peeling resources (Group 3)
+@group(3) @binding(0) var t_min_depth: texture_2d<f32>;
+@group(3) @binding(1) var peel_sampler: sampler;
+
+// Matcap lighting: view-space normal -> UV -> 4-channel weighted blend
 fn light_surface_matcap(normal: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
     var n = normalize(normal);
-    n.y = -n.y;
-    n = n * 0.98;
+    n.y = -n.y; // flip Y for camera convention
+    n = n * 0.98; // scale to avoid edge artifacts
     let uv = n.xy * 0.5 + vec2<f32>(0.5);
     let mat_r = textureSample(matcap_r, matcap_sampler, uv).rgb;
     let mat_g = textureSample(matcap_g, matcap_sampler, uv).rgb;
@@ -80,30 +85,20 @@ struct VertexOutput {
     @location(4) edge_real: vec3<f32>,
 }
 
-// OIT output: accumulation texture and reveal texture
-struct OitOutput {
-    @location(0) accum: vec4<f32>,
-    @location(1) reveal: vec4<f32>,  // Only .r is used, but vec4 is safer for some drivers
-}
-
 @vertex
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    // Read position, normal, barycentric, color from storage buffers
     let local_position = positions[vertex_index].xyz;
     let local_normal = normals[vertex_index].xyz;
     let bary = barycentrics[vertex_index].xyz;
     let color = colors[vertex_index];
 
-    // Apply model transform
     let world_position = (mesh_uniforms.model * vec4<f32>(local_position, 1.0)).xyz;
-    // Transform normal with upper-left 3x3 of model matrix (assuming uniform scale)
     let world_normal = normalize((mesh_uniforms.model * vec4<f32>(local_normal, 0.0)).xyz);
 
-    // Transform position with view_proj matrix
     out.clip_position = camera.view_proj * vec4<f32>(world_position, 1.0);
     out.world_position = world_position;
     out.world_normal = world_normal;
@@ -114,27 +109,31 @@ fn vs_main(
     return out;
 }
 
-// Weight function for OIT (simplified version)
-// The original McGuire/Bavoil weight function was too aggressive.
-// This simpler version provides depth-based ordering without extreme values.
-fn oit_weight(depth: f32, alpha: f32) -> f32 {
-    // Simple depth-based weight: closer objects get higher weight
-    // depth is in [0, 1] where 0 is near, 1 is far
-    let z = 1.0 - depth; // invert so near = 1, far = 0
-    return max(0.01, z * z * z * 1000.0);
+struct PeelOutput {
+    @location(0) color: vec4<f32>,
+    @location(1) depth_out: vec4<f32>,
 }
 
 @fragment
 fn fs_main(
     in: VertexOutput,
     @builtin(front_facing) front_facing: bool,
-) -> OitOutput {
+) -> PeelOutput {
+    // --- Depth peeling: discard if at or in front of previous peel depth ---
+    let depth = in.clip_position.z;
+    let viewport_dim = vec2<f32>(textureDimensions(t_min_depth));
+    let peel_uv = in.clip_position.xy / viewport_dim;
+    let min_depth = textureSample(t_min_depth, peel_sampler, peel_uv).r;
+    if (depth <= min_depth + 1e-6) {
+        discard;
+    }
+
     // Handle backface culling: if policy==3 and !front_facing, discard
     if (mesh_uniforms.backface_policy == 3u && !front_facing) {
         discard;
     }
 
-    // Slice plane culling - discard fragments on negative side of enabled planes
+    // Slice plane culling
     if (mesh_uniforms.slice_planes_enabled != 0u) {
         for (var i = 0u; i < 4u; i = i + 1u) {
             let plane = slice_planes.planes[i];
@@ -166,10 +165,8 @@ fn fs_main(
         }
     }
 
-    // Use per-vertex color if non-zero (for quantities)
-    let color_sum = in.vertex_color.r + in.vertex_color.g + in.vertex_color.b;
     var per_element_alpha = 1.0;
-    if (color_sum > 0.001) {
+    if (mesh_uniforms.use_vertex_color == 1u) {
         base_color = in.vertex_color.rgb;
         per_element_alpha = in.vertex_color.w;
     }
@@ -194,7 +191,7 @@ fn fs_main(
         normal = -normal;
     }
 
-    // Apply matcap lighting: transform normal to view space
+    // Apply matcap lighting
     let view_normal_for_matcap = normalize((camera.view * vec4<f32>(normal, 0.0)).xyz);
     var color = light_surface_matcap(view_normal_for_matcap, base_color);
 
@@ -218,28 +215,15 @@ fn fs_main(
         color = mix(mesh_uniforms.edge_color.rgb, color, edge_factor);
     }
 
-    // Compute alpha from transparency
-    // transparency of 0.0 means fully opaque (alpha = 1.0)
-    // transparency of 1.0 means fully transparent (alpha = 0.0)
-    // Per-element alpha from color quantities modulates structure-wide transparency
+    // Compute alpha
     let alpha = (1.0 - mesh_uniforms.transparency) * per_element_alpha;
 
-    // Skip nearly transparent fragments
-    if (alpha < 0.001) {
+    if (alpha <= 0.0) {
         discard;
     }
 
-    // Compute OIT weight based on depth
-    let depth = in.clip_position.z; // Normalized depth [0, 1]
-    let weight = oit_weight(depth, alpha);
-
-    // OIT output
-    var out: OitOutput;
-    // Accumulation: premultiplied color * weight
-    out.accum = vec4<f32>(color * alpha, alpha) * weight;
-    // Reveal: alpha (will be multiplied via blend state to compute product)
-    // Output as vec4 for compatibility - only .r channel is used
-    out.reveal = vec4<f32>(alpha, 0.0, 0.0, 1.0);
-
+    var out: PeelOutput;
+    out.color = vec4<f32>(color * alpha, alpha);
+    out.depth_out = vec4<f32>(depth, 0.0, 0.0, 1.0);
     return out;
 }
