@@ -296,13 +296,15 @@ impl Camera {
             self.position = new_pos;
         }
 
-        // Recompute up from world up direction, but keep it perpendicular to look
-        let new_look = (self.target - self.position).normalize();
-        let new_right = new_look.cross(up_vec).normalize();
-        self.up = new_right.cross(new_look).normalize();
+        // Rebuild up vector robustly using look_at_rh (matches C++ Polyscope's
+        // use of glm::lookAt after orbit rotation). This avoids degenerate
+        // cross products when the look direction is near-parallel to the up axis.
+        let view = Mat4::look_at_rh(self.position, self.target, up_vec);
+        // Extract camera up from the view matrix (second row of the rotation part)
+        self.up = Vec3::new(view.col(0).y, view.col(1).y, view.col(2).y).normalize();
 
-        // Guard against degenerate up (looking straight along up axis)
-        if self.up.length_squared() < 0.5 {
+        // Final guard: if extraction failed (NaN), fall back to world up
+        if !self.up.is_finite() || self.up.length_squared() < 0.5 {
             self.up = up_vec;
         }
     }
