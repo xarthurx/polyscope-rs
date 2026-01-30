@@ -426,8 +426,8 @@ mod tests {
         let img = FloatingColorRenderImage::new("colored", 2, 2, depths, colors);
 
         assert_eq!(img.depth_at(0, 0), 1.0);
-        assert_eq!(img.color_at(0, 0), Vec3::X);
-        assert_eq!(img.color_at(1, 1), Vec3::ONE);
+        assert_eq!(img.color_at(0, 0), Vec4::new(1.0, 0.0, 0.0, 1.0));
+        assert_eq!(img.color_at(1, 1), Vec4::new(1.0, 1.0, 1.0, 1.0));
     }
 
     #[test]
@@ -445,9 +445,9 @@ mod tests {
         let colors = vec![Vec3::X, Vec3::Y, Vec3::Z, Vec3::ONE];
         let img = FloatingRawColorImage::new("raw", 2, 2, colors);
 
-        assert_eq!(img.color_at(0, 0), Vec3::X);
-        assert_eq!(img.color_at(1, 0), Vec3::Y);
-        assert_eq!(img.color_at(0, 1), Vec3::Z);
-        assert_eq!(img.color_at(1, 1), Vec3::ONE);
+        assert_eq!(img.color_at(0, 0), Vec4::new(1.0, 0.0, 0.0, 1.0));
+        assert_eq!(img.color_at(1, 0), Vec4::new(0.0, 1.0, 0.0, 1.0));
+        assert_eq!(img.color_at(0, 1), Vec4::new(0.0, 0.0, 1.0, 1.0));
+        assert_eq!(img.color_at(1, 1), Vec4::new(1.0, 1.0, 1.0, 1.0));
     }
 }

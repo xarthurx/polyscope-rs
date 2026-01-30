@@ -746,20 +746,20 @@ mod tests {
     #[test]
     fn test_node_color_quantity() {
         let colors = vec![Vec3::X, Vec3::Y, Vec3::Z];
-        let q = CurveNodeColorQuantity::new("colors", "parent", colors.clone());
+        let q = CurveNodeColorQuantity::new("colors", "parent", colors);
 
         assert_eq!(q.name(), "colors");
-        assert_eq!(q.colors(), &colors);
+        assert_eq!(q.colors(), &[Vec4::new(1.0, 0.0, 0.0, 1.0), Vec4::new(0.0, 1.0, 0.0, 1.0), Vec4::new(0.0, 0.0, 1.0, 1.0)]);
         assert_eq!(q.data_size(), 3);
     }
 
     #[test]
     fn test_edge_color_quantity() {
         let colors = vec![Vec3::ONE, Vec3::ZERO];
-        let q = CurveEdgeColorQuantity::new("edge_colors", "parent", colors.clone());
+        let q = CurveEdgeColorQuantity::new("edge_colors", "parent", colors);
 
         assert_eq!(q.name(), "edge_colors");
-        assert_eq!(q.colors(), &colors);
+        assert_eq!(q.colors(), &[Vec4::new(1.0, 1.0, 1.0, 1.0), Vec4::new(0.0, 0.0, 0.0, 1.0)]);
         assert_eq!(q.data_size(), 2);
     }
 

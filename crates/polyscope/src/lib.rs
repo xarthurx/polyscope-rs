@@ -1750,10 +1750,10 @@ impl SlicePlaneHandle {
 
     /// Gets the color of the plane visualization.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map_or(Vec3::new(0.5, 0.5, 0.5), |p| p.color().truncate())
+                .map_or(Vec4::new(0.5, 0.5, 0.5, 1.0), polyscope_core::SlicePlane::color)
         })
     }
 
@@ -2555,7 +2555,7 @@ mod tests {
 
         // Verify values were set
         with_curve_network_ref(&name, |cn| {
-            assert_eq!(cn.color(), Vec3::new(1.0, 0.0, 0.0));
+            assert_eq!(cn.color(), Vec4::new(1.0, 0.0, 0.0, 1.0));
             assert_eq!(cn.radius(), 0.1);
             assert!(!cn.radius_is_relative());
             assert_eq!(cn.material(), "clay");
@@ -2580,7 +2580,7 @@ mod tests {
 
         // Verify mutation persisted
         let color = with_curve_network_ref(&name, |cn| cn.color());
-        assert_eq!(color, Some(Vec3::new(0.5, 0.5, 0.5)));
+        assert_eq!(color, Some(Vec4::new(0.5, 0.5, 0.5, 1.0)));
     }
 
     #[test]
@@ -2693,7 +2693,7 @@ mod tests {
 
         assert_eq!(handle.origin(), Vec3::new(1.0, 0.0, 0.0));
         assert_eq!(handle.normal(), Vec3::Z);
-        assert_eq!(handle.color(), Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(handle.color(), Vec4::new(1.0, 0.0, 0.0, 1.0));
         assert!((handle.transparency() - 0.5).abs() < 0.001);
     }
 
@@ -2860,7 +2860,7 @@ mod tests {
         assert_eq!(handle.normal(), Vec3::Z);
         assert!(!handle.draw_plane());
         assert!(handle.draw_widget());
-        assert_eq!(handle.color(), Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(handle.color(), Vec4::new(1.0, 0.0, 0.0, 1.0));
         assert!((handle.transparency() - 0.8).abs() < 0.001);
     }
 

@@ -467,10 +467,10 @@ mod tests {
 
         let colors = q.compute_colors();
         assert_eq!(colors.len(), 4);
-        assert_eq!(colors[0], q.checker_colors()[0]);
-        assert_eq!(colors[1], q.checker_colors()[1]);
-        assert_eq!(colors[2], q.checker_colors()[1]);
-        assert_eq!(colors[3], q.checker_colors()[0]);
+        assert_eq!(colors[0], q.checker_colors()[0].extend(1.0));
+        assert_eq!(colors[1], q.checker_colors()[1].extend(1.0));
+        assert_eq!(colors[2], q.checker_colors()[1].extend(1.0));
+        assert_eq!(colors[3], q.checker_colors()[0].extend(1.0));
     }
 
     #[test]
@@ -484,8 +484,8 @@ mod tests {
 
         let colors = q.compute_colors();
         assert_eq!(colors.len(), 2);
-        assert_eq!(colors[0], q.checker_colors()[1]); // on line
-        assert_eq!(colors[1], q.checker_colors()[0]); // off line
+        assert_eq!(colors[0], q.checker_colors()[1].extend(1.0)); // on line
+        assert_eq!(colors[1], q.checker_colors()[0].extend(1.0)); // off line
     }
 
     #[test]
@@ -539,9 +539,9 @@ mod tests {
 
         let colors = q.compute_colors();
         assert_eq!(colors.len(), 3);
-        assert_eq!(colors[0], q.checker_colors()[0]); // cell (0,0) even
-        assert_eq!(colors[1], q.checker_colors()[1]); // cell (1,0) odd
-        assert_eq!(colors[2], q.checker_colors()[1]); // cell (0,1) odd
+        assert_eq!(colors[0], q.checker_colors()[0].extend(1.0)); // cell (0,0) even
+        assert_eq!(colors[1], q.checker_colors()[1].extend(1.0)); // cell (1,0) odd
+        assert_eq!(colors[2], q.checker_colors()[1].extend(1.0)); // cell (0,1) odd
     }
 
     #[test]

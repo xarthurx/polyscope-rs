@@ -1667,10 +1667,10 @@ mod tests {
 
         // Each vertex gets color from the last face it belongs to
         assert_eq!(colors.len(), 4);
-        // Vertex 0 is only in face 0 (value 0.0) -> should be Vec3::ZERO
-        assert!((colors[0] - Vec3::ZERO).length() < 1e-5);
-        // Vertex 3 is only in face 1 (value 1.0) -> should be Vec3::ONE
-        assert!((colors[3] - Vec3::ONE).length() < 1e-5);
+        // Vertex 0 is only in face 0 (value 0.0) -> should be near zero RGB
+        assert!((colors[0] - Vec4::new(0.0, 0.0, 0.0, 1.0)).length() < 1e-5);
+        // Vertex 3 is only in face 1 (value 1.0) -> should be near one RGB
+        assert!((colors[3] - Vec4::new(1.0, 1.0, 1.0, 1.0)).length() < 1e-5);
     }
 
     /// Test face color quantity compute_vertex_colors.
@@ -1687,9 +1687,9 @@ mod tests {
 
         assert_eq!(colors.len(), 4);
         // Vertex 0 is only in face 0 -> red
-        assert_eq!(colors[0], Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(colors[0], Vec4::new(1.0, 0.0, 0.0, 1.0));
         // Vertex 3 is only in face 1 -> green
-        assert_eq!(colors[3], Vec3::new(0.0, 1.0, 0.0));
+        assert_eq!(colors[3], Vec4::new(0.0, 1.0, 0.0, 1.0));
     }
 
     /// Test edge_is_real for triangle (all edges should be real).
