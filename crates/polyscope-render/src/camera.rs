@@ -276,7 +276,9 @@ impl Camera {
         let pitch_rot = Mat4::from_axis_angle(right_dir, -clamped_dy);
 
         // Yaw around world-space up axis
-        let yaw_rot = Mat4::from_axis_angle(up_vec, delta_x);
+        // Negate: we rotate the camera position (not the view matrix), so the
+        // orbit direction must be inverted to match the C++ view-matrix convention.
+        let yaw_rot = Mat4::from_axis_angle(up_vec, -delta_x);
 
         // Apply: translate to center, rotate, translate back
         let to_center = Mat4::from_translation(self.target);
@@ -315,7 +317,8 @@ impl Camera {
         let up_dir = self.camera_up();
 
         // Yaw around camera-space up, then pitch around camera-space right
-        let yaw_rot = Mat4::from_axis_angle(up_dir, delta_x);
+        // Negate: position-based orbit is opposite to view-matrix rotation.
+        let yaw_rot = Mat4::from_axis_angle(up_dir, -delta_x);
         let pitch_rot = Mat4::from_axis_angle(right_dir, -delta_y);
 
         let to_center = Mat4::from_translation(self.target);
@@ -422,7 +425,8 @@ impl Camera {
         };
 
         // Yaw around world up
-        let yaw_rot = Quat::from_axis_angle(up_vec, delta_x);
+        // Negate: positive mouse delta_x (drag right) should turn view right
+        let yaw_rot = Quat::from_axis_angle(up_vec, -delta_x);
         // Pitch around camera right
         let right_dir = self.right();
         let pitch_rot = Quat::from_axis_angle(right_dir, -clamped_dy);
