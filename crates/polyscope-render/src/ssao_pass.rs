@@ -420,7 +420,7 @@ impl SsaoPass {
     }
 
     /// Creates a bind group for the blur pass.
-    /// The depth_view is used for edge-aware bilateral blurring.
+    /// The `depth_view` is used for edge-aware bilateral blurring.
     #[must_use]
     pub fn create_blur_bind_group(
         &self,

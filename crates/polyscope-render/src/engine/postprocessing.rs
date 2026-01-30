@@ -217,8 +217,8 @@ impl RenderEngine {
 
 
     /// Initializes SSAA (supersampling) pass.
-    /// The pipeline uses Rgba16Float because it downsamples the HDR texture
-    /// to the HDR intermediate texture (both are Rgba16Float).
+    /// The pipeline uses `Rgba16Float` because it downsamples the HDR texture
+    /// to the HDR intermediate texture (both are `Rgba16Float`).
     pub(crate) fn init_ssaa_pass(&mut self) {
         self.ssaa_pass = Some(crate::ssaa_pass::SsaaPass::new(
             &self.device,

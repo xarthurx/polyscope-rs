@@ -44,6 +44,18 @@ struct ReflectionUniforms {
 @group(0) @binding(4) var<storage, read> barycentrics: array<vec4<f32>>;
 @group(0) @binding(5) var<storage, read> colors: array<vec4<f32>>;
 @group(0) @binding(6) var<storage, read> edge_is_real: array<vec4<f32>>;
+// Slice plane uniforms for fragment-level slicing
+struct SlicePlaneUniforms {
+    origin: vec3<f32>,
+    enabled: f32,
+    normal: vec3<f32>,
+    _padding: f32,
+}
+
+struct SlicePlanesArray {
+    planes: array<SlicePlaneUniforms, 4>,
+}
+
 @group(1) @binding(0) var<uniform> reflection: ReflectionUniforms;
 
 // Matcap textures (Group 2)
@@ -52,6 +64,9 @@ struct ReflectionUniforms {
 @group(2) @binding(2) var matcap_b: texture_2d<f32>;
 @group(2) @binding(3) var matcap_k: texture_2d<f32>;
 @group(2) @binding(4) var matcap_sampler: sampler;
+
+// Slice planes (Group 3)
+@group(3) @binding(0) var<uniform> slice_planes: SlicePlanesArray;
 
 fn light_surface_matcap(normal: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
     var n = normalize(normal);
@@ -73,6 +88,7 @@ struct VertexOutput {
     @location(2) barycentric: vec3<f32>,
     @location(3) vertex_color: vec4<f32>,
     @location(4) edge_real: vec3<f32>,
+    @location(5) original_world_position: vec3<f32>,
 }
 
 @vertex
@@ -101,6 +117,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     out.barycentric = bary;
     out.vertex_color = color;
     out.edge_real = edge_is_real[vertex_index].xyz;
+    out.original_world_position = world_position;
 
     return out;
 }
@@ -110,6 +127,19 @@ fn fs_main(in: VertexOutput, @builtin(front_facing) front_facing: bool) -> @loca
     // Clip pixels above ground plane (reflected geometry should not poke through)
     if (in.world_position.y > reflection.ground_height) {
         discard;
+    }
+
+    // Slice plane culling — test against original (pre-reflection) world position
+    if (mesh_uniforms.slice_planes_enabled != 0u) {
+        for (var i = 0u; i < 4u; i = i + 1u) {
+            let plane = slice_planes.planes[i];
+            if (plane.enabled > 0.5) {
+                let dist = dot(in.original_world_position - plane.origin, plane.normal);
+                if (dist < 0.0) {
+                    discard;
+                }
+            }
+        }
     }
 
     // Get base color

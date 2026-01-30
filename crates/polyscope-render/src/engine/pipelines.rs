@@ -1155,7 +1155,7 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Reflected Mesh Pipeline Layout"),
-                bind_group_layouts: &[&mesh_bind_group_layout, reflection_pass.bind_group_layout(), &self.matcap_bind_group_layout],
+                bind_group_layouts: &[&mesh_bind_group_layout, reflection_pass.bind_group_layout(), &self.matcap_bind_group_layout, &self.slice_plane_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -1297,7 +1297,7 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Reflected Point Cloud Pipeline Layout"),
-                bind_group_layouts: &[&point_bind_group_layout, reflection_pass.bind_group_layout(), &self.matcap_bind_group_layout],
+                bind_group_layouts: &[&point_bind_group_layout, reflection_pass.bind_group_layout(), &self.matcap_bind_group_layout, &self.slice_plane_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -1438,7 +1438,7 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Reflected Curve Network Pipeline Layout"),
-                bind_group_layouts: &[&curve_bind_group_layout, reflection_pass.bind_group_layout(), &self.matcap_bind_group_layout],
+                bind_group_layouts: &[&curve_bind_group_layout, reflection_pass.bind_group_layout(), &self.matcap_bind_group_layout, &self.slice_plane_bind_group_layout],
                 push_constant_ranges: &[],
             });
 

@@ -28,6 +28,18 @@ struct ReflectionUniforms {
 @group(0) @binding(1) var<uniform> uniforms: CurveNetworkUniforms;
 @group(0) @binding(2) var<storage, read> edge_vertices: array<vec4<f32>>;
 @group(0) @binding(3) var<storage, read> edge_colors: array<vec4<f32>>;
+// Slice plane uniforms for fragment-level slicing
+struct SlicePlaneUniforms {
+    origin: vec3<f32>,
+    enabled: f32,
+    normal: vec3<f32>,
+    _padding: f32,
+}
+
+struct SlicePlanesArray {
+    planes: array<SlicePlaneUniforms, 4>,
+}
+
 @group(1) @binding(0) var<uniform> reflection: ReflectionUniforms;
 
 // Matcap textures (Group 2)
@@ -36,6 +48,9 @@ struct ReflectionUniforms {
 @group(2) @binding(2) var matcap_b: texture_2d<f32>;
 @group(2) @binding(3) var matcap_k: texture_2d<f32>;
 @group(2) @binding(4) var matcap_sampler: sampler;
+
+// Slice planes (Group 3)
+@group(3) @binding(0) var<uniform> slice_planes: SlicePlanesArray;
 
 fn light_surface_matcap(normal: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
     var n = normalize(normal);
@@ -170,6 +185,19 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     // Clip hit point above ground plane
     if (hit_point.y > reflection.ground_height) {
         discard;
+    }
+
+    // Slice plane culling — test against original (pre-reflection) hit point
+    // Reflection matrix is its own inverse, so apply it to get back to original space
+    let original_hit = (reflection.reflection_matrix * vec4<f32>(hit_point, 1.0)).xyz;
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let plane = slice_planes.planes[i];
+        if (plane.enabled > 0.5) {
+            let dist = dot(original_hit - plane.origin, plane.normal);
+            if (dist < 0.0) {
+                discard;
+            }
+        }
     }
 
     // Compute depth

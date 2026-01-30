@@ -5,7 +5,7 @@ use egui::Ui;
 /// Available material names for matcap rendering.
 const MATERIALS: &[&str] = &["clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal"];
 
-/// Builds a material selector ComboBox. Returns true if the material changed.
+/// Builds a material selector `ComboBox`. Returns true if the material changed.
 pub fn build_material_selector(ui: &mut Ui, material: &mut String) -> bool {
     let mut changed = false;
     egui::ComboBox::from_label("Material")

@@ -7,7 +7,7 @@
 
 /// Resources for the depth peeling transparency system.
 pub struct DepthPeelPass {
-    /// Pipeline for peeling passes (surface_mesh_peel.wgsl)
+    /// Pipeline for peeling passes (`surface_mesh_peel.wgsl`)
     peel_pipeline: wgpu::RenderPipeline,
     /// Pipeline for compositing each peeled layer into the final buffer (under)
     composite_under_pipeline: wgpu::RenderPipeline,
@@ -16,17 +16,17 @@ pub struct DepthPeelPass {
     /// Pipeline for updating min-depth (copies peel depth into min-depth via Max blend)
     depth_update_pipeline: wgpu::RenderPipeline,
 
-    /// Min-depth texture (Rgba16Float) — stores the maximum depth peeled so far.
-    /// Uses Rgba16Float instead of R32Float because R32Float is not blendable
+    /// Min-depth texture (`Rgba16Float`) — stores the maximum depth peeled so far.
+    /// Uses `Rgba16Float` instead of `R32Float` because `R32Float` is not blendable
     /// in WebGPU without the float32-blendable feature, and we need Max blend.
     min_depth_texture: wgpu::Texture,
     min_depth_view: wgpu::TextureView,
 
-    /// Per-peel-pass color output (Rgba16Float, premultiplied alpha)
+    /// Per-peel-pass color output (`Rgba16Float`, premultiplied alpha)
     peel_color_texture: wgpu::Texture,
     peel_color_view: wgpu::TextureView,
 
-    /// Per-peel-pass depth output as color (R32Float) — fragment depth written as color
+    /// Per-peel-pass depth output as color (`R32Float`) — fragment depth written as color
     peel_depth_color_texture: wgpu::Texture,
     peel_depth_color_view: wgpu::TextureView,
 
@@ -34,13 +34,13 @@ pub struct DepthPeelPass {
     peel_depth_texture: wgpu::Texture,
     peel_depth_view: wgpu::TextureView,
 
-    /// Final accumulated result (Rgba16Float)
+    /// Final accumulated result (`Rgba16Float`)
     pub(crate) final_texture: wgpu::Texture,
     pub(crate) final_view: wgpu::TextureView,
 
     /// Bind group layout for peel shader's Group 3 (min-depth texture + sampler)
     pub(crate) peel_bind_group_layout: wgpu::BindGroupLayout,
-    /// Bind group for peel shader (references min_depth_texture)
+    /// Bind group for peel shader (references `min_depth_texture`)
     peel_bind_group: wgpu::BindGroup,
 
     /// Bind group layout for composite shader (image + sampler)
@@ -57,6 +57,7 @@ pub struct DepthPeelPass {
 
 impl DepthPeelPass {
     /// Creates a new depth peel pass with all required resources.
+    #[must_use] 
     pub fn new(
         device: &wgpu::Device,
         width: u32,
@@ -277,36 +278,43 @@ impl DepthPeelPass {
     }
 
     /// Returns the peel pipeline for external use.
+    #[must_use] 
     pub fn peel_pipeline(&self) -> &wgpu::RenderPipeline {
         &self.peel_pipeline
     }
 
     /// Returns the peel bind group (Group 3 for min-depth texture).
+    #[must_use] 
     pub fn peel_bind_group(&self) -> &wgpu::BindGroup {
         &self.peel_bind_group
     }
 
     /// Returns the peel color view (render target for each peel pass).
+    #[must_use] 
     pub fn peel_color_view(&self) -> &wgpu::TextureView {
         &self.peel_color_view
     }
 
     /// Returns the peel depth color view (depth-as-color output).
+    #[must_use] 
     pub fn peel_depth_color_view(&self) -> &wgpu::TextureView {
         &self.peel_depth_color_view
     }
 
     /// Returns the peel depth view (actual depth buffer).
+    #[must_use] 
     pub fn peel_depth_view(&self) -> &wgpu::TextureView {
         &self.peel_depth_view
     }
 
     /// Returns the min-depth view.
+    #[must_use] 
     pub fn min_depth_view(&self) -> &wgpu::TextureView {
         &self.min_depth_view
     }
 
     /// Returns the final accumulated view.
+    #[must_use] 
     pub fn final_view(&self) -> &wgpu::TextureView {
         &self.final_view
     }

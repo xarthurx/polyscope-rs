@@ -413,12 +413,16 @@ fn create_matcap_sampler(device: &wgpu::Device) -> wgpu::Sampler {
 
 /// Initialize all matcap textures and bind groups.
 ///
-/// Returns a HashMap mapping material name -> `MatcapTextureSet`.
+/// Returns a `HashMap` mapping material name -> `MatcapTextureSet`.
+#[must_use] 
 pub fn init_matcap_textures(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     bind_group_layout: &wgpu::BindGroupLayout,
 ) -> HashMap<String, MatcapTextureSet> {
+    // Blendable material entry: (name, R channel, G channel, B channel, K channel)
+    type BlendableMatEntry<'a> = (&'a str, &'a [u8], &'a [u8], &'a [u8], &'a [u8]);
+
     let sampler = create_matcap_sampler(device);
     let mut textures = HashMap::new();
 
@@ -428,8 +432,8 @@ pub fn init_matcap_textures(
         upload_matcap_texture(device, queue, label, w, h, &rgba)
     };
 
-    // Blendable materials: 4 separate textures
-    let blendable_mats: &[(&str, &[u8], &[u8], &[u8], &[u8])] = &[
+    // Blendable materials: 4 separate textures (R, G, B, K channels)
+    let blendable_mats: &[BlendableMatEntry<'_>] = &[
         (
             "clay",
             matcap_data::CLAY_R,
@@ -572,6 +576,7 @@ pub fn init_matcap_textures(
 }
 
 /// Create the matcap bind group layout (5 entries: 4 textures + 1 sampler).
+#[must_use] 
 pub fn create_matcap_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Matcap Bind Group Layout"),

@@ -71,7 +71,7 @@ impl PointCloudRenderData {
 
         // Create color buffer (default white if not provided)
         let color_data: Vec<f32> = if let Some(colors) = colors {
-            colors.iter().flat_map(|c| c.to_array()).collect()
+            colors.iter().flat_map(glam::Vec4::to_array).collect()
         } else {
             vec![1.0; positions.len() * 4]
         };
@@ -124,7 +124,7 @@ impl PointCloudRenderData {
 
     /// Updates the color buffer.
     pub fn update_colors(&self, queue: &wgpu::Queue, colors: &[Vec4]) {
-        let color_data: Vec<f32> = colors.iter().flat_map(|c| c.to_array()).collect();
+        let color_data: Vec<f32> = colors.iter().flat_map(glam::Vec4::to_array).collect();
         queue.write_buffer(&self.color_buffer, 0, bytemuck::cast_slice(&color_data));
     }
 

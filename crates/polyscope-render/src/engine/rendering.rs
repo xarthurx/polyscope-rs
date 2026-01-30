@@ -453,6 +453,7 @@ impl RenderEngine {
         render_pass.set_bind_group(0, mesh_bind_group, &[]);
         render_pass.set_bind_group(1, reflection.bind_group(), &[]);
         render_pass.set_bind_group(2, self.matcap_bind_group_for(material_name), &[]);
+        render_pass.set_bind_group(3, &self.slice_plane_bind_group, &[]);
         render_pass.set_stencil_reference(1); // Test against stencil value 1
         render_pass.draw(0..vertex_count, 0..1);
     }
@@ -507,6 +508,7 @@ impl RenderEngine {
         render_pass.set_bind_group(0, point_bind_group, &[]);
         render_pass.set_bind_group(1, reflection.bind_group(), &[]);
         render_pass.set_bind_group(2, self.matcap_bind_group_for(material_name), &[]);
+        render_pass.set_bind_group(3, &self.slice_plane_bind_group, &[]);
         render_pass.set_stencil_reference(1);
         // 6 vertices per point (billboard quad as 2 triangles)
         render_pass.draw(0..6, 0..point_count);
@@ -568,6 +570,7 @@ impl RenderEngine {
         render_pass.set_bind_group(0, curve_bind_group, &[]);
         render_pass.set_bind_group(1, reflection.bind_group(), &[]);
         render_pass.set_bind_group(2, self.matcap_bind_group_for(material_name), &[]);
+        render_pass.set_bind_group(3, &self.slice_plane_bind_group, &[]);
         render_pass.set_vertex_buffer(0, tube_vertex_buffer.slice(..));
         render_pass.set_stencil_reference(1);
         render_pass.draw(0..tube_vertex_count, 0..1);

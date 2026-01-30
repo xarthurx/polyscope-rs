@@ -12,6 +12,7 @@ pub struct ToneMapUniforms {
     pub gamma: f32,
     pub ssao_enabled: u32, // 0 = disabled, 1 = enabled
     /// Padding to 32 bytes (workaround for wgpu late binding size validation).
+    #[allow(clippy::pub_underscore_fields)]
     pub _padding: [f32; 4],
 }
 

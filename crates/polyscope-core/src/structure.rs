@@ -79,6 +79,7 @@ pub trait Structure: Any + Send + Sync {
     }
 
     /// Returns the material name for this structure (e.g., "clay", "wax").
+    #[allow(clippy::unnecessary_literal_bound)]
     fn material(&self) -> &str {
         "clay"
     }
