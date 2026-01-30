@@ -2,7 +2,7 @@
 
 mod quantities;
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, Vec4};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
@@ -34,7 +34,7 @@ pub struct CurveNetwork {
     quantities: Vec<Box<dyn Quantity>>,
 
     // Visualization parameters
-    color: Vec3,
+    color: Vec4,
     radius: f32,
     radius_is_relative: bool,
     material: String,
@@ -76,7 +76,7 @@ impl CurveNetwork {
             enabled: true,
             transform: Mat4::IDENTITY,
             quantities: Vec::new(),
-            color: Vec3::new(0.2, 0.5, 0.8),
+            color: Vec4::new(0.2, 0.5, 0.8, 1.0),
             radius: 0.005,
             radius_is_relative: true,
             material: "default".to_string(),
@@ -171,13 +171,13 @@ impl CurveNetwork {
 
     /// Gets the base color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the base color.
     pub fn set_color(&mut self, color: Vec3) -> &mut Self {
-        self.color = color;
+        self.color = color.extend(1.0);
         self
     }
 
@@ -374,7 +374,7 @@ impl CurveNetwork {
             &mut render_mode,
             &mut self.material,
         ) {
-            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
             self.radius = radius;
             self.radius_is_relative = radius_is_relative;
             self.render_mode = render_mode;
@@ -627,7 +627,7 @@ impl CurveNetwork {
         render_data.update_edge_vertices(queue, &transformed_nodes, &self.edge_tail_inds, &self.edge_tip_inds);
 
         let uniforms = CurveNetworkUniforms {
-            color: [self.color.x, self.color.y, self.color.z, 1.0],
+            color: self.color.to_array(),
             radius: self.radius,
             radius_is_relative: u32::from(self.radius_is_relative),
             render_mode: self.render_mode,
@@ -645,7 +645,7 @@ impl CurveNetwork {
                 point_radius: self.radius * 1.02,
                 use_per_point_color: 0, // Use base color
                 _padding: [0.0; 2],
-                base_color: [self.color.x, self.color.y, self.color.z, 1.0],
+                base_color: self.color.to_array(),
             };
             render_data.update_node_uniforms(queue, &node_uniforms);
         }
@@ -902,13 +902,13 @@ mod tests {
         let mut cn = CurveNetwork::new("test", nodes, edges);
 
         // Test defaults
-        assert_eq!(cn.color(), Vec3::new(0.2, 0.5, 0.8));
+        assert_eq!(cn.color(), Vec4::new(0.2, 0.5, 0.8, 1.0));
         assert_eq!(cn.radius(), 0.005);
         assert!(cn.radius_is_relative());
 
         // Test setters
         cn.set_color(Vec3::new(1.0, 0.0, 0.0));
-        assert_eq!(cn.color(), Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(cn.color(), Vec4::new(1.0, 0.0, 0.0, 1.0));
 
         cn.set_radius(0.1, false);
         assert_eq!(cn.radius(), 0.1);

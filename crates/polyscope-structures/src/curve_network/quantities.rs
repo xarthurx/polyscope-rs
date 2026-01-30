@@ -1,6 +1,6 @@
 //! Curve network quantity implementations.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use polyscope_core::quantity::{EdgeQuantity, Quantity, QuantityKind, VertexQuantity};
 use polyscope_render::{ColorMap, CurveNetworkRenderData};
 
@@ -290,7 +290,7 @@ impl EdgeQuantity for CurveEdgeScalarQuantity {}
 pub struct CurveNodeColorQuantity {
     name: String,
     structure_name: String,
-    colors: Vec<Vec3>,
+    colors: Vec<Vec4>,
     enabled: bool,
 }
 
@@ -304,20 +304,21 @@ impl CurveNodeColorQuantity {
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
-            colors,
+            colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
             enabled: false,
         }
     }
 
     /// Returns the colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 
     /// Applies this color quantity to the curve network render data.
     pub fn apply_to_render_data(&self, queue: &wgpu::Queue, render_data: &CurveNetworkRenderData) {
-        render_data.update_node_colors(queue, &self.colors);
+        let colors_rgb: Vec<Vec3> = self.colors.iter().map(|c| c.truncate()).collect();
+        render_data.update_node_colors(queue, &colors_rgb);
     }
 
     /// Builds the egui UI for this color quantity.
@@ -374,7 +375,7 @@ impl VertexQuantity for CurveNodeColorQuantity {}
 pub struct CurveEdgeColorQuantity {
     name: String,
     structure_name: String,
-    colors: Vec<Vec3>,
+    colors: Vec<Vec4>,
     enabled: bool,
 }
 
@@ -388,20 +389,21 @@ impl CurveEdgeColorQuantity {
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
-            colors,
+            colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
             enabled: false,
         }
     }
 
     /// Returns the colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 
     /// Applies this color quantity to the curve network render data.
     pub fn apply_to_render_data(&self, queue: &wgpu::Queue, render_data: &CurveNetworkRenderData) {
-        render_data.update_edge_colors(queue, &self.colors);
+        let colors_rgb: Vec<Vec3> = self.colors.iter().map(|c| c.truncate()).collect();
+        render_data.update_edge_colors(queue, &colors_rgb);
     }
 
     /// Builds the egui UI for this color quantity.
@@ -462,7 +464,7 @@ pub struct CurveNodeVectorQuantity {
     enabled: bool,
     length_scale: f32,
     radius: f32,
-    color: Vec3,
+    color: Vec4,
 }
 
 impl CurveNodeVectorQuantity {
@@ -479,7 +481,7 @@ impl CurveNodeVectorQuantity {
             enabled: false,
             length_scale: 1.0,
             radius: 0.005,
-            color: Vec3::new(0.8, 0.2, 0.2),
+            color: Vec4::new(0.8, 0.2, 0.2, 1.0),
         }
     }
 
@@ -513,13 +515,13 @@ impl CurveNodeVectorQuantity {
 
     /// Gets the color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the color.
     pub fn set_color(&mut self, c: Vec3) {
-        self.color = c;
+        self.color = c.extend(1.0);
     }
 
     /// Builds the egui UI for this quantity.
@@ -534,7 +536,7 @@ impl CurveNodeVectorQuantity {
             &mut color,
         );
         if changed {
-            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
         }
         changed
     }
@@ -592,7 +594,7 @@ pub struct CurveEdgeVectorQuantity {
     enabled: bool,
     length_scale: f32,
     radius: f32,
-    color: Vec3,
+    color: Vec4,
 }
 
 impl CurveEdgeVectorQuantity {
@@ -609,7 +611,7 @@ impl CurveEdgeVectorQuantity {
             enabled: false,
             length_scale: 1.0,
             radius: 0.005,
-            color: Vec3::new(0.2, 0.8, 0.2),
+            color: Vec4::new(0.2, 0.8, 0.2, 1.0),
         }
     }
 
@@ -643,13 +645,13 @@ impl CurveEdgeVectorQuantity {
 
     /// Gets the color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the color.
     pub fn set_color(&mut self, c: Vec3) {
-        self.color = c;
+        self.color = c.extend(1.0);
     }
 
     /// Builds the egui UI for this quantity.
@@ -664,7 +666,7 @@ impl CurveEdgeVectorQuantity {
             &mut color,
         );
         if changed {
-            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
         }
         changed
     }
