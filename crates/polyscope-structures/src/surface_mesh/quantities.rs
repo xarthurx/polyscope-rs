@@ -297,7 +297,7 @@ pub struct MeshVertexColorQuantity {
 }
 
 impl MeshVertexColorQuantity {
-    /// Creates a new vertex color quantity.
+    /// Creates a new vertex color quantity (RGB, alpha defaults to 1.0).
     pub fn new(
         name: impl Into<String>,
         structure_name: impl Into<String>,
@@ -307,6 +307,20 @@ impl MeshVertexColorQuantity {
             name: name.into(),
             structure_name: structure_name.into(),
             colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
+            enabled: false,
+        }
+    }
+
+    /// Creates a new vertex color quantity with explicit RGBA alpha values.
+    pub fn new_with_alpha(
+        name: impl Into<String>,
+        structure_name: impl Into<String>,
+        colors: Vec<Vec4>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            structure_name: structure_name.into(),
+            colors,
             enabled: false,
         }
     }
@@ -372,7 +386,7 @@ pub struct MeshFaceColorQuantity {
 }
 
 impl MeshFaceColorQuantity {
-    /// Creates a new face color quantity.
+    /// Creates a new face color quantity (RGB, alpha defaults to 1.0).
     pub fn new(
         name: impl Into<String>,
         structure_name: impl Into<String>,
@@ -382,6 +396,20 @@ impl MeshFaceColorQuantity {
             name: name.into(),
             structure_name: structure_name.into(),
             colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
+            enabled: false,
+        }
+    }
+
+    /// Creates a new face color quantity with explicit RGBA alpha values.
+    pub fn new_with_alpha(
+        name: impl Into<String>,
+        structure_name: impl Into<String>,
+        colors: Vec<Vec4>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            structure_name: structure_name.into(),
+            colors,
             enabled: false,
         }
     }

@@ -572,7 +572,7 @@ impl SurfaceMeshHandle {
         self
     }
 
-    /// Adds a vertex color quantity.
+    /// Adds a vertex color quantity (RGB, alpha defaults to 1.0).
     pub fn add_vertex_color_quantity(&self, name: &str, colors: Vec<Vec3>) -> &Self {
         with_surface_mesh(&self.name, |mesh| {
             mesh.add_vertex_color_quantity(name, colors);
@@ -580,10 +580,32 @@ impl SurfaceMeshHandle {
         self
     }
 
-    /// Adds a face color quantity.
+    /// Adds a vertex color quantity with explicit per-vertex RGBA alpha values.
+    ///
+    /// Use this to specify per-vertex transparency. Requires OIT transparency mode
+    /// to render correctly (set via appearance settings).
+    pub fn add_vertex_color_quantity_with_alpha(&self, name: &str, colors: Vec<Vec4>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_vertex_color_quantity_with_alpha(name, colors);
+        });
+        self
+    }
+
+    /// Adds a face color quantity (RGB, alpha defaults to 1.0).
     pub fn add_face_color_quantity(&self, name: &str, colors: Vec<Vec3>) -> &Self {
         with_surface_mesh(&self.name, |mesh| {
             mesh.add_face_color_quantity(name, colors);
+        });
+        self
+    }
+
+    /// Adds a face color quantity with explicit per-face RGBA alpha values.
+    ///
+    /// Use this to specify per-face transparency. Requires OIT transparency mode
+    /// to render correctly (set via appearance settings).
+    pub fn add_face_color_quantity_with_alpha(&self, name: &str, colors: Vec<Vec4>) -> &Self {
+        with_surface_mesh(&self.name, |mesh| {
+            mesh.add_face_color_quantity_with_alpha(name, colors);
         });
         self
     }

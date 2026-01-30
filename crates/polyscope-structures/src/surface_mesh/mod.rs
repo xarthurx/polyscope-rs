@@ -899,7 +899,7 @@ impl SurfaceMesh {
         self
     }
 
-    /// Adds a vertex color quantity to this mesh.
+    /// Adds a vertex color quantity to this mesh (RGB, alpha defaults to 1.0).
     pub fn add_vertex_color_quantity(
         &mut self,
         name: impl Into<String>,
@@ -910,13 +910,35 @@ impl SurfaceMesh {
         self
     }
 
-    /// Adds a face color quantity to this mesh.
+    /// Adds a vertex color quantity with explicit per-vertex RGBA alpha values.
+    pub fn add_vertex_color_quantity_with_alpha(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec4>,
+    ) -> &mut Self {
+        let quantity = MeshVertexColorQuantity::new_with_alpha(name, self.name.clone(), colors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a face color quantity to this mesh (RGB, alpha defaults to 1.0).
     pub fn add_face_color_quantity(
         &mut self,
         name: impl Into<String>,
         colors: Vec<Vec3>,
     ) -> &mut Self {
         let quantity = MeshFaceColorQuantity::new(name, self.name.clone(), colors);
+        self.add_quantity(Box::new(quantity));
+        self
+    }
+
+    /// Adds a face color quantity with explicit per-face RGBA alpha values.
+    pub fn add_face_color_quantity_with_alpha(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<Vec4>,
+    ) -> &mut Self {
+        let quantity = MeshFaceColorQuantity::new_with_alpha(name, self.name.clone(), colors);
         self.add_quantity(Box::new(quantity));
         self
     }
