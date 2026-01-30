@@ -274,11 +274,13 @@ impl Camera {
         let frame_right = rt * Vec3::new(1.0, 0.0, 0.0);
 
         // Gimbal-lock protection: prevent flipping past poles
+        // With positive clamped_dy rotating downward (toward +up pole),
+        // clamp to prevent crossing:
         let dot = frame_look.dot(up_vec);
         let clamped_dy = if dot > 0.99 {
-            delta_y.min(0.0)
+            delta_y.max(0.0) // near top pole: only allow pitching downward (away)
         } else if dot < -0.99 {
-            delta_y.max(0.0)
+            delta_y.min(0.0) // near bottom pole: only allow pitching upward (away)
         } else {
             delta_y
         };
@@ -289,12 +291,14 @@ impl Camera {
         vm *= Mat4::from_translation(self.target);
 
         // 2. Pitch around camera-space right axis (from the view matrix frame)
-        vm *= Mat4::from_axis_angle(frame_right, -clamped_dy);
+        // C++ uses: glm::rotate(identity, -delPhi, frameRightDir)
+        // glam's look_at_rh produces an inverted-Z view compared to glm::lookAt,
+        // so pitch direction must also be flipped.
+        vm *= Mat4::from_axis_angle(frame_right, clamped_dy);
 
         // 3. Yaw around world-space up axis
-        // Negate: glam uses right-handed look_at_rh, so yaw direction is
-        // inverted compared to C++ Polyscope's glm::lookAt (left-handed).
-        vm *= Mat4::from_axis_angle(up_vec, -delta_x);
+        // C++ uses: glm::rotate(identity, delTheta, getUpVec()) — no negation
+        vm *= Mat4::from_axis_angle(up_vec, delta_x);
 
         // 4. Undo centering
         vm *= Mat4::from_translation(-self.target);
