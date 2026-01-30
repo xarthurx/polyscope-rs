@@ -1,0 +1,121 @@
+use crate::{with_context, with_context_mut, Vec3, VolumeGrid};
+
+/// Registers a volume grid with polyscope.
+pub fn register_volume_grid(
+    name: impl Into<String>,
+    node_dim: glam::UVec3,
+    bound_min: Vec3,
+    bound_max: Vec3,
+) -> VolumeGridHandle {
+    let name = name.into();
+    let grid = VolumeGrid::new(name.clone(), node_dim, bound_min, bound_max);
+
+    with_context_mut(|ctx| {
+        ctx.registry
+            .register(Box::new(grid))
+            .expect("failed to register volume grid");
+        ctx.update_extents();
+    });
+
+    VolumeGridHandle { name }
+}
+
+/// Registers a volume grid with uniform dimensions.
+pub fn register_volume_grid_uniform(
+    name: impl Into<String>,
+    dim: u32,
+    bound_min: Vec3,
+    bound_max: Vec3,
+) -> VolumeGridHandle {
+    register_volume_grid(name, glam::UVec3::splat(dim), bound_min, bound_max)
+}
+
+/// Gets a registered volume grid by name.
+#[must_use]
+pub fn get_volume_grid(name: &str) -> Option<VolumeGridHandle> {
+    with_context(|ctx| {
+        if ctx.registry.contains("VolumeGrid", name) {
+            Some(VolumeGridHandle {
+                name: name.to_string(),
+            })
+        } else {
+            None
+        }
+    })
+}
+
+/// Handle for a registered volume grid.
+#[derive(Clone)]
+pub struct VolumeGridHandle {
+    name: String,
+}
+
+impl VolumeGridHandle {
+    /// Returns the name of this volume grid.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Sets the edge color.
+    pub fn set_edge_color(&self, color: Vec3) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            vg.set_edge_color(color);
+        });
+        self
+    }
+
+    /// Sets the edge width.
+    pub fn set_edge_width(&self, width: f32) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            vg.set_edge_width(width);
+        });
+        self
+    }
+
+    /// Adds a node scalar quantity.
+    pub fn add_node_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            vg.add_node_scalar_quantity(name, values);
+        });
+        self
+    }
+
+    /// Adds a cell scalar quantity.
+    pub fn add_cell_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            vg.add_cell_scalar_quantity(name, values);
+        });
+        self
+    }
+}
+
+/// Executes a closure with mutable access to a registered volume grid.
+///
+/// Returns `None` if the volume grid does not exist.
+pub fn with_volume_grid<F, R>(name: &str, f: F) -> Option<R>
+where
+    F: FnOnce(&mut VolumeGrid) -> R,
+{
+    with_context_mut(|ctx| {
+        ctx.registry
+            .get_mut("VolumeGrid", name)
+            .and_then(|s| s.as_any_mut().downcast_mut::<VolumeGrid>())
+            .map(f)
+    })
+}
+
+/// Executes a closure with immutable access to a registered volume grid.
+///
+/// Returns `None` if the volume grid does not exist.
+pub fn with_volume_grid_ref<F, R>(name: &str, f: F) -> Option<R>
+where
+    F: FnOnce(&VolumeGrid) -> R,
+{
+    with_context(|ctx| {
+        ctx.registry
+            .get("VolumeGrid", name)
+            .and_then(|s| s.as_any().downcast_ref::<VolumeGrid>())
+            .map(f)
+    })
+}
