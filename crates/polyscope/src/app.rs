@@ -445,7 +445,7 @@ impl App {
         let e = v.dot(w0);
         let denom = a_dot * c - b_dot * b_dot;
 
-        let mut s;
+        let s;
         let mut t;
         if denom.abs() < 1e-8 {
             s = 0.0;
@@ -456,10 +456,8 @@ impl App {
         }
 
         if s < 0.0 {
-            s = 0.0;
             t = ray_dir.dot(a - ray_origin);
         } else if s > 1.0 {
-            s = 1.0;
             t = ray_dir.dot(b - ray_origin);
         }
 

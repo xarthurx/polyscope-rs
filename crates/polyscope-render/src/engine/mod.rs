@@ -99,10 +99,8 @@ pub struct RenderEngine {
     pub vector_pipeline: Option<wgpu::RenderPipeline>,
     /// Vector bind group layout.
     pub vector_bind_group_layout: Option<wgpu::BindGroupLayout>,
-    /// Surface mesh render pipeline (depth write enabled, for opaque/Pretty mode).
+    /// Surface mesh render pipeline (alpha blending, depth write enabled).
     pub mesh_pipeline: Option<wgpu::RenderPipeline>,
-    /// Surface mesh transparent pipeline (no depth write, for Simple mode).
-    pub mesh_transparent_pipeline: Option<wgpu::RenderPipeline>,
     /// Surface mesh depth/normal-only pipeline (Pretty mode prepass).
     pub mesh_depth_normal_pipeline: Option<wgpu::RenderPipeline>,
     /// Mesh bind group layout.
@@ -476,7 +474,7 @@ impl RenderEngine {
             vector_pipeline: None,
             vector_bind_group_layout: None,
             mesh_pipeline: None,
-            mesh_transparent_pipeline: None,
+
             mesh_depth_normal_pipeline: None,
             mesh_bind_group_layout: None,
             curve_network_edge_pipeline: None,
@@ -790,7 +788,7 @@ impl RenderEngine {
             vector_pipeline: None,
             vector_bind_group_layout: None,
             mesh_pipeline: None,
-            mesh_transparent_pipeline: None,
+
             mesh_depth_normal_pipeline: None,
             mesh_bind_group_layout: None,
             curve_network_edge_pipeline: None,
