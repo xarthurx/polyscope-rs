@@ -1,6 +1,6 @@
 //! Camera and view management.
 
-use glam::{Mat4, Vec3};
+use glam::{Mat3, Mat4, Quat, Vec3};
 
 /// Camera navigation/interaction style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -8,13 +8,15 @@ pub enum NavigationStyle {
     /// Turntable - orbits around target, constrained to up direction.
     #[default]
     Turntable,
-    /// Free - unconstrained rotation.
+    /// Free - unconstrained rotation using camera-local axes.
     Free,
-    /// Planar - 2D panning only.
+    /// Planar - 2D panning only, no rotation.
     Planar,
-    /// First person - WASD-style movement.
+    /// Arcball - sphere-mapped rotation (virtual trackball).
+    Arcball,
+    /// First person - mouse look + WASD movement.
     FirstPerson,
-    /// None - camera controls disabled.
+    /// None - all camera controls disabled.
     None,
 }
 
@@ -234,38 +236,236 @@ impl Camera {
         self.forward().cross(self.up).normalize()
     }
 
-    /// Orbits the camera around the target.
+    /// Returns the camera's local up direction (from the view matrix).
+    #[must_use]
+    pub fn camera_up(&self) -> Vec3 {
+        let view = self.view_matrix();
+        let r = Mat3::from_cols(
+            view.x_axis.truncate(),
+            view.y_axis.truncate(),
+            view.z_axis.truncate(),
+        );
+        r.transpose() * Vec3::Y
+    }
+
+    // ========================================================================
+    // Per-mode orbit/rotation methods
+    // ========================================================================
+
+    /// Turntable orbit: yaw around world-space up, pitch around camera-space
+    /// right, with gimbal-lock protection. Always looks at target.
     ///
-    /// After computing the new position from spherical angles, re-normalizes
-    /// the distance to prevent numerical drift over many small orbit steps.
-    pub fn orbit(&mut self, delta_x: f32, delta_y: f32) {
+    /// Matches C++ Polyscope `processRotate` for `NavigateStyle::Turntable`.
+    pub fn orbit_turntable(&mut self, delta_x: f32, delta_y: f32) {
         let radius = (self.position - self.target).length();
-        let mut theta = (self.position.x - self.target.x).atan2(self.position.z - self.target.z);
-        let mut phi = ((self.position.y - self.target.y) / radius).acos();
+        let look_dir = self.forward();
+        let up_vec = self.up_direction.to_vec3();
 
-        theta -= delta_x;
-        phi = (phi - delta_y).clamp(0.01, std::f32::consts::PI - 0.01);
+        // Gimbal-lock protection: prevent flipping past poles
+        let dot = look_dir.dot(up_vec);
+        let clamped_dy = if dot > 0.99 {
+            delta_y.min(0.0) // only allow moving away from top pole
+        } else if dot < -0.99 {
+            delta_y.max(0.0) // only allow moving away from bottom pole
+        } else {
+            delta_y
+        };
 
-        self.position = self.target
-            + Vec3::new(
-                radius * phi.sin() * theta.sin(),
-                radius * phi.cos(),
-                radius * phi.sin() * theta.cos(),
-            );
+        // Pitch around camera-space right axis
+        let right_dir = self.right();
+        let pitch_rot = Mat4::from_axis_angle(right_dir, -clamped_dy);
 
-        // Re-enforce exact distance to prevent numerical drift in turntable mode
-        let offset = self.position - self.target;
+        // Yaw around world-space up axis
+        let yaw_rot = Mat4::from_axis_angle(up_vec, delta_x);
+
+        // Apply: translate to center, rotate, translate back
+        let to_center = Mat4::from_translation(self.target);
+        let from_center = Mat4::from_translation(-self.target);
+        let transform = to_center * yaw_rot * pitch_rot * from_center;
+
+        let new_pos = transform.transform_point3(self.position);
+
+        // Re-enforce exact distance to prevent numerical drift
+        let offset = new_pos - self.target;
         let actual_dist = offset.length();
         if actual_dist > 1e-8 {
             self.position = self.target + offset * (radius / actual_dist);
+        } else {
+            self.position = new_pos;
+        }
+
+        // Recompute up from world up direction, but keep it perpendicular to look
+        let new_look = (self.target - self.position).normalize();
+        let new_right = new_look.cross(up_vec).normalize();
+        self.up = new_right.cross(new_look).normalize();
+
+        // Guard against degenerate up (looking straight along up axis)
+        if self.up.length_squared() < 0.5 {
+            self.up = up_vec;
         }
     }
 
-    /// Pans the camera.
+    /// Free orbit: unconstrained rotation using camera-local axes.
+    /// Both yaw and pitch use the camera's own coordinate frame.
+    ///
+    /// Matches C++ Polyscope `processRotate` for `NavigateStyle::Free`.
+    pub fn orbit_free(&mut self, delta_x: f32, delta_y: f32) {
+        let radius = (self.position - self.target).length();
+        let right_dir = self.right();
+        let up_dir = self.camera_up();
+
+        // Yaw around camera-space up, then pitch around camera-space right
+        let yaw_rot = Mat4::from_axis_angle(up_dir, delta_x);
+        let pitch_rot = Mat4::from_axis_angle(right_dir, -delta_y);
+
+        let to_center = Mat4::from_translation(self.target);
+        let from_center = Mat4::from_translation(-self.target);
+        let transform = to_center * pitch_rot * yaw_rot * from_center;
+
+        let new_pos = transform.transform_point3(self.position);
+
+        // Re-enforce exact distance
+        let offset = new_pos - self.target;
+        let actual_dist = offset.length();
+        if actual_dist > 1e-8 {
+            self.position = self.target + offset * (radius / actual_dist);
+        } else {
+            self.position = new_pos;
+        }
+
+        // Update up vector by rotating it along with the camera
+        let rot = pitch_rot * yaw_rot;
+        self.up = rot.transform_vector3(self.up).normalize();
+    }
+
+    /// Arcball orbit: maps 2D mouse positions to a virtual sphere for rotation.
+    /// `start` and `end` are normalized screen coordinates in [-1, 1].
+    ///
+    /// Matches C++ Polyscope `processRotate` for `NavigateStyle::Arcball`.
+    pub fn orbit_arcball(&mut self, start: [f32; 2], end: [f32; 2]) {
+        let to_sphere = |v: [f32; 2]| -> Vec3 {
+            let x = v[0].clamp(-1.0, 1.0);
+            let y = v[1].clamp(-1.0, 1.0);
+            let mag = x * x + y * y;
+            if mag <= 1.0 {
+                Vec3::new(x, y, -(1.0 - mag).sqrt())
+            } else {
+                Vec3::new(x, y, 0.0).normalize()
+            }
+        };
+
+        let sphere_start = to_sphere(start);
+        let sphere_end = to_sphere(end);
+
+        let rot_axis = -sphere_start.cross(sphere_end);
+        if rot_axis.length_squared() < 1e-12 {
+            return; // No meaningful rotation
+        }
+        let rot_angle = sphere_start.dot(sphere_end).clamp(-1.0, 1.0).acos();
+        if rot_angle.abs() < 1e-8 {
+            return;
+        }
+
+        // Build rotation in camera space, then convert to world space
+        let view = self.view_matrix();
+        let r = Mat3::from_cols(
+            view.x_axis.truncate(),
+            view.y_axis.truncate(),
+            view.z_axis.truncate(),
+        );
+        let r_inv = r.transpose();
+
+        // Camera-space rotation
+        let cam_rot = Mat3::from_axis_angle(rot_axis.normalize(), rot_angle);
+
+        // World-space rotation: R^-1 * cam_rot * R
+        let world_rot = r_inv * cam_rot * r;
+        let world_rot4 = Mat4::from_mat3(world_rot);
+
+        let to_center = Mat4::from_translation(self.target);
+        let from_center = Mat4::from_translation(-self.target);
+        let transform = to_center * world_rot4 * from_center;
+
+        let radius = (self.position - self.target).length();
+        let new_pos = transform.transform_point3(self.position);
+
+        // Re-enforce distance
+        let offset = new_pos - self.target;
+        let actual_dist = offset.length();
+        if actual_dist > 1e-8 {
+            self.position = self.target + offset * (radius / actual_dist);
+        } else {
+            self.position = new_pos;
+        }
+
+        // Rotate up vector
+        self.up = (world_rot * self.up).normalize();
+    }
+
+    /// First-person mouse look: yaw around world up, pitch around camera right.
+    /// Unlike orbit modes, this moves the target (look direction) rather than
+    /// orbiting around a fixed target.
+    ///
+    /// Matches C++ Polyscope `processRotate` for `NavigateStyle::FirstPerson`.
+    pub fn mouse_look(&mut self, delta_x: f32, delta_y: f32) {
+        let up_vec = self.up_direction.to_vec3();
+        let look_dir = self.forward();
+
+        // Gimbal-lock protection for pitch
+        let dot = look_dir.dot(up_vec);
+        let clamped_dy = if dot > 0.99 {
+            delta_y.min(0.0)
+        } else if dot < -0.99 {
+            delta_y.max(0.0)
+        } else {
+            delta_y
+        };
+
+        // Yaw around world up
+        let yaw_rot = Quat::from_axis_angle(up_vec, delta_x);
+        // Pitch around camera right
+        let right_dir = self.right();
+        let pitch_rot = Quat::from_axis_angle(right_dir, -clamped_dy);
+
+        // Apply rotations to look direction
+        let new_look = (pitch_rot * yaw_rot * look_dir).normalize();
+
+        // Move the target while keeping position fixed
+        let dist = (self.target - self.position).length();
+        self.target = self.position + new_look * dist;
+
+        // Update up to stay perpendicular to look direction
+        let new_right = new_look.cross(up_vec).normalize();
+        self.up = new_right.cross(new_look).normalize();
+        if self.up.length_squared() < 0.5 {
+            self.up = up_vec;
+        }
+    }
+
+    /// First-person WASD movement in camera-local coordinates.
+    /// `delta` is (right, up, forward) movement in camera space,
+    /// pre-scaled by `move_speed` and delta time by the caller.
+    pub fn move_first_person(&mut self, delta: Vec3) {
+        let fwd = self.forward();
+        let right = self.right();
+        let cam_up = self.camera_up();
+
+        let world_offset = right * delta.x + cam_up * delta.y + fwd * delta.z;
+        self.position += world_offset;
+        self.target += world_offset;
+    }
+
+    /// Legacy orbit method — delegates to `orbit_turntable`.
+    pub fn orbit(&mut self, delta_x: f32, delta_y: f32) {
+        self.orbit_turntable(delta_x, delta_y);
+    }
+
+    /// Pans the camera (translates position and target together).
+    /// For Turntable mode, this moves the orbit center.
     pub fn pan(&mut self, delta_x: f32, delta_y: f32) {
         let right = self.right();
-        let up = self.up;
-        let offset = right * delta_x + up * delta_y;
+        let up_dir = self.camera_up();
+        let offset = right * delta_x + up_dir * delta_y;
         self.position += offset;
         self.target += offset;
     }

@@ -1,5 +1,6 @@
 //! Application window and event loop management.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use egui_wgpu::ScreenDescriptor;
@@ -9,6 +10,7 @@ use winit::{
     dpi::LogicalSize,
     event::{ElementState, MouseButton, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
+    keyboard::KeyCode,
     window::{Window, WindowId},
 };
 
@@ -74,6 +76,10 @@ pub struct App {
     tone_mapping_settings: polyscope_ui::ToneMappingSettings,
     // Whether the camera has been auto-fitted to the scene
     camera_fitted: bool,
+    // Keyboard state for first-person WASD movement
+    keys_down: HashSet<KeyCode>,
+    // Frame timing for first-person movement
+    last_frame_time: Option<std::time::Instant>,
 }
 
 impl App {
@@ -111,6 +117,8 @@ impl App {
             transform_gizmo: polyscope_ui::TransformGizmo::new(),
             tone_mapping_settings: polyscope_ui::ToneMappingSettings::default(),
             camera_fitted: false,
+            keys_down: HashSet::new(),
+            last_frame_time: None,
         }
     }
 
@@ -2977,6 +2985,51 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
+                // Per-frame first-person WASD movement
+                let now = std::time::Instant::now();
+                if let Some(last) = self.last_frame_time {
+                    let dt = now.duration_since(last).as_secs_f32();
+                    if let Some(engine) = &mut self.engine {
+                        if engine.camera.navigation_style
+                            == polyscope_render::NavigationStyle::FirstPerson
+                            && !self.keys_down.is_empty()
+                        {
+                            let mut delta = Vec3::ZERO;
+                            if self.keys_down.contains(&KeyCode::KeyA) {
+                                delta.x -= 1.0; // strafe left
+                            }
+                            if self.keys_down.contains(&KeyCode::KeyD) {
+                                delta.x += 1.0; // strafe right
+                            }
+                            if self.keys_down.contains(&KeyCode::KeyQ) {
+                                delta.y += 1.0; // rise
+                            }
+                            if self.keys_down.contains(&KeyCode::KeyE) {
+                                delta.y -= 1.0; // descend
+                            }
+                            if self.keys_down.contains(&KeyCode::KeyW) {
+                                delta.z += 1.0; // forward
+                            }
+                            if self.keys_down.contains(&KeyCode::KeyS) {
+                                delta.z -= 1.0; // backward
+                            }
+                            if delta.length_squared() > 0.0 {
+                                let length_scale = engine
+                                    .camera
+                                    .position
+                                    .distance(engine.camera.target)
+                                    .max(1.0);
+                                let speed =
+                                    length_scale * dt * engine.camera.move_speed;
+                                engine
+                                    .camera
+                                    .move_first_person(delta.normalize() * speed);
+                            }
+                        }
+                    }
+                }
+                self.last_frame_time = Some(now);
+
                 self.render();
                 if let Some(window) = &self.window {
                     window.request_redraw();
@@ -2996,6 +3049,10 @@ impl ApplicationHandler for App {
                 // - Left drag (no Shift): Rotate/orbit - only if egui isn't using pointer (gizmo)
                 // - Left drag + Shift OR Right drag: Pan - right drag always works
                 if let Some(engine) = &mut self.engine {
+                    use polyscope_render::NavigationStyle;
+
+                    let nav = engine.camera.navigation_style;
+
                     // Left drag rotation: blocked when gizmo is active
                     let is_rotate = self.left_mouse_down && !self.shift_down && !egui_using_pointer;
                     // Left+Shift pan: blocked when gizmo is active
@@ -3005,14 +3062,62 @@ impl ApplicationHandler for App {
                     let is_right_pan = self.right_mouse_down;
 
                     if is_rotate {
-                        engine
-                            .camera
-                            .orbit(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
+                        match nav {
+                            NavigationStyle::Turntable => {
+                                engine.camera.orbit_turntable(
+                                    delta_x as f32 * 0.01,
+                                    delta_y as f32 * 0.01,
+                                );
+                            }
+                            NavigationStyle::Free => {
+                                engine.camera.orbit_free(
+                                    delta_x as f32 * 0.01,
+                                    delta_y as f32 * 0.01,
+                                );
+                            }
+                            NavigationStyle::Arcball => {
+                                // Arcball needs normalized screen coordinates [-1, 1]
+                                if let Some(window) = &self.window {
+                                    let size = window.inner_size();
+                                    let w = size.width as f32;
+                                    let h = size.height as f32;
+                                    let prev_x = (self.mouse_pos.0 - delta_x) as f32;
+                                    let prev_y = (self.mouse_pos.1 - delta_y) as f32;
+                                    let cur_x = self.mouse_pos.0 as f32;
+                                    let cur_y = self.mouse_pos.1 as f32;
+
+                                    let start = [
+                                        (prev_x / w) * 2.0 - 1.0,
+                                        -((prev_y / h) * 2.0 - 1.0),
+                                    ];
+                                    let end = [
+                                        (cur_x / w) * 2.0 - 1.0,
+                                        -((cur_y / h) * 2.0 - 1.0),
+                                    ];
+                                    engine.camera.orbit_arcball(start, end);
+                                }
+                            }
+                            NavigationStyle::FirstPerson => {
+                                engine.camera.mouse_look(
+                                    delta_x as f32 * 0.005,
+                                    delta_y as f32 * 0.005,
+                                );
+                            }
+                            NavigationStyle::Planar | NavigationStyle::None => {
+                                // No rotation in these modes
+                            }
+                        }
                     } else if is_left_pan || is_right_pan {
-                        let scale = engine.camera.position.distance(engine.camera.target) * 0.002;
-                        engine
-                            .camera
-                            .pan(-delta_x as f32 * scale, delta_y as f32 * scale);
+                        match nav {
+                            NavigationStyle::None | NavigationStyle::FirstPerson => {}
+                            _ => {
+                                let scale =
+                                    engine.camera.position.distance(engine.camera.target) * 0.002;
+                                engine
+                                    .camera
+                                    .pan(-delta_x as f32 * scale, delta_y as f32 * scale);
+                            }
+                        }
                     }
                 }
             }
@@ -3317,35 +3422,50 @@ impl ApplicationHandler for App {
                 }
 
                 if let Some(engine) = &mut self.engine {
-                    let scroll = match delta {
-                        winit::event::MouseScrollDelta::LineDelta(_, y) => y,
-                        winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32 * 0.1,
-                    };
-                    // Scale zoom delta based on projection mode
-                    let scale = match engine.camera.projection_mode {
-                        polyscope_render::ProjectionMode::Perspective => {
-                            engine.camera.position.distance(engine.camera.target) * 0.1
-                        }
-                        polyscope_render::ProjectionMode::Orthographic => {
-                            // For orthographic, scale based on current ortho_scale
-                            engine.camera.ortho_scale * 0.5
-                        }
-                    };
-                    engine.camera.zoom(scroll * scale);
+                    use polyscope_render::NavigationStyle;
+                    let nav = engine.camera.navigation_style;
+
+                    // Zoom disabled for None and FirstPerson modes
+                    if nav != NavigationStyle::None && nav != NavigationStyle::FirstPerson {
+                        let scroll = match delta {
+                            winit::event::MouseScrollDelta::LineDelta(_, y) => y,
+                            winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32 * 0.1,
+                        };
+                        // Scale zoom delta based on projection mode
+                        let scale = match engine.camera.projection_mode {
+                            polyscope_render::ProjectionMode::Perspective => {
+                                engine.camera.position.distance(engine.camera.target) * 0.1
+                            }
+                            polyscope_render::ProjectionMode::Orthographic => {
+                                // For orthographic, scale based on current ortho_scale
+                                engine.camera.ortho_scale * 0.5
+                            }
+                        };
+                        engine.camera.zoom(scroll * scale);
+                    }
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                if event.state == ElementState::Pressed {
-                    match event.physical_key {
-                        winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::Escape) => {
-                            self.close_requested = true;
+                // Track WASD/QE keys for first-person movement
+                if let winit::keyboard::PhysicalKey::Code(code) = event.physical_key {
+                    match event.state {
+                        ElementState::Pressed => {
+                            self.keys_down.insert(code);
+                            // Handle special keys
+                            match code {
+                                KeyCode::Escape => {
+                                    self.close_requested = true;
+                                }
+                                KeyCode::F12 => {
+                                    self.request_auto_screenshot();
+                                    log::info!("Screenshot requested (F12)");
+                                }
+                                _ => {}
+                            }
                         }
-                        winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::F12) => {
-                            // Take screenshot with auto-generated filename
-                            self.request_auto_screenshot();
-                            log::info!("Screenshot requested (F12)");
+                        ElementState::Released => {
+                            self.keys_down.remove(&code);
                         }
-                        _ => {}
                     }
                 }
             }

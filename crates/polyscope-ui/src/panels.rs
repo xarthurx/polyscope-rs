@@ -659,13 +659,21 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                     0 => "Turntable",
                     1 => "Free",
                     2 => "Planar",
-                    3 => "First Person",
+                    3 => "Arcball",
+                    4 => "First Person",
                     _ => "None",
                 })
                 .show_ui(ui, |ui| {
-                    for (i, name) in ["Turntable", "Free", "Planar", "First Person", "None"]
-                        .iter()
-                        .enumerate()
+                    for (i, name) in [
+                        "Turntable",
+                        "Free",
+                        "Planar",
+                        "Arcball",
+                        "First Person",
+                        "None",
+                    ]
+                    .iter()
+                    .enumerate()
                     {
                         if ui
                             .selectable_value(&mut settings.navigation_style, i as u32, *name)

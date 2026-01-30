@@ -2051,7 +2051,8 @@ pub fn apply_camera_settings(
         0 => NavigationStyle::Turntable,
         1 => NavigationStyle::Free,
         2 => NavigationStyle::Planar,
-        3 => NavigationStyle::FirstPerson,
+        3 => NavigationStyle::Arcball,
+        4 => NavigationStyle::FirstPerson,
         _ => NavigationStyle::None,
     };
 
@@ -2087,8 +2088,9 @@ pub fn camera_to_settings(camera: &polyscope_render::Camera) -> polyscope_ui::Ca
             NavigationStyle::Turntable => 0,
             NavigationStyle::Free => 1,
             NavigationStyle::Planar => 2,
-            NavigationStyle::FirstPerson => 3,
-            NavigationStyle::None => 4,
+            NavigationStyle::Arcball => 3,
+            NavigationStyle::FirstPerson => 4,
+            NavigationStyle::None => 5,
         },
         projection_mode: match camera.projection_mode {
             ProjectionMode::Perspective => 0,
