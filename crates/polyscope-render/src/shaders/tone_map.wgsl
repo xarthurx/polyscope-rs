@@ -6,6 +6,7 @@ struct ToneMapUniforms {
     white_level: f32,
     gamma: f32,
     ssao_enabled: u32, // 0 = disabled, 1 = enabled
+    _padding: vec4<f32>, // Pad to 32 bytes (workaround for wgpu late binding size validation)
 }
 
 @group(0) @binding(0) var input_texture: texture_2d<f32>;

@@ -1,6 +1,7 @@
 //! Planar reflection rendering pass.
 
 use glam::Mat4;
+use std::num::NonZeroU64;
 use wgpu::util::DeviceExt;
 
 /// GPU representation of reflection uniforms.
@@ -60,7 +61,7 @@ impl ReflectionPass {
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: None,
+                    min_binding_size: NonZeroU64::new(80),
                 },
                 count: None,
             }],

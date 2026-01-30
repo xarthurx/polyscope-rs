@@ -46,7 +46,8 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 
 ### Bugs / Known Issues
 
-- [ ] **SSAA crash on factor change** — Switching SSAA from 1x to 2x/4x triggers a buffer size mismatch (`Buffer is bound with size 16 where the shader expects 32`). Root cause is in the shadow system re-implementation (commit `e7697cf`), which introduced a uniform buffer sizing bug that surfaces when textures are recreated. Blocked on engine.rs refactor.
+- [x] ~~**SSAA crash on factor change**~~ — Fixed by setting explicit `min_binding_size` on all uniform buffer bindings and correcting WGSL vec3 padding mismatches.
+- [ ] **Intermittent SIGSEGV on WSL2** — Under Windows Subsystem for Linux 2 with GPU passthrough, the application may occasionally crash with SIGSEGV inside the GPU driver. This is a WSL2/GPU driver instability issue, not a polyscope-rs bug. Native platforms are unaffected.
 
 ### Tier 2 — Broader Feature Additions
 
@@ -65,9 +66,9 @@ All Tier 3 quantities have full GPU rendering pipelines (init/update/draw), auto
 
 ### Upstream Follow-ups (from C++ Polyscope)
 
-- [ ] **Double-click to set view center** — Port upstream commit 61fc32a
-- [ ] **Turntable orbit drift prevention** — Port upstream commit 129c680
-- [ ] **Drag & drop file callback** — Port upstream commit 0ff26c2
+- [x] **Double-click to set view center** — Port upstream commit 61fc32a
+- [x] **Turntable orbit drift prevention** — Port upstream commit 129c680
+- [x] **Drag & drop file callback** — Port upstream commit 0ff26c2
 
 ### Tier 4 — Polish
 

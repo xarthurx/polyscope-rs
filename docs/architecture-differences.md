@@ -11,6 +11,12 @@ This document outlines key architectural differences between the original C++ Po
 | **Geometry Shaders** | Yes (used extensively) | Not available in wgpu |
 | **Compute Shaders** | Optional | Available |
 
+### Uniform Buffer Binding Validation
+
+All uniform buffer bindings in polyscope-rs set explicit `min_binding_size` (via `NonZeroU64`) rather than using `None` (deferred validation). This is a deliberate design choice to work around [wgpu Issue #7359](https://github.com/gfx-rs/wgpu/issues/7359), where late buffer binding size validation can cross-contaminate between pipelines sharing a command encoder. By specifying sizes at bind group layout creation time, validation errors surface immediately at pipeline/bind-group creation rather than intermittently at draw time.
+
+**WGSL struct alignment caveat**: WGSL `vec3<T>` aligns to 16 bytes, not 12. Padding fields in WGSL uniform structs must use scalar types (e.g., `_pad0: u32, _pad1: u32, _pad2: u32`) rather than `vec3<u32>` to match Rust `#[repr(C)]` struct sizes.
+
 ## Point Cloud Rendering
 
 ### C++ Polyscope Approach

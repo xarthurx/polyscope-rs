@@ -4,6 +4,7 @@
 
 use glam::{Mat4, Vec3, Vec4};
 use polyscope_core::slice_plane::SlicePlane;
+use std::num::NonZeroU64;
 use wgpu::util::DeviceExt;
 
 /// GPU representation of slice plane visualization uniforms.
@@ -168,7 +169,7 @@ pub fn create_slice_plane_bind_group_layout(device: &wgpu::Device) -> wgpu::Bind
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: None,
+                    min_binding_size: NonZeroU64::new(272),
                 },
                 count: None,
             },
@@ -179,7 +180,7 @@ pub fn create_slice_plane_bind_group_layout(device: &wgpu::Device) -> wgpu::Bind
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: None,
+                    min_binding_size: NonZeroU64::new(112),
                 },
                 count: None,
             },

@@ -1,5 +1,6 @@
 //! Tone mapping post-processing pass.
 
+use std::num::NonZeroU64;
 use wgpu::util::DeviceExt;
 
 /// GPU representation of tone mapping uniforms.
@@ -10,6 +11,8 @@ pub struct ToneMapUniforms {
     pub white_level: f32,
     pub gamma: f32,
     pub ssao_enabled: u32, // 0 = disabled, 1 = enabled
+    /// Padding to 32 bytes (workaround for wgpu late binding size validation).
+    pub _padding: [f32; 4],
 }
 
 impl Default for ToneMapUniforms {
@@ -19,6 +22,7 @@ impl Default for ToneMapUniforms {
             white_level: 1.0,
             gamma: 2.2,
             ssao_enabled: 0,
+            _padding: [0.0; 4],
         }
     }
 }
@@ -64,7 +68,7 @@ impl ToneMapPass {
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: None,
+                        min_binding_size: NonZeroU64::new(32),
                     },
                     count: None,
                 },
@@ -163,6 +167,7 @@ impl ToneMapPass {
             white_level,
             gamma,
             ssao_enabled: u32::from(ssao_enabled),
+            _padding: [0.0; 4],
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
     }

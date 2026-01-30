@@ -1,6 +1,7 @@
 //! SSAO (Screen Space Ambient Occlusion) rendering pass.
 
 use glam::Mat4;
+use std::num::NonZeroU64;
 use wgpu::util::DeviceExt;
 
 /// GPU representation of SSAO uniforms.
@@ -131,7 +132,7 @@ impl SsaoPass {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: None,
+                            min_binding_size: NonZeroU64::new(160),
                         },
                         count: None,
                     },
@@ -215,7 +216,7 @@ impl SsaoPass {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: None,
+                            min_binding_size: NonZeroU64::new(16),
                         },
                         count: None,
                     },

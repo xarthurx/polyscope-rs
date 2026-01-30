@@ -217,10 +217,12 @@ impl RenderEngine {
 
 
     /// Initializes SSAA (supersampling) pass.
+    /// The pipeline uses Rgba16Float because it downsamples the HDR texture
+    /// to the HDR intermediate texture (both are Rgba16Float).
     pub(crate) fn init_ssaa_pass(&mut self) {
         self.ssaa_pass = Some(crate::ssaa_pass::SsaaPass::new(
             &self.device,
-            self.surface_config.format,
+            wgpu::TextureFormat::Rgba16Float,
         ));
     }
 
@@ -309,11 +311,13 @@ impl RenderEngine {
         self.ssaa_intermediate_view = Some(view);
     }
 
-    /// Ensures OIT (Order-Independent Transparency) textures exist and match viewport size.
+    /// Ensures OIT (Order-Independent Transparency) textures exist and match render resolution.
+    /// Uses SSAA-scaled dimensions so OIT textures match the depth buffer.
     pub fn ensure_oit_textures(&mut self) {
+        let (render_w, render_h) = self.render_dimensions();
         let needs_create = self.oit_accum_texture.is_none()
-            || self.oit_accum_texture.as_ref().map(wgpu::Texture::width) != Some(self.width)
-            || self.oit_accum_texture.as_ref().map(wgpu::Texture::height) != Some(self.height);
+            || self.oit_accum_texture.as_ref().map(wgpu::Texture::width) != Some(render_w)
+            || self.oit_accum_texture.as_ref().map(wgpu::Texture::height) != Some(render_h);
 
         if !needs_create {
             return;
@@ -323,8 +327,8 @@ impl RenderEngine {
         let accum_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("OIT Accumulation Texture"),
             size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
+                width: render_w,
+                height: render_h,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -342,8 +346,8 @@ impl RenderEngine {
         let reveal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("OIT Reveal Texture"),
             size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
+                width: render_w,
+                height: render_h,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -447,7 +451,9 @@ impl RenderEngine {
             return false;
         }
 
-        // Update SSAO uniforms
+        // Update SSAO uniforms — use SSAA-scaled dimensions since
+        // SSAO textures are rendered at SSAA resolution
+        let (render_w, render_h) = self.render_dimensions();
         let proj = self.camera.projection_matrix();
         let inv_proj = proj.inverse();
         ssao_pass.update_uniforms(
@@ -458,8 +464,8 @@ impl RenderEngine {
             config.bias,
             config.intensity,
             config.sample_count,
-            self.width as f32,
-            self.height as f32,
+            render_w as f32,
+            render_h as f32,
         );
 
         // Create bind groups
@@ -500,9 +506,7 @@ impl RenderEngine {
     ///
     /// When SSAA is enabled (factor > 1):
     /// 1. Downsamples HDR (SSAA res) → intermediate HDR (screen res)
-    /// 2. Tone maps intermediate HDR → output LDR
-    ///
-    /// Note: When SSAA is enabled, SSAO is disabled to avoid resolution mismatch.
+    /// 2. Tone maps intermediate HDR → output LDR (SSAO disabled — resolution mismatch)
     pub fn render_tone_mapping(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -518,9 +522,14 @@ impl RenderEngine {
                     ssaa_pass.render_to_target(&self.device, encoder, hdr_view, intermediate_view);
 
                     // Step 2: Tone map intermediate HDR -> output LDR
-                    // SSAO is disabled during SSAA (would need separate downsampling)
-                    let bind_group =
-                        tone_map.create_bind_group(&self.device, intermediate_view, intermediate_view);
+                    // Pass intermediate_view as the SSAO slot — SSAO is disabled via
+                    // ssao_enabled=0 uniform so the texture value is ignored, but the
+                    // bind group requires a valid Float texture of matching format.
+                    let bind_group = tone_map.create_bind_group(
+                        &self.device,
+                        intermediate_view,
+                        intermediate_view,
+                    );
                     tone_map.render(encoder, output_view, &bind_group);
                     return;
                 }

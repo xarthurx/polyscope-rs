@@ -161,6 +161,10 @@ For developers familiar with the C++ version or considering migration, see:
 | macOS | ✅ Should work |
 | WebGPU | 🔄 Planned |
 
+## Known Issues
+
+- **Intermittent SIGSEGV on WSL2**: When running under Windows Subsystem for Linux 2 with GPU passthrough, the application may occasionally crash with exit code 139 (SIGSEGV) inside the GPU driver. This is a known class of WSL2/GPU driver instability issues, not a bug in polyscope-rs. Native Linux, Windows, and macOS are unaffected.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.

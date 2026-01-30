@@ -1,6 +1,7 @@
 //! Shadow map generation and blur passes.
 
 use glam::{Mat4, Vec3};
+use std::num::NonZeroU64;
 use wgpu::util::DeviceExt;
 
 /// Shadow map resolution.
@@ -111,7 +112,7 @@ impl ShadowMapPass {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: None,
+                            min_binding_size: NonZeroU64::new(80),
                         },
                         count: None,
                     },

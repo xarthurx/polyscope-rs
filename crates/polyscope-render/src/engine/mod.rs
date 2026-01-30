@@ -7,6 +7,7 @@ mod rendering;
 mod textures;
 
 use std::collections::HashMap;
+use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use wgpu::util::DeviceExt;
@@ -308,7 +309,7 @@ impl RenderEngine {
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: None,
+                        min_binding_size: NonZeroU64::new(128),
                     },
                     count: None,
                 }],
@@ -338,7 +339,7 @@ impl RenderEngine {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: None,
+                            min_binding_size: NonZeroU64::new(272),
                         },
                         count: None,
                     },
@@ -349,7 +350,7 @@ impl RenderEngine {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: None,
+                            min_binding_size: NonZeroU64::new(96),
                         },
                         count: None,
                     },
@@ -360,7 +361,7 @@ impl RenderEngine {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: None,
+                            min_binding_size: NonZeroU64::new(80),
                         },
                         count: None,
                     },
@@ -618,7 +619,7 @@ impl RenderEngine {
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: None,
+                        min_binding_size: NonZeroU64::new(128),
                     },
                     count: None,
                 }],
@@ -648,7 +649,7 @@ impl RenderEngine {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: None,
+                            min_binding_size: NonZeroU64::new(272),
                         },
                         count: None,
                     },
@@ -659,7 +660,7 @@ impl RenderEngine {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: None,
+                            min_binding_size: NonZeroU64::new(96),
                         },
                         count: None,
                     },
@@ -670,7 +671,7 @@ impl RenderEngine {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
-                            min_binding_size: None,
+                            min_binding_size: NonZeroU64::new(80),
                         },
                         count: None,
                     },
