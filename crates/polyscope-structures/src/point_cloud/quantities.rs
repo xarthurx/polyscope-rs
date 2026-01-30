@@ -1,6 +1,6 @@
 //! Point cloud quantity implementations.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use polyscope_core::quantity::{Quantity, QuantityKind, VertexQuantity};
 use polyscope_render::{ColorMap, PointCloudRenderData, VectorRenderData, VectorUniforms};
 
@@ -153,7 +153,7 @@ pub struct PointCloudVectorQuantity {
     enabled: bool,
     length_scale: f32,
     radius: f32,
-    color: Vec3,
+    color: Vec4,
     render_data: Option<VectorRenderData>,
 }
 
@@ -171,7 +171,7 @@ impl PointCloudVectorQuantity {
             enabled: false,
             length_scale: 1.0,
             radius: 0.005,
-            color: Vec3::new(0.8, 0.2, 0.2), // Red
+            color: Vec4::new(0.8, 0.2, 0.2, 1.0), // Red
             render_data: None,
         }
     }
@@ -213,7 +213,7 @@ impl PointCloudVectorQuantity {
                 length_scale: self.length_scale,
                 radius: self.radius,
                 _padding: [0.0; 2],
-                color: [self.color.x, self.color.y, self.color.z, 1.0],
+                color: self.color.to_array(),
             };
             render_data.update_uniforms(queue, &uniforms);
         }
@@ -231,7 +231,7 @@ impl PointCloudVectorQuantity {
 
     /// Sets the color.
     pub fn set_color(&mut self, color: Vec3) {
-        self.color = color;
+        self.color = color.extend(1.0);
     }
 
     /// Gets the length scale.
@@ -248,7 +248,7 @@ impl PointCloudVectorQuantity {
 
     /// Gets the color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
@@ -264,7 +264,7 @@ impl PointCloudVectorQuantity {
             &mut color,
         );
         if changed {
-            self.color = Vec3::new(color[0], color[1], color[2]);
+            self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
         }
         changed
     }
@@ -318,7 +318,7 @@ impl VertexQuantity for PointCloudVectorQuantity {}
 pub struct PointCloudColorQuantity {
     name: String,
     structure_name: String,
-    colors: Vec<Vec3>,
+    colors: Vec<Vec4>,
     enabled: bool,
 }
 
@@ -332,20 +332,21 @@ impl PointCloudColorQuantity {
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
-            colors,
+            colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
             enabled: false,
         }
     }
 
     /// Returns the colors.
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 
     /// Applies this color quantity to the point cloud render data.
     pub fn apply_to_render_data(&self, queue: &wgpu::Queue, render_data: &PointCloudRenderData) {
-        render_data.update_colors(queue, &self.colors);
+        let colors_rgb: Vec<Vec3> = self.colors.iter().map(|c| c.truncate()).collect();
+        render_data.update_colors(queue, &colors_rgb);
     }
 
     /// Builds the egui UI for this color quantity.

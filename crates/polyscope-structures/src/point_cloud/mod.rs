@@ -2,7 +2,7 @@
 
 mod quantities;
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, Vec4};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
@@ -21,7 +21,7 @@ pub struct PointCloud {
     render_data: Option<PointCloudRenderData>,
     material: String,
     point_radius: f32,
-    base_color: Vec3,
+    base_color: Vec4,
     // GPU picking resources
     pick_uniform_buffer: Option<wgpu::Buffer>,
     pick_bind_group: Option<wgpu::BindGroup>,
@@ -40,7 +40,7 @@ impl PointCloud {
             render_data: None,
             material: "clay".to_string(),
             point_radius: 0.01,
-            base_color: Vec3::new(0.2, 0.5, 0.8),
+            base_color: Vec4::new(0.2, 0.5, 0.8, 1.0),
             pick_uniform_buffer: None,
             pick_bind_group: None,
             structure_id: 0,
@@ -191,12 +191,12 @@ impl PointCloud {
 
     /// Sets the base color.
     pub fn set_base_color(&mut self, color: Vec3) {
-        self.base_color = color;
+        self.base_color = color.extend(1.0);
     }
 
     /// Gets the base color.
     #[must_use]
-    pub fn base_color(&self) -> Vec3 {
+    pub fn base_color(&self) -> Vec4 {
         self.base_color
     }
 
@@ -265,7 +265,7 @@ impl PointCloud {
         let mut radius = self.point_radius;
 
         if polyscope_ui::build_point_cloud_ui(ui, self.points.len(), &mut radius, &mut color, &mut self.material) {
-            self.base_color = Vec3::new(color[0], color[1], color[2]);
+            self.base_color = Vec4::new(color[0], color[1], color[2], self.base_color.w);
             self.point_radius = radius;
         }
 
@@ -309,7 +309,7 @@ impl PointCloud {
             point_radius: self.point_radius,
             use_per_point_color: 0,
             _padding: [0.0; 2],
-            base_color: [self.base_color.x, self.base_color.y, self.base_color.z, 1.0],
+            base_color: self.base_color.to_array(),
         };
 
         // Priority: color quantity > scalar quantity > base color
