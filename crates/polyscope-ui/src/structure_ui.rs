@@ -114,10 +114,13 @@ pub fn build_surface_mesh_ui(
         }
     });
 
-    // Transparency
+    // Opacity (displayed as 1.0 - transparency so slider semantics match the label:
+    // opacity 1 = fully opaque, opacity 0 = fully transparent)
     ui.horizontal(|ui| {
         ui.label("Opacity:");
-        if ui.add(egui::Slider::new(transparency, 0.0..=1.0)).changed() {
+        let mut opacity = 1.0 - *transparency;
+        if ui.add(egui::Slider::new(&mut opacity, 0.0..=1.0)).changed() {
+            *transparency = 1.0 - opacity;
             changed = true;
         }
     });
