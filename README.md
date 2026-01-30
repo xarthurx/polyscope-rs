@@ -164,6 +164,7 @@ For developers familiar with the C++ version or considering migration, see:
 ## Known Issues
 
 - **Intermittent SIGSEGV on WSL2**: When running under Windows Subsystem for Linux 2 with GPU passthrough, the application may occasionally crash with exit code 139 (SIGSEGV) inside the GPU driver. This is a known class of WSL2/GPU driver instability issues, not a bug in polyscope-rs. Native Linux, Windows, and macOS are unaffected.
+- **wgpu late binding validation workaround**: All uniform buffer bindings use explicit `min_binding_size` to work around [wgpu#7359](https://github.com/gfx-rs/wgpu/issues/7359), where late buffer binding size validation cross-contaminates between pipelines in the same command encoder. This is transparent to users but relevant for contributors adding new pipelines or bind group layouts.
 
 ## License
 
