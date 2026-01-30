@@ -491,6 +491,7 @@ impl App {
         let mut camera_changed = false;
         let mut scene_extents_changed = false;
         let mut screenshot_requested = false;
+        let mut reset_view_requested = false;
         let mut ssaa_changed = false;
 
         polyscope_ui::build_left_panel(&egui.context, |ui| {
@@ -499,8 +500,10 @@ impl App {
                 polyscope_ui::ViewAction::Screenshot => {
                     screenshot_requested = true;
                 }
-                // TODO: ResetView should reset camera view
-                polyscope_ui::ViewAction::ResetView | polyscope_ui::ViewAction::None => {}
+                polyscope_ui::ViewAction::ResetView => {
+                    reset_view_requested = true;
+                }
+                polyscope_ui::ViewAction::None => {}
             }
 
             // Camera settings panel
@@ -936,6 +939,16 @@ impl App {
             let filename = format!("screenshot_{:04}.png", self.screenshot_counter);
             self.screenshot_counter += 1;
             self.screenshot_pending = Some(filename);
+        }
+
+        // Reset camera to home view (matching C++ Polyscope's resetCameraToHomeView)
+        if reset_view_requested {
+            let bbox = crate::with_context(|ctx| ctx.bounding_box);
+            let (min, max) = bbox;
+            if min.x.is_finite() && max.x.is_finite() && (max - min).length() > 0.0 {
+                engine.camera.look_at_box(min, max);
+                engine.camera.fov = std::f32::consts::FRAC_PI_4; // Reset FOV to default 45°
+            }
         }
 
         // End egui frame
