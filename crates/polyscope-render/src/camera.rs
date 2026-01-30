@@ -255,39 +255,55 @@ impl Camera {
     /// Turntable orbit: yaw around world-space up, pitch around camera-space
     /// right, with gimbal-lock protection. Always looks at target.
     ///
-    /// Matches C++ Polyscope `processRotate` for `NavigateStyle::Turntable`.
+    /// Matches C++ Polyscope `processRotate` for `NavigateStyle::Turntable`:
+    /// operates on the view matrix directly, then reconstructs position via
+    /// `lookAt`. This avoids degenerate cross products at the poles that
+    /// occur when transforming the camera position in world space.
     pub fn orbit_turntable(&mut self, delta_x: f32, delta_y: f32) {
-        let radius = (self.position - self.target).length();
-        let look_dir = self.forward();
         let up_vec = self.up_direction.to_vec3();
 
+        // Get the camera frame from the current view matrix (always valid)
+        let view_mat = self.view_matrix();
+        let r = glam::Mat3::from_cols(
+            view_mat.x_axis.truncate(),
+            view_mat.y_axis.truncate(),
+            view_mat.z_axis.truncate(),
+        );
+        let rt = r.transpose();
+        let frame_look = rt * Vec3::new(0.0, 0.0, -1.0);
+        let frame_right = rt * Vec3::new(1.0, 0.0, 0.0);
+
         // Gimbal-lock protection: prevent flipping past poles
-        let dot = look_dir.dot(up_vec);
+        let dot = frame_look.dot(up_vec);
         let clamped_dy = if dot > 0.99 {
-            delta_y.min(0.0) // only allow moving away from top pole
+            delta_y.min(0.0)
         } else if dot < -0.99 {
-            delta_y.max(0.0) // only allow moving away from bottom pole
+            delta_y.max(0.0)
         } else {
             delta_y
         };
 
-        // Pitch around camera-space right axis
-        let right_dir = self.right();
-        let pitch_rot = Mat4::from_axis_angle(right_dir, -clamped_dy);
+        // Build the new view matrix by applying rotations (matching C++ exactly):
+        // 1. Translate to center
+        let mut vm = view_mat;
+        vm *= Mat4::from_translation(self.target);
 
-        // Yaw around world-space up axis
-        // Negate: we rotate the camera position (not the view matrix), so the
-        // orbit direction must be inverted to match the C++ view-matrix convention.
-        let yaw_rot = Mat4::from_axis_angle(up_vec, -delta_x);
+        // 2. Pitch around camera-space right axis (from the view matrix frame)
+        vm *= Mat4::from_axis_angle(frame_right, -clamped_dy);
 
-        // Apply: translate to center, rotate, translate back
-        let to_center = Mat4::from_translation(self.target);
-        let from_center = Mat4::from_translation(-self.target);
-        let transform = to_center * yaw_rot * pitch_rot * from_center;
+        // 3. Yaw around world-space up axis
+        vm *= Mat4::from_axis_angle(up_vec, delta_x);
 
-        let new_pos = transform.transform_point3(self.position);
+        // 4. Undo centering
+        vm *= Mat4::from_translation(-self.target);
 
-        // Re-enforce exact distance to prevent numerical drift
+        // Extract camera world position from the new view matrix
+        let new_view = vm;
+        let inv_view = new_view.inverse();
+        let new_pos = Vec3::new(inv_view.w_axis.x, inv_view.w_axis.y, inv_view.w_axis.z);
+
+        // Enforce exact distance to prevent numerical drift
+        let radius = (self.position - self.target).length();
         let offset = new_pos - self.target;
         let actual_dist = offset.length();
         if actual_dist > 1e-8 {
@@ -296,16 +312,17 @@ impl Camera {
             self.position = new_pos;
         }
 
-        // Rebuild up vector robustly using look_at_rh (matches C++ Polyscope's
-        // use of glm::lookAt after orbit rotation). This avoids degenerate
-        // cross products when the look direction is near-parallel to the up axis.
-        let view = Mat4::look_at_rh(self.position, self.target, up_vec);
-        // Extract camera up from the view matrix (second row of the rotation part)
-        self.up = Vec3::new(view.col(0).y, view.col(1).y, view.col(2).y).normalize();
-
-        // Final guard: if extraction failed (NaN), fall back to world up
-        if !self.up.is_finite() || self.up.length_squared() < 0.5 {
-            self.up = up_vec;
+        // Reconstruct view with lookAt (matches C++ line 204: lookAt(pos, center, upVec))
+        // This ensures the up vector and view matrix are always consistent.
+        let final_view = Mat4::look_at_rh(self.position, self.target, up_vec);
+        if final_view.is_finite() {
+            // Extract up from the reconstructed view matrix
+            let fr = glam::Mat3::from_cols(
+                final_view.x_axis.truncate(),
+                final_view.y_axis.truncate(),
+                final_view.z_axis.truncate(),
+            );
+            self.up = fr.transpose() * Vec3::Y;
         }
     }
 
