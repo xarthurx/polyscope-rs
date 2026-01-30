@@ -66,7 +66,8 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 - `RenderEngine` - wgpu-based renderer (windowed or headless)
 - `Camera` - 3D camera with orbit/pan/zoom controls
 - `ShaderBuilder` - WGSL shader compilation
-- `MaterialRegistry` / `ColorMapRegistry` - Built-in materials and color maps
+- `MatcapTextureSet` / `ColorMapRegistry` - Matcap material textures and color maps
+- `materials.rs` - 8 matcap materials (clay, wax, candy, flat, mud, ceramic, jade, normal) with 4-channel blend (R/G/B/K textures)
 
 ### Structures (polyscope-structures)
 
@@ -123,6 +124,8 @@ Shaders are written in WGSL (WebGPU Shading Language). Implemented shaders:
 - SSAO (Screen-Space Ambient Occlusion)
 - Slice plane visualization (grid pattern)
 - Volume mesh slice capping
+- Matcap lighting (all scene shaders use `light_surface_matcap()` via Group 2 bind group)
+- Reflected geometry (mesh, point cloud, curve network) with matcap lighting
 
 ### Critical: Model Transform Propagation
 
@@ -143,6 +146,18 @@ Failure to do this causes quantities to stay frozen in place when the user moves
 ### Transparency (polyscope-render)
 
 Weighted Blended Order-Independent Transparency (OIT) is implemented via `OitPass` and `oit_composite.wgsl`. Surface meshes support `set_transparency()`.
+
+### Matcap Materials (polyscope-render)
+
+All scene lighting uses **matcap (material capture)** textures, matching C++ Polyscope's rendering:
+
+- **8 materials**: clay, wax, candy, flat, mud, ceramic, jade, normal
+- **4-channel blend** (clay/wax/candy/flat): `color.r * mat_r + color.g * mat_g + color.b * mat_b + (1-r-g-b) * mat_k`
+- **Single-texture** (mud/ceramic/jade/normal): Direct matcap lookup modulated by base color
+- **Per-structure material**: Each structure has `material()` / `set_material()` on the `Structure` trait
+- **Bind group layout**: Group 0 = per-object uniforms, Group 1 = slice planes/reflection, Group 2 = matcap textures
+- **Texture data**: Embedded via `include_bytes!()` from `crates/polyscope-render/data/matcaps/`
+- **Shared function**: All shaders call `light_surface_matcap(view_normal, base_color)` for consistent lighting
 
 ## Current Status
 

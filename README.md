@@ -34,7 +34,7 @@ This project is an experiment in **AI-driven software development**. I have limi
 | Volume Meshes | ✅ Tet/Hex cells |
 | Volume Grids | ✅ Basic support |
 | Camera Views | ✅ Full support |
-| Materials | ✅ 8 materials |
+| Materials | ✅ 8 matcap materials (per-structure) |
 | Color Maps | ✅ 10+ maps |
 | Ground Plane | ✅ Tile/Shadow/Reflection |
 | Slice Planes | ✅ Up to 4 planes |

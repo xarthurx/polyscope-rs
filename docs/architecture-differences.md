@@ -250,6 +250,22 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 
 All 8 built-in materials (Clay, Wax, Candy, Flat, Mud, Ceramic, Jade, Normal) and 10+ color maps (Viridis, Blues, Reds, Coolwarm, etc.) are implemented with equivalent behavior.
 
+**Matcap rendering implementation:**
+
+Both C++ Polyscope and polyscope-rs use **matcap (material capture)** textures for lighting. The view-space normal is mapped to UV coordinates to sample pre-baked lighting from matcap textures, eliminating the need for runtime light source calculations.
+
+| Aspect | C++ Polyscope | polyscope-rs |
+|--------|---------------|--------------|
+| **Texture format** | Embedded via `bindata` | Embedded via `include_bytes!()` |
+| **4-channel materials** | `color.r*R + color.g*G + color.b*B + (1-r-g-b)*K` | Same formula |
+| **Single-texture materials** | Direct lookup modulated by color | Same approach |
+| **Bind group slot** | N/A (OpenGL textures) | Group 2 in all scene pipelines |
+| **Per-structure material** | `structure->setMaterial(...)` | `structure.set_material(...)` via `Structure` trait |
+
+**Material types:**
+- **4-channel blend** (clay, wax, candy, flat): Four HDR textures (R/G/B/K channels) blended by the object's base color
+- **Single-texture** (mud, ceramic, jade, normal): One JPEG texture, modulated by base color luminance
+
 ---
 
 ## API Differences
