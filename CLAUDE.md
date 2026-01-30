@@ -1,188 +1,63 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-polyscope-rs is a Rust-native 3D visualization library for geometric data. It's a port/reimagining of the C++ [Polyscope](https://polyscope.run) library, targeting the Rust ecosystem.
-
-**Core paradigm**: Structures (geometric objects) + Quantities (data associated with structures)
+polyscope-rs is a Rust-native 3D visualization library for geometric data, ported from C++ [Polyscope](https://polyscope.run). **Core paradigm**: Structures (geometric objects) + Quantities (data on structures).
 
 ## Build Commands
 
 ```bash
-# Build all crates
-cargo build
-
-# Build in release mode
-cargo build --release
-
-# Run tests
-cargo test
-
-# Run a specific test
-cargo test test_name
-
-# Check without building
-cargo check
-
-# Format code
-cargo fmt
-
-# Run clippy lints
-cargo clippy
+cargo build            # Build all crates
+cargo build --release  # Release mode
+cargo test             # Run tests
+cargo check            # Check without building
+cargo fmt              # Format code
+cargo clippy           # Lint
 ```
 
 ## Workspace Structure
 
 ```
-polyscope-rs/
-├── crates/
-│   ├── polyscope-core/       # Core traits, registry, state management
-│   ├── polyscope-render/     # wgpu rendering backend
-│   ├── polyscope-ui/         # egui UI integration
-│   ├── polyscope-structures/ # Structure implementations (mesh, points, etc.)
-│   └── polyscope/            # Main crate, re-exports all sub-crates
-├── examples/
-└── tests/
+crates/
+├── polyscope-core/       # Core traits, registry, state management
+├── polyscope-render/     # wgpu rendering backend
+├── polyscope-ui/         # egui UI integration
+├── polyscope-structures/ # Structure implementations
+└── polyscope/            # Main crate, re-exports all sub-crates
 ```
 
-## Architecture
+## Key Architecture
 
-### Core Traits (polyscope-core)
-
-- `Structure` - Base trait for geometric objects (meshes, point clouds)
-- `Quantity` - Base trait for data attached to structures (scalars, vectors, colors)
-- `HasQuantities` - Trait for structures that can have quantities attached
-
-### State Management
-
-Global state is managed via `OnceLock<RwLock<Context>>`:
-- `with_context(|ctx| ...)` - Read access
-- `with_context_mut(|ctx| ...)` - Write access
-
-### Rendering (polyscope-render)
-
-- `RenderEngine` - wgpu-based renderer (windowed or headless)
-- `Camera` - 3D camera with orbit/pan/zoom controls
-- `ShaderBuilder` - WGSL shader compilation
-- `MatcapTextureSet` / `ColorMapRegistry` - Matcap material textures and color maps
-- `materials.rs` - 8 matcap materials (clay, wax, candy, flat, mud, ceramic, jade, normal) with 4-channel blend (R/G/B/K textures)
-
-### Structures (polyscope-structures)
-
-- `PointCloud` - Point set with scalar/vector/color quantities (full feature parity)
-- `SurfaceMesh` - Triangle mesh with full quantity support: vertex/face scalar/color/vector, parameterization (checker/grid/local), intrinsic vectors (tangent-space with n-fold symmetry), one-forms (edge-based differential forms)
-- `CurveNetwork` - Edge network with node/edge scalar/color/vector quantities, tube rendering via compute shaders
-- `VolumeMesh` - Tet/hex mesh with vertex/cell scalar/color/vector quantities, slice plane capping (full)
-- `VolumeGrid` - Regular 3D grid with node scalar quantities (missing: cell quantities, isosurface)
-- `CameraView` - Camera frustum visualization (full)
-- `FloatingQuantity` - Screen-space quantities: scalar images, color images, depth/color/raw render images
-
-## Technology Stack
-
-| Component | Library |
-|-----------|---------|
-| Rendering | wgpu |
-| UI | egui (pure Rust, no native dependencies) |
-| Math | glam |
-| Windowing | winit |
-| Serialization | serde + serde_json |
-
-## Development Notes
-
-### Adding a New Structure
-
-1. Create module in `polyscope-structures/src/`
-2. Implement `Structure` trait
-3. Implement `HasQuantities` if it supports quantities
-4. Add registration function in main `polyscope` crate
-5. Add tests
-
-### Adding a New Quantity
-
-1. Create quantity struct implementing `Quantity` trait
-2. Add appropriate marker trait (`VertexQuantity`, `FaceQuantity`, etc.)
-3. Add GPU rendering fields and methods (`render_data`, `init_gpu_resources`, `update_uniforms`, `render_data()`)
-4. Add active accessor methods on parent structure (e.g., `active_vertex_vector_quantity()`)
-5. Add `auto_scale()` call in the structure's registration method
-6. Add init/update/draw code in `app.rs` render pipeline
-7. Add convenience method on parent structure
-8. Add UI controls in `polyscope-ui`
-
-### Shader Development
-
-Shaders are written in WGSL (WebGPU Shading Language). Implemented shaders:
-- Point sphere impostor (instanced rendering, no geometry shaders)
-- Mesh surface (flat/smooth shading)
-- Vector arrows (instanced, fully capped shaft+cone, 120 verts/arrow)
-- Ground plane with shadows and reflections
-- Curve network (line mode + tube mode via compute shaders)
-- GPU picking (point, mesh, curve, volume)
-- Tone mapping
-- Shadow map + blur
-- SSAO (Screen-Space Ambient Occlusion)
-- Slice plane visualization (grid pattern)
-- Volume mesh slice capping
-- Depth peeling transparency (multi-pass front-to-back peeling with alpha-under composite)
-- Matcap lighting (all scene shaders use `light_surface_matcap()` via Group 2 bind group)
-- Reflected geometry (mesh, point cloud, curve network) with matcap lighting
-
-### Critical: Model Transform Propagation
-
-Any GPU data derived from a structure's geometry (positions, normals, directions, etc.) **must** be transformed by the structure's model matrix at render time. This applies to:
-
-- Vector arrow base positions and directions (via `VectorUniforms.model`)
-- Pick buffers and hit-testing coordinates
-- Any new quantity that bakes world-space positions into GPU buffers
-
-When adding a new rendered quantity or GPU resource:
-1. Include a `model: mat4x4<f32>` in the shader's uniform struct
-2. Apply it in the vertex shader to both positions (w=1) and directions (w=0)
-3. Pass `structure.transform()` every frame via `update_uniforms()`
-4. Never assume GPU-baked positions are in world space — they are in local/object space
-
-Failure to do this causes quantities to stay frozen in place when the user moves or rotates the structure via gizmos.
-
-### Transparency (polyscope-render)
-
-Depth peeling transparency is implemented via `DepthPeelPass` (`depth_peel_pass.rs`), matching C++ Polyscope's "Pretty" mode. The algorithm renders N geometry passes (default 8), each discarding fragments at or in front of the previous pass's depth, then composites layers front-to-back with alpha-under blending. Key files: `surface_mesh_peel.wgsl` (peel shader with min-depth discard), `composite_peel.wgsl` (alpha-under composite), `depth_update_peel.wgsl` (min-depth update via Max blend). Surface meshes support `set_transparency()`.
-
-### Matcap Materials (polyscope-render)
-
-All scene lighting uses **matcap (material capture)** textures, matching C++ Polyscope's rendering:
-
-- **8 materials**: clay, wax, candy, flat, mud, ceramic, jade, normal
-- **4-channel blend** (clay/wax/candy/flat): `color.r * mat_r + color.g * mat_g + color.b * mat_b + (1-r-g-b) * mat_k`
-- **Single-texture** (mud/ceramic/jade/normal): Direct matcap lookup modulated by base color
-- **Per-structure material**: Each structure has `material()` / `set_material()` on the `Structure` trait
+- **State**: Global `OnceLock<RwLock<Context>>` accessed via `with_context()` / `with_context_mut()`
 - **Bind group layout**: Group 0 = per-object uniforms, Group 1 = slice planes/reflection, Group 2 = matcap textures
-- **Texture data**: Embedded via `include_bytes!()` from `crates/polyscope-render/data/matcaps/`
-- **Shared function**: All shaders call `light_surface_matcap(view_normal, base_color)` for consistent lighting
+- **Render loop**: `app.rs` — shadow map → slice planes → ground plane → depth prepass → main pass (points/curves/vectors) → surface mesh pass → depth peel → SSAO → tone mapping
 
-## Current Status
+## Critical: Model Transform Propagation
 
-- **Version:** 0.2.0
-- **Clippy:** Clean (zero warnings)
-- **Tests:** Passing
-- **Feature parity:** ~95% of C++ Polyscope 2.x
+GPU data from structure geometry **must** be transformed by the model matrix. When adding new rendered quantities:
+1. Include `model: mat4x4<f32>` in shader uniform struct
+2. Apply in vertex shader: positions (w=1), directions (w=0)
+3. Pass `structure.transform()` every frame via `update_uniforms()`
+4. Never assume GPU-baked positions are in world space — they are local/object space
 
-### Missing Features (vs C++ Polyscope)
-- Full polygon mesh support (arbitrary polygons beyond triangles)
+## Adding New Structures/Quantities
 
-### Vector Arrow Geometry
+**Structure**: Create module in `polyscope-structures/src/` → implement `Structure` + `HasQuantities` traits → add registration function in `polyscope` crate → add tests.
 
-Arrow instances use 120 vertices each (8-segment cross-section):
-- Shaft cylinder: 48 verts (8 segments × 6)
-- Cone sides: 24 verts (8 segments × 3)
-- Cone bottom cap: 24 verts (8 segments × 3)
-- Shaft bottom cap: 24 verts (8 segments × 3)
+**Quantity**: Implement `Quantity` trait → add marker trait → add GPU resources (`render_data`, `init_gpu_resources`, `update_uniforms`) → add active accessor on parent structure → add `auto_scale()` in registration → add init/update/draw in `app.rs` → add UI in `polyscope-ui`.
 
-All vector-like quantities (vertex/face vectors, intrinsic vectors, one-forms) share `vector_arrow.wgsl` and `VectorRenderData` GPU resources. Registration methods call `auto_scale()` to size arrows proportionally to the structure's bounding box.
+## Known Issues
+
+- **Pretty mode non-linear opacity**: Depth peeling renders both faces of closed meshes, giving effective alpha = `2α - α²`. Matches C++ Polyscope. Transparency only becomes visible at low opacity values.
+- **Pretty mode f16 depth precision**: Min-depth uses `Rgba16Float` (WebGPU `R32Float` not blendable without `float32-blendable` feature). Requires epsilon `2e-3` in `surface_mesh_peel.wgsl` vs C++'s `1e-6` (24-bit depth). Closely spaced layers within 0.002 NDC depth may not be distinguished.
+- **Missing**: Full polygon mesh support (arbitrary polygons beyond triangles).
 
 ## Reference
 
-- Original C++ Polyscope: https://github.com/nmwsharp/polyscope
-- **Local C++ Polyscope source**: `~/repo/polyscope` - Always check this for implementation details
-- Polyscope documentation: https://polyscope.run
+- **Local C++ Polyscope source**: `~/repo/polyscope` — always check for implementation details
+- C++ Polyscope repo: https://github.com/nmwsharp/polyscope
+- Polyscope docs: https://polyscope.run
+- Architecture comparison: `docs/architecture-differences.md`
 - Design document: `docs/plans/2026-01-21-polyscope-rs-design.md`

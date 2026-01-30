@@ -16,7 +16,9 @@ pub struct DepthPeelPass {
     /// Pipeline for updating min-depth (copies peel depth into min-depth via Max blend)
     depth_update_pipeline: wgpu::RenderPipeline,
 
-    /// Min-depth texture (R32Float) — stores the maximum depth peeled so far
+    /// Min-depth texture (Rgba16Float) — stores the maximum depth peeled so far.
+    /// Uses Rgba16Float instead of R32Float because R32Float is not blendable
+    /// in WebGPU without the float32-blendable feature, and we need Max blend.
     min_depth_texture: wgpu::Texture,
     min_depth_view: wgpu::TextureView,
 
@@ -71,8 +73,10 @@ impl DepthPeelPass {
         });
 
         // Create textures
+        // Min-depth uses Rgba16Float (blendable) instead of R32Float (not blendable).
+        // Only the R channel is used; the Max blend keeps the furthest peeled depth.
         let (min_depth_texture, min_depth_view) =
-            Self::create_r32float_texture(device, width, height, "peel min depth");
+            Self::create_rgba16_texture(device, width, height, "peel min depth");
         let (peel_color_texture, peel_color_view) =
             Self::create_rgba16_texture(device, width, height, "peel layer color");
         let (peel_depth_color_texture, peel_depth_color_view) =
@@ -243,7 +247,7 @@ impl DepthPeelPass {
         self.width = width;
         self.height = height;
 
-        let (t, v) = Self::create_r32float_texture(device, width, height, "peel min depth");
+        let (t, v) = Self::create_rgba16_texture(device, width, height, "peel min depth");
         self.min_depth_texture = t;
         self.min_depth_view = v;
 
@@ -670,8 +674,10 @@ impl DepthPeelPass {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::R32Float,
-                    // Max blend: keeps the maximum of src and dst
+                    format: wgpu::TextureFormat::Rgba16Float,
+                    // Max blend: keeps the maximum of src and dst.
+                    // Uses Rgba16Float because R32Float is not blendable in WebGPU
+                    // without the float32-blendable feature.
                     blend: Some(wgpu::BlendState {
                         color: wgpu::BlendComponent {
                             src_factor: wgpu::BlendFactor::One,

@@ -116,18 +116,35 @@ Supports up to 4,096 structures and 4,096 elements per structure.
 ## Transparency Rendering
 
 ### C++ Polyscope Approach
-Uses depth peeling or sorted rendering for order-independent transparency.
+Uses front-to-back **depth peeling** (Pretty mode) for order-independent transparency. Each peel pass renders ALL structures and the ground plane with blending disabled and depth test Less, discarding fragments at or in front of the previous pass's maximum depth. Layers are composited front-to-back with alpha-under blending. The min-depth buffer uses `DEPTH24` format with native `DepthMode::Greater` for exact depth tracking. Simple mode uses additive blending with depth disabled. None mode uses standard alpha-over with depth Less.
 
 ### polyscope-rs Approach
-Uses **Weighted Blended Order-Independent Transparency (OIT)**:
+Implements the same **depth peeling** algorithm (Pretty mode) and **alpha blending** (Simple mode):
 
-1. **Accumulation Pass**: Transparent fragments write weighted color and alpha to accumulation/reveal textures
-2. **Composite Pass**: Full-screen pass blends accumulated transparency over the opaque scene
+- **Pretty mode (depth peeling)**: Multi-pass front-to-back peeling with alpha-under compositing, matching C++ Polyscope's algorithm. Each pass peels the next closest layer and composites into a final buffer.
+- **Simple mode (alpha blending)**: Standard alpha blending with depth write enabled.
 
-**Trade-offs:**
-- Single-pass approach (no multi-pass depth peeling)
-- Approximate but fast and artifact-free for most cases
-- Surface meshes support per-structure transparency via `set_transparency()`
+**Key implementation differences from C++:**
+
+| Aspect | C++ Polyscope | polyscope-rs |
+|--------|---------------|--------------|
+| **Min-depth format** | `DEPTH24` (24-bit integer) | `Rgba16Float` (half precision) |
+| **Min-depth update** | Native `DepthMode::Greater` | Max blend on color attachment |
+| **Depth epsilon** | `1e-6` (exact with DEPTH24) | `2e-3` (compensates for f16 quantization) |
+| **Peel loop contents** | ALL structures + ground plane | Surface meshes only (ground rendered before) |
+| **Blend modes** | GL blend state per-mode | wgpu pipeline blend state |
+
+**Why Rgba16Float instead of R32Float for min-depth:** WebGPU's `R32Float` format is not blendable without the optional `float32-blendable` feature. Since depth peeling requires Max blend to track the furthest peeled depth, we use `Rgba16Float` which is always blendable, at the cost of reduced precision (~10-bit mantissa vs 24-bit).
+
+**Known issues:**
+- **Non-linear opacity**: Both front and back faces of closed meshes are peeled, giving effective alpha = `2α - α²` instead of linear `α`. This matches C++ Polyscope behavior but differs from Simple mode's single-face rendering.
+- **f16 depth precision**: The larger epsilon (`2e-3`) means geometry layers within 0.002 NDC depth units may not be correctly distinguished during peeling.
+
+**Files:**
+- `crates/polyscope-render/src/depth_peel_pass.rs` - Peel pass resources and pipeline setup
+- `crates/polyscope-render/src/shaders/surface_mesh_peel.wgsl` - Peel geometry shader (depth discard + premultiplied alpha output)
+- `crates/polyscope-render/src/shaders/composite_peel.wgsl` - Alpha-under composite shader
+- `crates/polyscope-render/src/shaders/depth_update_peel.wgsl` - Min-depth update shader (f32 → f16 via Max blend)
 
 ## Shader Composition
 
@@ -239,7 +256,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Ground Reflections | ✅ | ✅ | Stencil-based |
 | Tone Mapping | ✅ | ✅ | HDR pipeline |
 | SSAO | ❌ | ✅ | polyscope-rs only feature |
-| Transparency | ✅ | ✅ | Weighted Blended OIT |
+| Transparency | ✅ | ✅ | Depth peeling (Pretty) + alpha blending (Simple); f16 min-depth precision |
 | Slice Planes | ✅ | ✅ | Max 4, with volume mesh capping |
 | Groups | ✅ | ✅ | Hierarchical |
 | Gizmos | ✅ | ✅ | Via egui (transform-gizmo-egui), not GPU-rendered |

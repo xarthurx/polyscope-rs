@@ -99,9 +99,9 @@ pub struct RenderEngine {
     pub vector_pipeline: Option<wgpu::RenderPipeline>,
     /// Vector bind group layout.
     pub vector_bind_group_layout: Option<wgpu::BindGroupLayout>,
-    /// Surface mesh render pipeline.
+    /// Surface mesh render pipeline (depth write enabled, for opaque/Pretty mode).
     pub mesh_pipeline: Option<wgpu::RenderPipeline>,
-    /// Surface mesh transparent pipeline (no depth write).
+    /// Surface mesh transparent pipeline (no depth write, for Simple mode).
     pub mesh_transparent_pipeline: Option<wgpu::RenderPipeline>,
     /// Surface mesh depth/normal-only pipeline (Pretty mode prepass).
     pub mesh_depth_normal_pipeline: Option<wgpu::RenderPipeline>,

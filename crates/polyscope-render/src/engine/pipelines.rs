@@ -412,6 +412,9 @@ impl RenderEngine {
                 cache: None,
             });
 
+        // Transparent pipeline: same shader but no depth write.
+        // Used in Simple mode for all meshes so that transparent fragments
+        // don't block the background via depth buffer writes.
         let transparent_pipeline = self
             .device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -437,8 +440,7 @@ impl RenderEngine {
                         Some(wgpu::ColorTargetState {
                             format: wgpu::TextureFormat::Rgba16Float,
                             blend: None,
-                            // Don't overwrite normals for transparent meshes
-                            write_mask: wgpu::ColorWrites::empty(),
+                            write_mask: wgpu::ColorWrites::ALL,
                         }),
                     ],
                     compilation_options: wgpu::PipelineCompilationOptions::default(),

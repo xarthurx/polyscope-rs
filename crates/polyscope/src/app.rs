@@ -1743,25 +1743,183 @@ impl App {
             [bg_r as f32, bg_g as f32, bg_b as f32],
         );
 
-        let is_opaque_mesh = |mesh: &SurfaceMesh| {
-            if mesh.transparency() > 0.0 {
-                return false;
-            }
-            if let Some(cq) = mesh.active_vertex_color_quantity() {
-                if cq.has_transparency() {
-                    return false;
-                }
-            }
-            if let Some(cq) = mesh.active_face_color_quantity() {
-                if cq.has_transparency() {
-                    return false;
-                }
-            }
-            true
-        };
-
         let use_depth_peel = self.appearance_settings.transparency_mode == 2;
 
+        // Render ground plane BEFORE surface mesh passes so transparent objects
+        // composite correctly over the ground. Without this, either:
+        // - Simple mode: meshes with no depth write get overwritten by later ground plane
+        // - Pretty mode: mesh depth prepass blocks ground from rendering, making peeled
+        //   transparent meshes appear gray (no ground behind them to show through)
+        let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
+            let center = ctx.center();
+            (
+                [center.x, center.y, center.z],
+                ctx.bounding_box.0.y,
+                ctx.length_scale,
+            )
+        });
+
+        if self.ground_plane.mode == GroundPlaneMode::TileReflection {
+            // Compute ground height
+            let ground_height = if self.ground_plane.height_is_relative {
+                scene_min_y - length_scale * 0.001
+            } else {
+                self.ground_plane.height
+            };
+
+            // Update reflection uniforms
+            let reflection_matrix = reflection::ground_reflection_matrix(ground_height);
+            engine.update_reflection(
+                reflection_matrix,
+                self.ground_plane.reflection_intensity,
+                ground_height,
+            );
+
+            // 1. Render stencil pass (mark ground plane region)
+            engine.render_stencil_pass(
+                &mut encoder,
+                &view,
+                ground_height,
+                scene_center,
+                length_scale,
+            );
+
+            // 2. Render ground plane FIRST (opaque base)
+            engine.render_ground_plane(
+                &mut encoder,
+                &view,
+                true, // enabled
+                scene_center,
+                scene_min_y,
+                length_scale,
+                gp_height_override,
+                self.ground_plane.shadow_darkness,
+                gp_shadow_mode,
+                0.0, // No transparency - fully opaque ground
+            );
+
+            // 3. Render reflected meshes ON TOP of ground
+            {
+                let hdr_view = engine.hdr_texture_view().unwrap_or(&view);
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Reflected Geometry Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: hdr_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                        depth_slice: None,
+                    })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: engine.depth_view(),
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Load, // Keep stencil from previous pass
+                            store: wgpu::StoreOp::Store,
+                        }),
+                    }),
+                    ..Default::default()
+                });
+
+                // Render each visible structure reflected
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !structure.is_enabled() {
+                            continue;
+                        }
+                        // SurfaceMesh
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                if let Some(mesh_data) = mesh.render_data() {
+                                    if let Some(bind_group) =
+                                        engine.create_reflected_mesh_bind_group(mesh_data)
+                                    {
+                                        engine.render_reflected_mesh(
+                                            &mut render_pass,
+                                            &bind_group,
+                                            mesh_data.vertex_count(),
+                                            structure.material(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        // VolumeMesh (uses SurfaceMeshRenderData)
+                        if structure.type_name() == "VolumeMesh" {
+                            if let Some(vol_mesh) =
+                                structure.as_any().downcast_ref::<VolumeMesh>()
+                            {
+                                if let Some(mesh_data) = vol_mesh.render_data() {
+                                    if let Some(bind_group) =
+                                        engine.create_reflected_mesh_bind_group(mesh_data)
+                                    {
+                                        engine.render_reflected_mesh(
+                                            &mut render_pass,
+                                            &bind_group,
+                                            mesh_data.vertex_count(),
+                                            structure.material(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        // PointCloud
+                        if structure.type_name() == "PointCloud" {
+                            if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                                if let Some(pc_data) = pc.render_data() {
+                                    if let Some(bind_group) =
+                                        engine.create_reflected_point_cloud_bind_group(pc_data)
+                                    {
+                                        engine.render_reflected_point_cloud(
+                                            &mut render_pass,
+                                            &bind_group,
+                                            pc_data.num_points,
+                                            structure.material(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        // CurveNetwork
+                        if structure.type_name() == "CurveNetwork" {
+                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                                if let Some(cn_data) = cn.render_data() {
+                                    if let Some(bind_group) =
+                                        engine.create_reflected_curve_network_bind_group(cn_data)
+                                    {
+                                        engine.render_reflected_curve_network(
+                                            &mut render_pass,
+                                            &bind_group,
+                                            cn_data,
+                                            structure.material(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        } else {
+            // Non-reflection ground plane modes
+            engine.render_ground_plane(
+                &mut encoder,
+                &view,
+                gp_enabled,
+                scene_center,
+                scene_min_y,
+                length_scale,
+                gp_height_override,
+                self.ground_plane.shadow_darkness,
+                gp_shadow_mode,
+                0.0,
+            );
+        }
 
         // Surface mesh depth prepass for Pretty mode (opaque meshes only)
         if use_depth_peel {
@@ -1814,9 +1972,6 @@ impl App {
                         }
                         if structure.type_name() == "SurfaceMesh" {
                             if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                if !is_opaque_mesh(mesh) {
-                                    continue;
-                                }
                                 if let Some(render_data) = mesh.render_data() {
                                     prepass.set_bind_group(
                                         2,
@@ -2127,6 +2282,8 @@ impl App {
                 }
 
                 // Surface meshes: depth/normal only (color handled by depth peeling)
+                // All surface meshes go through depth peeling for color, so we only
+                // write depth+normals here for SSAO regardless of transparency.
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
                         if !structure.is_enabled() {
@@ -2134,9 +2291,6 @@ impl App {
                         }
                         if structure.type_name() == "SurfaceMesh" {
                             if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                if !is_opaque_mesh(mesh) {
-                                    continue;
-                                }
                                 if let Some(render_data) = mesh.render_data() {
                                     render_pass.set_bind_group(
                                         2,
@@ -2193,6 +2347,13 @@ impl App {
                     }
                 });
             } else {
+                // Simple/None mode: render all surface meshes through the normal
+                // pipeline (alpha blending with depth write). The ground plane has
+                // already been rendered before this pass, so alpha blending correctly
+                // composites transparent meshes over the ground. Depth write ensures
+                // proper occlusion between meshes and prevents later passes from
+                // overwriting mesh pixels. When alpha=1.0, this produces the same
+                // visual result as fully opaque rendering.
                 render_pass.set_pipeline(mesh_pipeline);
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
@@ -2201,9 +2362,6 @@ impl App {
                         }
                         if structure.type_name() == "SurfaceMesh" {
                             if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                if !is_opaque_mesh(mesh) {
-                                    continue;
-                                }
                                 if let Some(render_data) = mesh.render_data() {
                                     render_pass.set_bind_group(
                                         2,
@@ -2252,257 +2410,8 @@ impl App {
             }
         }
 
-        // Render ground plane before transparency passes so transparent objects composite correctly over it
-        // Get scene parameters for ground plane
-        let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
-            let center = ctx.center();
-            (
-                [center.x, center.y, center.z],
-                ctx.bounding_box.0.y,
-                ctx.length_scale,
-            )
-        });
-
-        // Ground plane and reflection rendering (before transparency passes so depth is available)
-        if self.ground_plane.mode == GroundPlaneMode::TileReflection {
-            // Compute ground height
-            let ground_height = if self.ground_plane.height_is_relative {
-                scene_min_y - length_scale * 0.001
-            } else {
-                self.ground_plane.height
-            };
-
-            // Update reflection uniforms
-            let reflection_matrix = reflection::ground_reflection_matrix(ground_height);
-            engine.update_reflection(
-                reflection_matrix,
-                self.ground_plane.reflection_intensity,
-                ground_height,
-            );
-
-            // 1. Render stencil pass (mark ground plane region)
-            engine.render_stencil_pass(
-                &mut encoder,
-                &view,
-                ground_height,
-                scene_center,
-                length_scale,
-            );
-
-            // 2. Render ground plane FIRST (opaque base)
-            engine.render_ground_plane(
-                &mut encoder,
-                &view,
-                true, // enabled
-                scene_center,
-                scene_min_y,
-                length_scale,
-                gp_height_override,
-                self.ground_plane.shadow_darkness,
-                gp_shadow_mode,
-                0.0, // No transparency - fully opaque ground
-            );
-
-            // 3. Render reflected meshes ON TOP of ground
-            {
-                let hdr_view = engine.hdr_texture_view().unwrap_or(&view);
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Reflected Geometry Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: hdr_view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                        depth_slice: None,
-                    })],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: engine.depth_view(),
-                        depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        }),
-                        stencil_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Load, // Keep stencil from previous pass
-                            store: wgpu::StoreOp::Store,
-                        }),
-                    }),
-                    ..Default::default()
-                });
-
-                // Render each visible structure reflected
-                crate::with_context(|ctx| {
-                    for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
-                            continue;
-                        }
-                        // SurfaceMesh
-                        if structure.type_name() == "SurfaceMesh" {
-                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                if let Some(mesh_data) = mesh.render_data() {
-                                    if let Some(bind_group) =
-                                        engine.create_reflected_mesh_bind_group(mesh_data)
-                                    {
-                                        engine.render_reflected_mesh(
-                                            &mut render_pass,
-                                            &bind_group,
-                                            mesh_data.vertex_count(),
-                                            structure.material(),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                        // VolumeMesh (uses SurfaceMeshRenderData)
-                        if structure.type_name() == "VolumeMesh" {
-                            if let Some(vol_mesh) =
-                                structure.as_any().downcast_ref::<VolumeMesh>()
-                            {
-                                if let Some(mesh_data) = vol_mesh.render_data() {
-                                    if let Some(bind_group) =
-                                        engine.create_reflected_mesh_bind_group(mesh_data)
-                                    {
-                                        engine.render_reflected_mesh(
-                                            &mut render_pass,
-                                            &bind_group,
-                                            mesh_data.vertex_count(),
-                                            structure.material(),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                        // PointCloud
-                        if structure.type_name() == "PointCloud" {
-                            if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
-                                if let Some(pc_data) = pc.render_data() {
-                                    if let Some(bind_group) =
-                                        engine.create_reflected_point_cloud_bind_group(pc_data)
-                                    {
-                                        engine.render_reflected_point_cloud(
-                                            &mut render_pass,
-                                            &bind_group,
-                                            pc_data.num_points,
-                                            structure.material(),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                        // CurveNetwork
-                        if structure.type_name() == "CurveNetwork" {
-                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
-                                if let Some(cn_data) = cn.render_data() {
-                                    if let Some(bind_group) =
-                                        engine.create_reflected_curve_network_bind_group(cn_data)
-                                    {
-                                        engine.render_reflected_curve_network(
-                                            &mut render_pass,
-                                            &bind_group,
-                                            cn_data,
-                                            structure.material(),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-        } else {
-            // Non-reflection ground plane modes
-            engine.render_ground_plane(
-                &mut encoder,
-                &view,
-                gp_enabled,
-                scene_center,
-                scene_min_y,
-                length_scale,
-                gp_height_override,
-                self.ground_plane.shadow_darkness,
-                gp_shadow_mode,
-                0.0,
-            );
-        }
-
-        // Transparent surface meshes in Simple mode render after the ground plane
-        if !use_depth_peel {
-            if let Some(mesh_pipeline) = &engine.mesh_transparent_pipeline {
-                let hdr_view = engine.hdr_view().expect("HDR view should be available");
-                let normal_view = engine
-                    .normal_view()
-                    .expect("Normal view should be available");
-
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Transparent Surface Mesh Pass"),
-                    color_attachments: &[
-                        Some(wgpu::RenderPassColorAttachment {
-                            view: hdr_view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            },
-                            depth_slice: None,
-                        }),
-                        Some(wgpu::RenderPassColorAttachment {
-                            view: normal_view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            },
-                            depth_slice: None,
-                        }),
-                    ],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: &engine.depth_view,
-                        depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        }),
-                        stencil_ops: None,
-                    }),
-                    ..Default::default()
-                });
-
-                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
-                render_pass.set_pipeline(mesh_pipeline);
-
-                crate::with_context(|ctx| {
-                    for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
-                            continue;
-                        }
-                        if structure.type_name() == "SurfaceMesh" {
-                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                                if is_opaque_mesh(mesh) {
-                                    continue;
-                                }
-                                if let Some(render_data) = mesh.render_data() {
-                                    render_pass.set_bind_group(
-                                        2,
-                                        engine.matcap_bind_group_for(structure.material()),
-                                        &[],
-                                    );
-                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                    render_pass.set_index_buffer(
-                                        render_data.index_buffer.slice(..),
-                                        wgpu::IndexFormat::Uint32,
-                                    );
-                                    render_pass.draw_indexed(
-                                        0..render_data.num_indices,
-                                        0,
-                                        0..1,
-                                    );
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-        }
+        // Note: Ground plane is rendered earlier (before depth prepass and surface mesh pass)
+        // so that transparent meshes can correctly composite over it.
 
         // Depth peeling transparency pass for surface meshes
         // All surface meshes go through depth peeling to handle overlapping geometry correctly

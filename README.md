@@ -40,7 +40,7 @@ This project is an experiment in **AI-driven software development**. I have limi
 | Slice Planes | ✅ Up to 4 planes |
 | Groups | ✅ Hierarchical |
 | Gizmos | ✅ Translate/Rotate/Scale |
-| Transparency | ✅ Weighted Blended OIT |
+| Transparency | ✅ Depth peeling (Pretty) + alpha blending (Simple) |
 | Tone Mapping | ✅ HDR pipeline |
 | SSAO | ✅ Ambient occlusion |
 | Screenshots | ✅ PNG/JPEG export |
@@ -158,6 +158,8 @@ For developers familiar with the C++ version or considering migration, see:
 
 - **Intermittent SIGSEGV on WSL2**: When running under Windows Subsystem for Linux 2 with GPU passthrough, the application may occasionally crash with exit code 139 (SIGSEGV) inside the GPU driver. This is a known class of WSL2/GPU driver instability issues, not a bug in polyscope-rs. Native Linux, Windows, and macOS are unaffected.
 - **wgpu late binding validation workaround**: All uniform buffer bindings use explicit `min_binding_size` to work around [wgpu#7359](https://github.com/gfx-rs/wgpu/issues/7359), where late buffer binding size validation cross-contaminates between pipelines in the same command encoder. This is transparent to users but relevant for contributors adding new pipelines or bind group layouts.
+- **Pretty mode non-linear opacity**: In Pretty (depth peeling) transparency mode, opacity response is non-linear compared to Simple mode. Both front and back faces of closed meshes are peeled, giving effective alpha = `2α - α²`. This is inherent to depth peeling and matches C++ Polyscope behavior. Transparency only becomes visually apparent at lower opacity values.
+- **Pretty mode f16 depth precision**: The depth peeling min-depth texture uses `Rgba16Float` (half precision) because WebGPU's `R32Float` does not support blending without the optional `float32-blendable` feature. This requires a larger depth comparison epsilon (`2e-3`) than C++ Polyscope's `1e-6` (which uses 24-bit depth). Very closely spaced geometry layers (within 0.002 NDC depth) may not be correctly distinguished during peeling.
 
 ## License
 

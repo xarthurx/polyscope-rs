@@ -124,7 +124,11 @@ fn fs_main(
     let viewport_dim = vec2<f32>(textureDimensions(t_min_depth));
     let peel_uv = in.clip_position.xy / viewport_dim;
     let min_depth = textureSample(t_min_depth, peel_sampler, peel_uv).r;
-    if (depth <= min_depth + 1e-6) {
+    // Use epsilon large enough to account for f16 quantization in the min_depth texture.
+    // The min_depth is stored in Rgba16Float (half precision, ~10-bit mantissa).
+    // At depth 1.0, f16 precision is ~0.001, so we need epsilon > 0.001 to reliably
+    // distinguish already-peeled layers from new ones.
+    if (depth <= min_depth + 2e-3) {
         discard;
     }
 
