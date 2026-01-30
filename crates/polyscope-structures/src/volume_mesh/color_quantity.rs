@@ -1,13 +1,13 @@
 //! Color quantities for volume meshes.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use polyscope_core::quantity::{CellQuantity, Quantity, QuantityKind, VertexQuantity};
 
 /// A color quantity defined at mesh vertices.
 pub struct VolumeMeshVertexColorQuantity {
     name: String,
     structure_name: String,
-    colors: Vec<Vec3>,
+    colors: Vec<Vec4>,
     enabled: bool,
 }
 
@@ -20,13 +20,13 @@ impl VolumeMeshVertexColorQuantity {
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
-            colors,
+            colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
             enabled: false,
         }
     }
 
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 
@@ -77,7 +77,7 @@ impl VertexQuantity for VolumeMeshVertexColorQuantity {}
 pub struct VolumeMeshCellColorQuantity {
     name: String,
     structure_name: String,
-    colors: Vec<Vec3>,
+    colors: Vec<Vec4>,
     enabled: bool,
 }
 
@@ -90,13 +90,13 @@ impl VolumeMeshCellColorQuantity {
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
-            colors,
+            colors: colors.into_iter().map(|c| c.extend(1.0)).collect(),
             enabled: false,
         }
     }
 
     #[must_use]
-    pub fn colors(&self) -> &[Vec3] {
+    pub fn colors(&self) -> &[Vec4] {
         &self.colors
     }
 

@@ -4,7 +4,7 @@ mod scalar_quantity;
 
 pub use scalar_quantity::*;
 
-use glam::{Mat4, UVec3, Vec3};
+use glam::{Mat4, UVec3, Vec3, Vec4};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
@@ -32,8 +32,8 @@ pub struct VolumeGrid {
     quantities: Vec<Box<dyn Quantity>>,
 
     // Visualization parameters
-    color: Vec3,
-    edge_color: Vec3,
+    color: Vec4,
+    edge_color: Vec4,
     edge_width: f32,
     cube_size_factor: f32,
 
@@ -58,8 +58,8 @@ impl VolumeGrid {
             enabled: true,
             transform: Mat4::IDENTITY,
             quantities: Vec::new(),
-            color: Vec3::new(0.5, 0.5, 0.5),
-            edge_color: Vec3::new(0.0, 0.0, 0.0),
+            color: Vec4::new(0.5, 0.5, 0.5, 1.0),
+            edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
             edge_width: 1.0,
             cube_size_factor: 0.0,
             render_data: None,
@@ -147,25 +147,25 @@ impl VolumeGrid {
 
     /// Gets the grid color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the grid color.
     pub fn set_color(&mut self, color: Vec3) -> &mut Self {
-        self.color = color;
+        self.color = color.extend(1.0);
         self
     }
 
     /// Gets the edge color.
     #[must_use]
-    pub fn edge_color(&self) -> Vec3 {
+    pub fn edge_color(&self) -> Vec4 {
         self.edge_color
     }
 
     /// Sets the edge color.
     pub fn set_edge_color(&mut self, color: Vec3) -> &mut Self {
-        self.edge_color = color;
+        self.edge_color = color.extend(1.0);
         self
     }
 
@@ -244,7 +244,7 @@ impl VolumeGrid {
 
         // Update uniforms with edge color
         let uniforms = polyscope_render::CurveNetworkUniforms {
-            color: [self.edge_color.x, self.edge_color.y, self.edge_color.z, 1.0],
+            color: self.edge_color.to_array(),
             radius: 0.002,
             radius_is_relative: 1,
             render_mode: 0,
@@ -301,7 +301,7 @@ impl VolumeGrid {
             ui.label("Edge Color:");
             let mut color = [self.edge_color.x, self.edge_color.y, self.edge_color.z];
             if ui.color_edit_button_rgb(&mut color).changed() {
-                self.set_edge_color(Vec3::new(color[0], color[1], color[2]));
+                self.edge_color = Vec4::new(color[0], color[1], color[2], self.edge_color.w);
             }
         });
 

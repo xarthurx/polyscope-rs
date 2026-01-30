@@ -53,7 +53,7 @@ pub use vector_quantity::*;
 
 // Re-export SliceMeshData from this module
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, Vec4};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
@@ -85,9 +85,9 @@ pub struct VolumeMesh {
     quantities: Vec<Box<dyn Quantity>>,
 
     // Visualization parameters
-    color: Vec3,
-    interior_color: Vec3,
-    edge_color: Vec3,
+    color: Vec4,
+    interior_color: Vec4,
+    edge_color: Vec4,
     edge_width: f32,
 
     // GPU resources (renders exterior faces)
@@ -110,9 +110,9 @@ impl VolumeMesh {
     /// * `vertices` - Vertex positions
     /// * `cells` - Cell indices, 8 per cell (unused indices should be `u32::MAX`)
     pub fn new(name: impl Into<String>, vertices: Vec<Vec3>, cells: Vec<[u32; 8]>) -> Self {
-        let color = Vec3::new(0.25, 0.50, 0.75);
+        let color = Vec4::new(0.25, 0.50, 0.75, 1.0);
         // Interior color is a desaturated version
-        let interior_color = Vec3::new(0.45, 0.50, 0.55);
+        let interior_color = Vec4::new(0.45, 0.50, 0.55, 1.0);
 
         Self {
             name: name.into(),
@@ -123,7 +123,7 @@ impl VolumeMesh {
             quantities: Vec::new(),
             color,
             interior_color,
-            edge_color: Vec3::ZERO,
+            edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
             edge_width: 0.0,
             render_data: None,
             slice_render_data: None,
@@ -198,37 +198,37 @@ impl VolumeMesh {
 
     /// Gets the base color.
     #[must_use]
-    pub fn color(&self) -> Vec3 {
+    pub fn color(&self) -> Vec4 {
         self.color
     }
 
     /// Sets the base color.
     pub fn set_color(&mut self, color: Vec3) -> &mut Self {
-        self.color = color;
+        self.color = color.extend(1.0);
         self
     }
 
     /// Gets the interior color.
     #[must_use]
-    pub fn interior_color(&self) -> Vec3 {
+    pub fn interior_color(&self) -> Vec4 {
         self.interior_color
     }
 
     /// Sets the interior color.
     pub fn set_interior_color(&mut self, color: Vec3) -> &mut Self {
-        self.interior_color = color;
+        self.interior_color = color.extend(1.0);
         self
     }
 
     /// Gets the edge color.
     #[must_use]
-    pub fn edge_color(&self) -> Vec3 {
+    pub fn edge_color(&self) -> Vec4 {
         self.edge_color
     }
 
     /// Sets the edge color.
     pub fn set_edge_color(&mut self, color: Vec3) -> &mut Self {
-        self.edge_color = color;
+        self.edge_color = color.extend(1.0);
         self
     }
 
@@ -560,7 +560,7 @@ impl VolumeMesh {
                 if let Some(color) = q.as_any().downcast_ref::<VolumeMeshVertexColorQuantity>() {
                     let colors: Vec<Vec3> = vertex_indices
                         .iter()
-                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec3::ONE))
+                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec4::new(1.0, 1.0, 1.0, 1.0)).truncate())
                         .collect();
                     vertex_colors = Some(colors);
                     break;
@@ -576,7 +576,7 @@ impl VolumeMesh {
                 if let Some(color) = q.as_any().downcast_ref::<VolumeMeshCellColorQuantity>() {
                     let colors: Vec<Vec3> = cell_indices
                         .iter()
-                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec3::ONE))
+                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec4::new(1.0, 1.0, 1.0, 1.0)).truncate())
                         .collect();
                     vertex_colors = Some(colors);
                     break;
@@ -742,8 +742,8 @@ impl VolumeMesh {
                 show_edges: u32::from(self.edge_width > 0.0),
                 edge_width: self.edge_width,
                 transparency: 0.0,
-                surface_color: [self.color.x, self.color.y, self.color.z, 1.0],
-                edge_color: [self.edge_color.x, self.edge_color.y, self.edge_color.z, 1.0],
+                surface_color: self.color.to_array(),
+                edge_color: self.edge_color.to_array(),
                 backface_policy: 0,
                 slice_planes_enabled: 0,
                 ..Default::default()
@@ -801,7 +801,7 @@ impl VolumeMesh {
 
             // Update uniforms with interior color
             if let Some(ref rd) = self.slice_render_data {
-                rd.update_uniforms(queue, self.interior_color);
+                rd.update_uniforms(queue, self.interior_color.truncate());
             }
 
             self.slice_plane_cache = Some((plane_origin, plane_normal));
@@ -844,7 +844,7 @@ impl VolumeMesh {
             ui.label("Color:");
             let mut color = [self.color.x, self.color.y, self.color.z];
             if ui.color_edit_button_rgb(&mut color).changed() {
-                self.set_color(Vec3::new(color[0], color[1], color[2]));
+                self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
             }
         });
 
@@ -1012,11 +1012,11 @@ impl VolumeMesh {
                             let va_idx = cell[a as usize] as usize;
                             let vb_idx = cell[b as usize] as usize;
                             // Interpolate colors
-                            vc[va_idx].lerp(vc[vb_idx], t)
+                            vc[va_idx].lerp(vc[vb_idx], t).truncate()
                         })
                         .collect()
                 } else {
-                    vec![self.interior_color; slice.vertices.len()]
+                    vec![self.interior_color.truncate(); slice.vertices.len()]
                 };
 
                 // Triangulate the polygon (fan from first vertex)

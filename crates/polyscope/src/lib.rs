@@ -1753,7 +1753,7 @@ impl SlicePlaneHandle {
     pub fn color(&self) -> Vec3 {
         with_context(|ctx| {
             ctx.get_slice_plane(&self.name)
-                .map_or(Vec3::new(0.5, 0.5, 0.5), polyscope_core::SlicePlane::color)
+                .map_or(Vec3::new(0.5, 0.5, 0.5), |p| p.color().truncate())
         })
     }
 
@@ -2125,7 +2125,7 @@ pub fn get_slice_plane_settings() -> Vec<polyscope_ui::SlicePlaneSettings> {
                 normal: plane.normal().to_array(),
                 draw_plane: plane.draw_plane(),
                 draw_widget: plane.draw_widget(),
-                color: plane.color().to_array(),
+                color: plane.color().truncate().to_array(),
                 transparency: plane.transparency(),
                 plane_size: plane.plane_size(),
                 is_selected: selected == Some(plane.name()),
@@ -2170,7 +2170,7 @@ pub fn handle_slice_plane_action(
                         normal: plane.normal().to_array(),
                         draw_plane: plane.draw_plane(),
                         draw_widget: plane.draw_widget(),
-                        color: plane.color().to_array(),
+                        color: plane.color().truncate().to_array(),
                         transparency: plane.transparency(),
                         plane_size: plane.plane_size(),
                         is_selected: false,

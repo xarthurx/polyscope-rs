@@ -1,6 +1,6 @@
 //! Vector quantities for volume meshes.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use polyscope_core::quantity::{CellQuantity, Quantity, QuantityKind, VertexQuantity};
 
 /// A vector quantity defined at mesh vertices.
@@ -11,7 +11,7 @@ pub struct VolumeMeshVertexVectorQuantity {
     enabled: bool,
     vector_length_scale: f32,
     vector_radius: f32,
-    vector_color: Vec3,
+    vector_color: Vec4,
 }
 
 impl VolumeMeshVertexVectorQuantity {
@@ -27,7 +27,7 @@ impl VolumeMeshVertexVectorQuantity {
             enabled: false,
             vector_length_scale: 1.0,
             vector_radius: 0.01,
-            vector_color: Vec3::new(0.1, 0.1, 0.8),
+            vector_color: Vec4::new(0.1, 0.1, 0.8, 1.0),
         }
     }
 
@@ -47,7 +47,7 @@ impl VolumeMeshVertexVectorQuantity {
     }
 
     pub fn set_color(&mut self, color: Vec3) -> &mut Self {
-        self.vector_color = color;
+        self.vector_color = color.extend(1.0);
         self
     }
 
@@ -113,7 +113,7 @@ pub struct VolumeMeshCellVectorQuantity {
     enabled: bool,
     vector_length_scale: f32,
     vector_radius: f32,
-    vector_color: Vec3,
+    vector_color: Vec4,
 }
 
 impl VolumeMeshCellVectorQuantity {
@@ -129,7 +129,7 @@ impl VolumeMeshCellVectorQuantity {
             enabled: false,
             vector_length_scale: 1.0,
             vector_radius: 0.01,
-            vector_color: Vec3::new(0.1, 0.1, 0.8),
+            vector_color: Vec4::new(0.1, 0.1, 0.8, 1.0),
         }
     }
 
@@ -149,7 +149,7 @@ impl VolumeMeshCellVectorQuantity {
     }
 
     pub fn set_color(&mut self, color: Vec3) -> &mut Self {
-        self.vector_color = color;
+        self.vector_color = color.extend(1.0);
         self
     }
 
