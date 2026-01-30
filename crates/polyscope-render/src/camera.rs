@@ -292,7 +292,9 @@ impl Camera {
         vm *= Mat4::from_axis_angle(frame_right, -clamped_dy);
 
         // 3. Yaw around world-space up axis
-        vm *= Mat4::from_axis_angle(up_vec, delta_x);
+        // Negate: glam uses right-handed look_at_rh, so yaw direction is
+        // inverted compared to C++ Polyscope's glm::lookAt (left-handed).
+        vm *= Mat4::from_axis_angle(up_vec, -delta_x);
 
         // 4. Undo centering
         vm *= Mat4::from_translation(-self.target);
