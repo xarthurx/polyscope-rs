@@ -11,7 +11,7 @@ struct CameraUniforms {
 }
 
 struct PickUniforms {
-    structure_id: u32,
+    global_start: u32,
     radius: f32,
     // Minimum pick radius - ensures curves are always clickable even when very thin
     min_pick_radius: f32,
@@ -44,13 +44,11 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     return out;
 }
 
-// Encode structure_id (12 bits) and element_id (12 bits) into RGB
-fn encode_pick_id(structure_id: u32, element_id: u32) -> vec3<f32> {
-    let s = structure_id & 0xFFFu;
-    let e = element_id & 0xFFFu;
-    let r = f32(s >> 4u) / 255.0;
-    let g = f32(((s & 0xFu) << 4u) | (e >> 8u)) / 255.0;
-    let b = f32(e & 0xFFu) / 255.0;
+// Encode a flat 24-bit global index into RGB color
+fn index_to_color(index: u32) -> vec3<f32> {
+    let r = f32((index >> 16u) & 0xFFu) / 255.0;
+    let g = f32((index >> 8u) & 0xFFu) / 255.0;
+    let b = f32(index & 0xFFu) / 255.0;
     return vec3<f32>(r, g, b);
 }
 
@@ -154,7 +152,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     out.depth = clip_pos.z / clip_pos.w;
 
     // Output encoded pick ID
-    let pick_color = encode_pick_id(pick.structure_id, in.edge_id);
+    let pick_color = index_to_color(pick.global_start + in.edge_id);
     out.color = vec4<f32>(pick_color, 1.0);
 
     return out;

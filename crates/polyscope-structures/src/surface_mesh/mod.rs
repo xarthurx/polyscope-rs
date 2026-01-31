@@ -13,7 +13,7 @@ use glam::{Mat4, Vec2, Vec3, Vec4};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{ColorMapRegistry, MeshUniforms, SurfaceMeshRenderData};
+use polyscope_render::{ColorMapRegistry, MeshPickUniforms, MeshUniforms, SurfaceMeshRenderData};
 use std::ops::Range;
 
 /// Shading style for surface mesh rendering.
@@ -75,6 +75,12 @@ pub struct SurfaceMesh {
 
     // GPU resources
     render_data: Option<SurfaceMeshRenderData>,
+
+    // GPU picking resources
+    pick_uniform_buffer: Option<wgpu::Buffer>,
+    pick_bind_group: Option<wgpu::BindGroup>,
+    pick_face_index_buffer: Option<wgpu::Buffer>,
+    global_start: u32,
 }
 
 impl SurfaceMesh {
@@ -113,6 +119,11 @@ impl SurfaceMesh {
             transparency: 0.0, // 0.0 = fully opaque, 1.0 = fully transparent
 
             render_data: None,
+
+            pick_uniform_buffer: None,
+            pick_bind_group: None,
+            pick_face_index_buffer: None,
+            global_start: 0,
         };
         mesh.recompute();
         mesh
@@ -1208,6 +1219,104 @@ impl SurfaceMesh {
         self.render_data
             .as_ref()
             .is_some_and(polyscope_render::SurfaceMeshRenderData::has_shadow_resources)
+    }
+
+    /// Initializes GPU resources for pick rendering.
+    ///
+    /// Creates the pick uniform buffer, face index mapping buffer, and bind group.
+    /// The face index buffer maps each GPU triangle to its original polygon face index.
+    pub fn init_pick_resources(
+        &mut self,
+        device: &wgpu::Device,
+        mesh_pick_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        global_start: u32,
+    ) {
+        use wgpu::util::DeviceExt;
+
+        self.global_start = global_start;
+
+        // Create pick uniform buffer with MeshPickUniforms
+        let model = self.transform.to_cols_array_2d();
+        let pick_uniforms = MeshPickUniforms {
+            global_start,
+            _padding: [0.0; 3],
+            model,
+        };
+        let pick_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("mesh pick uniforms"),
+            contents: bytemuck::cast_slice(&[pick_uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        // Build face index mapping buffer: tri_index -> face_index
+        // For each triangle in the triangulation, store which polygon face it belongs to
+        let mut face_index_data: Vec<u32> = Vec::with_capacity(self.triangulation.len());
+        for (face_idx, range) in self.face_to_tri_range.iter().enumerate() {
+            for _ in range.clone() {
+                face_index_data.push(face_idx as u32);
+            }
+        }
+        let pick_face_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("mesh pick face indices"),
+            contents: bytemuck::cast_slice(&face_index_data),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
+
+        // Create pick bind group (reuses position buffer from render_data)
+        if let Some(render_data) = &self.render_data {
+            let pick_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("mesh pick bind group"),
+                layout: mesh_pick_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: camera_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: pick_uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: render_data.vertex_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: pick_face_index_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+            self.pick_bind_group = Some(pick_bind_group);
+        }
+
+        self.pick_uniform_buffer = Some(pick_uniform_buffer);
+        self.pick_face_index_buffer = Some(pick_face_index_buffer);
+    }
+
+    /// Returns the pick bind group if initialized.
+    #[must_use]
+    pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.pick_bind_group.as_ref()
+    }
+
+    /// Updates pick uniforms (model transform) when the structure is moved.
+    pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let model = self.transform.to_cols_array_2d();
+            let pick_uniforms = MeshPickUniforms {
+                global_start: self.global_start,
+                _padding: [0.0; 3],
+                model,
+            };
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[pick_uniforms]));
+        }
+    }
+
+    /// Returns the total number of vertices in the triangulation (for draw calls).
+    #[must_use]
+    pub fn num_triangulation_vertices(&self) -> u32 {
+        (self.triangulation.len() * 3) as u32
     }
 
     /// Updates GPU buffers with current mesh settings.

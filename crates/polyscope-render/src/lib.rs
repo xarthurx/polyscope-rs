@@ -72,8 +72,8 @@ pub use ground_plane::{GroundPlaneRenderData, GroundPlaneUniforms};
 pub use materials::{Material, MaterialRegistry, MaterialUniforms};
 pub use depth_peel_pass::DepthPeelPass;
 pub use pick::{
-    color_to_index, decode_pick_id, encode_pick_id, index_to_color, PickElementType, PickResult,
-    PickUniforms, TubePickUniforms,
+    color_to_index, decode_pick_id, encode_pick_id, index_to_color, MeshPickUniforms,
+    PickElementType, PickResult, PickUniforms, TubePickUniforms,
 };
 pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use reflection::{ground_reflection_matrix, reflection_matrix};

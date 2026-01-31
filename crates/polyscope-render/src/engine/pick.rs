@@ -2,41 +2,85 @@ use std::num::NonZeroU64;
 
 use super::RenderEngine;
 
+/// A contiguous range of global pick indices assigned to a structure.
+#[derive(Debug, Clone)]
+pub struct PickRange {
+    /// The starting global index for this structure's elements.
+    pub global_start: u32,
+    /// Number of elements in this range.
+    pub count: u32,
+    /// Structure type name (e.g., `PointCloud`, `SurfaceMesh`).
+    pub type_name: String,
+    /// Structure name.
+    pub name: String,
+}
+
 impl RenderEngine {
-    // ========== Pick System - Structure ID Management ==========
+    // ========== Pick System - Range-Based ID Management ==========
 
-    /// Assigns a unique pick ID to a structure. Returns the assigned ID.
-    pub fn assign_structure_id(&mut self, type_name: &str, name: &str) -> u16 {
+    /// Assigns a contiguous range of global pick indices to a structure.
+    ///
+    /// Returns the `global_start` index. The structure owns indices
+    /// `[global_start, global_start + num_elements)`.
+    ///
+    /// Index 0 is reserved as background (no hit), so all ranges start from >= 1.
+    pub fn assign_pick_range(
+        &mut self,
+        type_name: &str,
+        name: &str,
+        num_elements: u32,
+    ) -> u32 {
         let key = (type_name.to_string(), name.to_string());
-        if let Some(&id) = self.structure_id_map.get(&key) {
-            return id;
+
+        // If already assigned, return existing start
+        if let Some(range) = self.pick_ranges.get(&key) {
+            return range.global_start;
         }
-        let id = self.next_structure_id;
-        self.next_structure_id += 1;
-        self.structure_id_map.insert(key.clone(), id);
-        self.structure_id_reverse.insert(id, key);
-        id
+
+        let global_start = self.next_global_index;
+        self.next_global_index += num_elements;
+
+        let range = PickRange {
+            global_start,
+            count: num_elements,
+            type_name: type_name.to_string(),
+            name: name.to_string(),
+        };
+
+        self.pick_ranges.insert(key, range);
+
+        global_start
     }
 
-    /// Removes a structure's pick ID.
-    pub fn remove_structure_id(&mut self, type_name: &str, name: &str) {
+    /// Removes a structure's pick range.
+    ///
+    /// The range is freed but the global index counter is not decremented
+    /// (monotonic allocation — no fragmentation complexity).
+    pub fn remove_pick_range(&mut self, type_name: &str, name: &str) {
         let key = (type_name.to_string(), name.to_string());
-        if let Some(id) = self.structure_id_map.remove(&key) {
-            self.structure_id_reverse.remove(&id);
+        self.pick_ranges.remove(&key);
+    }
+
+    /// Looks up which structure owns a global pick index.
+    ///
+    /// Returns `(type_name, name, local_element_index)` or None if no structure
+    /// owns this index (background or freed range).
+    pub fn lookup_global_index(&self, global_index: u32) -> Option<(&str, &str, u32)> {
+        for range in self.pick_ranges.values() {
+            if global_index >= range.global_start
+                && global_index < range.global_start + range.count
+            {
+                let local = global_index - range.global_start;
+                return Some((&range.type_name, &range.name, local));
+            }
         }
+        None
     }
 
-    /// Looks up structure info from a pick ID.
-    pub fn lookup_structure_id(&self, id: u16) -> Option<(&str, &str)> {
-        self.structure_id_reverse
-            .get(&id)
-            .map(|(t, n)| (t.as_str(), n.as_str()))
-    }
-
-    /// Gets the pick ID for a structure, if assigned.
-    pub fn get_structure_id(&self, type_name: &str, name: &str) -> Option<u16> {
+    /// Gets the `global_start` for a structure's pick range, if assigned.
+    pub fn get_pick_range_start(&self, type_name: &str, name: &str) -> Option<u32> {
         let key = (type_name.to_string(), name.to_string());
-        self.structure_id_map.get(&key).copied()
+        self.pick_ranges.get(&key).map(|r| r.global_start)
     }
 
     // ========== Pick System - GPU Resources ==========
@@ -320,7 +364,7 @@ impl RenderEngine {
                             },
                             count: None,
                         },
-                        // Pick uniforms (structure_id, radius, min_pick_radius)
+                        // Pick uniforms (global_start, radius, min_pick_radius)
                         wgpu::BindGroupLayoutEntry {
                             binding: 1,
                             visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
@@ -431,11 +475,143 @@ impl RenderEngine {
             .expect("curve network tube pick bind group layout not initialized")
     }
 
-    /// Reads the pick buffer at (x, y) and returns the decoded structure/element.
+    /// Initializes the mesh pick pipeline for surface meshes.
+    pub fn init_mesh_pick_pipeline(&mut self) {
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Mesh Pick Shader"),
+                source: wgpu::ShaderSource::Wgsl(
+                    include_str!("../shaders/pick_mesh.wgsl").into(),
+                ),
+            });
+
+        // Mesh pick bind group layout: camera, mesh pick uniforms, positions, face_indices
+        let bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Mesh Pick Bind Group Layout"),
+                    entries: &[
+                        // Camera uniforms
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: NonZeroU64::new(272),
+                            },
+                            count: None,
+                        },
+                        // Mesh pick uniforms (global_start + model matrix = 80 bytes)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: NonZeroU64::new(80),
+                            },
+                            count: None,
+                        },
+                        // Position storage buffer (expanded per-triangle-vertex)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Face index mapping buffer (tri_index -> face_index)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Mesh Pick Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("SurfaceMesh Pick Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..wgpu::PrimitiveState::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24Plus,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.mesh_pick_pipeline = Some(pipeline);
+        self.mesh_pick_bind_group_layout = Some(bind_group_layout);
+    }
+
+    /// Returns whether the mesh pick pipeline is initialized.
+    pub fn has_mesh_pick_pipeline(&self) -> bool {
+        self.mesh_pick_pipeline.is_some()
+    }
+
+    /// Gets the mesh pick pipeline.
+    pub fn mesh_pick_pipeline(&self) -> &wgpu::RenderPipeline {
+        self.mesh_pick_pipeline
+            .as_ref()
+            .expect("mesh pick pipeline not initialized")
+    }
+
+    /// Gets the mesh pick bind group layout.
+    pub fn mesh_pick_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.mesh_pick_bind_group_layout
+            .as_ref()
+            .expect("mesh pick bind group layout not initialized")
+    }
+
+    /// Reads the pick buffer at (x, y) and returns the decoded global index.
     ///
     /// Returns None if picking system not initialized or coordinates out of bounds.
-    /// Returns Some((0, 0)) for background clicks.
-    pub fn pick_at(&self, x: u32, y: u32) -> Option<(u16, u16)> {
+    /// Returns Some(0) for background clicks.
+    pub fn pick_at(&self, x: u32, y: u32) -> Option<u32> {
         let pick_texture = self.pick_texture.as_ref()?;
         let staging_buffer = self.pick_staging_buffer.as_ref()?;
 
@@ -492,8 +668,9 @@ impl RenderEngine {
         drop(data);
         staging_buffer.unmap();
 
-        let (struct_id, elem_id) = crate::pick::decode_pick_id(pixel[0], pixel[1], pixel[2]);
-        Some((struct_id, elem_id))
+        // Decode flat 24-bit global index from RGB
+        let global_index = crate::pick::color_to_index(pixel[0], pixel[1], pixel[2]);
+        Some(global_index)
     }
 
     /// Returns the pick texture view for external rendering.
@@ -523,7 +700,7 @@ impl RenderEngine {
                 view: pick_view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), // Background = (0,0,0)
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), // Background = (0,0,0) = index 0
                     store: wgpu::StoreOp::Store,
                 },
                 depth_slice: None,

@@ -65,13 +65,14 @@ impl App {
 
                         // Initialize pick resources (after render data)
                         if pc.pick_bind_group().is_none() && pc.render_data().is_some() {
-                            let structure_id =
-                                engine.assign_structure_id("PointCloud", &structure_name);
+                            let num_points = pc.points().len() as u32;
+                            let global_start =
+                                engine.assign_pick_range("PointCloud", &structure_name, num_points);
                             pc.init_pick_resources(
                                 &engine.device,
                                 engine.pick_bind_group_layout(),
                                 engine.camera_buffer(),
-                                structure_id,
+                                global_start,
                             );
                         }
 
@@ -99,6 +100,22 @@ impl App {
                                 engine.camera_buffer(),
                             );
                         }
+                        // Initialize pick resources (after render data)
+                        if mesh.pick_bind_group().is_none() && mesh.render_data().is_some() {
+                            let num_faces = mesh.num_faces() as u32;
+                            let global_start = engine.assign_pick_range(
+                                "SurfaceMesh",
+                                mesh.name(),
+                                num_faces,
+                            );
+                            mesh.init_pick_resources(
+                                &engine.device,
+                                engine.mesh_pick_bind_group_layout(),
+                                engine.camera_buffer(),
+                                global_start,
+                            );
+                        }
+
                         // Initialize shadow resources if render data exists but shadow doesn't
                         if mesh.render_data().is_some() && !mesh.has_shadow_resources() {
                             if let (Some(shadow_layout), Some(shadow_pass)) =
@@ -221,13 +238,14 @@ impl App {
                             if !engine.has_curve_network_pick_pipeline() {
                                 engine.init_curve_network_pick_pipeline();
                             }
-                            let structure_id =
-                                engine.assign_structure_id("CurveNetwork", cn.name());
+                            let num_edges = cn.num_edges() as u32;
+                            let global_start =
+                                engine.assign_pick_range("CurveNetwork", cn.name(), num_edges);
                             cn.init_pick_resources(
                                 &engine.device,
                                 engine.pick_bind_group_layout(),
                                 engine.camera_buffer(),
-                                structure_id,
+                                global_start,
                             );
                         }
 
@@ -517,6 +535,7 @@ impl App {
                 if structure.type_name() == "SurfaceMesh" {
                     if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
                         mesh.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                        mesh.update_pick_uniforms(&engine.queue);
 
                         // Update vertex vector quantity uniforms
                         let model = structure.transform();
@@ -653,8 +672,31 @@ impl App {
                     }
                 });
 
-                // Note: SurfaceMesh pick rendering would go here
-                // once its pick pipeline is created
+                // Draw surface meshes to pick buffer
+                if engine.has_mesh_pick_pipeline() {
+                    pick_pass.set_pipeline(engine.mesh_pick_pipeline());
+                    crate::with_context(|ctx| {
+                        for structure in ctx.registry.iter() {
+                            if !ctx.is_structure_visible(structure) {
+                                continue;
+                            }
+                            if structure.type_name() == "SurfaceMesh" {
+                                if let Some(mesh) =
+                                    structure.as_any().downcast_ref::<SurfaceMesh>()
+                                {
+                                    if let Some(pick_bind_group) = mesh.pick_bind_group() {
+                                        pick_pass
+                                            .set_bind_group(0, pick_bind_group, &[]);
+                                        pick_pass.draw(
+                                            0..mesh.num_triangulation_vertices(),
+                                            0..1,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
             }
 
             engine.queue.submit(std::iter::once(encoder.finish()));

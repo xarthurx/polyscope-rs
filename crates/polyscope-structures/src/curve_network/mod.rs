@@ -53,7 +53,7 @@ pub struct CurveNetwork {
     // GPU picking resources (line mode)
     pick_uniform_buffer: Option<wgpu::Buffer>,
     pick_bind_group: Option<wgpu::BindGroup>,
-    structure_id: u16,
+    global_start: u32,
 
     // GPU picking resources (tube mode) - uses ray-cylinder intersection
     tube_pick_uniform_buffer: Option<wgpu::Buffer>,
@@ -88,7 +88,7 @@ impl CurveNetwork {
             render_data: None,
             pick_uniform_buffer: None,
             pick_bind_group: None,
-            structure_id: 0,
+            global_start: 0,
             tube_pick_uniform_buffer: None,
             tube_pick_bind_group: None,
         };
@@ -480,13 +480,13 @@ impl CurveNetwork {
         device: &wgpu::Device,
         pick_bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
-        structure_id: u16,
+        global_start: u32,
     ) {
-        self.structure_id = structure_id;
+        self.global_start = global_start;
 
         // Create pick uniform buffer
         let pick_uniforms = PickUniforms {
-            structure_id: u32::from(structure_id),
+            global_start,
             point_radius: self.radius, // Used as line_width in shader
             _padding: [0.0; 2],
         };
@@ -532,7 +532,7 @@ impl CurveNetwork {
     pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
         if let Some(buffer) = &self.pick_uniform_buffer {
             let pick_uniforms = PickUniforms {
-                structure_id: u32::from(self.structure_id),
+                global_start: self.global_start,
                 point_radius: self.radius,
                 _padding: [0.0; 2],
             };
@@ -542,7 +542,7 @@ impl CurveNetwork {
         // Also update tube pick uniforms if initialized
         if let Some(buffer) = &self.tube_pick_uniform_buffer {
             let tube_pick_uniforms = TubePickUniforms {
-                structure_id: u32::from(self.structure_id),
+                global_start: self.global_start,
                 radius: self.radius,
                 min_pick_radius: 0.02, // Fixed minimum for easier selection
                 _padding: 0.0,
@@ -561,7 +561,7 @@ impl CurveNetwork {
     ) {
         // Create tube pick uniform buffer
         let tube_pick_uniforms = TubePickUniforms {
-            structure_id: u32::from(self.structure_id),
+            global_start: self.global_start,
             radius: self.radius,
             min_pick_radius: 0.02, // Minimum pick radius for easier selection
             _padding: 0.0,

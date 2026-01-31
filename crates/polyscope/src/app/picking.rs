@@ -8,17 +8,17 @@ impl App {
     pub(super) fn gpu_pick_at(&self, x: u32, y: u32) -> Option<(String, String, u32)> {
         let engine = self.engine.as_ref()?;
 
-        // Read pick buffer
-        let (struct_id, elem_id) = engine.pick_at(x, y)?;
+        // Read pick buffer — returns flat 24-bit global index
+        let global_index = engine.pick_at(x, y)?;
 
-        // Background check (struct_id 0 means nothing was hit)
-        if struct_id == 0 {
+        // Background check (index 0 means nothing was hit)
+        if global_index == 0 {
             return None;
         }
 
-        // Look up structure info from ID
-        let (type_name, name) = engine.lookup_structure_id(struct_id)?;
-        Some((type_name.to_string(), name.to_string(), u32::from(elem_id)))
+        // Look up structure info from global index
+        let (type_name, name, local_index) = engine.lookup_global_index(global_index)?;
+        Some((type_name.to_string(), name.to_string(), local_index))
     }
 
     /// Performs screen-space picking to find which structure (if any) is at the given screen position.

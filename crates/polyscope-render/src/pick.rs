@@ -54,9 +54,11 @@ pub fn color_to_index(r: u8, g: u8, b: u8) -> u32 {
 
 /// Encodes a structure ID and element ID into RGB pick color.
 ///
+/// **DEPRECATED**: Use `index_to_color()` with flat global indices instead.
 /// Uses 12 bits for structure ID (max 4096) and 12 bits for element ID (max 4096).
 /// Layout: R[7:0] = struct[11:4], G[7:4] = struct[3:0], G[3:0] = elem[11:8], B[7:0] = elem[7:0]
 #[must_use]
+#[deprecated(note = "Use index_to_color() with flat global indices instead")]
 pub fn encode_pick_id(structure_id: u16, element_id: u16) -> [u8; 3] {
     let s = structure_id & 0xFFF; // 12 bits max
     let e = element_id & 0xFFF; // 12 bits max
@@ -68,20 +70,26 @@ pub fn encode_pick_id(structure_id: u16, element_id: u16) -> [u8; 3] {
 }
 
 /// Decodes RGB pick color back to structure ID and element ID.
+///
+/// **DEPRECATED**: Use `color_to_index()` with flat global indices instead.
 #[must_use]
+#[deprecated(note = "Use color_to_index() with flat global indices instead")]
 pub fn decode_pick_id(r: u8, g: u8, b: u8) -> (u16, u16) {
     let structure_id = (u16::from(r) << 4) | (u16::from(g) >> 4);
     let element_id = (u16::from(g & 0xF) << 8) | u16::from(b);
     (structure_id, element_id)
 }
 
-/// GPU uniforms for pick rendering.
+/// GPU uniforms for pick rendering (flat 24-bit global index encoding).
+///
+/// Each structure is assigned a contiguous range `[global_start, global_start + num_elements)`.
+/// The shader encodes `global_start + element_index` as a 24-bit RGB color.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[allow(clippy::pub_underscore_fields)]
 pub struct PickUniforms {
-    /// The structure ID to encode in pick colors.
-    pub structure_id: u32,
+    /// The starting global index for this structure's elements.
+    pub global_start: u32,
     /// Point radius for sphere impostor rendering.
     pub point_radius: f32,
     /// Padding to align to 16 bytes.
@@ -91,20 +99,20 @@ pub struct PickUniforms {
 impl Default for PickUniforms {
     fn default() -> Self {
         Self {
-            structure_id: 0,
+            global_start: 0,
             point_radius: 0.01,
             _padding: [0.0; 2],
         }
     }
 }
 
-/// GPU uniforms for tube-based curve network pick rendering.
+/// GPU uniforms for tube-based curve network pick rendering (flat 24-bit global index encoding).
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[allow(clippy::pub_underscore_fields)]
 pub struct TubePickUniforms {
-    /// The structure ID to encode in pick colors.
-    pub structure_id: u32,
+    /// The starting global index for this structure's elements.
+    pub global_start: u32,
     /// Tube radius for ray-cylinder intersection.
     pub radius: f32,
     /// Minimum pick radius - ensures curves are always clickable even when very thin.
@@ -116,10 +124,40 @@ pub struct TubePickUniforms {
 impl Default for TubePickUniforms {
     fn default() -> Self {
         Self {
-            structure_id: 0,
+            global_start: 0,
             radius: 0.01,
             min_pick_radius: 0.02, // Default minimum pick radius for easier selection
             _padding: 0.0,
+        }
+    }
+}
+
+/// GPU uniforms for mesh pick rendering (flat 24-bit global index encoding).
+///
+/// Includes the model transform since mesh positions are in object space.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
+pub struct MeshPickUniforms {
+    /// The starting global index for this structure's face elements.
+    pub global_start: u32,
+    /// Padding to align model matrix to 16-byte boundary.
+    pub _padding: [f32; 3],
+    /// Model transform matrix.
+    pub model: [[f32; 4]; 4],
+}
+
+impl Default for MeshPickUniforms {
+    fn default() -> Self {
+        Self {
+            global_start: 0,
+            _padding: [0.0; 3],
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
         }
     }
 }

@@ -25,7 +25,7 @@ pub struct PointCloud {
     // GPU picking resources
     pick_uniform_buffer: Option<wgpu::Buffer>,
     pick_bind_group: Option<wgpu::BindGroup>,
-    structure_id: u16,
+    global_start: u32,
 }
 
 impl PointCloud {
@@ -43,7 +43,7 @@ impl PointCloud {
             base_color: Vec4::new(0.2, 0.5, 0.8, 1.0),
             pick_uniform_buffer: None,
             pick_bind_group: None,
-            structure_id: 0,
+            global_start: 0,
         }
     }
 
@@ -118,13 +118,13 @@ impl PointCloud {
         device: &wgpu::Device,
         pick_bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
-        structure_id: u16,
+        global_start: u32,
     ) {
-        self.structure_id = structure_id;
+        self.global_start = global_start;
 
         // Create pick uniform buffer
         let pick_uniforms = PickUniforms {
-            structure_id: u32::from(structure_id),
+            global_start,
             point_radius: self.point_radius,
             _padding: [0.0; 2],
         };
@@ -170,7 +170,7 @@ impl PointCloud {
     pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
         if let Some(buffer) = &self.pick_uniform_buffer {
             let pick_uniforms = PickUniforms {
-                structure_id: u32::from(self.structure_id),
+                global_start: self.global_start,
                 point_radius: self.point_radius,
                 _padding: [0.0; 2],
             };

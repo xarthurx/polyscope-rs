@@ -198,13 +198,11 @@ pub struct RenderEngine {
     /// Gridcube bind group layout.
     pub(crate) gridcube_bind_group_layout: Option<wgpu::BindGroupLayout>,
 
-    // Pick system - structure ID management
-    /// Map from (`type_name`, name) to structure pick ID.
-    pub(crate) structure_id_map: HashMap<(String, String), u16>,
-    /// Reverse map from structure pick ID to (`type_name`, name).
-    pub(crate) structure_id_reverse: HashMap<u16, (String, String)>,
-    /// Next available structure ID (0 is reserved for background).
-    pub(crate) next_structure_id: u16,
+    // Pick system - range-based ID management (flat 24-bit global index)
+    /// Map from (`type_name`, name) to pick range.
+    pub(crate) pick_ranges: HashMap<(String, String), pick::PickRange>,
+    /// Next available global index (0 is reserved for background).
+    pub(crate) next_global_index: u32,
 
     // Pick system - GPU resources
     /// Pick color texture for element selection.
@@ -227,8 +225,12 @@ pub struct RenderEngine {
     pub(crate) curve_network_tube_pick_pipeline: Option<wgpu::RenderPipeline>,
     /// Tube pick bind group layout.
     pub(crate) curve_network_tube_pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
-    /// Pick bind group layout (shared across pick pipelines).
+    /// Pick bind group layout (shared across point cloud and curve network pick pipelines).
     pub(crate) pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Pick pipeline for surface meshes (face picking).
+    pub(crate) mesh_pick_pipeline: Option<wgpu::RenderPipeline>,
+    /// Mesh pick bind group layout (has extra face_indices binding).
+    pub(crate) mesh_pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
 }
 
 impl RenderEngine {
@@ -531,9 +533,8 @@ impl RenderEngine {
             simple_mesh_bind_group_layout: None,
             gridcube_pipeline: None,
             gridcube_bind_group_layout: None,
-            structure_id_map: HashMap::new(),
-            structure_id_reverse: HashMap::new(),
-            next_structure_id: 1, // 0 is reserved for background
+            pick_ranges: HashMap::new(),
+            next_global_index: 1, // 0 is reserved for background
             pick_texture: None,
             pick_texture_view: None,
             pick_depth_texture: None,
@@ -545,6 +546,8 @@ impl RenderEngine {
             curve_network_tube_pick_pipeline: None,
             curve_network_tube_pick_bind_group_layout: None,
             pick_bind_group_layout: None,
+            mesh_pick_pipeline: None,
+            mesh_pick_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
@@ -563,6 +566,7 @@ impl RenderEngine {
         engine.create_reflected_point_cloud_pipeline();
         engine.create_reflected_curve_network_pipeline();
         engine.init_pick_pipeline();
+        engine.init_mesh_pick_pipeline();
 
         Ok(engine)
     }
@@ -851,9 +855,8 @@ impl RenderEngine {
             simple_mesh_bind_group_layout: None,
             gridcube_pipeline: None,
             gridcube_bind_group_layout: None,
-            structure_id_map: HashMap::new(),
-            structure_id_reverse: HashMap::new(),
-            next_structure_id: 1, // 0 is reserved for background
+            pick_ranges: HashMap::new(),
+            next_global_index: 1, // 0 is reserved for background
             pick_texture: None,
             pick_texture_view: None,
             pick_depth_texture: None,
@@ -865,6 +868,8 @@ impl RenderEngine {
             curve_network_tube_pick_pipeline: None,
             curve_network_tube_pick_bind_group_layout: None,
             pick_bind_group_layout: None,
+            mesh_pick_pipeline: None,
+            mesh_pick_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
@@ -883,6 +888,7 @@ impl RenderEngine {
         engine.create_reflected_point_cloud_pipeline();
         engine.create_reflected_curve_network_pipeline();
         engine.init_pick_pipeline();
+        engine.init_mesh_pick_pipeline();
 
         Ok(engine)
     }

@@ -387,6 +387,7 @@ impl ApplicationHandler for App {
                             log::debug!("[CLICK DEBUG] gpu_picked: {gpu_picked:?}");
                             let mut point_hit: Option<(String, u32, f32)> = None;
                             let mut curve_hit: Option<(String, u32, f32)> = None;
+                            let mut mesh_hit: Option<(String, u32, f32)> = None;
                             // Filter GPU picks by group visibility
                             let gpu_picked = gpu_picked.filter(|(type_name, name, _)| {
                                 crate::with_context(|ctx| {
@@ -404,6 +405,14 @@ impl ApplicationHandler for App {
                                             ray_origin, ray_dir, &name, idx,
                                         )
                                         .map(|t| (name, idx, t));
+                                } else if type_name == "SurfaceMesh" {
+                                    // GPU pick gives face index — validate with ray hit
+                                    if let Some((_, _, t)) = &structure_hit {
+                                        mesh_hit = Some((name, idx, *t));
+                                    } else {
+                                        // GPU picked a mesh but ray didn't hit — use a default depth
+                                        mesh_hit = Some((name, idx, 1.0));
+                                    }
                                 }
                             }
                             log::debug!("[CLICK DEBUG] point_hit: {point_hit:?}");
@@ -461,6 +470,21 @@ impl ApplicationHandler for App {
                                     best_hit = Some((
                                         ClickHit::Structure {
                                             type_name: "CurveNetwork".to_string(),
+                                            name,
+                                            element_index: idx,
+                                        },
+                                        t,
+                                    ));
+                                }
+                            }
+
+                            if let Some((name, idx, t)) = mesh_hit {
+                                let is_better =
+                                    best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                if is_better {
+                                    best_hit = Some((
+                                        ClickHit::Structure {
+                                            type_name: "SurfaceMesh".to_string(),
                                             name,
                                             element_index: idx,
                                         },

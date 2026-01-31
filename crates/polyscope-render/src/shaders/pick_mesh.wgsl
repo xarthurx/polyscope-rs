@@ -1,7 +1,8 @@
 // Pick shader for surface meshes - outputs encoded face index
 //
-// Each face is rendered with a unique color encoding the structure ID and face index.
-// Uses flat interpolation to ensure the entire face gets the same color.
+// Each face is rendered with a unique color encoding its global index.
+// Uses a face_indices storage buffer to map GPU triangle indices to polygon face indices.
+// Uses flat interpolation to ensure the entire triangle gets the same color.
 
 struct CameraUniforms {
     view: mat4x4<f32>,
@@ -12,29 +13,29 @@ struct CameraUniforms {
     _padding: f32,
 }
 
-struct PickUniforms {
-    structure_id: u32,
+struct MeshPickUniforms {
+    global_start: u32,
     _padding0: f32,
     _padding1: f32,
     _padding2: f32,
+    model: mat4x4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
-@group(0) @binding(1) var<uniform> pick: PickUniforms;
+@group(0) @binding(1) var<uniform> pick: MeshPickUniforms;
 @group(0) @binding(2) var<storage, read> positions: array<vec4<f32>>;
+@group(0) @binding(3) var<storage, read> face_indices: array<u32>;
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) @interpolate(flat) face_index: u32,
+    @location(0) @interpolate(flat) tri_index: u32,
 }
 
-// Encode structure_id (12 bits) and element_id (12 bits) into RGB
-fn encode_pick_id(structure_id: u32, element_id: u32) -> vec3<f32> {
-    let s = structure_id & 0xFFFu;
-    let e = element_id & 0xFFFu;
-    let r = f32(s >> 4u) / 255.0;
-    let g = f32(((s & 0xFu) << 4u) | (e >> 8u)) / 255.0;
-    let b = f32(e & 0xFFu) / 255.0;
+// Encode a flat 24-bit global index into RGB color
+fn index_to_color(index: u32) -> vec3<f32> {
+    let r = f32((index >> 16u) & 0xFFu) / 255.0;
+    let g = f32((index >> 8u) & 0xFFu) / 255.0;
+    let b = f32(index & 0xFFu) / 255.0;
     return vec3<f32>(r, g, b);
 }
 
@@ -44,18 +45,22 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    // Get vertex position from storage buffer
-    let world_pos = positions[vertex_index].xyz;
+    // Get vertex position from storage buffer and apply model transform
+    let local_pos = positions[vertex_index].xyz;
+    let world_pos = (pick.model * vec4<f32>(local_pos, 1.0)).xyz;
     out.clip_position = camera.view_proj * vec4<f32>(world_pos, 1.0);
 
-    // Face index = vertex_index / 3 (each face has 3 vertices)
-    out.face_index = vertex_index / 3u;
+    // Triangle index = vertex_index / 3 (each triangle has 3 vertices in expanded buffer)
+    out.tri_index = vertex_index / 3u;
 
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let color = encode_pick_id(pick.structure_id, in.face_index);
+    // Look up the polygon face index for this GPU triangle
+    let face_index = face_indices[in.tri_index];
+    let global_index = pick.global_start + face_index;
+    let color = index_to_color(global_index);
     return vec4<f32>(color, 1.0);
 }
