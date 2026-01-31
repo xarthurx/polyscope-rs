@@ -18,6 +18,7 @@ pub mod error;
 pub mod gizmo;
 pub mod ground_plane;
 pub mod group;
+pub mod marching_cubes;
 pub mod options;
 pub mod pick;
 pub mod quantity;
@@ -29,6 +30,7 @@ pub mod structure;
 pub mod tone_mapping;
 
 pub use error::{PolyscopeError, Result};
+pub use marching_cubes::{McmMesh, marching_cubes};
 pub use gizmo::{GizmoAxis, GizmoConfig, GizmoMode, GizmoSpace, GizmoUniforms, Transform};
 pub use ground_plane::{GroundPlaneConfig, GroundPlaneMode};
 pub use group::Group;

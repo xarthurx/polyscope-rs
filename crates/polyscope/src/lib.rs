@@ -122,6 +122,7 @@ pub use polyscope_structures::{
     CameraExtrinsics, CameraIntrinsics, CameraParameters, CameraView, CurveNetwork, PointCloud,
     SurfaceMesh, VolumeCellType, VolumeGrid, VolumeMesh,
 };
+pub use polyscope_structures::volume_grid::VolumeGridVizMode;
 
 // Re-export module APIs
 pub use camera_view::*;

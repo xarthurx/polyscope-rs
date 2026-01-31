@@ -189,6 +189,14 @@ pub struct RenderEngine {
     pub(crate) reflected_curve_network_pipeline: Option<wgpu::RenderPipeline>,
     /// Bind group layout for reflected curve network.
     pub(crate) reflected_curve_network_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Simple mesh pipeline (for isosurface rendering).
+    pub simple_mesh_pipeline: Option<wgpu::RenderPipeline>,
+    /// Simple mesh bind group layout.
+    pub(crate) simple_mesh_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Gridcube pipeline (for volume grid scalar visualization).
+    pub gridcube_pipeline: Option<wgpu::RenderPipeline>,
+    /// Gridcube bind group layout.
+    pub(crate) gridcube_bind_group_layout: Option<wgpu::BindGroupLayout>,
 
     // Pick system - structure ID management
     /// Map from (`type_name`, name) to structure pick ID.
@@ -519,6 +527,10 @@ impl RenderEngine {
             reflected_point_cloud_bind_group_layout: None,
             reflected_curve_network_pipeline: None,
             reflected_curve_network_bind_group_layout: None,
+            simple_mesh_pipeline: None,
+            simple_mesh_bind_group_layout: None,
+            gridcube_pipeline: None,
+            gridcube_bind_group_layout: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
@@ -540,6 +552,8 @@ impl RenderEngine {
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
         engine.create_curve_network_tube_pipelines();
+        engine.create_simple_mesh_pipeline();
+        engine.create_gridcube_pipeline();
         engine.create_shadow_pipeline();
         engine.init_tone_mapping();
         engine.init_ssaa_pass();
@@ -833,6 +847,10 @@ impl RenderEngine {
             reflected_point_cloud_bind_group_layout: None,
             reflected_curve_network_pipeline: None,
             reflected_curve_network_bind_group_layout: None,
+            simple_mesh_pipeline: None,
+            simple_mesh_bind_group_layout: None,
+            gridcube_pipeline: None,
+            gridcube_bind_group_layout: None,
             structure_id_map: HashMap::new(),
             structure_id_reverse: HashMap::new(),
             next_structure_id: 1, // 0 is reserved for background
@@ -854,6 +872,8 @@ impl RenderEngine {
         engine.create_mesh_pipeline();
         engine.create_curve_network_edge_pipeline();
         engine.create_curve_network_tube_pipelines();
+        engine.create_simple_mesh_pipeline();
+        engine.create_gridcube_pipeline();
         engine.create_shadow_pipeline();
         engine.init_tone_mapping();
         engine.init_ssaa_pass();

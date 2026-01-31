@@ -1,4 +1,6 @@
 use crate::{with_context, with_context_mut, Vec3, VolumeGrid};
+use polyscope_structures::volume_grid::{VolumeGridNodeScalarQuantity, VolumeGridCellScalarQuantity, VolumeGridVizMode};
+use polyscope_core::structure::HasQuantities;
 
 /// Registers a volume grid with polyscope.
 pub fn register_volume_grid(
@@ -85,6 +87,74 @@ impl VolumeGridHandle {
     pub fn add_cell_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.add_cell_scalar_quantity(name, values);
+        });
+        self
+    }
+
+    /// Sets the cube size factor (0 = no cubes, 1 = full size).
+    pub fn set_cube_size_factor(&self, factor: f32) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            vg.set_cube_size_factor(factor);
+        });
+        self
+    }
+
+    /// Enables a quantity by name.
+    pub fn set_quantity_enabled(&self, quantity_name: &str, enabled: bool) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            if let Some(q) = vg.get_quantity_mut(quantity_name) {
+                q.set_enabled(enabled);
+            }
+        });
+        self
+    }
+
+    /// Sets the visualization mode for a node scalar quantity.
+    pub fn set_node_scalar_viz_mode(&self, quantity_name: &str, mode: VolumeGridVizMode) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            if let Some(q) = vg.get_quantity_mut(quantity_name) {
+                if let Some(nsq) = q.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                    nsq.set_viz_mode(mode);
+                }
+            }
+        });
+        self
+    }
+
+    /// Sets the isosurface level for a node scalar quantity.
+    pub fn set_isosurface_level(&self, quantity_name: &str, level: f32) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            if let Some(q) = vg.get_quantity_mut(quantity_name) {
+                if let Some(nsq) = q.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                    nsq.set_isosurface_level(level);
+                }
+            }
+        });
+        self
+    }
+
+    /// Sets the isosurface color for a node scalar quantity.
+    pub fn set_isosurface_color(&self, quantity_name: &str, color: Vec3) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            if let Some(q) = vg.get_quantity_mut(quantity_name) {
+                if let Some(nsq) = q.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                    nsq.set_isosurface_color(color);
+                }
+            }
+        });
+        self
+    }
+
+    /// Sets the color map for a quantity (node or cell scalar).
+    pub fn set_color_map(&self, quantity_name: &str, color_map: &str) -> &Self {
+        with_volume_grid(&self.name, |vg| {
+            if let Some(q) = vg.get_quantity_mut(quantity_name) {
+                if let Some(nsq) = q.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                    nsq.set_color_map(color_map);
+                } else if let Some(csq) = q.as_any_mut().downcast_mut::<VolumeGridCellScalarQuantity>() {
+                    csq.set_color_map(color_map);
+                }
+            }
         });
         self
     }

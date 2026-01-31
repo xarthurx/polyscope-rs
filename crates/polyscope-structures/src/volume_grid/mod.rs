@@ -181,6 +181,23 @@ impl VolumeGrid {
         self
     }
 
+    /// Gets the cube size factor.
+    #[must_use]
+    pub fn cube_size_factor(&self) -> f32 {
+        self.cube_size_factor
+    }
+
+    /// Sets the cube size factor (0 = no cubes, 1 = full size).
+    pub fn set_cube_size_factor(&mut self, factor: f32) -> &mut Self {
+        self.cube_size_factor = factor.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Returns a mutable reference to the quantities list.
+    pub fn quantities_mut(&mut self) -> &mut [Box<dyn Quantity>] {
+        &mut self.quantities
+    }
+
     /// Generates the bounding box wireframe geometry.
     fn generate_bbox_wireframe(&self) -> (Vec<Vec3>, Vec<[u32; 2]>) {
         let min = self.bound_min;
@@ -242,10 +259,10 @@ impl VolumeGrid {
             &edge_tip_inds,
         );
 
-        // Update uniforms with edge color
+        // Update uniforms with edge color and width
         let uniforms = polyscope_render::CurveNetworkUniforms {
             color: self.edge_color.to_array(),
-            radius: 0.002,
+            radius: self.edge_width * 0.002,
             radius_is_relative: 1,
             render_mode: 0,
             _padding: 0.0,
@@ -261,14 +278,34 @@ impl VolumeGrid {
         self.render_data.as_ref()
     }
 
+    /// Updates GPU buffers per-frame (wireframe uniforms: edge color, edge width).
+    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
+        if let Some(render_data) = &self.render_data {
+            let uniforms = polyscope_render::CurveNetworkUniforms {
+                color: self.edge_color.to_array(),
+                radius: self.edge_width * 0.002,
+                radius_is_relative: 1,
+                render_mode: 0,
+                _padding: 0.0,
+            };
+            render_data.update_uniforms(queue, &uniforms);
+        }
+    }
+
     /// Adds a node scalar quantity to the grid.
     pub fn add_node_scalar_quantity(
         &mut self,
         name: impl Into<String>,
         values: Vec<f32>,
     ) -> &mut Self {
-        let quantity =
-            VolumeGridNodeScalarQuantity::new(name, self.name.clone(), values, self.node_dim);
+        let quantity = VolumeGridNodeScalarQuantity::new(
+            name,
+            self.name.clone(),
+            values,
+            self.node_dim,
+            self.bound_min,
+            self.bound_max,
+        );
         self.add_quantity(Box::new(quantity));
         self
     }
@@ -279,14 +316,30 @@ impl VolumeGrid {
         name: impl Into<String>,
         values: Vec<f32>,
     ) -> &mut Self {
-        let quantity =
-            VolumeGridCellScalarQuantity::new(name, self.name.clone(), values, self.cell_dim());
+        let quantity = VolumeGridCellScalarQuantity::new(
+            name,
+            self.name.clone(),
+            values,
+            self.cell_dim(),
+            self.bound_min,
+            self.bound_max,
+        );
         self.add_quantity(Box::new(quantity));
         self
     }
 
     /// Builds the egui UI for this volume grid.
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+    ///
+    /// # Arguments
+    /// * `colormap_names` - Available colormap names for quantity visualization.
+    ///   If empty, defaults to built-in names.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, colormap_names: &[&str]) {
+        let default_names = ["viridis", "blues", "reds", "coolwarm", "rainbow"];
+        let names = if colormap_names.is_empty() {
+            &default_names[..]
+        } else {
+            colormap_names
+        };
         // Grid info
         ui.label(format!(
             "Nodes: {}x{}x{} ({})",
@@ -305,22 +358,6 @@ impl VolumeGrid {
             }
         });
 
-        // Edge width
-        ui.horizontal(|ui| {
-            ui.label("Edge Width:");
-            let mut width = self.edge_width;
-            if ui
-                .add(
-                    egui::DragValue::new(&mut width)
-                        .speed(0.01)
-                        .range(0.0..=5.0),
-                )
-                .changed()
-            {
-                self.set_edge_width(width);
-            }
-        });
-
         // Show quantities
         if !self.quantities.is_empty() {
             ui.separator();
@@ -330,12 +367,12 @@ impl VolumeGrid {
                     .as_any_mut()
                     .downcast_mut::<VolumeGridNodeScalarQuantity>()
                 {
-                    sq.build_egui_ui(ui);
+                    sq.build_egui_ui(ui, names);
                 } else if let Some(sq) = quantity
                     .as_any_mut()
                     .downcast_mut::<VolumeGridCellScalarQuantity>()
                 {
-                    sq.build_egui_ui(ui);
+                    sq.build_egui_ui(ui, names);
                 }
             }
         }
