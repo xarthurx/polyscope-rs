@@ -57,7 +57,7 @@ use glam::{Mat4, Vec3, Vec4};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{MeshUniforms, SliceMeshRenderData, SurfaceMeshRenderData};
+use polyscope_render::{MeshPickUniforms, MeshUniforms, SliceMeshRenderData, SurfaceMeshRenderData};
 
 /// Cell type for volume meshes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,6 +93,12 @@ pub struct VolumeMesh {
     // GPU resources (renders exterior faces)
     render_data: Option<SurfaceMeshRenderData>,
 
+    // GPU picking resources
+    pick_uniform_buffer: Option<wgpu::Buffer>,
+    pick_bind_group: Option<wgpu::BindGroup>,
+    pick_cell_index_buffer: Option<wgpu::Buffer>,
+    global_start: u32,
+
     // Slice mesh GPU resources (renders cross-section caps)
     slice_render_data: Option<SliceMeshRenderData>,
     /// Cached slice plane parameters for invalidation (origin, normal)
@@ -126,6 +132,10 @@ impl VolumeMesh {
             edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
             edge_width: 0.0,
             render_data: None,
+            pick_uniform_buffer: None,
+            pick_bind_group: None,
+            pick_cell_index_buffer: None,
+            global_start: 0,
             slice_render_data: None,
             slice_plane_cache: None,
             culling_plane_cache: None,
@@ -730,6 +740,178 @@ impl VolumeMesh {
         }
     }
 
+    /// Generates cell index per triangle mapping for GPU picking.
+    ///
+    /// Returns one `u32` per triangle indicating which cell that triangle belongs to.
+    /// Matches the triangle ordering from `generate_render_geometry()`.
+    fn generate_cell_index_per_triangle(&self) -> Vec<u32> {
+        let face_counts = self.compute_face_counts();
+        let mut cell_indices = Vec::new();
+
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
+            if cell[4] == u32::MAX {
+                // Tetrahedron
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    if face_counts[&key] == 1 {
+                        cell_indices.push(cell_idx as u32);
+                    }
+                }
+            } else {
+                // Hexahedron
+                for quad in HEX_FACE_STENCIL {
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]];
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    if face_counts[&key] == 1 {
+                        // 2 triangles per quad face
+                        cell_indices.push(cell_idx as u32);
+                        cell_indices.push(cell_idx as u32);
+                    }
+                }
+            }
+        }
+
+        cell_indices
+    }
+
+    /// Generates cell index per triangle mapping with cell culling.
+    fn generate_cell_index_per_triangle_with_culling(&self, planes: &[(Vec3, Vec3)]) -> Vec<u32> {
+        let face_counts = self.compute_face_counts_with_culling(planes);
+        let mut cell_indices = Vec::new();
+
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
+            if !self.is_cell_visible(cell, planes) {
+                continue;
+            }
+
+            if cell[4] == u32::MAX {
+                for [a, b, c] in TET_FACE_STENCIL {
+                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
+                    if face_counts.get(&key) == Some(&1) {
+                        cell_indices.push(cell_idx as u32);
+                    }
+                }
+            } else {
+                for quad in HEX_FACE_STENCIL {
+                    let v0 = cell[quad[0][0]];
+                    let v1 = cell[quad[0][1]];
+                    let v2 = cell[quad[0][2]];
+                    let v3 = cell[quad[1][2]];
+                    let key = canonical_face_key(v0, v1, v2, Some(v3));
+                    if face_counts.get(&key) == Some(&1) {
+                        cell_indices.push(cell_idx as u32);
+                        cell_indices.push(cell_idx as u32);
+                    }
+                }
+            }
+        }
+
+        cell_indices
+    }
+
+    /// Initializes GPU resources for pick rendering.
+    ///
+    /// Creates the pick uniform buffer, cell index mapping buffer, and bind group.
+    /// The cell index buffer maps each GPU triangle to its parent cell index.
+    pub fn init_pick_resources(
+        &mut self,
+        device: &wgpu::Device,
+        mesh_pick_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        global_start: u32,
+    ) {
+        use wgpu::util::DeviceExt;
+
+        self.global_start = global_start;
+
+        let model = self.transform.to_cols_array_2d();
+        let pick_uniforms = MeshPickUniforms {
+            global_start,
+            _padding: [0.0; 3],
+            model,
+        };
+        let pick_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("volume mesh pick uniforms"),
+            contents: bytemuck::cast_slice(&[pick_uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        // Build cell index mapping: tri_index -> cell_index
+        let cell_index_data = if self.culling_plane_cache.is_some() {
+            self.generate_cell_index_per_triangle_with_culling(
+                self.culling_plane_cache.as_deref().unwrap_or(&[]),
+            )
+        } else {
+            self.generate_cell_index_per_triangle()
+        };
+
+        let pick_cell_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("volume mesh pick cell indices"),
+            contents: bytemuck::cast_slice(&cell_index_data),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
+
+        // Create pick bind group using render_data vertex buffer
+        if let Some(render_data) = &self.render_data {
+            let pick_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("volume mesh pick bind group"),
+                layout: mesh_pick_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: camera_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: pick_uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: render_data.vertex_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: pick_cell_index_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+            self.pick_bind_group = Some(pick_bind_group);
+        }
+
+        self.pick_uniform_buffer = Some(pick_uniform_buffer);
+        self.pick_cell_index_buffer = Some(pick_cell_index_buffer);
+    }
+
+    /// Returns the pick bind group if initialized.
+    #[must_use]
+    pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.pick_bind_group.as_ref()
+    }
+
+    /// Updates pick uniforms (model transform) when the structure is moved.
+    pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let model = self.transform.to_cols_array_2d();
+            let pick_uniforms = MeshPickUniforms {
+                global_start: self.global_start,
+                _padding: [0.0; 3],
+                model,
+            };
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[pick_uniforms]));
+        }
+    }
+
+    /// Returns the total number of vertices in the rendered triangulation (for draw calls).
+    #[must_use]
+    pub fn num_render_vertices(&self) -> u32 {
+        self.render_data
+            .as_ref()
+            .map_or(0, SurfaceMeshRenderData::num_vertices)
+    }
+
     /// Updates GPU buffers.
     pub fn update_gpu_buffers(&self, queue: &wgpu::Queue) {
         if let Some(ref rd) = self.render_data {
@@ -1123,6 +1305,9 @@ impl Structure for VolumeMesh {
     fn set_transform(&mut self, transform: Mat4) {
         self.transform = transform;
         self.culling_plane_cache = None;
+        // Invalidate pick resources since cell culling may change
+        self.pick_bind_group = None;
+        self.pick_cell_index_buffer = None;
     }
 
     fn is_enabled(&self) -> bool {
@@ -1151,6 +1336,9 @@ impl Structure for VolumeMesh {
 
     fn refresh(&mut self) {
         self.render_data = None;
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
+        self.pick_cell_index_buffer = None;
         self.slice_render_data = None;
         self.slice_plane_cache = None;
         self.culling_plane_cache = None;

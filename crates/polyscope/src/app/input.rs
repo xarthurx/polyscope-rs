@@ -517,23 +517,31 @@ impl ApplicationHandler for App {
 
                                     let element_type = match type_name.as_str() {
                                         "PointCloud" => polyscope_render::PickElementType::Point,
-                                        "SurfaceMesh" | "VolumeMesh" => {
-                                            polyscope_render::PickElementType::Face
-                                        }
+                                        "SurfaceMesh" => polyscope_render::PickElementType::Face,
+                                        "VolumeMesh" => polyscope_render::PickElementType::Cell,
                                         "CurveNetwork" => polyscope_render::PickElementType::Edge,
+                                        "VolumeGrid" => polyscope_render::PickElementType::Vertex,
                                         _ => polyscope_render::PickElementType::None,
+                                    };
+
+                                    // For VolumeGrid, pick name is "gridname/quantityname"
+                                    // Extract the grid name for structure selection
+                                    let structure_name = if type_name == "VolumeGrid" {
+                                        name.split('/').next().unwrap_or(name).to_string()
+                                    } else {
+                                        name.clone()
                                     };
 
                                     self.selection = Some(PickResult {
                                         hit: true,
                                         structure_type: type_name.clone(),
-                                        structure_name: name.clone(),
+                                        structure_name: structure_name.clone(),
                                         element_index: u64::from(*element_index),
                                         element_type,
                                         screen_pos: click_screen,
                                         depth: 0.5,
                                     });
-                                    crate::select_structure(type_name, name);
+                                    crate::select_structure(type_name, &structure_name);
                                     self.selection_info = crate::get_selection_info();
                                 }
                                 None => {

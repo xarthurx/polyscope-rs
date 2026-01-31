@@ -607,6 +607,127 @@ impl RenderEngine {
             .expect("mesh pick bind group layout not initialized")
     }
 
+    /// Initializes the gridcube pick pipeline for volume grid instances.
+    pub fn init_gridcube_pick_pipeline(&mut self) {
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Gridcube Pick Shader"),
+                source: wgpu::ShaderSource::Wgsl(
+                    include_str!("../shaders/pick_gridcube.wgsl").into(),
+                ),
+            });
+
+        // Gridcube pick bind group layout: camera, GridcubePickUniforms, positions
+        let bind_group_layout =
+            self.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Gridcube Pick Bind Group Layout"),
+                    entries: &[
+                        // Camera uniforms (binding 0)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: NonZeroU64::new(272),
+                            },
+                            count: None,
+                        },
+                        // GridcubePickUniforms (model + global_start + cube_size_factor = 80 bytes) (binding 1)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: NonZeroU64::new(80),
+                            },
+                            count: None,
+                        },
+                        // Cube positions storage buffer (template + per-instance) (binding 2)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Gridcube Pick Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Gridcube Pick Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..wgpu::PrimitiveState::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth24Plus,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        self.gridcube_pick_pipeline = Some(pipeline);
+        self.gridcube_pick_bind_group_layout = Some(bind_group_layout);
+    }
+
+    /// Returns whether the gridcube pick pipeline is initialized.
+    pub fn has_gridcube_pick_pipeline(&self) -> bool {
+        self.gridcube_pick_pipeline.is_some()
+    }
+
+    /// Gets the gridcube pick pipeline.
+    pub fn gridcube_pick_pipeline(&self) -> &wgpu::RenderPipeline {
+        self.gridcube_pick_pipeline
+            .as_ref()
+            .expect("gridcube pick pipeline not initialized")
+    }
+
+    /// Gets the gridcube pick bind group layout.
+    pub fn gridcube_pick_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.gridcube_pick_bind_group_layout
+            .as_ref()
+            .expect("gridcube pick bind group layout not initialized")
+    }
+
     /// Reads the pick buffer at (x, y) and returns the decoded global index.
     ///
     /// Returns None if picking system not initialized or coordinates out of bounds.

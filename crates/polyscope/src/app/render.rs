@@ -469,6 +469,87 @@ impl App {
                                 }
                             }
                         }
+
+                        // --- VolumeGrid pick initialization ---
+                        // Init gridcube pick pipeline if needed
+                        if !engine.has_gridcube_pick_pipeline() {
+                            // Only init if there are any enabled gridcube quantities
+                            let has_enabled_gridcube = vg.quantities().iter().any(|q| {
+                                if let Some(nsq) = q.as_any().downcast_ref::<VolumeGridNodeScalarQuantity>() {
+                                    nsq.is_enabled() && nsq.viz_mode() == VolumeGridVizMode::Gridcube && nsq.gridcube_render_data().is_some()
+                                } else if let Some(csq) = q.as_any().downcast_ref::<VolumeGridCellScalarQuantity>() {
+                                    csq.is_enabled() && csq.gridcube_render_data().is_some()
+                                } else {
+                                    false
+                                }
+                            });
+                            if has_enabled_gridcube {
+                                engine.init_gridcube_pick_pipeline();
+                            }
+                        }
+
+                        // Assign pick ranges and init pick resources for each enabled quantity
+                        if engine.has_gridcube_pick_pipeline() {
+                            let vg_name = vg.name().to_string();
+                            for quantity in vg.quantities_mut() {
+                                if !quantity.is_enabled() {
+                                    continue;
+                                }
+
+                                if let Some(nsq) = quantity.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                                    if nsq.viz_mode() == VolumeGridVizMode::Gridcube
+                                        && nsq.gridcube_render_data().is_some()
+                                        && nsq.pick_bind_group().is_none()
+                                    {
+                                        let num_elements = nsq.num_pick_elements();
+                                        let pick_name = format!("{}/{}", vg_name, nsq.name());
+                                        let global_start = engine.assign_pick_range(
+                                            "VolumeGrid",
+                                            &pick_name,
+                                            num_elements,
+                                        );
+                                        nsq.init_pick_resources(
+                                            &engine.device,
+                                            engine.gridcube_pick_bind_group_layout(),
+                                            engine.camera_buffer(),
+                                            global_start,
+                                        );
+                                    }
+                                    // Update pick uniforms every frame (model may change)
+                                    nsq.update_pick_uniforms(
+                                        &engine.queue,
+                                        transform.to_cols_array_2d(),
+                                        cube_size_factor.max(0.5),
+                                    );
+                                }
+
+                                if let Some(csq) = quantity.as_any_mut().downcast_mut::<VolumeGridCellScalarQuantity>() {
+                                    if csq.gridcube_render_data().is_some()
+                                        && csq.pick_bind_group().is_none()
+                                    {
+                                        let num_elements = csq.num_pick_elements();
+                                        let pick_name = format!("{}/{}", vg_name, csq.name());
+                                        let global_start = engine.assign_pick_range(
+                                            "VolumeGrid",
+                                            &pick_name,
+                                            num_elements,
+                                        );
+                                        csq.init_pick_resources(
+                                            &engine.device,
+                                            engine.gridcube_pick_bind_group_layout(),
+                                            engine.camera_buffer(),
+                                            global_start,
+                                        );
+                                    }
+                                    // Update pick uniforms every frame
+                                    csq.update_pick_uniforms(
+                                        &engine.queue,
+                                        transform.to_cols_array_2d(),
+                                        cube_size_factor.max(0.5),
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -508,6 +589,25 @@ impl App {
                                 &engine.device,
                                 engine.mesh_bind_group_layout(),
                                 engine.camera_buffer(),
+                            );
+                        }
+
+                        // Initialize pick resources (after render data)
+                        if vm.pick_bind_group().is_none() && vm.render_data().is_some() {
+                            if !engine.has_mesh_pick_pipeline() {
+                                engine.init_mesh_pick_pipeline();
+                            }
+                            let num_cells = vm.num_cells() as u32;
+                            let global_start = engine.assign_pick_range(
+                                "VolumeMesh",
+                                vm.name(),
+                                num_cells,
+                            );
+                            vm.init_pick_resources(
+                                &engine.device,
+                                engine.mesh_pick_bind_group_layout(),
+                                engine.camera_buffer(),
+                                global_start,
                             );
                         }
                     }
@@ -580,6 +680,7 @@ impl App {
                 if structure.type_name() == "VolumeMesh" {
                     if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
                         vm.update_gpu_buffers(&engine.queue);
+                        vm.update_pick_uniforms(&engine.queue);
                     }
                 }
             }
@@ -672,7 +773,8 @@ impl App {
                     }
                 });
 
-                // Draw surface meshes to pick buffer
+                // Draw surface meshes and volume meshes to pick buffer
+                // (both use the same mesh pick pipeline with face/cell index mapping)
                 if engine.has_mesh_pick_pipeline() {
                     pick_pass.set_pipeline(engine.mesh_pick_pipeline());
                     crate::with_context(|ctx| {
@@ -691,6 +793,57 @@ impl App {
                                             0..mesh.num_triangulation_vertices(),
                                             0..1,
                                         );
+                                    }
+                                }
+                            }
+                            if structure.type_name() == "VolumeMesh" {
+                                if let Some(vm) =
+                                    structure.as_any().downcast_ref::<VolumeMesh>()
+                                {
+                                    if let Some(pick_bind_group) = vm.pick_bind_group() {
+                                        pick_pass
+                                            .set_bind_group(0, pick_bind_group, &[]);
+                                        pick_pass.draw(
+                                            0..vm.num_render_vertices(),
+                                            0..1,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // --- VolumeGrid gridcube picking ---
+                if engine.has_gridcube_pick_pipeline() {
+                    pick_pass.set_pipeline(engine.gridcube_pick_pipeline());
+                    crate::with_context(|ctx| {
+                        for structure in ctx.registry.iter() {
+                            if !ctx.is_structure_visible(structure) {
+                                continue;
+                            }
+                            if structure.type_name() == "VolumeGrid" {
+                                if let Some(vg) =
+                                    structure.as_any().downcast_ref::<VolumeGrid>()
+                                {
+                                    for quantity in vg.quantities() {
+                                        if !quantity.is_enabled() {
+                                            continue;
+                                        }
+                                        if let Some(nsq) = quantity.as_any().downcast_ref::<VolumeGridNodeScalarQuantity>() {
+                                            if nsq.viz_mode() == VolumeGridVizMode::Gridcube {
+                                                if let Some(pick_bg) = nsq.pick_bind_group() {
+                                                    pick_pass.set_bind_group(0, pick_bg, &[]);
+                                                    pick_pass.draw(0..nsq.pick_total_vertices(), 0..1);
+                                                }
+                                            }
+                                        }
+                                        if let Some(csq) = quantity.as_any().downcast_ref::<VolumeGridCellScalarQuantity>() {
+                                            if let Some(pick_bg) = csq.pick_bind_group() {
+                                                pick_pass.set_bind_group(0, pick_bg, &[]);
+                                                pick_pass.draw(0..csq.pick_total_vertices(), 0..1);
+                                            }
+                                        }
                                     }
                                 }
                             }

@@ -35,6 +35,7 @@ pub fn build_selection_panel(
                 PickElementType::Vertex => "Vertex",
                 PickElementType::Face => "Face",
                 PickElementType::Edge => "Edge",
+                PickElementType::Cell => "Cell",
             };
             ui.label(format!("{} #{}", element_type_str, selection.element_index));
 

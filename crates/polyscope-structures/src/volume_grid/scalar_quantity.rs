@@ -3,7 +3,8 @@
 use glam::{UVec3, Vec3};
 use polyscope_core::quantity::{Quantity, QuantityKind};
 use polyscope_core::{McmMesh, marching_cubes};
-use polyscope_render::{GridcubeRenderData, IsosurfaceRenderData};
+use polyscope_render::{GridcubePickUniforms, GridcubeRenderData, IsosurfaceRenderData};
+use wgpu::util::DeviceExt;
 
 /// Visualization mode for volume grid scalar quantities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,6 +48,11 @@ pub struct VolumeGridNodeScalarQuantity {
 
     // Flag: user clicked "Register as Surface Mesh"
     register_as_mesh_requested: bool,
+
+    // Pick state
+    pick_uniform_buffer: Option<wgpu::Buffer>,
+    pick_bind_group: Option<wgpu::BindGroup>,
+    global_start: u32,
 }
 
 impl VolumeGridNodeScalarQuantity {
@@ -81,6 +87,9 @@ impl VolumeGridNodeScalarQuantity {
             bound_min,
             bound_max,
             register_as_mesh_requested: false,
+            pick_uniform_buffer: None,
+            pick_bind_group: None,
+            global_start: 0,
         }
     }
 
@@ -302,6 +311,100 @@ impl VolumeGridNodeScalarQuantity {
         self.isosurface_dirty = false;
     }
 
+    // --- Pick resources ---
+
+    /// Initializes pick resources for this quantity.
+    ///
+    /// Requires that `gridcube_render_data` is already initialized (needs the position buffer).
+    pub fn init_pick_resources(
+        &mut self,
+        device: &wgpu::Device,
+        pick_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        global_start: u32,
+    ) {
+        self.global_start = global_start;
+
+        let gridcube_rd = match &self.gridcube_render_data {
+            Some(rd) => rd,
+            None => return,
+        };
+
+        let uniforms = GridcubePickUniforms {
+            global_start,
+            cube_size_factor: 1.0,
+            ..Default::default()
+        };
+
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("gridcube node pick uniforms"),
+            contents: bytemuck::cast_slice(&[uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("gridcube node pick bind group"),
+            layout: pick_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: gridcube_rd.position_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        self.pick_uniform_buffer = Some(uniform_buffer);
+        self.pick_bind_group = Some(bind_group);
+    }
+
+    /// Returns the pick bind group, if initialized.
+    #[must_use]
+    pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.pick_bind_group.as_ref()
+    }
+
+    /// Updates the pick uniform buffer with current model transform and cube size factor.
+    pub fn update_pick_uniforms(
+        &self,
+        queue: &wgpu::Queue,
+        model: [[f32; 4]; 4],
+        cube_size_factor: f32,
+    ) {
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let uniforms = GridcubePickUniforms {
+                model,
+                global_start: self.global_start,
+                cube_size_factor,
+                ..Default::default()
+            };
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        }
+    }
+
+    /// Returns the number of pick elements (= number of gridcube instances).
+    #[must_use]
+    pub fn num_pick_elements(&self) -> u32 {
+        self.gridcube_render_data
+            .as_ref()
+            .map_or(0, |rd| rd.num_instances)
+    }
+
+    /// Returns the total vertices for the pick draw call.
+    #[must_use]
+    pub fn pick_total_vertices(&self) -> u32 {
+        self.gridcube_render_data
+            .as_ref()
+            .map_or(0, GridcubeRenderData::total_vertices)
+    }
+
     /// Returns whether the user has requested registering the isosurface as a mesh.
     #[must_use]
     pub fn register_as_mesh_requested(&self) -> bool {
@@ -495,6 +598,8 @@ impl Quantity for VolumeGridNodeScalarQuantity {
         self.isosurface_render_data = None;
         self.isosurface_mesh_cache = None;
         self.isosurface_dirty = true;
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -527,6 +632,11 @@ pub struct VolumeGridCellScalarQuantity {
     // Grid geometry
     bound_min: Vec3,
     bound_max: Vec3,
+
+    // Pick state
+    pick_uniform_buffer: Option<wgpu::Buffer>,
+    pick_bind_group: Option<wgpu::BindGroup>,
+    global_start: u32,
 }
 
 impl VolumeGridCellScalarQuantity {
@@ -553,6 +663,9 @@ impl VolumeGridCellScalarQuantity {
             gridcube_dirty: true,
             bound_min,
             bound_max,
+            pick_uniform_buffer: None,
+            pick_bind_group: None,
+            global_start: 0,
         }
     }
 
@@ -640,6 +753,98 @@ impl VolumeGridCellScalarQuantity {
     pub fn set_gridcube_render_data(&mut self, data: GridcubeRenderData) {
         self.gridcube_render_data = Some(data);
         self.gridcube_dirty = false;
+    }
+
+    // --- Pick resources ---
+
+    /// Initializes pick resources for this cell scalar quantity.
+    pub fn init_pick_resources(
+        &mut self,
+        device: &wgpu::Device,
+        pick_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        global_start: u32,
+    ) {
+        self.global_start = global_start;
+
+        let gridcube_rd = match &self.gridcube_render_data {
+            Some(rd) => rd,
+            None => return,
+        };
+
+        let uniforms = GridcubePickUniforms {
+            global_start,
+            cube_size_factor: 1.0,
+            ..Default::default()
+        };
+
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("gridcube cell pick uniforms"),
+            contents: bytemuck::cast_slice(&[uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("gridcube cell pick bind group"),
+            layout: pick_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: gridcube_rd.position_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        self.pick_uniform_buffer = Some(uniform_buffer);
+        self.pick_bind_group = Some(bind_group);
+    }
+
+    /// Returns the pick bind group, if initialized.
+    #[must_use]
+    pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.pick_bind_group.as_ref()
+    }
+
+    /// Updates the pick uniform buffer with current model transform and cube size factor.
+    pub fn update_pick_uniforms(
+        &self,
+        queue: &wgpu::Queue,
+        model: [[f32; 4]; 4],
+        cube_size_factor: f32,
+    ) {
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let uniforms = GridcubePickUniforms {
+                model,
+                global_start: self.global_start,
+                cube_size_factor,
+                ..Default::default()
+            };
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        }
+    }
+
+    /// Returns the number of pick elements (= number of gridcube instances).
+    #[must_use]
+    pub fn num_pick_elements(&self) -> u32 {
+        self.gridcube_render_data
+            .as_ref()
+            .map_or(0, |rd| rd.num_instances)
+    }
+
+    /// Returns the total vertices for the pick draw call.
+    #[must_use]
+    pub fn pick_total_vertices(&self) -> u32 {
+        self.gridcube_render_data
+            .as_ref()
+            .map_or(0, GridcubeRenderData::total_vertices)
     }
 
     /// Builds egui UI for this quantity.
@@ -734,6 +939,8 @@ impl Quantity for VolumeGridCellScalarQuantity {
     fn refresh(&mut self) {
         self.gridcube_render_data = None;
         self.gridcube_dirty = true;
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

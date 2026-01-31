@@ -92,7 +92,8 @@ pub use surface_mesh_render::{MeshUniforms, SurfaceMeshRenderData};
 pub use tone_mapping::{ToneMapPass, ToneMapUniforms};
 pub use vector_render::{VectorRenderData, VectorUniforms};
 pub use volume_grid_render::{
-    GridcubeRenderData, GridcubeUniforms, IsosurfaceRenderData, SimpleMeshUniforms,
+    GridcubePickUniforms, GridcubeRenderData, GridcubeUniforms, IsosurfaceRenderData,
+    SimpleMeshUniforms,
 };
 
 /// Render context passed to structures during drawing.

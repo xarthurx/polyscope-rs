@@ -231,6 +231,10 @@ pub struct RenderEngine {
     pub(crate) mesh_pick_pipeline: Option<wgpu::RenderPipeline>,
     /// Mesh pick bind group layout (has extra face_indices binding).
     pub(crate) mesh_pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
+    /// Pick pipeline for volume grid gridcube instances.
+    pub(crate) gridcube_pick_pipeline: Option<wgpu::RenderPipeline>,
+    /// Gridcube pick bind group layout (camera, pick uniforms, positions).
+    pub(crate) gridcube_pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
 }
 
 impl RenderEngine {
@@ -548,6 +552,8 @@ impl RenderEngine {
             pick_bind_group_layout: None,
             mesh_pick_pipeline: None,
             mesh_pick_bind_group_layout: None,
+            gridcube_pick_pipeline: None,
+            gridcube_pick_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();
@@ -870,6 +876,8 @@ impl RenderEngine {
             pick_bind_group_layout: None,
             mesh_pick_pipeline: None,
             mesh_pick_bind_group_layout: None,
+            gridcube_pick_pipeline: None,
+            gridcube_pick_bind_group_layout: None,
         };
 
         engine.init_point_pipeline();

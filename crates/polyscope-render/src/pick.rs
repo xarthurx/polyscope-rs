@@ -20,6 +20,8 @@ pub enum PickElementType {
     Face,
     /// An edge of a mesh or curve network.
     Edge,
+    /// A cell of a volume mesh.
+    Cell,
 }
 
 /// Result of a pick operation.

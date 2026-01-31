@@ -91,6 +91,41 @@ impl Default for GridcubeUniforms {
     }
 }
 
+/// GPU uniforms for gridcube pick rendering.
+///
+/// Layout must match WGSL `GridcubePickUniforms` exactly.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(clippy::pub_underscore_fields)]
+pub struct GridcubePickUniforms {
+    /// Model transform matrix.
+    pub model: [[f32; 4]; 4],
+    /// The starting global index for this quantity's elements.
+    pub global_start: u32,
+    /// Cube size factor (0..1).
+    pub cube_size_factor: f32,
+    /// Padding to 16-byte alignment.
+    pub _pad0: f32,
+    pub _pad1: f32,
+}
+
+impl Default for GridcubePickUniforms {
+    fn default() -> Self {
+        Self {
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            global_start: 0,
+            cube_size_factor: 1.0,
+            _pad0: 0.0,
+            _pad1: 0.0,
+        }
+    }
+}
+
 /// GPU resources for isosurface (simple mesh) visualization.
 pub struct IsosurfaceRenderData {
     /// Position buffer (storage, vec4 per expanded triangle vertex).
@@ -635,6 +670,14 @@ mod tests {
         assert_eq!(size % 16, 0, "SimpleMeshUniforms size ({size} bytes) must be 16-byte aligned");
         // model(64) + base_color(16) + transparency(4) + slice_planes_enabled(4) + backface_policy(4) + pad(4) = 96
         assert_eq!(size, 96, "SimpleMeshUniforms should be 96 bytes, got {size}");
+    }
+
+    #[test]
+    fn test_gridcube_pick_uniforms_size() {
+        let size = std::mem::size_of::<GridcubePickUniforms>();
+        assert_eq!(size % 16, 0, "GridcubePickUniforms size ({size} bytes) must be 16-byte aligned");
+        // model(64) + global_start(4) + cube_size_factor(4) + pad0(4) + pad1(4) = 80
+        assert_eq!(size, 80, "GridcubePickUniforms should be 80 bytes, got {size}");
     }
 
     #[test]
