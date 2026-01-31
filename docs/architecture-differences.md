@@ -231,9 +231,9 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Surface Mesh | ✅ Full | ✅ Full | Triangles + arbitrary polygons, full quantity support (vertex/face scalar/color/vector/parameterization/intrinsic vector/one-form) |
 | Curve Network | ✅ Full | ✅ Full | Line, loop, segments; tube rendering via compute shaders; node/edge scalar/color/vector quantities |
 | Volume Mesh | ✅ Full | ✅ Full | Tet/hex cells, quantities, interior face detection, slice capping |
-| Volume Grid | ✅ Full | ✅ Basic | Node scalars only. Missing: cell quantities, isosurface rendering |
+| Volume Grid | ✅ Full | ✅ Most | Node/cell scalars. Missing: isosurface rendering |
 | Camera View | ✅ Full | ✅ Full | Frustum visualization |
-| Floating Quantities | ✅ Full | ✅ Most | Scalar/color images, depth/color render images |
+| Floating Quantities | ✅ Full | ✅ Full | Scalar/color images, depth/color/raw render images |
 
 ### Quantities
 
@@ -262,6 +262,12 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Gizmos | ✅ | ✅ | Via egui (transform-gizmo-egui), not GPU-rendered |
 | Picking | ✅ | ✅ | GPU-based, element-level |
 | Screenshots | ✅ | ✅ | PNG/JPEG, transparent background |
+| RGBA Colors | ✅ | ✅ | Per-element alpha on all structures |
+| Camera Navigation | ✅ | ✅ | Turntable, Free, Planar, Arcball, First-person |
+| Ortho/Perspective | ✅ | ✅ | Toggle between projection modes |
+| Double-click View Center | ✅ | ✅ | Set view center at click position |
+| Reset View | ✅ | ✅ | Recompute home view from scene extents |
+| Auto Scene Extents | ✅ | ✅ | Auto-compute with manual override |
 
 ### Materials & Color Maps
 

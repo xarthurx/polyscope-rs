@@ -2,7 +2,7 @@
 
 ## Current Status
 
-polyscope-rs has reached substantial feature parity with C++ Polyscope for core functionality.
+polyscope-rs has reached full feature parity with C++ Polyscope 2.x for all core functionality.
 
 ### Completed Features
 
@@ -16,7 +16,7 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 
 #### Structures
 - [x] **PointCloud** - Full feature parity with sphere impostors
-- [x] **SurfaceMesh** - Triangles with vertex/face scalar/color/vector quantities, parameterization (checker/grid/local), intrinsic vectors (tangent-space, n-fold symmetry), one-forms (edge arrows), flat/smooth shading
+- [x] **SurfaceMesh** - Triangles + arbitrary polygons via `IntoFaceList` trait, full quantity support (vertex/face scalar/color/vector, parameterization, intrinsic vectors, one-forms), RGBA alpha colors
 - [x] **CurveNetwork** - Lines + tubes via compute shaders, node/edge scalar/color/vector quantities
 - [x] **VolumeMesh** - Tet/hex cells, interior face detection, slice capping, vertex/cell scalar/color/vector quantities
 - [x] **VolumeGrid** - Node/cell scalars, wireframe bounding box visualization
@@ -25,20 +25,39 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 
 #### Scene Features
 - [x] Ground plane with shadows
-- [x] Ground reflections
+- [x] Ground reflections (with slice plane clipping)
 - [x] SSAO (Screen-Space Ambient Occlusion)
 - [x] Tone mapping (multiple modes)
-- [x] Transparency (Depth Peeling / Pretty)
+- [x] Transparency (Depth Peeling / Pretty + Simple + None)
 - [x] Slice planes (up to 4) with gizmo manipulation
 - [x] Volume mesh slice capping with quantity interpolation
-- [x] Groups (structure organization)
+- [x] Groups (structure organization, hierarchical)
 - [x] Transform gizmo (translate, rotate, scale via egui)
 - [x] GPU picking (pixel-perfect, element-level)
 - [x] Screenshots (PNG/JPEG export, transparent background)
+- [x] Reset View button (recomputes home view from scene extents)
+- [x] Auto-compute scene extents with manual override (editable bbox when disabled)
+
+#### Camera Navigation
+- [x] Turntable orbit (gimbal-lock protected, view-matrix based)
+- [x] Free orbit (unconstrained rotation)
+- [x] Planar navigation (2D pan/zoom)
+- [x] Arcball rotation
+- [x] First-person navigation
+- [x] Double-click to set view center
+- [x] Orthographic / Perspective projection toggle
 
 #### Materials & Color Maps
-- [x] All 8 built-in materials (Clay, Wax, Candy, Flat, Mud, Ceramic, Jade, Normal)
+- [x] All 8 built-in matcap materials (Clay, Wax, Candy, Flat, Mud, Ceramic, Jade, Normal)
+- [x] Per-structure material selection via `Structure` trait
+- [x] 4-channel blend materials (R/G/B/K textures)
+- [x] Single-texture materials
 - [x] 10+ color maps (Viridis, Blues, Reds, Coolwarm, etc.)
+
+#### RGBA Color Support
+- [x] Per-vertex RGBA colors on SurfaceMesh
+- [x] Per-face RGBA colors on SurfaceMesh
+- [x] Per-element alpha on PointCloud, CurveNetwork, VolumeMesh
 
 ---
 
@@ -46,35 +65,27 @@ polyscope-rs has reached substantial feature parity with C++ Polyscope for core 
 
 ### Bugs / Known Issues
 
-- [x] ~~**SSAA crash on factor change**~~ — Fixed by setting explicit `min_binding_size` on all uniform buffer bindings and correcting WGSL vec3 padding mismatches.
 - [ ] **Intermittent SIGSEGV on WSL2** — Under Windows Subsystem for Linux 2 with GPU passthrough, the application may occasionally crash with SIGSEGV inside the GPU driver. This is a WSL2/GPU driver instability issue, not a polyscope-rs bug. Native platforms are unaffected.
 
-### Tier 2 — Broader Feature Additions
+### Tier 2 — Remaining Gaps
 
-- [ ] **Matcap Material System** - Current materials use parametric Phong lighting (ambient/diffuse/specular/shininess scalars). C++ Polyscope uses texture-based matcap rendering (view-space normal → HDR texture lookup) which gives its distinctive visual quality. Gaps: (1) No matcap texture loading or rendering; (2) MaterialUniforms not wired to surface mesh / point cloud shaders; (3) Only CurveNetwork exposes `set_material()`; SurfaceMesh and PointCloud do not; (4) Missing `concrete` material; (5) No custom material loading API (`loadBlendableMaterial` / `loadStaticMaterial`).
-- [ ] **RGBA Color Quantities** - SurfaceMesh supports RGBA alpha; other structures still RGB-only
-- [ ] **Full Polygon Mesh Support** - Arbitrary n-gon faces (not just triangles); proper triangulation for rendering and quantities
+- [ ] **Volume Grid Isosurface** - Marching cubes isosurface extraction (currently node/cell scalars only)
+- [ ] **Custom Material Loading** - User-provided matcap textures (`loadBlendableMaterial` / `loadStaticMaterial`)
 
-### Tier 3 — Advanced Quantity Types
-
-- [x] **Parameterization Quantities** - UV coordinates visualization with checker, grid, local check, and local radial styles. Both vertex and corner variants.
-- [x] **Intrinsic Vectors** - Tangent-space vector visualization with auto-computed tangent basis and n-fold symmetry (1=vector, 2=line, 4=cross).
-- [x] **One-Form Quantities** - Differential form visualization as edge-midpoint arrows with orientation support.
-- [x] **Floating Quantities** - Scalar images (colormap-based), color images (direct RGB), depth render images, color render images, and raw color images for screen-space data.
-
-All Tier 3 quantities have full GPU rendering pipelines (init/update/draw), auto-scaling, and egui UI controls.
-
-### Upstream Follow-ups (from C++ Polyscope)
-
-- [x] **Double-click to set view center** — Port upstream commit 61fc32a
-- [x] **Turntable orbit drift prevention** — Port upstream commit 129c680
-- [x] **Drag & drop file callback** — Port upstream commit 0ff26c2
-
-### Tier 4 — Polish
+### Tier 3 — Polish
 
 - [ ] More examples and documentation
 - [ ] Platform testing — macOS and WebGPU targets
 - [ ] Integration tests — visual regression testing beyond unit tests
+- [ ] API documentation (rustdoc)
+
+---
+
+## Upstream Follow-ups (from C++ Polyscope)
+
+- [x] **Double-click to set view center** — Port upstream commit 61fc32a
+- [x] **Turntable orbit drift prevention** — Port upstream commit 129c680
+- [x] **Drag & drop file callback** — Port upstream commit 0ff26c2
 
 ---
 
@@ -85,14 +96,8 @@ All Tier 3 quantities have full GPU rendering pipelines (init/update/draw), auto
 - **Right drag**: Pan camera
 - **Scroll wheel**: Zoom
 - **Left click** (no drag): Select structure at click position
+- **Double-click**: Set view center at click position
 - **Right click** (no drag): Deselect
-
----
-
-## Known Limitations
-
-1. **Polygon Meshes**: Only triangles fully supported; arbitrary polygons need triangulation
-2. **Color Quantities**: SurfaceMesh supports RGBA alpha; other structures RGB-only
 
 ---
 
@@ -101,3 +106,4 @@ All Tier 3 quantities have full GPU rendering pipelines (init/update/draw), auto
 - All shaders written in WGSL (WebGPU Shading Language)
 - No geometry shader support in wgpu - using compute shaders and instancing instead
 - egui used instead of Dear ImGui for pure Rust, zero native dependencies
+- Rust edition 2024, MSRV 1.85

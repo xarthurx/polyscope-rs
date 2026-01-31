@@ -16,13 +16,13 @@ This is a Rust reimplementation of the original C++ [Polyscope](https://github.c
 
 This project is an experiment in **AI-driven software development**. I have limited Rust experience but have used [Polyscope](https://polyscope.run) extensively and contributed PRs to the original C++ library. It validates the hypothesis that languages with **informative compiler feedback** (like Rust) work better with AI-assisted development.
 
-**Note:** This project is in an **early phase** and requires more testing. **Use at your own risk.** Contributions and feedback are welcome in the [Discussions](https://github.com/xarthurx/polyscope-rs/discussions) section.
+**Note:** This project has reached full feature parity with C++ Polyscope 2.x but is still maturing. Contributions and feedback are welcome in the [Discussions](https://github.com/xarthurx/polyscope-rs/discussions) section.
 
 ## Project Status
 
-**Current Version:** 0.2.0 (Alpha)
+**Current Version:** 0.5.0
 
-**Feature Parity:** ~100% of C++ Polyscope 2.x
+**Feature Parity:** Full parity with C++ Polyscope 2.x for all core functionality
 
 ### What's Working
 
@@ -32,7 +32,7 @@ This project is an experiment in **AI-driven software development**. I have limi
 | Surface Meshes | ✅ Triangles + arbitrary polygons, full quantity support |
 | Curve Networks | ✅ Full support |
 | Volume Meshes | ✅ Tet/Hex cells |
-| Volume Grids | ✅ Basic support |
+| Volume Grids | ✅ Node/cell scalars |
 | Camera Views | ✅ Full support |
 | Materials | ✅ 8 matcap materials (per-structure) |
 | Color Maps | ✅ 10+ maps |
@@ -43,8 +43,10 @@ This project is an experiment in **AI-driven software development**. I have limi
 | Transparency | ✅ Depth peeling (Pretty) + alpha blending (Simple) |
 | Tone Mapping | ✅ HDR pipeline |
 | SSAO | ✅ Ambient occlusion |
+| RGBA Colors | ✅ Per-element alpha on all structures |
 | Screenshots | ✅ PNG/JPEG export |
 | Picking | ✅ Structure/Element |
+| Camera Navigation | ✅ Turntable/Free/Planar/Arcball/First-person |
 | Parameterization | ✅ Checker/Grid/Local styles |
 | Intrinsic Vectors | ✅ Tangent-space with symmetry |
 | One-Forms | ✅ Edge-based differential forms |
@@ -58,7 +60,7 @@ See [docs/architecture-differences.md](docs/architecture-differences.md) for a d
 - **Surface Meshes** - Render triangular meshes with scalars, vectors, colors, parameterization, intrinsic vectors, and one-forms
 - **Curve Networks** - Display networks of curves and edges
 - **Volume Meshes** - Visualize tetrahedral and hexahedral meshes
-- **Volume Grids** - Render implicit surfaces via marching cubes
+- **Volume Grids** - Render regular 3D grids with node/cell scalar quantities
 - **Camera Views** - Visualize camera frustums and poses
 - **Slice Planes** - Cut through geometry to see interiors
 - **Groups** - Organize structures hierarchically
@@ -97,7 +99,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polyscope = "0.2"
+polyscope = "0.5"
 ```
 
 ## Architecture

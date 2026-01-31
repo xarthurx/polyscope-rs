@@ -1001,17 +1001,12 @@ impl App {
         // Update tone mapping uniforms - use passthrough values if disabled
         // Get SSAO settings from global options
         let ssao_enabled = polyscope_core::with_context(|ctx| ctx.options.ssao.enabled);
-        if self.tone_mapping_settings.enabled {
-            engine.update_tone_mapping(
-                self.tone_mapping_settings.exposure,
-                self.tone_mapping_settings.white_level,
-                self.tone_mapping_settings.gamma,
-                ssao_enabled,
-            );
-        } else {
-            // Passthrough values: no exposure adjustment, linear transfer
-            engine.update_tone_mapping(0.0, 1.0, 1.0, ssao_enabled);
-        }
+        engine.update_tone_mapping(
+            self.tone_mapping_settings.exposure,
+            self.tone_mapping_settings.white_level,
+            self.tone_mapping_settings.gamma,
+            ssao_enabled,
+        );
 
         // Store background color for use in render passes
         let bg_r = f64::from(self.background_color.x);
