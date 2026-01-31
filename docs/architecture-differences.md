@@ -146,6 +146,27 @@ Implements the same **depth peeling** algorithm (Pretty mode) and **alpha blendi
 - `crates/polyscope-render/src/shaders/composite_peel.wgsl` - Alpha-under composite shader
 - `crates/polyscope-render/src/shaders/depth_update_peel.wgsl` - Min-depth update shader (f32 → f16 via Max blend)
 
+## Groups & Visibility Propagation
+
+### C++ Polyscope Approach
+Groups are created programmatically via `createGroup()` and structures are added with `addChildStructure()`. Toggling a group's visibility hides all member structures. The UI provides a Groups section in the left panel.
+
+### polyscope-rs Approach
+Same programmatic-only API (`create_group()`, `group.add_surface_mesh("name")`). Key differences in the Rust implementation:
+
+| Aspect | C++ Polyscope | polyscope-rs |
+|--------|---------------|--------------|
+| **UI creation** | Button to create groups in UI | No UI creation (programmatic only) |
+| **Visibility check** | Per-structure enabled flag | `is_structure_visible()` combines structure enabled + group ancestry |
+| **Cascading toggle** | Manual per-group | Automatic: toggling parent cascades to all descendant groups |
+| **UI layout** | Groups listed in panel | Recursive tree with indentation, member count, default open |
+
+**Visibility propagation** is implemented via `Context::is_structure_visible()` which checks both `structure.is_enabled()` and walks the group ancestry chain (`is_structure_visible_in_groups()` → `is_group_and_ancestors_enabled()`). This single check is used across the render loop (21+ locations), picking code, and GPU pick filtering.
+
+**Cascading toggle**: When a parent group is disabled, `collect_descendant_indices()` recursively finds all descendant groups and sets their enabled state to match, emitting a `SyncEnabled(Vec<usize>)` action that updates all affected groups in one pass.
+
+**Member count**: `count_structures_recursive()` walks the group tree to show total structure count including nested subgroups, e.g., "All Objects (9)" for a parent with 3 child groups each containing 3 structures.
+
 ## Shader Composition
 
 ### C++ Polyscope Approach
@@ -231,7 +252,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | Surface Mesh | ✅ Full | ✅ Full | Triangles + arbitrary polygons, full quantity support (vertex/face scalar/color/vector/parameterization/intrinsic vector/one-form) |
 | Curve Network | ✅ Full | ✅ Full | Line, loop, segments; tube rendering via compute shaders; node/edge scalar/color/vector quantities |
 | Volume Mesh | ✅ Full | ✅ Full | Tet/hex cells, quantities, interior face detection, slice capping |
-| Volume Grid | ✅ Full | ✅ Most | Node/cell scalars. Missing: isosurface rendering |
+| Volume Grid | ✅ Full | ✅ Full | Node/cell scalars, gridcube + isosurface (marching cubes) |
 | Camera View | ✅ Full | ✅ Full | Frustum visualization |
 | Floating Quantities | ✅ Full | ✅ Full | Scalar/color images, depth/color/raw render images |
 
@@ -258,7 +279,7 @@ The wgpu backend provides better future-proofing, especially for macOS (where Op
 | SSAO | ❌ | ✅ | polyscope-rs only feature |
 | Transparency | ✅ | ✅ | Depth peeling (Pretty) + alpha blending (Simple); f16 min-depth precision |
 | Slice Planes | ✅ | ✅ | Max 4, with volume mesh capping |
-| Groups | ✅ | ✅ | Hierarchical |
+| Groups | ✅ | ✅ | Hierarchical, visibility propagation, cascading toggle |
 | Gizmos | ✅ | ✅ | Via egui (transform-gizmo-egui), not GPU-rendered |
 | Picking | ✅ | ✅ | GPU-based, element-level |
 | Screenshots | ✅ | ✅ | PNG/JPEG, transparent background |
@@ -394,7 +415,7 @@ with_point_cloud("my points", |pc| {
 
 ---
 
-All major features and quantity types are now implemented, including arbitrary polygon meshes, parameterization, intrinsic vectors, one-forms, and RGBA color support with full GPU rendering.
+All major features and quantity types are now implemented, including arbitrary polygon meshes, parameterization, intrinsic vectors, one-forms, RGBA color support, volume grid isosurface (marching cubes) and gridcube rendering, and group visibility propagation with cascading toggle.
 
 ---
 

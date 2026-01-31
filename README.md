@@ -102,6 +102,34 @@ Add to your `Cargo.toml`:
 polyscope = "0.5"
 ```
 
+## Demos
+
+Run any demo with:
+
+```bash
+cargo run --example <demo_name>
+```
+
+| Demo | Command | Description |
+|------|---------|-------------|
+| Point Cloud | `cargo run --example point_cloud_demo` | Scalar, vector, and color quantities on point sets |
+| Surface Mesh | `cargo run --example surface_mesh_demo` | Stanford Bunny with full quantity support |
+| Curve Network | `cargo run --example curve_network_demo` | Curve and edge network visualization |
+| Volume Mesh | `cargo run --example volume_mesh_demo` | Tet/hex meshes with interior face detection and quantities |
+| Volume Grid | `cargo run --example volume_grid_demo` | Gridcube mode, isosurface (marching cubes), cell scalars |
+| Camera View | `cargo run --example camera_view_demo` | Camera frustum visualization |
+| Slice Planes | `cargo run --example slice_plane_demo` | Fragment-level slicing, volume mesh capping, gizmo control |
+| Groups & Gizmos | `cargo run --example groups_and_gizmos_demo` | Hierarchical groups, transform gizmos, structure selection |
+| Ground Plane | `cargo run --example ground_plane_demo` | Ground plane modes, shadows, reflections |
+| Materials | `cargo run --example materials_demo` | All 8 matcap materials across structure types |
+| Transparency | `cargo run --example transparency_demo` | Depth peeling (Pretty) and alpha blending (Simple) modes |
+
+**Controls** (common to all demos):
+- Left drag: Orbit camera
+- Right drag: Pan camera
+- Scroll: Zoom
+- ESC: Exit
+
 ## Architecture
 
 polyscope-rs uses a paradigm of **structures** and **quantities**:
