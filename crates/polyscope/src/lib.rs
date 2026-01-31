@@ -687,38 +687,6 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_group_action_create() {
-        setup();
-        let name = unique_name("action_create_group");
-        let mut settings = Vec::new();
-
-        handle_group_action(
-            polyscope_ui::GroupsAction::Create(name.clone()),
-            &mut settings,
-        );
-
-        assert_eq!(settings.len(), 1);
-        assert_eq!(settings[0].name, name);
-        assert!(get_group(&name).is_some());
-    }
-
-    #[test]
-    fn test_handle_group_action_remove() {
-        setup();
-        let name = unique_name("action_remove_group");
-
-        // Create group
-        create_group(&name);
-        let mut settings = vec![polyscope_ui::GroupSettings::with_name(&name)];
-
-        // Remove via action
-        handle_group_action(polyscope_ui::GroupsAction::Remove(0), &mut settings);
-
-        assert!(settings.is_empty());
-        assert!(get_group(&name).is_none());
-    }
-
-    #[test]
     fn test_get_gizmo_settings() {
         setup();
 

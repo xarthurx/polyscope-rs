@@ -46,7 +46,7 @@ impl App {
 
         crate::with_context(|ctx| {
             for structure in ctx.registry.iter() {
-                if !structure.is_enabled() {
+                if !ctx.is_structure_visible(structure) {
                     continue;
                 }
 
@@ -348,7 +348,7 @@ impl App {
 
         crate::with_context(|ctx| {
             for structure in ctx.registry.iter() {
-                if !structure.is_enabled() {
+                if !ctx.is_structure_visible(structure) {
                     continue;
                 }
 

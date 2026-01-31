@@ -68,7 +68,8 @@ pub struct App {
     pub(super) new_slice_plane_name: String,
     // Group UI state
     pub(super) group_settings: Vec<polyscope_ui::GroupSettings>,
-    pub(super) new_group_name: String,
+    // Dynamic left panel width (updated each frame from egui)
+    pub(super) left_panel_width: f64,
     // Gizmo UI state
     pub(super) gizmo_settings: polyscope_ui::GizmoSettings,
     pub(super) selection_info: polyscope_ui::SelectionInfo,
@@ -114,7 +115,7 @@ impl App {
             slice_plane_settings: crate::get_slice_plane_settings(),
             new_slice_plane_name: String::new(),
             group_settings: crate::get_group_settings(),
-            new_group_name: String::new(),
+            left_panel_width: 320.0, // Default, updated dynamically each frame
             gizmo_settings: crate::get_gizmo_settings(),
             selection_info: polyscope_ui::SelectionInfo::default(),
             slice_plane_selection: polyscope_ui::SlicePlaneSelectionInfo::default(),

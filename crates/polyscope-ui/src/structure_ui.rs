@@ -30,20 +30,19 @@ pub fn build_point_cloud_ui(
 ) -> bool {
     let mut changed = false;
 
-    ui.label(format!("Points: {num_points}"));
+    ui.label(format!("{num_points} points"));
 
     if build_material_selector(ui, material) {
         changed = true;
     }
 
-    ui.horizontal(|ui| {
+    egui::Grid::new("point_cloud_props").num_columns(2).show(ui, |ui| {
         ui.label("Color:");
         if ui.color_edit_button_rgb(base_color).changed() {
             changed = true;
         }
-    });
+        ui.end_row();
 
-    ui.horizontal(|ui| {
         ui.label("Radius:");
         if ui
             .add(
@@ -55,6 +54,7 @@ pub fn build_point_cloud_ui(
         {
             changed = true;
         }
+        ui.end_row();
     });
 
     changed
@@ -77,9 +77,7 @@ pub fn build_surface_mesh_ui(
 ) -> bool {
     let mut changed = false;
 
-    ui.label(format!("Vertices: {num_vertices}"));
-    ui.label(format!("Faces: {num_faces}"));
-    ui.label(format!("Edges: {num_edges}"));
+    ui.label(format!("{num_vertices} verts, {num_faces} faces, {num_edges} edges"));
 
     if build_material_selector(ui, material) {
         changed = true;
@@ -106,23 +104,23 @@ pub fn build_surface_mesh_ui(
             }
         });
 
-    // Surface color
-    ui.horizontal(|ui| {
+    // Surface color & opacity
+    egui::Grid::new("mesh_color_grid").num_columns(2).show(ui, |ui| {
         ui.label("Color:");
         if ui.color_edit_button_rgb(surface_color).changed() {
             changed = true;
         }
-    });
+        ui.end_row();
 
-    // Opacity (displayed as 1.0 - transparency so slider semantics match the label:
-    // opacity 1 = fully opaque, opacity 0 = fully transparent)
-    ui.horizontal(|ui| {
+        // Opacity (displayed as 1.0 - transparency so slider semantics match the label:
+        // opacity 1 = fully opaque, opacity 0 = fully transparent)
         ui.label("Opacity:");
         let mut opacity = 1.0 - *transparency;
         if ui.add(egui::Slider::new(&mut opacity, 0.0..=1.0)).changed() {
             *transparency = 1.0 - opacity;
             changed = true;
         }
+        ui.end_row();
     });
 
     ui.separator();
@@ -134,7 +132,7 @@ pub fn build_surface_mesh_ui(
 
     if *show_edges {
         ui.indent("edges", |ui| {
-            ui.horizontal(|ui| {
+            egui::Grid::new("mesh_edge_grid").num_columns(2).show(ui, |ui| {
                 ui.label("Width:");
                 if ui
                     .add(egui::DragValue::new(edge_width).speed(0.1).range(0.1..=5.0))
@@ -142,12 +140,13 @@ pub fn build_surface_mesh_ui(
                 {
                     changed = true;
                 }
-            });
-            ui.horizontal(|ui| {
+                ui.end_row();
+
                 ui.label("Color:");
                 if ui.color_edit_button_rgb(edge_color).changed() {
                     changed = true;
                 }
+                ui.end_row();
             });
         });
     }
@@ -199,8 +198,7 @@ pub fn build_curve_network_ui(
 ) -> bool {
     let mut changed = false;
 
-    ui.label(format!("Nodes: {num_nodes}"));
-    ui.label(format!("Edges: {num_edges}"));
+    ui.label(format!("{num_nodes} nodes, {num_edges} edges"));
 
     if build_material_selector(ui, material) {
         changed = true;
@@ -208,12 +206,25 @@ pub fn build_curve_network_ui(
 
     ui.separator();
 
-    // Color
-    ui.horizontal(|ui| {
+    egui::Grid::new("curve_network_grid").num_columns(2).show(ui, |ui| {
         ui.label("Color:");
         if ui.color_edit_button_rgb(color).changed() {
             changed = true;
         }
+        ui.end_row();
+
+        ui.label("Radius:");
+        if ui
+            .add(
+                egui::DragValue::new(radius)
+                    .speed(0.001)
+                    .range(0.001..=10.0),
+            )
+            .changed()
+        {
+            changed = true;
+        }
+        ui.end_row();
     });
 
     // Render mode
@@ -230,21 +241,6 @@ pub fn build_curve_network_ui(
                 changed = true;
             }
         });
-
-    // Radius
-    ui.horizontal(|ui| {
-        ui.label("Radius:");
-        if ui
-            .add(
-                egui::DragValue::new(radius)
-                    .speed(0.001)
-                    .range(0.001..=10.0),
-            )
-            .changed()
-        {
-            changed = true;
-        }
-    });
 
     // Radius is relative checkbox
     if ui.checkbox(radius_is_relative, "Relative radius").changed() {

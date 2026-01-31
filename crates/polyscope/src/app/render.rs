@@ -590,7 +590,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "PointCloud" {
@@ -611,7 +611,7 @@ impl App {
                 // Use tube picking (ray-cylinder) for all curve networks for better hit detection
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "CurveNetwork" {
@@ -695,7 +695,7 @@ impl App {
         let mut reset_view_requested = false;
         let mut ssaa_changed = false;
 
-        polyscope_ui::build_left_panel(&egui.context, |ui| {
+        let panel_width = polyscope_ui::build_left_panel(&egui.context, |ui| {
             let view_action = polyscope_ui::build_controls_section(ui, &mut bg_color);
             match view_action {
                 polyscope_ui::ViewAction::Screenshot => {
@@ -752,19 +752,6 @@ impl App {
                 }
             }
 
-            // Groups section
-            let groups_action = polyscope_ui::panels::build_groups_section(
-                ui,
-                &mut self.group_settings,
-                &mut self.new_group_name,
-            );
-            if groups_action != polyscope_ui::GroupsAction::None {
-                crate::handle_group_action(groups_action.clone(), &mut self.group_settings);
-                if matches!(groups_action, polyscope_ui::GroupsAction::Create(_)) {
-                    self.new_group_name.clear();
-                }
-            }
-
             // Sync selection info from context
             self.selection_info = crate::get_selection_info();
 
@@ -791,6 +778,15 @@ impl App {
                 &mut gp_shadow_darkness,
                 &mut gp_reflection_intensity,
             );
+
+            // Groups section (only shown if groups were created via API)
+            let groups_action = polyscope_ui::panels::build_groups_section(
+                ui,
+                &mut self.group_settings,
+            );
+            if groups_action != polyscope_ui::GroupsAction::None {
+                crate::handle_group_action(groups_action, &mut self.group_settings);
+            }
 
             // Collect colormap names for VolumeGrid UI
             let colormap_names: Vec<String> = engine.color_maps.names().map(String::from).collect();
@@ -859,6 +855,8 @@ impl App {
                 },
             );
         });
+        // Update dynamic panel width (with small margin to account for resize handle)
+        self.left_panel_width = f64::from(panel_width) + 5.0;
 
         // Show selection panel if we have a selection
         if let Some(ref selection) = self.selection {
@@ -871,11 +869,11 @@ impl App {
         }
 
         // Common gizmo setup - check if pointer is over UI panel
-        const LEFT_PANEL_WIDTH: f32 = 320.0;
+        let panel_w = self.left_panel_width as f32;
         let pointer_over_ui = egui.context.input(|i| {
             i.pointer
                 .hover_pos()
-                .is_some_and(|pos| pos.x <= LEFT_PANEL_WIDTH)
+                .is_some_and(|pos| pos.x <= panel_w)
         });
 
         // Get camera matrices from engine - MUST match what's used for 3D rendering
@@ -1244,7 +1242,7 @@ impl App {
 
             crate::with_context(|ctx| {
                 for structure in ctx.registry.iter() {
-                    if !structure.is_enabled() {
+                    if !ctx.is_structure_visible(structure) {
                         continue;
                     }
                         if structure.type_name() == "CurveNetwork" {
@@ -1287,7 +1285,7 @@ impl App {
                 // Render shadow-casting structures (SurfaceMesh only for now)
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "SurfaceMesh" {
@@ -1406,7 +1404,7 @@ impl App {
                 // Render each visible structure reflected
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         // SurfaceMesh
@@ -1544,7 +1542,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "SurfaceMesh" {
@@ -1607,7 +1605,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "PointCloud" {
@@ -1631,7 +1629,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
@@ -1699,7 +1697,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
@@ -1744,7 +1742,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "CurveNetwork" {
@@ -1777,7 +1775,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "CurveNetwork" {
@@ -1863,7 +1861,7 @@ impl App {
                 // write depth+normals here for SSAO regardless of transparency.
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "SurfaceMesh" {
@@ -1894,7 +1892,7 @@ impl App {
                 render_pass.set_pipeline(mesh_pipeline);
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "VolumeMesh" {
@@ -1934,7 +1932,7 @@ impl App {
                 render_pass.set_pipeline(mesh_pipeline);
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "SurfaceMesh" {
@@ -1993,7 +1991,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() || structure.type_name() != "VolumeGrid" {
+                        if !ctx.is_structure_visible(structure) || structure.type_name() != "VolumeGrid" {
                             continue;
                         }
                         if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
@@ -2023,7 +2021,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() || structure.type_name() != "VolumeGrid" {
+                        if !ctx.is_structure_visible(structure) || structure.type_name() != "VolumeGrid" {
                             continue;
                         }
                         if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
@@ -2157,7 +2155,7 @@ impl App {
 
                         crate::with_context(|ctx| {
                             for structure in ctx.registry.iter() {
-                                if !structure.is_enabled() {
+                                if !ctx.is_structure_visible(structure) {
                                     continue;
                                 }
                                 if structure.type_name() == "SurfaceMesh" {
@@ -2305,7 +2303,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "PointCloud" {
@@ -2328,7 +2326,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
@@ -2392,7 +2390,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         if structure.type_name() == "SurfaceMesh" {
@@ -2432,7 +2430,7 @@ impl App {
 
                 crate::with_context(|ctx| {
                     for structure in ctx.registry.iter() {
-                        if !structure.is_enabled() {
+                        if !ctx.is_structure_visible(structure) {
                             continue;
                         }
                         render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);

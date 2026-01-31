@@ -48,6 +48,10 @@ GPU data from structure geometry **must** be transformed by the model matrix. Wh
 
 **Quantity**: Implement `Quantity` trait → add marker trait → add GPU resources (`render_data`, `init_gpu_resources`, `update_uniforms`) → add active accessor on parent structure → add `auto_scale()` in registration → add init/update/draw in `app.rs` → add UI in `polyscope-ui`.
 
+## UI Layout Convention
+
+For label+widget rows (sliders, drag values, color pickers), always use `egui::Grid` with 2 columns instead of `ui.horizontal` + `ui.add_sized`. Grid auto-sizes the label column and left-aligns labels. For buttons, `ui.add_sized` with a fixed width is fine.
+
 ## Known Issues
 
 - **Pretty mode non-linear opacity**: Depth peeling renders both faces of closed meshes, giving effective alpha = `2α - α²`. Matches C++ Polyscope. Transparency only becomes visible at low opacity values.

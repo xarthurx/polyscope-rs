@@ -166,35 +166,40 @@ fn main() {
     });
 
     // === Create groups ===
+    // Each group mixes structure types (mesh + point cloud + curve) to demonstrate
+    // that groups can organize across type boundaries, unlike the Structures panel
+    // which groups by type.
 
     // Main parent group
     let all_objects = polyscope::create_group("All Objects");
     all_objects.set_show_child_details(true);
 
-    // Sub-groups
-    let cubes_group = polyscope::create_group("Cubes");
-    cubes_group
+    // Group 1: all "red/1" objects
+    let group_1 = polyscope::create_group("Group 1 (Red)");
+    group_1
         .add_surface_mesh("red_cube")
-        .add_surface_mesh("green_cube")
-        .add_surface_mesh("blue_cube");
-
-    let spheres_group = polyscope::create_group("Spheres");
-    spheres_group
         .add_point_cloud("sphere_1")
-        .add_point_cloud("sphere_2")
-        .add_point_cloud("sphere_3");
+        .add_curve_network("helix_1");
 
-    let curves_group = polyscope::create_group("Curves");
-    curves_group
-        .add_curve_network("helix_1")
-        .add_curve_network("helix_2")
+    // Group 2: all "green/2" objects
+    let group_2 = polyscope::create_group("Group 2 (Green)");
+    group_2
+        .add_surface_mesh("green_cube")
+        .add_point_cloud("sphere_2")
+        .add_curve_network("helix_2");
+
+    // Group 3: all "blue/3" objects
+    let group_3 = polyscope::create_group("Group 3 (Blue)");
+    group_3
+        .add_surface_mesh("blue_cube")
+        .add_point_cloud("sphere_3")
         .add_curve_network("helix_3");
 
     // Build hierarchy
     all_objects
-        .add_child_group("Cubes")
-        .add_child_group("Spheres")
-        .add_child_group("Curves");
+        .add_child_group("Group 1 (Red)")
+        .add_child_group("Group 2 (Green)")
+        .add_child_group("Group 3 (Blue)");
 
     // === Select a structure and set up gizmo ===
 
@@ -217,9 +222,12 @@ fn main() {
     println!();
     println!("Groups hierarchy:");
     println!("  All Objects");
-    println!("    ├── Cubes (red, green, blue cubes)");
-    println!("    ├── Spheres (3 point cloud spheres)");
-    println!("    └── Curves (3 helix curves)");
+    println!("    ├── Group 1 (Red)  : red_cube + sphere_1 + helix_1");
+    println!("    ├── Group 2 (Green): green_cube + sphere_2 + helix_2");
+    println!("    └── Group 3 (Blue) : blue_cube + sphere_3 + helix_3");
+    println!();
+    println!("Note: The Structures panel groups by type (SurfaceMesh, PointCloud, CurveNetwork),");
+    println!("      while Groups cut across types — toggling a group hides all its members.");
     println!();
     println!("Gizmo Controls:");
     println!("  - The green cube is selected by default");

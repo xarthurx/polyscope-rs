@@ -342,7 +342,7 @@ impl VolumeGrid {
         };
         // Grid info
         ui.label(format!(
-            "Nodes: {}x{}x{} ({})",
+            "{}x{}x{} grid ({} nodes)",
             self.node_dim.x,
             self.node_dim.y,
             self.node_dim.z,

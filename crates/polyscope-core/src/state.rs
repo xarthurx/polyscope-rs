@@ -160,6 +160,18 @@ impl Context {
             .collect()
     }
 
+    /// Checks if a structure should be visible, combining its own enabled state
+    /// with group visibility.
+    ///
+    /// A structure is visible if:
+    /// - Its own `is_enabled()` returns true, AND
+    /// - It's not in any disabled group (checked via `is_structure_visible_in_groups`)
+    #[must_use]
+    pub fn is_structure_visible(&self, structure: &dyn crate::Structure) -> bool {
+        structure.is_enabled()
+            && self.is_structure_visible_in_groups(structure.type_name(), structure.name())
+    }
+
     /// Checks if a structure should be visible based on its group membership.
     ///
     /// A structure is visible if:

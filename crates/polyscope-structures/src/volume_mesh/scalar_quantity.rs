@@ -87,7 +87,6 @@ impl VolumeMeshVertexScalarQuantity {
                 self.enabled = enabled;
             }
             ui.label(&self.name);
-            ui.label("(vertex scalar)");
             ui.label(format!("[{:.3}, {:.3}]", self.data_min, self.data_max));
         });
     }
@@ -209,7 +208,6 @@ impl VolumeMeshCellScalarQuantity {
                 self.enabled = enabled;
             }
             ui.label(&self.name);
-            ui.label("(cell scalar)");
             ui.label(format!("[{:.3}, {:.3}]", self.data_min, self.data_max));
         });
     }

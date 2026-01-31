@@ -832,7 +832,7 @@ impl VolumeMesh {
         let num_tets = self.cells.iter().filter(|c| c[4] == u32::MAX).count();
         let num_hexes = self.num_cells() - num_tets;
         ui.label(format!(
-            "Vertices: {}  Cells: {} ({} tets, {} hexes)",
+            "{} verts, {} cells ({} tets, {} hexes)",
             self.num_vertices(),
             self.num_cells(),
             num_tets,

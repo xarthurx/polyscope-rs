@@ -1,5 +1,5 @@
 use crate::{
-    add_slice_plane, deselect_structure, remove_group, remove_slice_plane,
+    add_slice_plane, deselect_structure, remove_slice_plane,
     reset_selected_transform, with_context, with_context_mut, GizmoSpace, Mat4, Vec3,
 };
 use polyscope_core::gizmo::Transform;
@@ -298,25 +298,15 @@ pub fn apply_group_settings(settings: &polyscope_ui::GroupSettings) {
 /// Handles a group UI action.
 pub fn handle_group_action(
     action: polyscope_ui::GroupsAction,
-    current_settings: &mut Vec<polyscope_ui::GroupSettings>,
+    current_settings: &mut [polyscope_ui::GroupSettings],
 ) {
     match action {
         polyscope_ui::GroupsAction::None => {}
-        polyscope_ui::GroupsAction::Create(name) => {
-            crate::create_group(&name);
-            current_settings.push(polyscope_ui::GroupSettings::with_name(&name));
-        }
-        polyscope_ui::GroupsAction::Remove(idx) => {
-            if idx < current_settings.len() {
-                let name = &current_settings[idx].name;
-                remove_group(name);
-                current_settings.remove(idx);
-            }
-        }
-        polyscope_ui::GroupsAction::ToggleEnabled(idx)
-        | polyscope_ui::GroupsAction::ToggleDetails(idx) => {
-            if idx < current_settings.len() {
-                apply_group_settings(&current_settings[idx]);
+        polyscope_ui::GroupsAction::SyncEnabled(indices) => {
+            for idx in indices {
+                if idx < current_settings.len() {
+                    apply_group_settings(&current_settings[idx]);
+                }
             }
         }
     }

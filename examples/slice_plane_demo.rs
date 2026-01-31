@@ -184,7 +184,16 @@ fn main() {
         .set_color(Vec3::new(0.4, 0.5, 0.7))
         .set_interior_color(Vec3::new(0.6, 0.3, 0.3));
 
-    // 4. Add slice planes
+    // 4. Create groups to organize structures
+    let surface_group = polyscope::create_group("Surface Objects");
+    surface_group
+        .add_surface_mesh("bunny")
+        .add_point_cloud("point_sphere");
+
+    let volume_group = polyscope::create_group("Volume Objects");
+    volume_group.add_volume_mesh("tet_cube");
+
+    // 5. Add slice planes
     println!();
     println!("Adding slice planes...");
 
@@ -215,6 +224,7 @@ fn main() {
     println!("- Use Translate mode to move the plane, Rotate mode to change its orientation");
     println!("- Toggle 'draw_plane' to show/hide the slice plane visualization");
     println!("- The tet_cube uses centroid-based culling (no half-tets)");
+    println!("- Use the Groups panel to toggle visibility of 'Surface Objects' and 'Volume Objects'");
     println!();
 
     polyscope::show();

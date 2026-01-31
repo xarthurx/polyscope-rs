@@ -233,14 +233,8 @@ impl GroupSettings {
 pub enum GroupsAction {
     /// No action.
     None,
-    /// Create a new group with the given name.
-    Create(String),
-    /// Remove group at the given index.
-    Remove(usize),
-    /// Toggle enabled state for group at index.
-    ToggleEnabled(usize),
-    /// Toggle `show_child_details` for group at index.
-    ToggleDetails(usize),
+    /// Enabled state changed for groups at these indices (includes cascaded children).
+    SyncEnabled(Vec<usize>),
 }
 
 /// Gizmo settings for UI.
@@ -470,137 +464,113 @@ pub fn build_gizmo_section(
     action
 }
 
-/// Builds UI for a single group item.
-/// Returns true if enabled was toggled.
-fn build_group_item(ui: &mut Ui, settings: &mut GroupSettings) -> bool {
-    let mut toggled = false;
+/// Counts the total number of structures in a group and all its descendant groups.
+fn count_structures_recursive(idx: usize, groups: &[GroupSettings]) -> usize {
+    let mut total = groups[idx].child_structures.len();
+    let name = &groups[idx].name;
+    for (i, g) in groups.iter().enumerate() {
+        if g.parent_group.as_deref() == Some(name) {
+            total += count_structures_recursive(i, groups);
+        }
+    }
+    total
+}
 
-    // Enabled checkbox
+/// Collects the index of a group and all its descendant groups (recursive).
+fn collect_descendant_indices(idx: usize, groups: &[GroupSettings], out: &mut Vec<usize>) {
+    let name = &groups[idx].name;
+    for (i, g) in groups.iter().enumerate() {
+        if g.parent_group.as_deref() == Some(name) {
+            out.push(i);
+            collect_descendant_indices(i, groups, out);
+        }
+    }
+}
+
+/// Renders a group checkbox and recursively renders its child groups indented.
+fn build_group_tree(
+    ui: &mut Ui,
+    idx: usize,
+    groups: &mut Vec<GroupSettings>,
+    toggled_idx: &mut Option<usize>,
+) {
+    let member_count = count_structures_recursive(idx, groups);
+    let label = format!("{} ({member_count})", groups[idx].name);
+
     ui.horizontal(|ui| {
-        if ui.checkbox(&mut settings.enabled, "Enabled").changed() {
-            toggled = true;
+        if ui.checkbox(&mut groups[idx].enabled, label).changed() && toggled_idx.is_none() {
+            *toggled_idx = Some(idx);
         }
     });
 
-    // Show child details checkbox
-    ui.horizontal(|ui| {
-        ui.checkbox(&mut settings.show_child_details, "Show details");
-    });
+    // Collect child group indices
+    let child_name = groups[idx].name.clone();
+    let child_indices: Vec<usize> = groups
+        .iter()
+        .enumerate()
+        .filter(|(_, g)| g.parent_group.as_deref() == Some(child_name.as_str()))
+        .map(|(i, _)| i)
+        .collect();
 
-    // Show parent if any
-    if let Some(ref parent) = settings.parent_group {
-        ui.horizontal(|ui| {
-            ui.label("Parent:");
-            ui.label(parent);
-        });
-    }
-
-    // Show child structures
-    if !settings.child_structures.is_empty() {
-        ui.separator();
-        ui.label("Structures:");
-        ui.indent("structures", |ui| {
-            for (type_name, name) in &settings.child_structures {
-                ui.horizontal(|ui| {
-                    ui.label(format!("[{type_name}]"));
-                    ui.label(name);
-                });
+    if !child_indices.is_empty() {
+        ui.indent(format!("group_children_{idx}"), |ui| {
+            for child_idx in child_indices {
+                build_group_tree(ui, child_idx, groups, toggled_idx);
             }
         });
     }
-
-    // Show child groups
-    if !settings.child_groups.is_empty() {
-        ui.separator();
-        ui.label("Child groups:");
-        ui.indent("child_groups", |ui| {
-            for child_name in &settings.child_groups {
-                ui.label(format!("  {child_name}"));
-            }
-        });
-    }
-
-    // Show empty state
-    if settings.child_structures.is_empty() && settings.child_groups.is_empty() {
-        ui.label("(empty)");
-    }
-
-    toggled
 }
 
 /// Builds the groups section.
+/// Only shown when groups exist (groups are created programmatically via the API).
+/// Each group is shown with a checkbox to toggle visibility.
+/// Child groups are indented under their parent.
+/// Toggling a parent cascades the enabled state to all descendant groups.
 /// Returns an action if one was triggered.
 pub fn build_groups_section(
     ui: &mut Ui,
     groups: &mut Vec<GroupSettings>,
-    new_group_name: &mut String,
 ) -> GroupsAction {
-    let mut action = GroupsAction::None;
+    if groups.is_empty() {
+        return GroupsAction::None;
+    }
+
+    let mut toggled_idx: Option<usize> = None;
 
     CollapsingHeader::new("Groups")
-        .default_open(false)
+        .default_open(true)
         .show(ui, |ui| {
-            // Add new group controls
-            ui.horizontal(|ui| {
-                ui.label("New group:");
-                ui.add_sized([80.0, 18.0], egui::TextEdit::singleline(new_group_name));
-                if ui.button("Create").clicked() && !new_group_name.is_empty() {
-                    action = GroupsAction::Create(new_group_name.clone());
-                }
-            });
-
-            if groups.is_empty() {
-                ui.label("No groups");
-                return;
-            }
-
-            ui.separator();
-
-            // Show only root groups (those without parents)
-            let root_groups: Vec<usize> = groups
+            // Find root groups (no parent)
+            let root_indices: Vec<usize> = groups
                 .iter()
                 .enumerate()
                 .filter(|(_, g)| g.parent_group.is_none())
                 .map(|(i, _)| i)
                 .collect();
 
-            let mut remove_idx = None;
-
-            for idx in root_groups {
-                let group = &mut groups[idx];
-                let header_text = format!(
-                    "{} {} ({})",
-                    if group.enabled { "●" } else { "○" },
-                    group.name,
-                    group.child_structures.len()
-                );
-
-                CollapsingHeader::new(header_text)
-                    .id_salt(format!("group_{idx}"))
-                    .default_open(false)
-                    .show(ui, |ui| {
-                        if build_group_item(ui, group) && action == GroupsAction::None {
-                            action = GroupsAction::ToggleEnabled(idx);
-                        }
-
-                        ui.separator();
-                        if ui.button("Remove").clicked() {
-                            remove_idx = Some(idx);
-                        }
-                    });
-            }
-
-            if let Some(idx) = remove_idx {
-                action = GroupsAction::Remove(idx);
+            for idx in root_indices {
+                build_group_tree(ui, idx, groups, &mut toggled_idx);
             }
         });
 
-    action
+    if let Some(idx) = toggled_idx {
+        // Cascade the new enabled state to all descendant groups
+        let new_state = groups[idx].enabled;
+        let mut affected = vec![idx];
+        collect_descendant_indices(idx, groups, &mut affected);
+        for &i in &affected[1..] {
+            groups[i].enabled = new_state;
+        }
+        GroupsAction::SyncEnabled(affected)
+    } else {
+        GroupsAction::None
+    }
 }
 
 /// Builds the main left panel.
-pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
-    SidePanel::left("polyscope_main_panel")
+/// Returns the actual panel width in logical pixels (for dynamic pointer checks).
+pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) -> f32 {
+    let resp = SidePanel::left("polyscope_main_panel")
         .default_width(305.0)
         .resizable(true)
         .show(ctx, |ui| {
@@ -612,6 +582,7 @@ pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) {
                     build_contents(ui);
                 });
         });
+    resp.response.rect.width()
 }
 
 /// Builds the polyscope controls section.
@@ -627,11 +598,13 @@ pub fn build_controls_section(ui: &mut Ui, background_color: &mut [f32; 3]) -> V
                 ui.color_edit_button_rgb(background_color);
             });
 
-            ui.horizontal(|ui| {
-                if ui.button("Reset View").clicked() {
+            ui.columns(2, |cols| {
+                let w = cols[0].available_width();
+                let h = cols[0].spacing().interact_size.y;
+                if cols[0].add_sized([w, h], egui::Button::new("Reset View")).clicked() {
                     action = ViewAction::ResetView;
                 }
-                if ui.button("Screenshot").clicked() {
+                if cols[1].add_sized([w, h], egui::Button::new("Screenshot")).clicked() {
                     action = ViewAction::Screenshot;
                 }
             });
@@ -989,7 +962,7 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
             }
 
             if settings.ssao_enabled {
-                ui.horizontal(|ui| {
+                egui::Grid::new("ssao_grid").num_columns(2).show(ui, |ui| {
                     ui.label("Radius:");
                     if ui
                         .add(Slider::new(&mut settings.ssao_radius, 0.01..=2.0))
@@ -997,9 +970,8 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
                     {
                         changed = true;
                     }
-                });
+                    ui.end_row();
 
-                ui.horizontal(|ui| {
                     ui.label("Intensity:");
                     if ui
                         .add(Slider::new(&mut settings.ssao_intensity, 0.1..=3.0))
@@ -1007,9 +979,8 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
                     {
                         changed = true;
                     }
-                });
+                    ui.end_row();
 
-                ui.horizontal(|ui| {
                     ui.label("Bias:");
                     if ui
                         .add(Slider::new(&mut settings.ssao_bias, 0.001..=0.1))
@@ -1017,15 +988,15 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
                     {
                         changed = true;
                     }
-                });
+                    ui.end_row();
 
-                ui.horizontal(|ui| {
                     ui.label("Samples:");
                     let mut samples = settings.ssao_sample_count as i32;
                     if ui.add(DragValue::new(&mut samples).range(4..=64)).changed() {
                         settings.ssao_sample_count = samples.max(4) as u32;
                         changed = true;
                     }
+                    ui.end_row();
                 });
             }
         });
@@ -1041,7 +1012,7 @@ pub fn build_tone_mapping_section(ui: &mut Ui, settings: &mut ToneMappingSetting
     CollapsingHeader::new("Tone Mapping")
         .default_open(false)
         .show(ui, |ui| {
-            ui.horizontal(|ui| {
+            egui::Grid::new("tone_mapping_grid").num_columns(2).show(ui, |ui| {
                 ui.label("Exposure:");
                 if ui
                     .add(
@@ -1053,9 +1024,8 @@ pub fn build_tone_mapping_section(ui: &mut Ui, settings: &mut ToneMappingSetting
                 {
                     changed = true;
                 }
-            });
+                ui.end_row();
 
-            ui.horizontal(|ui| {
                 ui.label("White Level:");
                 if ui
                     .add(
@@ -1067,9 +1037,8 @@ pub fn build_tone_mapping_section(ui: &mut Ui, settings: &mut ToneMappingSetting
                 {
                     changed = true;
                 }
-            });
+                ui.end_row();
 
-            ui.horizontal(|ui| {
                 ui.label("Gamma:");
                 if ui
                     .add(
@@ -1080,6 +1049,7 @@ pub fn build_tone_mapping_section(ui: &mut Ui, settings: &mut ToneMappingSetting
                 {
                     changed = true;
                 }
+                ui.end_row();
             });
 
             ui.separator();
@@ -1147,28 +1117,30 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
 
     // Normal direction with preset buttons
     ui.label("Normal:");
-    ui.horizontal(|ui| {
-        if ui.button("+X").clicked() {
+    ui.columns(6, |cols| {
+        let w = cols[0].available_width();
+        let h = cols[0].spacing().interact_size.y;
+        if cols[0].add_sized([w, h], egui::Button::new("+X")).clicked() {
             settings.normal = [1.0, 0.0, 0.0];
             changed = true;
         }
-        if ui.button("-X").clicked() {
+        if cols[1].add_sized([w, h], egui::Button::new("-X")).clicked() {
             settings.normal = [-1.0, 0.0, 0.0];
             changed = true;
         }
-        if ui.button("+Y").clicked() {
+        if cols[2].add_sized([w, h], egui::Button::new("+Y")).clicked() {
             settings.normal = [0.0, 1.0, 0.0];
             changed = true;
         }
-        if ui.button("-Y").clicked() {
+        if cols[3].add_sized([w, h], egui::Button::new("-Y")).clicked() {
             settings.normal = [0.0, -1.0, 0.0];
             changed = true;
         }
-        if ui.button("+Z").clicked() {
+        if cols[4].add_sized([w, h], egui::Button::new("+Z")).clicked() {
             settings.normal = [0.0, 0.0, 1.0];
             changed = true;
         }
-        if ui.button("-Z").clicked() {
+        if cols[5].add_sized([w, h], egui::Button::new("-Z")).clicked() {
             settings.normal = [0.0, 0.0, -1.0];
             changed = true;
         }
@@ -1231,21 +1203,19 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
 
     // Gizmo control button (only show when draw_widget is enabled)
     if settings.draw_widget && settings.enabled {
-        ui.horizontal(|ui| {
-            let button_text = if settings.is_selected {
-                "Editing (click to deselect)"
-            } else {
-                "Edit with Gizmo"
-            };
-            if ui.button(button_text).clicked() {
-                settings.is_selected = !settings.is_selected;
-                changed = true;
-            }
-        });
+        let gizmo_text = if settings.is_selected {
+            "Deselect Gizmo"
+        } else {
+            "Edit with Gizmo"
+        };
+        if ui.button(gizmo_text).clicked() {
+            settings.is_selected = !settings.is_selected;
+            changed = true;
+        }
     }
 
-    // Plane size
-    ui.horizontal(|ui| {
+    // Plane size & Color
+    egui::Grid::new("slice_plane_props").num_columns(2).show(ui, |ui| {
         ui.label("Plane size:");
         if ui
             .add(Slider::new(&mut settings.plane_size, 0.01..=1.0).logarithmic(true))
@@ -1253,14 +1223,13 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
         {
             changed = true;
         }
-    });
+        ui.end_row();
 
-    // Color
-    ui.horizontal(|ui| {
         ui.label("Color:");
         if ui.color_edit_button_rgb(&mut settings.color).changed() {
             changed = true;
         }
+        ui.end_row();
     });
 
     changed
@@ -1383,18 +1352,18 @@ pub fn build_ground_plane_section(
                 ui.separator();
                 ui.label("Shadow Settings:");
 
-                ui.horizontal(|ui| {
+                egui::Grid::new("shadow_grid").num_columns(2).show(ui, |ui| {
                     ui.label("Blur iterations:");
                     if ui.add(Slider::new(shadow_blur_iters, 0..=5)).changed() {
                         changed = true;
                     }
-                });
+                    ui.end_row();
 
-                ui.horizontal(|ui| {
                     ui.label("Darkness:");
                     if ui.add(Slider::new(shadow_darkness, 0.0..=1.0)).changed() {
                         changed = true;
                     }
+                    ui.end_row();
                 });
 
                 // Reflection settings (only for mode 3 - TileReflection)
@@ -1402,7 +1371,7 @@ pub fn build_ground_plane_section(
                     ui.separator();
                     ui.label("Reflection Settings:");
 
-                    ui.horizontal(|ui| {
+                    egui::Grid::new("reflection_grid").num_columns(2).show(ui, |ui| {
                         ui.label("Intensity:");
                         if ui
                             .add(Slider::new(reflection_intensity, 0.0..=1.0))
@@ -1410,6 +1379,7 @@ pub fn build_ground_plane_section(
                         {
                             changed = true;
                         }
+                        ui.end_row();
                     });
                 }
             }
@@ -1515,12 +1485,9 @@ pub fn build_structure_tree_with_ui<F, U>(
                                 .default_open(false)
                                 .show(ui, |ui| {
                                     // Checkbox for enable/disable
-                                    ui.horizontal(|ui| {
-                                        ui.label("Enabled:");
-                                        if ui.checkbox(&mut enabled_mut, "").changed() {
-                                            on_toggle(type_name, name, enabled_mut);
-                                        }
-                                    });
+                                    if ui.checkbox(&mut enabled_mut, "Enabled").changed() {
+                                        on_toggle(type_name, name, enabled_mut);
+                                    }
 
                                     ui.separator();
 

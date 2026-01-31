@@ -78,10 +78,11 @@ impl ApplicationHandler for App {
             .as_ref()
             .is_some_and(|e| e.context.is_using_pointer());
 
-        // Check if mouse is in the left UI panel area (approximately 305px wide + margin)
-        // Only block events here, not in the 3D viewport
-        const LEFT_PANEL_WIDTH: f64 = 320.0;
-        let mouse_in_ui_panel = self.mouse_pos.0 <= LEFT_PANEL_WIDTH;
+        // Check if mouse is in the left UI panel area.
+        // Uses the dynamic panel width (updated each frame from actual egui panel rect)
+        // instead of a hardcoded constant, so it stays accurate when the panel resizes
+        // (e.g., when groups are created/expanded or the user drags the panel edge).
+        let mouse_in_ui_panel = self.mouse_pos.0 <= self.left_panel_width;
 
         match event {
             WindowEvent::CloseRequested => {
@@ -386,6 +387,12 @@ impl ApplicationHandler for App {
                             log::debug!("[CLICK DEBUG] gpu_picked: {gpu_picked:?}");
                             let mut point_hit: Option<(String, u32, f32)> = None;
                             let mut curve_hit: Option<(String, u32, f32)> = None;
+                            // Filter GPU picks by group visibility
+                            let gpu_picked = gpu_picked.filter(|(type_name, name, _)| {
+                                crate::with_context(|ctx| {
+                                    ctx.is_structure_visible_in_groups(type_name, name)
+                                })
+                            });
                             if let Some((type_name, name, idx)) = gpu_picked {
                                 if type_name == "PointCloud" {
                                     point_hit = self

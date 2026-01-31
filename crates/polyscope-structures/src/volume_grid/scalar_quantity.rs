@@ -387,15 +387,16 @@ impl VolumeGridNodeScalarQuantity {
             });
         }
 
-        // Data range sliders
+        // Data range
         ui.horizontal(|ui| {
             ui.label("Range:");
             let mut min = self.data_min;
             let mut max = self.data_max;
             let speed = (max - min).abs() * 0.01;
             let speed = if speed > 0.0 { speed } else { 0.01 };
-            ui.add(egui::DragValue::new(&mut min).speed(speed).prefix("min: "));
-            ui.add(egui::DragValue::new(&mut max).speed(speed).prefix("max: "));
+            ui.add(egui::DragValue::new(&mut min).speed(speed));
+            ui.label("–");
+            ui.add(egui::DragValue::new(&mut max).speed(speed));
             if (min - self.data_min).abs() > f32::EPSILON
                 || (max - self.data_max).abs() > f32::EPSILON
             {
@@ -406,8 +407,7 @@ impl VolumeGridNodeScalarQuantity {
     }
 
     fn build_isosurface_ui(&mut self, ui: &mut egui::Ui) {
-        // Color picker
-        ui.horizontal(|ui| {
+        egui::Grid::new(format!("{}_iso_grid", self.name)).num_columns(2).show(ui, |ui| {
             ui.label("Color:");
             let mut color = [
                 self.isosurface_color.x,
@@ -417,48 +417,45 @@ impl VolumeGridNodeScalarQuantity {
             if ui.color_edit_button_rgb(&mut color).changed() {
                 self.isosurface_color = Vec3::new(color[0], color[1], color[2]);
             }
-        });
+            ui.end_row();
 
-        // Isovalue slider
-        ui.horizontal(|ui| {
             ui.label("Level:");
             let mut level = self.isosurface_level;
             let (range_min, range_max) = (self.data_min, self.data_max);
             if ui
-                .add(
-                    egui::Slider::new(&mut level, range_min..=range_max)
-                        .text("isovalue"),
-                )
+                .add(egui::Slider::new(&mut level, range_min..=range_max))
                 .changed()
             {
                 self.isosurface_level = level;
                 self.isosurface_dirty = true;
-                // Keep old mesh cache and render data alive until the next
-                // frame's init phase replaces them — avoids UI and geometry blink.
             }
+            ui.end_row();
         });
 
-        // Refresh button
-        ui.horizontal(|ui| {
-            if ui.button("Refresh Isosurface").clicked() {
-                self.isosurface_dirty = true;
-                self.isosurface_mesh_cache = None;
-                self.isosurface_render_data = None;
-            }
+        // Triangle count
+        if let Some(mesh) = &self.isosurface_mesh_cache {
+            ui.label(format!("{} tris", mesh.indices.len() / 3));
+        }
 
-            if let Some(mesh) = &self.isosurface_mesh_cache {
-                ui.label(format!(
-                    "{} triangles",
-                    mesh.indices.len() / 3
-                ));
-            }
-        });
-
-        // Register as mesh button
-        if self.isosurface_mesh_cache.is_some() {
-            if ui.button("Register as Surface Mesh").clicked() {
-                self.register_as_mesh_requested = true;
-            }
+        // Buttons: equal-width columns, same row
+        let has_cache = self.isosurface_mesh_cache.is_some();
+        if has_cache {
+            ui.columns(2, |cols| {
+                let w = cols[0].available_width();
+                let h = cols[0].spacing().interact_size.y;
+                if cols[0].add_sized([w, h], egui::Button::new("Refresh")).clicked() {
+                    self.isosurface_dirty = true;
+                    self.isosurface_mesh_cache = None;
+                    self.isosurface_render_data = None;
+                }
+                if cols[1].add_sized([w, h], egui::Button::new("Register Mesh")).clicked() {
+                    self.register_as_mesh_requested = true;
+                }
+            });
+        } else if ui.button("Refresh").clicked() {
+            self.isosurface_dirty = true;
+            self.isosurface_mesh_cache = None;
+            self.isosurface_render_data = None;
         }
     }
 }
@@ -683,15 +680,16 @@ impl VolumeGridCellScalarQuantity {
                     });
                 }
 
-                // Data range sliders
+                // Data range
                 ui.horizontal(|ui| {
                     ui.label("Range:");
                     let mut min = self.data_min;
                     let mut max = self.data_max;
                     let speed = (max - min).abs() * 0.01;
                     let speed = if speed > 0.0 { speed } else { 0.01 };
-                    ui.add(egui::DragValue::new(&mut min).speed(speed).prefix("min: "));
-                    ui.add(egui::DragValue::new(&mut max).speed(speed).prefix("max: "));
+                    ui.add(egui::DragValue::new(&mut min).speed(speed));
+                    ui.label("–");
+                    ui.add(egui::DragValue::new(&mut max).speed(speed));
                     if (min - self.data_min).abs() > f32::EPSILON
                         || (max - self.data_max).abs() > f32::EPSILON
                     {

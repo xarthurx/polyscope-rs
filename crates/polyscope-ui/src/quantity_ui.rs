@@ -47,7 +47,7 @@ pub fn build_scalar_quantity_ui(
                 {
                     changed = true;
                 }
-                ui.label("to");
+                ui.label("–");
                 if ui
                     .add(egui::DragValue::new(range_max).speed(0.01))
                     .changed()
@@ -99,7 +99,7 @@ pub fn build_vector_quantity_ui(
 
     if *enabled {
         ui.indent(name, |ui| {
-            ui.horizontal(|ui| {
+            egui::Grid::new(format!("{name}_vector_grid")).num_columns(2).show(ui, |ui| {
                 ui.label("Length:");
                 if ui
                     .add(
@@ -111,9 +111,8 @@ pub fn build_vector_quantity_ui(
                 {
                     changed = true;
                 }
-            });
+                ui.end_row();
 
-            ui.horizontal(|ui| {
                 ui.label("Radius:");
                 if ui
                     .add(
@@ -125,13 +124,13 @@ pub fn build_vector_quantity_ui(
                 {
                     changed = true;
                 }
-            });
+                ui.end_row();
 
-            ui.horizontal(|ui| {
                 ui.label("Color:");
                 if ui.color_edit_button_rgb(color).changed() {
                     changed = true;
                 }
+                ui.end_row();
             });
         });
     }
@@ -194,8 +193,7 @@ pub fn build_parameterization_quantity_ui(
                     }
                 });
 
-            // Checker size
-            ui.horizontal(|ui| {
+            egui::Grid::new(format!("{name}_param_grid")).num_columns(2).show(ui, |ui| {
                 ui.label("Checker size:");
                 if ui
                     .add(
@@ -207,10 +205,8 @@ pub fn build_parameterization_quantity_ui(
                 {
                     changed = true;
                 }
-            });
+                ui.end_row();
 
-            // Checker color 1
-            ui.horizontal(|ui| {
                 ui.label("Color 1:");
                 let mut c = [
                     checker_colors[0].x,
@@ -221,10 +217,8 @@ pub fn build_parameterization_quantity_ui(
                     checker_colors[0] = Vec3::new(c[0], c[1], c[2]);
                     changed = true;
                 }
-            });
+                ui.end_row();
 
-            // Checker color 2
-            ui.horizontal(|ui| {
                 ui.label("Color 2:");
                 let mut c = [
                     checker_colors[1].x,
@@ -235,6 +229,7 @@ pub fn build_parameterization_quantity_ui(
                     checker_colors[1] = Vec3::new(c[0], c[1], c[2]);
                     changed = true;
                 }
+                ui.end_row();
             });
         });
     }
@@ -262,7 +257,7 @@ pub fn build_intrinsic_vector_quantity_ui(
 
     if *enabled {
         ui.indent(name, |ui| {
-            ui.horizontal(|ui| {
+            egui::Grid::new(format!("{name}_intrinsic_grid")).num_columns(2).show(ui, |ui| {
                 ui.label("Length:");
                 if ui
                     .add(
@@ -274,9 +269,8 @@ pub fn build_intrinsic_vector_quantity_ui(
                 {
                     changed = true;
                 }
-            });
+                ui.end_row();
 
-            ui.horizontal(|ui| {
                 ui.label("Radius:");
                 if ui
                     .add(
@@ -288,17 +282,15 @@ pub fn build_intrinsic_vector_quantity_ui(
                 {
                     changed = true;
                 }
-            });
+                ui.end_row();
 
-            ui.horizontal(|ui| {
                 ui.label("Color:");
                 if ui.color_edit_button_rgb(color).changed() {
                     changed = true;
                 }
-            });
+                ui.end_row();
 
-            // Symmetry control
-            ui.horizontal(|ui| {
+                // Symmetry control
                 ui.label("Symmetry:");
                 let sym_label = match *n_sym {
                     1 => "Vector (1)",
@@ -319,6 +311,7 @@ pub fn build_intrinsic_vector_quantity_ui(
                             changed = true;
                         }
                     });
+                ui.end_row();
             });
         });
     }
