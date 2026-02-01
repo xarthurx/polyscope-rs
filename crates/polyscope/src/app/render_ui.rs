@@ -56,6 +56,7 @@ impl App {
         let mut screenshot_requested = false;
         let mut reset_view_requested = false;
         let mut ssaa_changed = false;
+        let mut fly_to_camera: Option<polyscope_structures::CameraParameters> = None;
 
         for egui_pass in 0..max_egui_passes {
             if egui_pass == 0 {
@@ -68,6 +69,7 @@ impl App {
                 screenshot_requested = false;
                 reset_view_requested = false;
                 ssaa_changed = false;
+                fly_to_camera = None;
             }
 
             let panel_width = polyscope_ui::build_left_panel(&egui.context, |ui| {
@@ -262,6 +264,11 @@ impl App {
                                 if type_name == "CameraView" {
                                     if let Some(cv) = s.as_any_mut().downcast_mut::<CameraView>() {
                                         cv.build_egui_ui(ui);
+                                        // Check if user requested "fly to" this camera
+                                        if cv.take_fly_to_request() {
+                                            let params = *cv.params();
+                                            fly_to_camera = Some(params);
+                                        }
                                     }
                                 }
                                 if type_name == "VolumeGrid" {
@@ -585,6 +592,21 @@ impl App {
                     engine.camera.look_at_box(min, max);
                     engine.camera.fov = std::f32::consts::FRAC_PI_4; // Reset FOV to default 45°
                 }
+            }
+
+            // Fly to a camera view (matching C++ Polyscope's setViewToThisCamera)
+            if let Some(params) = &fly_to_camera {
+                let position = params.position();
+                let look_dir = params.look_dir();
+                let (_, up, _) = params.camera_frame();
+                // Compute target point: place it at a reasonable distance along look direction.
+                // Use current camera's distance to target as reference, or scene length scale.
+                let current_dist = (engine.camera.position - engine.camera.target).length();
+                let dist = if current_dist > 0.01 { current_dist } else { 1.0 };
+                engine.camera.position = position;
+                engine.camera.target = position + look_dir * dist;
+                engine.camera.up = up;
+                engine.camera.fov = params.fov_vertical_degrees().to_radians();
             }
 
             // End egui pass and check for discard request (multi-pass layout)

@@ -5,9 +5,9 @@
 )]
 //! Materials demo showcasing all 8 matcap materials.
 //!
-//! This example creates a grid of real 3D models (Spot cow, Utah Teapot,
-//! Stanford Bunny, Armadillo), each assigned a different material, plus a
-//! point cloud and curve network to show materials across structure types.
+//! This example creates a grid of spherical meshes (icospheres), each assigned
+//! a different material, plus a point cloud and curve network to show materials
+//! across structure types.
 //!
 //! Run with: `cargo run --example materials_demo`
 //!
@@ -17,7 +17,7 @@
 //! - Right drag: Pan camera
 //! - Scroll: Zoom
 
-use glam::Vec3;
+use glam::{UVec3, Vec3};
 use polyscope::Structure;
 
 /// All available matcap material names.
@@ -25,69 +25,93 @@ const MATERIALS: &[&str] = &[
     "clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal",
 ];
 
-/// OBJ model paths, cycled for each material slot.
-const MODEL_PATHS: &[&str] = &[
-    "assets/spot.obj",
-    "assets/teapot.obj",
-    "assets/bunny.obj",
-    "assets/armadillo.obj",
-];
+/// Generate an icosphere mesh (subdivision of icosahedron).
+fn create_icosphere(subdivisions: u32) -> (Vec<Vec3>, Vec<UVec3>) {
+    use std::collections::HashMap;
 
-const MODEL_NAMES: &[&str] = &["spot", "teapot", "bunny", "armadillo"];
+    // Start with icosahedron vertices
+    let t = (1.0 + 5.0_f32.sqrt()) / 2.0;
+    let mut vertices: Vec<Vec3> = vec![
+        Vec3::new(-1.0, t, 0.0),
+        Vec3::new(1.0, t, 0.0),
+        Vec3::new(-1.0, -t, 0.0),
+        Vec3::new(1.0, -t, 0.0),
+        Vec3::new(0.0, -1.0, t),
+        Vec3::new(0.0, 1.0, t),
+        Vec3::new(0.0, -1.0, -t),
+        Vec3::new(0.0, 1.0, -t),
+        Vec3::new(t, 0.0, -1.0),
+        Vec3::new(t, 0.0, 1.0),
+        Vec3::new(-t, 0.0, -1.0),
+        Vec3::new(-t, 0.0, 1.0),
+    ];
+    // Normalize to unit sphere
+    for v in &mut vertices {
+        *v = v.normalize();
+    }
 
-/// Load an OBJ file and return vertices and triangle faces.
-fn load_obj(path: &str) -> (Vec<Vec3>, Vec<glam::UVec3>) {
-    let (models, _materials) = tobj::load_obj(
-        path,
-        &tobj::LoadOptions {
-            triangulate: true,
-            single_index: true,
-            ..Default::default()
-        },
-    )
-    .expect("Failed to load OBJ file");
+    let mut faces: Vec<UVec3> = vec![
+        UVec3::new(0, 11, 5),
+        UVec3::new(0, 5, 1),
+        UVec3::new(0, 1, 7),
+        UVec3::new(0, 7, 10),
+        UVec3::new(0, 10, 11),
+        UVec3::new(1, 5, 9),
+        UVec3::new(5, 11, 4),
+        UVec3::new(11, 10, 2),
+        UVec3::new(10, 7, 6),
+        UVec3::new(7, 1, 8),
+        UVec3::new(3, 9, 4),
+        UVec3::new(3, 4, 2),
+        UVec3::new(3, 2, 6),
+        UVec3::new(3, 6, 8),
+        UVec3::new(3, 8, 9),
+        UVec3::new(4, 9, 5),
+        UVec3::new(2, 4, 11),
+        UVec3::new(6, 2, 10),
+        UVec3::new(8, 6, 7),
+        UVec3::new(9, 8, 1),
+    ];
 
-    let mut vertices = Vec::new();
-    let mut faces = Vec::new();
+    // Subdivide
+    let mut midpoint_cache: HashMap<(u32, u32), u32> = HashMap::new();
 
-    for model in models {
-        let mesh = model.mesh;
-        let vertex_offset = vertices.len() as u32;
+    for _ in 0..subdivisions {
+        let mut new_faces = Vec::new();
+        midpoint_cache.clear();
 
-        for i in (0..mesh.positions.len()).step_by(3) {
-            vertices.push(Vec3::new(
-                mesh.positions[i],
-                mesh.positions[i + 1],
-                mesh.positions[i + 2],
-            ));
+        for face in &faces {
+            let a = get_midpoint(face.x, face.y, &mut vertices, &mut midpoint_cache);
+            let b = get_midpoint(face.y, face.z, &mut vertices, &mut midpoint_cache);
+            let c = get_midpoint(face.z, face.x, &mut vertices, &mut midpoint_cache);
+
+            new_faces.push(UVec3::new(face.x, a, c));
+            new_faces.push(UVec3::new(face.y, b, a));
+            new_faces.push(UVec3::new(face.z, c, b));
+            new_faces.push(UVec3::new(a, b, c));
         }
 
-        for i in (0..mesh.indices.len()).step_by(3) {
-            faces.push(glam::UVec3::new(
-                mesh.indices[i] + vertex_offset,
-                mesh.indices[i + 1] + vertex_offset,
-                mesh.indices[i + 2] + vertex_offset,
-            ));
-        }
+        faces = new_faces;
     }
 
     (vertices, faces)
 }
 
-/// Normalize a mesh to be centered at origin with a given target size.
-fn normalize_mesh(vertices: &mut [Vec3], target_size: f32) {
-    if vertices.is_empty() {
-        return;
+fn get_midpoint(
+    i0: u32,
+    i1: u32,
+    vertices: &mut Vec<Vec3>,
+    cache: &mut std::collections::HashMap<(u32, u32), u32>,
+) -> u32 {
+    let key = if i0 < i1 { (i0, i1) } else { (i1, i0) };
+    if let Some(&idx) = cache.get(&key) {
+        return idx;
     }
-    let min = vertices.iter().copied().reduce(Vec3::min).unwrap();
-    let max = vertices.iter().copied().reduce(Vec3::max).unwrap();
-    let center = (min + max) * 0.5;
-    let extent = max - min;
-    let max_extent = extent.x.max(extent.y).max(extent.z);
-    let scale = target_size / max_extent;
-    for v in vertices.iter_mut() {
-        *v = (*v - center) * scale;
-    }
+    let mid = (vertices[i0 as usize] + vertices[i1 as usize]).normalize();
+    let idx = vertices.len() as u32;
+    vertices.push(mid);
+    cache.insert(key, idx);
+    idx
 }
 
 /// Transform vertices by translating and scaling.
@@ -99,15 +123,8 @@ fn main() {
     env_logger::init();
     polyscope::init().expect("Failed to initialize polyscope");
 
-    // Load and normalize all 4 models
-    let base_models: Vec<(Vec<Vec3>, Vec<glam::UVec3>)> = MODEL_PATHS
-        .iter()
-        .map(|path| {
-            let (mut verts, faces) = load_obj(path);
-            normalize_mesh(&mut verts, 1.8);
-            (verts, faces)
-        })
-        .collect();
+    // Generate a base icosphere with 2 subdivisions (320 faces - smooth enough)
+    let (sphere_verts, sphere_faces) = create_icosphere(2);
 
     // Colors for each material (chosen to look distinct)
     let colors: &[Vec3] = &[
@@ -121,19 +138,20 @@ fn main() {
         Vec3::new(0.60, 0.50, 0.80), // normal - purple
     ];
 
-    // Create a 4x2 grid, each with a different material and model
+    // Create a 4x2 grid of spheres, each with a different material
     let spacing = 2.5_f32;
     for (i, &material) in MATERIALS.iter().enumerate() {
         let col = (i % 4) as f32;
         let row = (i / 4) as f32;
-        let pos = Vec3::new(col * spacing - 1.5 * spacing, -row * spacing, 0.0);
+        let pos = Vec3::new(
+            col * spacing - 1.5 * spacing,
+            -row * spacing,
+            0.0,
+        );
 
-        let model_idx = i % 4;
-        let (ref base_verts, ref base_faces) = base_models[model_idx];
-
-        let name = format!("{}_{}", MODEL_NAMES[model_idx], material);
-        let verts = transform_vertices(base_verts, pos, 1.0);
-        polyscope::register_surface_mesh(&name, verts, base_faces.clone());
+        let name = format!("sphere_{material}");
+        let verts = transform_vertices(&sphere_verts, pos, 1.0);
+        polyscope::register_surface_mesh(&name, verts, sphere_faces.clone());
         polyscope::with_surface_mesh(&name, |mesh| {
             mesh.set_surface_color(colors[i]);
             mesh.set_material(material);
@@ -181,15 +199,12 @@ fn main() {
     println!("Materials Demo");
     println!("==============");
     println!();
-    println!("This demo shows all 8 matcap materials on real 3D models:");
+    println!("This demo shows all 8 matcap materials on icosphere meshes:");
     println!();
     for (i, &material) in MATERIALS.iter().enumerate() {
         let col = i % 4;
         let row = i / 4;
-        println!(
-            "  Row {row}, Col {col}: {material} ({})",
-            MODEL_NAMES[i % 4]
-        );
+        println!("  Row {row}, Col {col}: {material}");
     }
     println!();
     println!("Additional structures:");

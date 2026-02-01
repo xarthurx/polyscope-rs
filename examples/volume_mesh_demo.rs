@@ -13,6 +13,7 @@
 //! - Vertex and cell color quantities
 //!
 //! Mesh assets:
+//! - `assets/bunny.mesh`: Stanford Bunny (2503 vertices, ~16k tetrahedra)
 //! - `assets/p01.mesh`: Rectangular channel (584 vertices, 2568 tetrahedra)
 //! - `assets/cyl248.mesh`: Cylinder (92 vertices, 248 tetrahedra)
 //!
@@ -78,12 +79,7 @@ fn load_mesh_file(path: &str) -> Option<(Vec<Vec3>, Vec<[u32; 4]>)> {
                                 .collect();
                             if parts.len() >= 4 {
                                 // MEDIT uses 1-based indexing
-                                tets.push([
-                                    parts[0] - 1,
-                                    parts[1] - 1,
-                                    parts[2] - 1,
-                                    parts[3] - 1,
-                                ]);
+                                tets.push([parts[0] - 1, parts[1] - 1, parts[2] - 1, parts[3] - 1]);
                             }
                         }
                     }
@@ -311,71 +307,76 @@ fn main() {
     env_logger::init();
     polyscope::init().expect("Failed to initialize polyscope");
 
-    // Load primary tet mesh: p01.mesh (rectangular channel)
-    let primary_path = "assets/p01.mesh";
-    let (tet_vertices, tets, mesh_name) = if Path::new(primary_path).exists() {
-        if let Some((v, t)) = load_mesh_file(primary_path) {
+    // Load primary tet mesh: bunny.mesh (Stanford Bunny)
+    let bunny_path = "assets/bunny.mesh";
+    let (bunny_vertices, bunny_tets, bunny_name) = if Path::new(bunny_path).exists() {
+        if let Some((v, t)) = load_mesh_file(bunny_path) {
             println!(
-                "Loaded {primary_path}: {} vertices, {} tets",
+                "Loaded {bunny_path}: {} vertices, {} tets",
                 v.len(),
                 t.len()
             );
-            (v, t, "channel")
+            (v, t, "bunny")
         } else {
-            println!("Failed to parse {primary_path}, using fallback");
+            println!("Failed to parse {bunny_path}, using fallback");
             let (v, t) = generate_subdivided_octahedron(Vec3::ZERO, 1.0, 2);
             (v, t, "octahedron")
         }
     } else {
-        println!("No {primary_path} found, using fallback");
+        println!("No {bunny_path} found, using fallback");
         let (v, t) = generate_subdivided_octahedron(Vec3::ZERO, 1.0, 2);
         (v, t, "octahedron")
     };
 
-    let tet_mesh = polyscope::register_tet_mesh(mesh_name, tet_vertices.clone(), tets.clone());
-    tet_mesh.set_color(Vec3::new(0.2, 0.5, 0.8));
-    tet_mesh.set_edge_width(0.5);
-    add_tet_quantities(mesh_name, &tet_vertices, &tets);
+    let bunny_mesh =
+        polyscope::register_tet_mesh(bunny_name, bunny_vertices.clone(), bunny_tets.clone());
+    bunny_mesh.set_color(Vec3::new(0.2, 0.5, 0.8));
+    bunny_mesh.set_edge_width(0.5);
+    add_tet_quantities(bunny_name, &bunny_vertices, &bunny_tets);
 
-    // Load secondary tet mesh: cyl248.mesh (cylinder)
-    let secondary_path = "assets/cyl248.mesh";
-    if Path::new(secondary_path).exists() {
-        if let Some((cyl_verts, cyl_tets)) = load_mesh_file(secondary_path) {
+    // Load secondary tet mesh: p01.mesh (rectangular channel)
+    let channel_path = "assets/p01.mesh";
+    let mut channel_verts_final = Vec::new();
+    let mut channel_tets_final = Vec::new();
+    if Path::new(channel_path).exists() {
+        if let Some((ch_verts, ch_tets)) = load_mesh_file(channel_path) {
             println!(
-                "Loaded {secondary_path}: {} vertices, {} tets",
-                cyl_verts.len(),
-                cyl_tets.len()
+                "Loaded {channel_path}: {} vertices, {} tets",
+                ch_verts.len(),
+                ch_tets.len()
             );
 
-            let primary_max_x = tet_vertices
-                .iter()
-                .map(|v| v.x)
-                .fold(f32::MIN, f32::max);
-            let cyl_min_x = cyl_verts.iter().map(|v| v.x).fold(f32::MAX, f32::min);
-            let offset_x = primary_max_x - cyl_min_x + 0.5;
+            let bunny_max_x = bunny_vertices.iter().map(|v| v.x).fold(f32::MIN, f32::max);
+            let ch_min_x = ch_verts.iter().map(|v| v.x).fold(f32::MAX, f32::min);
+            let offset_x = bunny_max_x - ch_min_x + 0.5;
 
-            let cyl_verts_offset: Vec<Vec3> = cyl_verts
+            channel_verts_final = ch_verts
                 .iter()
                 .map(|v| *v + Vec3::new(offset_x, 0.0, 0.0))
                 .collect();
+            channel_tets_final = ch_tets.clone();
 
-            let cyl_mesh = polyscope::register_tet_mesh(
-                "cylinder",
-                cyl_verts_offset.clone(),
-                cyl_tets.clone(),
+            let ch_mesh = polyscope::register_tet_mesh(
+                "channel",
+                channel_verts_final.clone(),
+                ch_tets,
             );
-            cyl_mesh.set_color(Vec3::new(0.7, 0.4, 0.2));
-            cyl_mesh.set_edge_width(0.5);
-            add_tet_quantities("cylinder", &cyl_verts_offset, &cyl_tets);
+            ch_mesh.set_color(Vec3::new(0.7, 0.4, 0.2));
+            ch_mesh.set_edge_width(0.5);
+            add_tet_quantities("channel", &channel_verts_final, &channel_tets_final);
         }
     }
 
-    // Hex grid
-    let hex_offset_x = tet_vertices
-        .iter()
-        .map(|v| v.x)
-        .fold(f32::MIN, f32::max)
-        + 3.0;
+    // Hex grid - position to the right of the rightmost tet mesh
+    let rightmost_x = if channel_verts_final.is_empty() {
+        bunny_vertices.iter().map(|v| v.x).fold(f32::MIN, f32::max)
+    } else {
+        channel_verts_final
+            .iter()
+            .map(|v| v.x)
+            .fold(f32::MIN, f32::max)
+    };
+    let hex_offset_x = rightmost_x + 1.0;
     let (hex_vertices, hexes) = generate_hex_grid(
         Vec3::new(hex_offset_x, 0.0, 0.0),
         Vec3::splat(1.0),
@@ -399,10 +400,17 @@ fn main() {
     println!();
     println!("Structures:");
     println!(
-        "  - {mesh_name}: {} vertices, {} tets (from {primary_path})",
-        tet_vertices.len(),
-        tets.len(),
+        "  - {bunny_name}: {} vertices, {} tets (from {bunny_path})",
+        bunny_vertices.len(),
+        bunny_tets.len(),
     );
+    if !channel_verts_final.is_empty() {
+        println!(
+            "  - channel: {} vertices, {} tets (from {channel_path})",
+            channel_verts_final.len(),
+            channel_tets_final.len(),
+        );
+    }
     println!(
         "  - hex_grid: {} vertices, {} hexes",
         hex_vertices.len(),

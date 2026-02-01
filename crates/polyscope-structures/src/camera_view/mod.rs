@@ -30,6 +30,9 @@ pub struct CameraView {
 
     // GPU resources (reuses CurveNetwork edge rendering)
     render_data: Option<CurveNetworkRenderData>,
+
+    // UI state: set to true when user clicks "fly to" button
+    fly_to_requested: bool,
 }
 
 impl CameraView {
@@ -46,6 +49,7 @@ impl CameraView {
             widget_focal_length_is_relative: true,
             widget_thickness: 0.02,
             render_data: None,
+            fly_to_requested: false,
         }
     }
 
@@ -241,8 +245,29 @@ impl CameraView {
         self.render_data.as_ref()
     }
 
+    /// Returns true if the user has requested to fly to this camera view.
+    /// The flag is automatically cleared after reading.
+    #[must_use]
+    pub fn take_fly_to_request(&mut self) -> bool {
+        let requested = self.fly_to_requested;
+        self.fly_to_requested = false;
+        requested
+    }
+
     /// Builds the egui UI for this camera view.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+        // "Fly to" button + camera info on same line
+        ui.horizontal(|ui| {
+            if ui.button("fly to").clicked() {
+                self.fly_to_requested = true;
+            }
+            ui.label(format!(
+                "FoV: {:.1}°  aspect: {:.2}",
+                self.params.fov_vertical_degrees(),
+                self.params.aspect_ratio()
+            ));
+        });
+
         // Color picker
         ui.horizontal(|ui| {
             ui.label("Color:");
@@ -276,8 +301,6 @@ impl CameraView {
             self.params.position().y,
             self.params.position().z
         ));
-        ui.label(format!("FoV: {:.1}°", self.params.fov_vertical_degrees()));
-        ui.label(format!("Aspect: {:.2}", self.params.aspect_ratio()));
     }
 }
 
