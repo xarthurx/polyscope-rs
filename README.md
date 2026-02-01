@@ -8,12 +8,12 @@ A Rust-native 3D visualization library for geometric data, inspired by [Polyscop
 
 <table>
   <tr>
-    <td><img src="docs/images/polyscope_materials.png" alt="Materials" width="400"/></td>
-    <td><img src="docs/images/polyscope_tet_mesh.png" alt="Volume Mesh" width="400"/></td>
+    <td align="center"><img src="docs/images/polyscope_materials.png" alt="Materials" width="400"/><br><b>Materials</b></td>
+    <td align="center"><img src="docs/images/polyscope_tet_mesh.png" alt="Volume Mesh" width="400"/><br><b>Volume Mesh</b></td>
   </tr>
   <tr>
-    <td><img src="docs/images/polyscope_camera_view.png" alt="Camera View" width="400"/></td>
-    <td><img src="docs/images/polyscope_volume_grid.png" alt="Volume Grid" width="400"/></td>
+    <td align="center"><img src="docs/images/polyscope_camera_view.png" alt="Camera View" width="400"/><br><b>Camera View</b></td>
+    <td align="center"><img src="docs/images/polyscope_volume_grid.png" alt="Volume Grid" width="400"/><br><b>Volume Grid</b></td>
   </tr>
 </table>
 
