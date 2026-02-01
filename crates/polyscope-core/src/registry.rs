@@ -308,7 +308,10 @@ mod tests {
         reg.register(mock("b", "SurfaceMesh")).unwrap();
         reg.register(mock("c", "PointCloud")).unwrap();
 
-        let meshes: Vec<&str> = reg.get_all_of_type("SurfaceMesh").map(|s| s.name()).collect();
+        let meshes: Vec<&str> = reg
+            .get_all_of_type("SurfaceMesh")
+            .map(|s| s.name())
+            .collect();
         assert_eq!(meshes.len(), 2);
         assert!(meshes.contains(&"a"));
         assert!(meshes.contains(&"b"));

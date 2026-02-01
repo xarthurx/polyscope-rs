@@ -4,8 +4,8 @@
 //! without opening a window. Useful for integration tests, batch processing,
 //! and automated screenshot generation.
 
-use crate::app::App;
 use crate::Result;
+use crate::app::App;
 use pollster::FutureExt;
 use polyscope_core::state::with_context_mut;
 use polyscope_render::RenderEngine;
@@ -28,9 +28,8 @@ use polyscope_render::RenderEngine;
 /// ```
 pub fn render_to_file(filename: &str, width: u32, height: u32) -> Result<()> {
     let data = render_to_image(width, height)?;
-    polyscope_render::save_image(filename, &data, width, height).map_err(|e| {
-        crate::PolyscopeError::RenderError(format!("Failed to save image: {e}"))
-    })
+    polyscope_render::save_image(filename, &data, width, height)
+        .map_err(|e| crate::PolyscopeError::RenderError(format!("Failed to save image: {e}")))
 }
 
 /// Renders the current scene to a raw RGBA pixel buffer.
@@ -56,7 +55,9 @@ pub fn render_to_image(width: u32, height: u32) -> Result<Vec<u8>> {
     // Create headless render engine
     let engine = RenderEngine::new_headless(width, height)
         .block_on()
-        .map_err(|e| crate::PolyscopeError::RenderError(format!("Failed to create headless engine: {e}")))?;
+        .map_err(|e| {
+            crate::PolyscopeError::RenderError(format!("Failed to create headless engine: {e}"))
+        })?;
     app.engine = Some(engine);
 
     // Clear stale GPU resources from all structures so they get re-initialized

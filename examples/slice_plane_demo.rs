@@ -224,7 +224,9 @@ fn main() {
     println!("- Use Translate mode to move the plane, Rotate mode to change its orientation");
     println!("- Toggle 'draw_plane' to show/hide the slice plane visualization");
     println!("- The tet_cube uses centroid-based culling (no half-tets)");
-    println!("- Use the Groups panel to toggle visibility of 'Surface Objects' and 'Volume Objects'");
+    println!(
+        "- Use the Groups panel to toggle visibility of 'Surface Objects' and 'Volume Objects'"
+    );
     println!();
 
     polyscope::show();

@@ -14,7 +14,7 @@
 //! - Camera controls (orbit, pan, zoom)
 
 use polyscope::{
-    init, register_point_cloud, show, shutdown, with_context_mut, HasQuantities, Result, Vec3,
+    HasQuantities, Result, Vec3, init, register_point_cloud, show, shutdown, with_context_mut,
 };
 use polyscope_structures::PointCloud;
 

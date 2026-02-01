@@ -95,9 +95,8 @@ fn main() {
                 let x = (i as f32 + 0.5) / 5.0;
                 let y = (j as f32 + 0.5) / 5.0;
                 let z = (k as f32 + 0.5) / 5.0;
-                let val = (x * std::f32::consts::PI * 2.0).sin()
-                    * (y * std::f32::consts::PI).cos()
-                    + z;
+                let val =
+                    (x * std::f32::consts::PI * 2.0).sin() * (y * std::f32::consts::PI).cos() + z;
                 cell_values.push(val);
             }
         }

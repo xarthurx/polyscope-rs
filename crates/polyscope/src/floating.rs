@@ -1,4 +1,4 @@
-use crate::{with_context_mut, Vec3};
+use crate::{Vec3, with_context_mut};
 
 /// Registers a floating scalar image (not attached to any structure).
 pub fn register_floating_scalar_image(

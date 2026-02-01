@@ -1,4 +1,4 @@
-use crate::{with_context, with_context_mut, Mat4};
+use crate::{Mat4, with_context, with_context_mut};
 
 /// Sets the transform of a point cloud by name.
 pub fn set_point_cloud_transform(name: &str, transform: Mat4) {

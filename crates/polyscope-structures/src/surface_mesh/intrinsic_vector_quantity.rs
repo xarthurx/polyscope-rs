@@ -583,7 +583,7 @@ mod tests {
 
         let sym = q.compute_symmetric_world_vectors();
         assert_eq!(sym.len(), 2); // 1 vector * 2 symmetry = 2
-                                  // First copy: original direction (+X)
+        // First copy: original direction (+X)
         assert!((sym[0].1 - Vec3::X).length() < 1e-5);
         // Second copy: 180 degree rotation (-X)
         assert!((sym[1].1 + Vec3::X).length() < 1e-5);
@@ -601,7 +601,7 @@ mod tests {
 
         let sym = q.compute_symmetric_world_vectors();
         assert_eq!(sym.len(), 4); // 1 vector * 4 symmetry = 4
-                                  // 0 deg: +X
+        // 0 deg: +X
         assert!((sym[0].1 - Vec3::X).length() < 1e-5);
         // 90 deg: +Y
         assert!((sym[1].1 - Vec3::Y).length() < 1e-5);

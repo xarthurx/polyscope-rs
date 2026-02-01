@@ -24,12 +24,7 @@ impl RenderEngine {
     /// `[global_start, global_start + num_elements)`.
     ///
     /// Index 0 is reserved as background (no hit), so all ranges start from >= 1.
-    pub fn assign_pick_range(
-        &mut self,
-        type_name: &str,
-        name: &str,
-        num_elements: u32,
-    ) -> u32 {
+    pub fn assign_pick_range(&mut self, type_name: &str, name: &str, num_elements: u32) -> u32 {
         let key = (type_name.to_string(), name.to_string());
 
         // If already assigned, return existing start
@@ -67,8 +62,7 @@ impl RenderEngine {
     /// owns this index (background or freed range).
     pub fn lookup_global_index(&self, global_index: u32) -> Option<(&str, &str, u32)> {
         for range in self.pick_ranges.values() {
-            if global_index >= range.global_start
-                && global_index < range.global_start + range.count
+            if global_index >= range.global_start && global_index < range.global_start + range.count
             {
                 let local = global_index - range.global_start;
                 return Some((&range.type_name, &range.name, local));
@@ -481,9 +475,7 @@ impl RenderEngine {
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("Mesh Pick Shader"),
-                source: wgpu::ShaderSource::Wgsl(
-                    include_str!("../shaders/pick_mesh.wgsl").into(),
-                ),
+                source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/pick_mesh.wgsl").into()),
             });
 
         // Mesh pick bind group layout: camera, mesh pick uniforms, positions, face_indices

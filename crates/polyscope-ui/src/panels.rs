@@ -553,10 +553,7 @@ fn build_group_tree(
 /// Child groups are indented under their parent.
 /// Toggling a parent cascades the enabled state to all descendant groups.
 /// Returns an action if one was triggered.
-pub fn build_groups_section(
-    ui: &mut Ui,
-    groups: &mut Vec<GroupSettings>,
-) -> GroupsAction {
+pub fn build_groups_section(ui: &mut Ui, groups: &mut Vec<GroupSettings>) -> GroupsAction {
     if groups.is_empty() {
         return GroupsAction::None;
     }
@@ -627,10 +624,16 @@ pub fn build_controls_section(ui: &mut Ui, background_color: &mut [f32; 3]) -> V
             ui.columns(2, |cols| {
                 let w = cols[0].available_width();
                 let h = cols[0].spacing().interact_size.y;
-                if cols[0].add_sized([w, h], egui::Button::new("Reset View")).clicked() {
+                if cols[0]
+                    .add_sized([w, h], egui::Button::new("Reset View"))
+                    .clicked()
+                {
                     action = ViewAction::ResetView;
                 }
-                if cols[1].add_sized([w, h], egui::Button::new("Screenshot")).clicked() {
+                if cols[1]
+                    .add_sized([w, h], egui::Button::new("Screenshot"))
+                    .clicked()
+                {
                     action = ViewAction::Screenshot;
                 }
             });
@@ -1032,10 +1035,7 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
 
 /// Builds the material loading section in the left panel.
 /// Returns a `MaterialAction` if the user requested loading.
-pub fn build_material_section(
-    ui: &mut Ui,
-    state: &mut MaterialLoadState,
-) -> MaterialAction {
+pub fn build_material_section(ui: &mut Ui, state: &mut MaterialLoadState) -> MaterialAction {
     let mut action = MaterialAction::None;
 
     CollapsingHeader::new("Materials")
@@ -1102,45 +1102,47 @@ pub fn build_tone_mapping_section(ui: &mut Ui, settings: &mut ToneMappingSetting
     CollapsingHeader::new("Tone Mapping")
         .default_open(false)
         .show(ui, |ui| {
-            egui::Grid::new("tone_mapping_grid").num_columns(2).show(ui, |ui| {
-                ui.label("Exposure:");
-                if ui
-                    .add(
-                        Slider::new(&mut settings.exposure, 0.1..=4.0)
-                            .logarithmic(true)
-                            .clamping(egui::SliderClamping::Always),
-                    )
-                    .changed()
-                {
-                    changed = true;
-                }
-                ui.end_row();
+            egui::Grid::new("tone_mapping_grid")
+                .num_columns(2)
+                .show(ui, |ui| {
+                    ui.label("Exposure:");
+                    if ui
+                        .add(
+                            Slider::new(&mut settings.exposure, 0.1..=4.0)
+                                .logarithmic(true)
+                                .clamping(egui::SliderClamping::Always),
+                        )
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                    ui.end_row();
 
-                ui.label("White Level:");
-                if ui
-                    .add(
-                        Slider::new(&mut settings.white_level, 0.5..=4.0)
-                            .logarithmic(true)
-                            .clamping(egui::SliderClamping::Always),
-                    )
-                    .changed()
-                {
-                    changed = true;
-                }
-                ui.end_row();
+                    ui.label("White Level:");
+                    if ui
+                        .add(
+                            Slider::new(&mut settings.white_level, 0.5..=4.0)
+                                .logarithmic(true)
+                                .clamping(egui::SliderClamping::Always),
+                        )
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                    ui.end_row();
 
-                ui.label("Gamma:");
-                if ui
-                    .add(
-                        Slider::new(&mut settings.gamma, 1.0..=3.0)
-                            .clamping(egui::SliderClamping::Always),
-                    )
-                    .changed()
-                {
-                    changed = true;
-                }
-                ui.end_row();
-            });
+                    ui.label("Gamma:");
+                    if ui
+                        .add(
+                            Slider::new(&mut settings.gamma, 1.0..=3.0)
+                                .clamping(egui::SliderClamping::Always),
+                        )
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                    ui.end_row();
+                });
 
             ui.separator();
             if ui.button("Reset to Defaults").clicked() {
@@ -1305,22 +1307,24 @@ fn build_slice_plane_item(ui: &mut Ui, settings: &mut SlicePlaneSettings) -> boo
     }
 
     // Plane size & Color
-    egui::Grid::new("slice_plane_props").num_columns(2).show(ui, |ui| {
-        ui.label("Plane size:");
-        if ui
-            .add(Slider::new(&mut settings.plane_size, 0.01..=1.0).logarithmic(true))
-            .changed()
-        {
-            changed = true;
-        }
-        ui.end_row();
+    egui::Grid::new("slice_plane_props")
+        .num_columns(2)
+        .show(ui, |ui| {
+            ui.label("Plane size:");
+            if ui
+                .add(Slider::new(&mut settings.plane_size, 0.01..=1.0).logarithmic(true))
+                .changed()
+            {
+                changed = true;
+            }
+            ui.end_row();
 
-        ui.label("Color:");
-        if ui.color_edit_button_rgb(&mut settings.color).changed() {
-            changed = true;
-        }
-        ui.end_row();
-    });
+            ui.label("Color:");
+            if ui.color_edit_button_rgb(&mut settings.color).changed() {
+                changed = true;
+            }
+            ui.end_row();
+        });
 
     changed
 }
@@ -1442,35 +1446,39 @@ pub fn build_ground_plane_section(
                 ui.separator();
                 ui.label("Shadow Settings:");
 
-                egui::Grid::new("shadow_grid").num_columns(2).show(ui, |ui| {
-                    ui.label("Blur iterations:");
-                    if ui.add(Slider::new(shadow_blur_iters, 0..=5)).changed() {
-                        changed = true;
-                    }
-                    ui.end_row();
+                egui::Grid::new("shadow_grid")
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                        ui.label("Blur iterations:");
+                        if ui.add(Slider::new(shadow_blur_iters, 0..=5)).changed() {
+                            changed = true;
+                        }
+                        ui.end_row();
 
-                    ui.label("Darkness:");
-                    if ui.add(Slider::new(shadow_darkness, 0.0..=1.0)).changed() {
-                        changed = true;
-                    }
-                    ui.end_row();
-                });
+                        ui.label("Darkness:");
+                        if ui.add(Slider::new(shadow_darkness, 0.0..=1.0)).changed() {
+                            changed = true;
+                        }
+                        ui.end_row();
+                    });
 
                 // Reflection settings (only for mode 3 - TileReflection)
                 if *mode == 3 {
                     ui.separator();
                     ui.label("Reflection Settings:");
 
-                    egui::Grid::new("reflection_grid").num_columns(2).show(ui, |ui| {
-                        ui.label("Intensity:");
-                        if ui
-                            .add(Slider::new(reflection_intensity, 0.0..=1.0))
-                            .changed()
-                        {
-                            changed = true;
-                        }
-                        ui.end_row();
-                    });
+                    egui::Grid::new("reflection_grid")
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            ui.label("Intensity:");
+                            if ui
+                                .add(Slider::new(reflection_intensity, 0.0..=1.0))
+                                .changed()
+                            {
+                                changed = true;
+                            }
+                            ui.end_row();
+                        });
                 }
             }
         });

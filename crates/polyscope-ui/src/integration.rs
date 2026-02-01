@@ -74,8 +74,7 @@ impl EguiIntegration {
 
     /// Handles platform output (clipboard, cursor, IME, etc.).
     pub fn handle_platform_output(&mut self, window: &Window, output: &egui::PlatformOutput) {
-        self.state
-            .handle_platform_output(window, output.clone());
+        self.state.handle_platform_output(window, output.clone());
     }
 
     /// Ends the frame and returns paint jobs (convenience for single-pass usage).

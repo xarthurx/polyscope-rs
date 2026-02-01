@@ -91,6 +91,7 @@ mod volume_mesh;
 
 // Re-export core types
 pub use polyscope_core::{
+    Mat4, Vec2, Vec3, Vec4,
     error::{PolyscopeError, Result},
     gizmo::{GizmoAxis, GizmoConfig, GizmoMode, GizmoSpace, Transform},
     group::Group,
@@ -98,10 +99,9 @@ pub use polyscope_core::{
     pick::{PickResult, Pickable},
     quantity::{ParamCoordsType, ParamVizStyle, Quantity, QuantityKind},
     registry::Registry,
-    slice_plane::{SlicePlane, SlicePlaneUniforms, MAX_SLICE_PLANES},
-    state::{with_context, with_context_mut, Context},
+    slice_plane::{MAX_SLICE_PLANES, SlicePlane, SlicePlaneUniforms},
+    state::{Context, with_context, with_context_mut},
     structure::{HasQuantities, Structure},
-    Mat4, Vec2, Vec3, Vec4,
 };
 
 // Re-export render types
@@ -119,11 +119,11 @@ pub use polyscope_ui::{
 };
 
 // Re-export structures
+pub use polyscope_structures::volume_grid::VolumeGridVizMode;
 pub use polyscope_structures::{
     CameraExtrinsics, CameraIntrinsics, CameraParameters, CameraView, CurveNetwork, PointCloud,
     SurfaceMesh, VolumeCellType, VolumeGrid, VolumeMesh,
 };
-pub use polyscope_structures::volume_grid::VolumeGridVizMode;
 
 // Re-export module APIs
 pub use camera_view::*;
@@ -131,6 +131,7 @@ pub use curve_network::*;
 pub use floating::*;
 pub use gizmo::*;
 pub use groups::*;
+pub use headless::*;
 pub use init::*;
 pub use point_cloud::*;
 pub use screenshot::*;
@@ -138,7 +139,6 @@ pub use slice_plane::*;
 pub use surface_mesh::*;
 pub use transform::*;
 pub use ui_sync::*;
-pub use headless::*;
 pub use volume_grid::*;
 pub use volume_mesh::*;
 
@@ -207,8 +207,8 @@ pub fn clear_file_drop_callback() {
 /// ```
 pub fn load_blendable_material(name: &str, filenames: [&str; 4]) {
     with_context_mut(|ctx| {
-        ctx.material_load_queue.push(
-            polyscope_core::state::MaterialLoadRequest::Blendable {
+        ctx.material_load_queue
+            .push(polyscope_core::state::MaterialLoadRequest::Blendable {
                 name: name.to_string(),
                 filenames: [
                     filenames[0].to_string(),
@@ -216,8 +216,7 @@ pub fn load_blendable_material(name: &str, filenames: [&str; 4]) {
                     filenames[2].to_string(),
                     filenames[3].to_string(),
                 ],
-            },
-        );
+            });
     });
 }
 
@@ -250,12 +249,11 @@ pub fn load_blendable_material_ext(name: &str, base: &str, ext: &str) {
 /// ```
 pub fn load_static_material(name: &str, filename: &str) {
     with_context_mut(|ctx| {
-        ctx.material_load_queue.push(
-            polyscope_core::state::MaterialLoadRequest::Static {
+        ctx.material_load_queue
+            .push(polyscope_core::state::MaterialLoadRequest::Static {
                 name: name.to_string(),
                 path: filename.to_string(),
-            },
-        );
+            });
     });
 }
 

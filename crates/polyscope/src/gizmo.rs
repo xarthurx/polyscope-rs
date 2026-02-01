@@ -1,4 +1,4 @@
-use crate::{with_context, with_context_mut, GizmoMode, GizmoSpace, Mat4};
+use crate::{GizmoMode, GizmoSpace, Mat4, with_context, with_context_mut};
 
 /// Selects a structure for gizmo manipulation.
 ///

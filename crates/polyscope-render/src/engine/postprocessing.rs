@@ -215,7 +215,6 @@ impl RenderEngine {
         self.create_ssao_output_texture();
     }
 
-
     /// Initializes SSAA (supersampling) pass.
     /// The pipeline uses `Rgba16Float` because it downsamples the HDR texture
     /// to the HDR intermediate texture (both are `Rgba16Float`).

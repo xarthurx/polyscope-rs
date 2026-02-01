@@ -57,7 +57,7 @@ pub struct DepthPeelPass {
 
 impl DepthPeelPass {
     /// Creates a new depth peel pass with all required resources.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         device: &wgpu::Device,
         width: u32,
@@ -148,18 +148,16 @@ impl DepthPeelPass {
         let depth_update_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("peel depth update bind group layout"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
                     },
-                ],
+                    count: None,
+                }],
             });
 
         // --- Pipelines ---
@@ -278,43 +276,43 @@ impl DepthPeelPass {
     }
 
     /// Returns the peel pipeline for external use.
-    #[must_use] 
+    #[must_use]
     pub fn peel_pipeline(&self) -> &wgpu::RenderPipeline {
         &self.peel_pipeline
     }
 
     /// Returns the peel bind group (Group 3 for min-depth texture).
-    #[must_use] 
+    #[must_use]
     pub fn peel_bind_group(&self) -> &wgpu::BindGroup {
         &self.peel_bind_group
     }
 
     /// Returns the peel color view (render target for each peel pass).
-    #[must_use] 
+    #[must_use]
     pub fn peel_color_view(&self) -> &wgpu::TextureView {
         &self.peel_color_view
     }
 
     /// Returns the peel depth color view (depth-as-color output).
-    #[must_use] 
+    #[must_use]
     pub fn peel_depth_color_view(&self) -> &wgpu::TextureView {
         &self.peel_depth_color_view
     }
 
     /// Returns the peel depth view (actual depth buffer).
-    #[must_use] 
+    #[must_use]
     pub fn peel_depth_view(&self) -> &wgpu::TextureView {
         &self.peel_depth_view
     }
 
     /// Returns the min-depth view.
-    #[must_use] 
+    #[must_use]
     pub fn min_depth_view(&self) -> &wgpu::TextureView {
         &self.min_depth_view
     }
 
     /// Returns the final accumulated view.
-    #[must_use] 
+    #[must_use]
     pub fn final_view(&self) -> &wgpu::TextureView {
         &self.final_view
     }
@@ -362,12 +360,10 @@ impl DepthPeelPass {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("peel depth update bind group"),
             layout: &self.depth_update_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&self.peel_depth_color_view),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&self.peel_depth_color_view),
+            }],
         });
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -451,8 +447,7 @@ impl DepthPeelPass {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -476,8 +471,7 @@ impl DepthPeelPass {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba16Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -545,10 +539,10 @@ impl DepthPeelPass {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("mesh peel pipeline layout"),
             bind_group_layouts: &[
-                mesh_bind_group_layout,         // Group 0
-                slice_plane_bind_group_layout,  // Group 1
-                matcap_bind_group_layout,       // Group 2
-                peel_bind_group_layout,         // Group 3
+                mesh_bind_group_layout,        // Group 0
+                slice_plane_bind_group_layout, // Group 1
+                matcap_bind_group_layout,      // Group 2
+                peel_bind_group_layout,        // Group 3
             ],
             push_constant_ranges: &[],
         });

@@ -41,11 +41,7 @@ impl VolumeMeshVertexScalarQuantity {
                 max = max.max(v);
             }
         }
-        if min > max {
-            (0.0, 1.0)
-        } else {
-            (min, max)
-        }
+        if min > max { (0.0, 1.0) } else { (min, max) }
     }
 
     /// Returns the values.
@@ -162,11 +158,7 @@ impl VolumeMeshCellScalarQuantity {
                 max = max.max(v);
             }
         }
-        if min > max {
-            (0.0, 1.0)
-        } else {
-            (min, max)
-        }
+        if min > max { (0.0, 1.0) } else { (min, max) }
     }
 
     /// Returns the values.

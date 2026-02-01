@@ -320,29 +320,65 @@ fn generate_unit_cube() -> (Vec<[f32; 4]>, Vec<[f32; 4]>) {
     // Face order: +X, -X, +Y, -Y, +Z, -Z
     let faces: [([f32; 3], [[f32; 3]; 4]); 6] = [
         // +X face (normal = +X)
-        ([1.0, 0.0, 0.0], [
-            [0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5],
-        ]),
+        (
+            [1.0, 0.0, 0.0],
+            [
+                [0.5, -0.5, -0.5],
+                [0.5, 0.5, -0.5],
+                [0.5, 0.5, 0.5],
+                [0.5, -0.5, 0.5],
+            ],
+        ),
         // -X face
-        ([-1.0, 0.0, 0.0], [
-            [-0.5, -0.5, 0.5], [-0.5, 0.5, 0.5], [-0.5, 0.5, -0.5], [-0.5, -0.5, -0.5],
-        ]),
+        (
+            [-1.0, 0.0, 0.0],
+            [
+                [-0.5, -0.5, 0.5],
+                [-0.5, 0.5, 0.5],
+                [-0.5, 0.5, -0.5],
+                [-0.5, -0.5, -0.5],
+            ],
+        ),
         // +Y face
-        ([0.0, 1.0, 0.0], [
-            [-0.5, 0.5, -0.5], [-0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, -0.5],
-        ]),
+        (
+            [0.0, 1.0, 0.0],
+            [
+                [-0.5, 0.5, -0.5],
+                [-0.5, 0.5, 0.5],
+                [0.5, 0.5, 0.5],
+                [0.5, 0.5, -0.5],
+            ],
+        ),
         // -Y face
-        ([0.0, -1.0, 0.0], [
-            [-0.5, -0.5, 0.5], [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5],
-        ]),
+        (
+            [0.0, -1.0, 0.0],
+            [
+                [-0.5, -0.5, 0.5],
+                [-0.5, -0.5, -0.5],
+                [0.5, -0.5, -0.5],
+                [0.5, -0.5, 0.5],
+            ],
+        ),
         // +Z face
-        ([0.0, 0.0, 1.0], [
-            [-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5],
-        ]),
+        (
+            [0.0, 0.0, 1.0],
+            [
+                [-0.5, -0.5, 0.5],
+                [0.5, -0.5, 0.5],
+                [0.5, 0.5, 0.5],
+                [-0.5, 0.5, 0.5],
+            ],
+        ),
         // -Z face
-        ([0.0, 0.0, -1.0], [
-            [0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5],
-        ]),
+        (
+            [0.0, 0.0, -1.0],
+            [
+                [0.5, -0.5, -0.5],
+                [-0.5, -0.5, -0.5],
+                [-0.5, 0.5, -0.5],
+                [0.5, 0.5, -0.5],
+            ],
+        ),
     ];
 
     let mut positions = Vec::with_capacity(36);
@@ -667,23 +703,41 @@ mod tests {
     #[test]
     fn test_simple_mesh_uniforms_size() {
         let size = std::mem::size_of::<SimpleMeshUniforms>();
-        assert_eq!(size % 16, 0, "SimpleMeshUniforms size ({size} bytes) must be 16-byte aligned");
+        assert_eq!(
+            size % 16,
+            0,
+            "SimpleMeshUniforms size ({size} bytes) must be 16-byte aligned"
+        );
         // model(64) + base_color(16) + transparency(4) + slice_planes_enabled(4) + backface_policy(4) + pad(4) = 96
-        assert_eq!(size, 96, "SimpleMeshUniforms should be 96 bytes, got {size}");
+        assert_eq!(
+            size, 96,
+            "SimpleMeshUniforms should be 96 bytes, got {size}"
+        );
     }
 
     #[test]
     fn test_gridcube_pick_uniforms_size() {
         let size = std::mem::size_of::<GridcubePickUniforms>();
-        assert_eq!(size % 16, 0, "GridcubePickUniforms size ({size} bytes) must be 16-byte aligned");
+        assert_eq!(
+            size % 16,
+            0,
+            "GridcubePickUniforms size ({size} bytes) must be 16-byte aligned"
+        );
         // model(64) + global_start(4) + cube_size_factor(4) + pad0(4) + pad1(4) = 80
-        assert_eq!(size, 80, "GridcubePickUniforms should be 80 bytes, got {size}");
+        assert_eq!(
+            size, 80,
+            "GridcubePickUniforms should be 80 bytes, got {size}"
+        );
     }
 
     #[test]
     fn test_gridcube_uniforms_size() {
         let size = std::mem::size_of::<GridcubeUniforms>();
-        assert_eq!(size % 16, 0, "GridcubeUniforms size ({size} bytes) must be 16-byte aligned");
+        assert_eq!(
+            size % 16,
+            0,
+            "GridcubeUniforms size ({size} bytes) must be 16-byte aligned"
+        );
         // model(64) + cube_size_factor(4) + data_min(4) + data_max(4) + transparency(4)
         // + slice_planes_enabled(4) + pad0(4) + pad1(4) + pad2(4) = 96
         assert_eq!(size, 96, "GridcubeUniforms should be 96 bytes, got {size}");

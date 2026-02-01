@@ -22,7 +22,10 @@ pub enum MaterialLoadRequest {
     /// Load a static material from a single file.
     Static { name: String, path: String },
     /// Load a blendable material from 4 files (R, G, B, K channels).
-    Blendable { name: String, filenames: [String; 4] },
+    Blendable {
+        name: String,
+        filenames: [String; 4],
+    },
 }
 
 /// Global context singleton.

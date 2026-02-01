@@ -102,11 +102,7 @@ impl VolumeGridNodeScalarQuantity {
                 max = max.max(v);
             }
         }
-        if min > max {
-            (0.0, 1.0)
-        } else {
-            (min, max)
-        }
+        if min > max { (0.0, 1.0) } else { (min, max) }
     }
 
     /// Returns the values.
@@ -246,11 +242,7 @@ impl VolumeGridNodeScalarQuantity {
             // Transform normals (only need to scale, then renormalize)
             for n in &mut mesh.normals {
                 // Scale normals by inverse spacing to account for non-uniform grid
-                *n = Vec3::new(
-                    n.x / spacing.x,
-                    n.y / spacing.y,
-                    n.z / spacing.z,
-                );
+                *n = Vec3::new(n.x / spacing.x, n.y / spacing.y, n.z / spacing.z);
                 let len = n.length();
                 if len > 0.0 {
                     *n /= len;
@@ -416,11 +408,7 @@ impl VolumeGridNodeScalarQuantity {
     }
 
     /// Builds egui UI for this quantity.
-    pub fn build_egui_ui(
-        &mut self,
-        ui: &mut egui::Ui,
-        colormap_names: &[&str],
-    ) {
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, colormap_names: &[&str]) {
         ui.horizontal(|ui| {
             let mut enabled = self.enabled;
             if ui.checkbox(&mut enabled, "").changed() {
@@ -437,10 +425,7 @@ impl VolumeGridNodeScalarQuantity {
                 ui.horizontal(|ui| {
                     ui.label("Mode:");
                     if ui
-                        .selectable_label(
-                            self.viz_mode == VolumeGridVizMode::Gridcube,
-                            "Gridcube",
-                        )
+                        .selectable_label(self.viz_mode == VolumeGridVizMode::Gridcube, "Gridcube")
                         .clicked()
                     {
                         self.viz_mode = VolumeGridVizMode::Gridcube;
@@ -477,10 +462,7 @@ impl VolumeGridNodeScalarQuantity {
                     .selected_text(&self.color_map)
                     .show_ui(ui, |ui| {
                         for &name in colormap_names {
-                            if ui
-                                .selectable_label(self.color_map == name, name)
-                                .clicked()
-                            {
+                            if ui.selectable_label(self.color_map == name, name).clicked() {
                                 self.color_map = name.to_string();
                                 self.gridcube_dirty = true;
                             }
@@ -509,30 +491,32 @@ impl VolumeGridNodeScalarQuantity {
     }
 
     fn build_isosurface_ui(&mut self, ui: &mut egui::Ui) {
-        egui::Grid::new(format!("{}_iso_grid", self.name)).num_columns(2).show(ui, |ui| {
-            ui.label("Color:");
-            let mut color = [
-                self.isosurface_color.x,
-                self.isosurface_color.y,
-                self.isosurface_color.z,
-            ];
-            if ui.color_edit_button_rgb(&mut color).changed() {
-                self.isosurface_color = Vec3::new(color[0], color[1], color[2]);
-            }
-            ui.end_row();
+        egui::Grid::new(format!("{}_iso_grid", self.name))
+            .num_columns(2)
+            .show(ui, |ui| {
+                ui.label("Color:");
+                let mut color = [
+                    self.isosurface_color.x,
+                    self.isosurface_color.y,
+                    self.isosurface_color.z,
+                ];
+                if ui.color_edit_button_rgb(&mut color).changed() {
+                    self.isosurface_color = Vec3::new(color[0], color[1], color[2]);
+                }
+                ui.end_row();
 
-            ui.label("Level:");
-            let mut level = self.isosurface_level;
-            let (range_min, range_max) = (self.data_min, self.data_max);
-            if ui
-                .add(egui::Slider::new(&mut level, range_min..=range_max))
-                .changed()
-            {
-                self.isosurface_level = level;
-                self.isosurface_dirty = true;
-            }
-            ui.end_row();
-        });
+                ui.label("Level:");
+                let mut level = self.isosurface_level;
+                let (range_min, range_max) = (self.data_min, self.data_max);
+                if ui
+                    .add(egui::Slider::new(&mut level, range_min..=range_max))
+                    .changed()
+                {
+                    self.isosurface_level = level;
+                    self.isosurface_dirty = true;
+                }
+                ui.end_row();
+            });
 
         // Triangle count
         if let Some(mesh) = &self.isosurface_mesh_cache {
@@ -545,12 +529,18 @@ impl VolumeGridNodeScalarQuantity {
             ui.columns(2, |cols| {
                 let w = cols[0].available_width();
                 let h = cols[0].spacing().interact_size.y;
-                if cols[0].add_sized([w, h], egui::Button::new("Refresh")).clicked() {
+                if cols[0]
+                    .add_sized([w, h], egui::Button::new("Refresh"))
+                    .clicked()
+                {
                     self.isosurface_dirty = true;
                     self.isosurface_mesh_cache = None;
                     self.isosurface_render_data = None;
                 }
-                if cols[1].add_sized([w, h], egui::Button::new("Register Mesh")).clicked() {
+                if cols[1]
+                    .add_sized([w, h], egui::Button::new("Register Mesh"))
+                    .clicked()
+                {
                     self.register_as_mesh_requested = true;
                 }
             });
@@ -682,11 +672,7 @@ impl VolumeGridCellScalarQuantity {
                 max = max.max(v);
             }
         }
-        if min > max {
-            (0.0, 1.0)
-        } else {
-            (min, max)
-        }
+        if min > max { (0.0, 1.0) } else { (min, max) }
     }
 
     /// Returns the values.
@@ -851,11 +837,7 @@ impl VolumeGridCellScalarQuantity {
     }
 
     /// Builds egui UI for this quantity.
-    pub fn build_egui_ui(
-        &mut self,
-        ui: &mut egui::Ui,
-        colormap_names: &[&str],
-    ) {
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, colormap_names: &[&str]) {
         ui.horizontal(|ui| {
             let mut enabled = self.enabled;
             if ui.checkbox(&mut enabled, "").changed() {
@@ -876,10 +858,7 @@ impl VolumeGridCellScalarQuantity {
                             .selected_text(&self.color_map)
                             .show_ui(ui, |ui| {
                                 for &name in colormap_names {
-                                    if ui
-                                        .selectable_label(self.color_map == name, name)
-                                        .clicked()
-                                    {
+                                    if ui.selectable_label(self.color_map == name, name).clicked() {
                                         self.color_map = name.to_string();
                                         self.gridcube_dirty = true;
                                     }

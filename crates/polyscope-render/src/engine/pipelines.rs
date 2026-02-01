@@ -71,7 +71,11 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("point pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout, &self.slice_plane_bind_group_layout, &self.matcap_bind_group_layout],
+                bind_group_layouts: &[
+                    &bind_group_layout,
+                    &self.slice_plane_bind_group_layout,
+                    &self.matcap_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -194,7 +198,11 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("vector pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout, &self.slice_plane_bind_group_layout, &self.matcap_bind_group_layout],
+                bind_group_layouts: &[
+                    &bind_group_layout,
+                    &self.slice_plane_bind_group_layout,
+                    &self.matcap_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -371,7 +379,11 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("mesh pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout, &self.slice_plane_bind_group_layout, &self.matcap_bind_group_layout],
+                bind_group_layouts: &[
+                    &bind_group_layout,
+                    &self.slice_plane_bind_group_layout,
+                    &self.matcap_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -426,56 +438,56 @@ impl RenderEngine {
                 cache: None,
             });
 
-        let depth_normal_pipeline = self
-            .device
-            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("surface mesh depth/normal pipeline"),
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: Some("vs_main"),
-                    buffers: &[],
-                    compilation_options: wgpu::PipelineCompilationOptions::default(),
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: Some("fs_main"),
-                    targets: &[
-                        // Color output (HDR) - disabled, keep scene color from other passes
-                        Some(wgpu::ColorTargetState {
-                            format: wgpu::TextureFormat::Rgba16Float,
-                            blend: None,
-                            write_mask: wgpu::ColorWrites::empty(),
-                        }),
-                        // Normal output (G-buffer for SSAO)
-                        Some(wgpu::ColorTargetState {
-                            format: wgpu::TextureFormat::Rgba16Float,
-                            blend: None,
-                            write_mask: wgpu::ColorWrites::ALL,
-                        }),
-                    ],
-                    compilation_options: wgpu::PipelineCompilationOptions::default(),
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: None, // Culling handled in shader
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    unclipped_depth: false,
-                    conservative: false,
-                },
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
-                    stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
-                }),
-                multisample: wgpu::MultisampleState::default(),
-                multiview: None,
-                cache: None,
-            });
+        let depth_normal_pipeline =
+            self.device
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("surface mesh depth/normal pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader,
+                        entry_point: Some("vs_main"),
+                        buffers: &[],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: Some("fs_main"),
+                        targets: &[
+                            // Color output (HDR) - disabled, keep scene color from other passes
+                            Some(wgpu::ColorTargetState {
+                                format: wgpu::TextureFormat::Rgba16Float,
+                                blend: None,
+                                write_mask: wgpu::ColorWrites::empty(),
+                            }),
+                            // Normal output (G-buffer for SSAO)
+                            Some(wgpu::ColorTargetState {
+                                format: wgpu::TextureFormat::Rgba16Float,
+                                blend: None,
+                                write_mask: wgpu::ColorWrites::ALL,
+                            }),
+                        ],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleList,
+                        strip_index_format: None,
+                        front_face: wgpu::FrontFace::Ccw,
+                        cull_mode: None, // Culling handled in shader
+                        polygon_mode: wgpu::PolygonMode::Fill,
+                        unclipped_depth: false,
+                        conservative: false,
+                    },
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: wgpu::TextureFormat::Depth24PlusStencil8,
+                        depth_write_enabled: true,
+                        depth_compare: wgpu::CompareFunction::Less,
+                        stencil: wgpu::StencilState::default(),
+                        bias: wgpu::DepthBiasState::default(),
+                    }),
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview: None,
+                    cache: None,
+                });
 
         self.mesh_pipeline = Some(pipeline);
         self.mesh_depth_normal_pipeline = Some(depth_normal_pipeline);
@@ -577,7 +589,11 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("curve network edge pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout, &self.slice_plane_bind_group_layout, &self.matcap_bind_group_layout],
+                bind_group_layouts: &[
+                    &bind_group_layout,
+                    &self.slice_plane_bind_group_layout,
+                    &self.matcap_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -1169,7 +1185,12 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Reflected Mesh Pipeline Layout"),
-                bind_group_layouts: &[&mesh_bind_group_layout, reflection_pass.bind_group_layout(), &self.matcap_bind_group_layout, &self.slice_plane_bind_group_layout],
+                bind_group_layouts: &[
+                    &mesh_bind_group_layout,
+                    reflection_pass.bind_group_layout(),
+                    &self.matcap_bind_group_layout,
+                    &self.slice_plane_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -1311,7 +1332,12 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Reflected Point Cloud Pipeline Layout"),
-                bind_group_layouts: &[&point_bind_group_layout, reflection_pass.bind_group_layout(), &self.matcap_bind_group_layout, &self.slice_plane_bind_group_layout],
+                bind_group_layouts: &[
+                    &point_bind_group_layout,
+                    reflection_pass.bind_group_layout(),
+                    &self.matcap_bind_group_layout,
+                    &self.slice_plane_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -1452,7 +1478,12 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Reflected Curve Network Pipeline Layout"),
-                bind_group_layouts: &[&curve_bind_group_layout, reflection_pass.bind_group_layout(), &self.matcap_bind_group_layout, &self.slice_plane_bind_group_layout],
+                bind_group_layouts: &[
+                    &curve_bind_group_layout,
+                    reflection_pass.bind_group_layout(),
+                    &self.matcap_bind_group_layout,
+                    &self.slice_plane_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -1609,7 +1640,11 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("simple mesh pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout, &self.slice_plane_bind_group_layout, &self.matcap_bind_group_layout],
+                bind_group_layouts: &[
+                    &bind_group_layout,
+                    &self.slice_plane_bind_group_layout,
+                    &self.matcap_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -1763,7 +1798,11 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("gridcube pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout, &self.slice_plane_bind_group_layout, &self.matcap_bind_group_layout],
+                bind_group_layouts: &[
+                    &bind_group_layout,
+                    &self.slice_plane_bind_group_layout,
+                    &self.matcap_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 

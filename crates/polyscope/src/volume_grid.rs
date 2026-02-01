@@ -1,6 +1,8 @@
-use crate::{with_context, with_context_mut, Vec3, VolumeGrid};
-use polyscope_structures::volume_grid::{VolumeGridNodeScalarQuantity, VolumeGridCellScalarQuantity, VolumeGridVizMode};
+use crate::{Vec3, VolumeGrid, with_context, with_context_mut};
 use polyscope_core::structure::HasQuantities;
+use polyscope_structures::volume_grid::{
+    VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,
+};
 
 /// Registers a volume grid with polyscope.
 pub fn register_volume_grid(
@@ -113,7 +115,10 @@ impl VolumeGridHandle {
     pub fn set_node_scalar_viz_mode(&self, quantity_name: &str, mode: VolumeGridVizMode) -> &Self {
         with_volume_grid(&self.name, |vg| {
             if let Some(q) = vg.get_quantity_mut(quantity_name) {
-                if let Some(nsq) = q.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                if let Some(nsq) = q
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                {
                     nsq.set_viz_mode(mode);
                 }
             }
@@ -125,7 +130,10 @@ impl VolumeGridHandle {
     pub fn set_isosurface_level(&self, quantity_name: &str, level: f32) -> &Self {
         with_volume_grid(&self.name, |vg| {
             if let Some(q) = vg.get_quantity_mut(quantity_name) {
-                if let Some(nsq) = q.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                if let Some(nsq) = q
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                {
                     nsq.set_isosurface_level(level);
                 }
             }
@@ -137,7 +145,10 @@ impl VolumeGridHandle {
     pub fn set_isosurface_color(&self, quantity_name: &str, color: Vec3) -> &Self {
         with_volume_grid(&self.name, |vg| {
             if let Some(q) = vg.get_quantity_mut(quantity_name) {
-                if let Some(nsq) = q.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                if let Some(nsq) = q
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                {
                     nsq.set_isosurface_color(color);
                 }
             }
@@ -149,9 +160,15 @@ impl VolumeGridHandle {
     pub fn set_color_map(&self, quantity_name: &str, color_map: &str) -> &Self {
         with_volume_grid(&self.name, |vg| {
             if let Some(q) = vg.get_quantity_mut(quantity_name) {
-                if let Some(nsq) = q.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                if let Some(nsq) = q
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                {
                     nsq.set_color_map(color_map);
-                } else if let Some(csq) = q.as_any_mut().downcast_mut::<VolumeGridCellScalarQuantity>() {
+                } else if let Some(csq) = q
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridCellScalarQuantity>()
+                {
                     csq.set_color_map(color_map);
                 }
             }

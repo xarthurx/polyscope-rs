@@ -182,5 +182,4 @@ mod tests {
         assert_eq!(index_to_color(0x00FF00), [0, 255, 0]);
         assert_eq!(index_to_color(0x0000FF), [0, 0, 255]);
     }
-
 }

@@ -625,7 +625,12 @@ impl CurveNetwork {
             .map(|p| (self.transform * p.extend(1.0)).truncate())
             .collect();
         render_data.update_node_positions(queue, &transformed_nodes);
-        render_data.update_edge_vertices(queue, &transformed_nodes, &self.edge_tail_inds, &self.edge_tip_inds);
+        render_data.update_edge_vertices(
+            queue,
+            &transformed_nodes,
+            &self.edge_tail_inds,
+            &self.edge_tip_inds,
+        );
 
         let uniforms = CurveNetworkUniforms {
             color: self.color.to_array(),

@@ -1,4 +1,4 @@
-use crate::{with_context, with_context_mut, SurfaceMesh, Vec2, Vec3, Vec4};
+use crate::{SurfaceMesh, Vec2, Vec3, Vec4, with_context, with_context_mut};
 use glam::UVec3;
 
 /// Trait for face data that can be converted to the internal polygon format.
@@ -294,11 +294,7 @@ impl SurfaceMeshHandle {
     }
 
     /// Adds a face intrinsic vector quantity with auto-computed tangent basis.
-    pub fn add_face_intrinsic_vector_quantity_auto(
-        &self,
-        name: &str,
-        vectors: Vec<Vec2>,
-    ) -> &Self {
+    pub fn add_face_intrinsic_vector_quantity_auto(&self, name: &str, vectors: Vec<Vec2>) -> &Self {
         with_surface_mesh(&self.name, |mesh| {
             mesh.add_face_intrinsic_vector_quantity_auto(name, vectors);
         });

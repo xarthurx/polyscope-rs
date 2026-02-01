@@ -749,7 +749,14 @@ mod tests {
         let q = CurveNodeColorQuantity::new("colors", "parent", colors);
 
         assert_eq!(q.name(), "colors");
-        assert_eq!(q.colors(), &[Vec4::new(1.0, 0.0, 0.0, 1.0), Vec4::new(0.0, 1.0, 0.0, 1.0), Vec4::new(0.0, 0.0, 1.0, 1.0)]);
+        assert_eq!(
+            q.colors(),
+            &[
+                Vec4::new(1.0, 0.0, 0.0, 1.0),
+                Vec4::new(0.0, 1.0, 0.0, 1.0),
+                Vec4::new(0.0, 0.0, 1.0, 1.0)
+            ]
+        );
         assert_eq!(q.data_size(), 3);
     }
 
@@ -759,7 +766,10 @@ mod tests {
         let q = CurveEdgeColorQuantity::new("edge_colors", "parent", colors);
 
         assert_eq!(q.name(), "edge_colors");
-        assert_eq!(q.colors(), &[Vec4::new(1.0, 1.0, 1.0, 1.0), Vec4::new(0.0, 0.0, 0.0, 1.0)]);
+        assert_eq!(
+            q.colors(),
+            &[Vec4::new(1.0, 1.0, 1.0, 1.0), Vec4::new(0.0, 0.0, 0.0, 1.0)]
+        );
         assert_eq!(q.data_size(), 2);
     }
 

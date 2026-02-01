@@ -13,7 +13,8 @@ impl RenderEngine {
     /// Returns the matcap bind group for a given material name.
     /// Falls back to the default material if the name is not found.
     pub fn matcap_bind_group_for(&self, material_name: &str) -> &wgpu::BindGroup {
-        &self.matcap_textures
+        &self
+            .matcap_textures
             .get(material_name)
             .unwrap_or(&self.matcap_textures[DEFAULT_MATERIAL])
             .bind_group

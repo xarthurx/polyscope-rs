@@ -5,8 +5,8 @@
 use egui::Ui;
 use glam::{DMat4, Mat4, Quat, Vec3};
 use transform_gizmo_egui::{
-    config::TransformPivotPoint, math::Transform, mint, Gizmo, GizmoConfig, GizmoExt, GizmoMode,
-    GizmoOrientation, GizmoVisuals,
+    Gizmo, GizmoConfig, GizmoExt, GizmoMode, GizmoOrientation, GizmoVisuals,
+    config::TransformPivotPoint, math::Transform, mint,
 };
 
 /// Wrapper around transform-gizmo-egui for polyscope integration.

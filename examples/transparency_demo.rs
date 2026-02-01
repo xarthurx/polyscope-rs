@@ -5,9 +5,9 @@
 )]
 //! Transparency demo demonstrating depth-peeled transparency rendering.
 //!
-//! This example creates overlapping transparent meshes to show how the
-//! depth peeling algorithm renders transparent surfaces correctly
-//! regardless of render order.
+//! This example loads real 3D models (Spot cow, Utah Teapot, Stanford Bunny)
+//! and renders them with varying transparency to show how the depth peeling
+//! algorithm handles overlapping transparent surfaces correctly.
 //!
 //! Run with: cargo run --example `transparency_demo`
 //!
@@ -17,43 +17,59 @@
 
 use glam::Vec3;
 
-/// Generate a unit cube mesh centered at origin.
-fn create_cube() -> (Vec<Vec3>, Vec<glam::UVec3>) {
-    let vertices = vec![
-        // Front face
-        Vec3::new(-0.5, -0.5, 0.5),
-        Vec3::new(0.5, -0.5, 0.5),
-        Vec3::new(0.5, 0.5, 0.5),
-        Vec3::new(-0.5, 0.5, 0.5),
-        // Back face
-        Vec3::new(-0.5, -0.5, -0.5),
-        Vec3::new(0.5, -0.5, -0.5),
-        Vec3::new(0.5, 0.5, -0.5),
-        Vec3::new(-0.5, 0.5, -0.5),
-    ];
+/// Load an OBJ file and return vertices and triangle faces.
+fn load_obj(path: &str) -> (Vec<Vec3>, Vec<glam::UVec3>) {
+    let (models, _materials) = tobj::load_obj(
+        path,
+        &tobj::LoadOptions {
+            triangulate: true,
+            single_index: true,
+            ..Default::default()
+        },
+    )
+    .expect("Failed to load OBJ file");
 
-    let faces = vec![
-        // Front
-        glam::UVec3::new(0, 1, 2),
-        glam::UVec3::new(0, 2, 3),
-        // Back
-        glam::UVec3::new(5, 4, 7),
-        glam::UVec3::new(5, 7, 6),
-        // Top
-        glam::UVec3::new(3, 2, 6),
-        glam::UVec3::new(3, 6, 7),
-        // Bottom
-        glam::UVec3::new(4, 5, 1),
-        glam::UVec3::new(4, 1, 0),
-        // Right
-        glam::UVec3::new(1, 5, 6),
-        glam::UVec3::new(1, 6, 2),
-        // Left
-        glam::UVec3::new(4, 0, 3),
-        glam::UVec3::new(4, 3, 7),
-    ];
+    let mut vertices = Vec::new();
+    let mut faces = Vec::new();
+
+    for model in models {
+        let mesh = model.mesh;
+        let vertex_offset = vertices.len() as u32;
+
+        for i in (0..mesh.positions.len()).step_by(3) {
+            vertices.push(Vec3::new(
+                mesh.positions[i],
+                mesh.positions[i + 1],
+                mesh.positions[i + 2],
+            ));
+        }
+
+        for i in (0..mesh.indices.len()).step_by(3) {
+            faces.push(glam::UVec3::new(
+                mesh.indices[i] + vertex_offset,
+                mesh.indices[i + 1] + vertex_offset,
+                mesh.indices[i + 2] + vertex_offset,
+            ));
+        }
+    }
 
     (vertices, faces)
+}
+
+/// Normalize a mesh to be centered at origin with a given target size.
+fn normalize_mesh(vertices: &mut [Vec3], target_size: f32) {
+    if vertices.is_empty() {
+        return;
+    }
+    let min = vertices.iter().copied().reduce(Vec3::min).unwrap();
+    let max = vertices.iter().copied().reduce(Vec3::max).unwrap();
+    let center = (min + max) * 0.5;
+    let extent = max - min;
+    let max_extent = extent.x.max(extent.y).max(extent.z);
+    let scale = target_size / max_extent;
+    for v in vertices.iter_mut() {
+        *v = (*v - center) * scale;
+    }
 }
 
 /// Transform vertices by translating and scaling.
@@ -65,50 +81,51 @@ fn main() {
     env_logger::init();
     polyscope::init().expect("Failed to initialize polyscope");
 
-    // Create base cube geometry
-    let (cube_verts, cube_faces) = create_cube();
+    // Load and normalize all three models to a common size
+    let (mut spot_verts, spot_faces) = load_obj("assets/spot.obj");
+    normalize_mesh(&mut spot_verts, 1.5);
 
-    // Create three overlapping transparent cubes with different colors
-    // Positioned to overlap so we can see the depth-peeling effect
+    let (mut teapot_verts, teapot_faces) = load_obj("assets/teapot.obj");
+    normalize_mesh(&mut teapot_verts, 1.5);
 
-    // Red cube (center-left)
-    let red_verts = transform_vertices(&cube_verts, Vec3::new(-0.3, 0.0, 0.0), 1.0);
-    polyscope::register_surface_mesh("red_cube", red_verts, cube_faces.clone());
-    polyscope::with_surface_mesh("red_cube", |mesh| {
-        mesh.set_surface_color(Vec3::new(1.0, 0.2, 0.2));
-        mesh.set_transparency(0.5); // 50% transparent
+    let (mut bunny_verts, bunny_faces) = load_obj("assets/bunny.obj");
+    normalize_mesh(&mut bunny_verts, 1.5);
+
+    // Position the three transparent models with slight overlap
+    let spot_positioned = transform_vertices(&spot_verts, Vec3::new(-0.4, 0.0, 0.0), 1.0);
+    polyscope::register_surface_mesh("spot_cow", spot_positioned, spot_faces.clone());
+    polyscope::with_surface_mesh("spot_cow", |mesh| {
+        mesh.set_surface_color(Vec3::new(1.0, 0.6, 0.2)); // warm orange
+        mesh.set_transparency(0.5);
     });
 
-    // Green cube (center)
-    let green_verts = transform_vertices(&cube_verts, Vec3::new(0.0, 0.0, 0.0), 1.0);
-    polyscope::register_surface_mesh("green_cube", green_verts, cube_faces.clone());
-    polyscope::with_surface_mesh("green_cube", |mesh| {
-        mesh.set_surface_color(Vec3::new(0.2, 1.0, 0.2));
-        mesh.set_transparency(0.5); // 50% transparent
+    let teapot_positioned = transform_vertices(&teapot_verts, Vec3::new(0.0, 0.0, 0.2), 1.0);
+    polyscope::register_surface_mesh("teapot", teapot_positioned, teapot_faces.clone());
+    polyscope::with_surface_mesh("teapot", |mesh| {
+        mesh.set_surface_color(Vec3::new(0.2, 0.5, 1.0)); // cool blue
+        mesh.set_transparency(0.5);
     });
 
-    // Blue cube (center-right)
-    let blue_verts = transform_vertices(&cube_verts, Vec3::new(0.3, 0.0, 0.0), 1.0);
-    polyscope::register_surface_mesh("blue_cube", blue_verts, cube_faces.clone());
-    polyscope::with_surface_mesh("blue_cube", |mesh| {
-        mesh.set_surface_color(Vec3::new(0.2, 0.2, 1.0));
-        mesh.set_transparency(0.5); // 50% transparent
+    let bunny_positioned = transform_vertices(&bunny_verts, Vec3::new(0.4, 0.0, -0.2), 1.0);
+    polyscope::register_surface_mesh("bunny", bunny_positioned, bunny_faces.clone());
+    polyscope::with_surface_mesh("bunny", |mesh| {
+        mesh.set_surface_color(Vec3::new(0.2, 0.9, 0.3)); // green
+        mesh.set_transparency(0.5);
     });
 
-    // Also add an opaque reference cube behind the others
-    let gray_verts = transform_vertices(&cube_verts, Vec3::new(0.0, 0.0, -1.0), 1.5);
-    polyscope::register_surface_mesh("opaque_cube", gray_verts, cube_faces);
-    polyscope::with_surface_mesh("opaque_cube", |mesh| {
+    // Opaque reference mesh behind the transparent ones
+    let spot_opaque = transform_vertices(&spot_verts, Vec3::new(0.0, 0.0, -1.5), 1.8);
+    polyscope::register_surface_mesh("opaque_spot", spot_opaque, spot_faces);
+    polyscope::with_surface_mesh("opaque_spot", |mesh| {
         mesh.set_surface_color(Vec3::new(0.5, 0.5, 0.5));
-        // Keep opaque (transparency = 0.0)
     });
 
     println!("Transparency Demo");
     println!("==================");
     println!();
     println!("This demo shows depth-peeled transparency (Pretty mode).");
-    println!("Three overlapping transparent cubes (red, green, blue) are rendered");
-    println!("in front of a gray opaque cube.");
+    println!("Three overlapping transparent models (Spot, Teapot, Bunny) are rendered");
+    println!("in front of an opaque gray Spot cow.");
     println!();
     println!("To see the difference between transparency modes:");
     println!("  1. Open the Appearance settings in the left panel");

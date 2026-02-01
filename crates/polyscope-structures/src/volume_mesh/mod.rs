@@ -48,7 +48,7 @@ mod vector_quantity;
 
 pub use color_quantity::*;
 pub use scalar_quantity::*;
-pub use slice_geometry::{slice_hex, slice_tet, CellSliceResult};
+pub use slice_geometry::{CellSliceResult, slice_hex, slice_tet};
 pub use vector_quantity::*;
 
 // Re-export SliceMeshData from this module
@@ -57,7 +57,9 @@ use glam::{Mat4, Vec3, Vec4};
 use polyscope_core::pick::PickResult;
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::{HasQuantities, RenderContext, Structure};
-use polyscope_render::{MeshPickUniforms, MeshUniforms, SliceMeshRenderData, SurfaceMeshRenderData};
+use polyscope_render::{
+    MeshPickUniforms, MeshUniforms, SliceMeshRenderData, SurfaceMeshRenderData,
+};
 
 /// Cell type for volume meshes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -570,7 +572,14 @@ impl VolumeMesh {
                 if let Some(color) = q.as_any().downcast_ref::<VolumeMeshVertexColorQuantity>() {
                     let colors: Vec<Vec3> = vertex_indices
                         .iter()
-                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec4::new(1.0, 1.0, 1.0, 1.0)).truncate())
+                        .map(|&idx| {
+                            color
+                                .colors()
+                                .get(idx)
+                                .copied()
+                                .unwrap_or(Vec4::new(1.0, 1.0, 1.0, 1.0))
+                                .truncate()
+                        })
                         .collect();
                     vertex_colors = Some(colors);
                     break;
@@ -586,7 +595,14 @@ impl VolumeMesh {
                 if let Some(color) = q.as_any().downcast_ref::<VolumeMeshCellColorQuantity>() {
                     let colors: Vec<Vec3> = cell_indices
                         .iter()
-                        .map(|&idx| color.colors().get(idx).copied().unwrap_or(Vec4::new(1.0, 1.0, 1.0, 1.0)).truncate())
+                        .map(|&idx| {
+                            color
+                                .colors()
+                                .get(idx)
+                                .copied()
+                                .unwrap_or(Vec4::new(1.0, 1.0, 1.0, 1.0))
+                                .truncate()
+                        })
                         .collect();
                     vertex_colors = Some(colors);
                     break;

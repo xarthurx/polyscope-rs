@@ -6,19 +6,17 @@
 //! Volume mesh demonstration showcasing tet and hex mesh visualization.
 //!
 //! This demo showcases:
+//! - Loading real tetrahedral meshes from MEDIT .mesh format files
 //! - Tetrahedral and hexahedral mesh rendering
 //! - Interior face detection (only exterior faces rendered)
 //! - Vertex and cell scalar quantities
 //! - Vertex and cell color quantities
-//! - Loading tet meshes from MEDIT .mesh format
+//!
+//! Mesh assets:
+//! - `assets/p01.mesh`: Rectangular channel (584 vertices, 2568 tetrahedra)
+//! - `assets/cyl248.mesh`: Cylinder (92 vertices, 248 tetrahedra)
 //!
 //! Run with: cargo run --example `volume_mesh_demo`
-//!
-//! To use with custom models (e.g., Armadillo):
-//! 1. Download a .mesh file (MEDIT format) and place in assets/
-//! 2. Modify the `mesh_path` variable below
-//!
-//! The demo includes procedurally generated meshes by default.
 
 use glam::Vec3;
 use std::collections::HashMap;
@@ -54,7 +52,6 @@ fn load_mesh_file(path: &str) -> Option<(Vec<Vec3>, Vec<[u32; 4]>)> {
         let line = line.trim();
 
         if line.eq_ignore_ascii_case("Vertices") {
-            // Read vertex count
             if let Some(count_line) = lines.next() {
                 if let Ok(count) = count_line.trim().parse::<usize>() {
                     for _ in 0..count {
@@ -71,7 +68,6 @@ fn load_mesh_file(path: &str) -> Option<(Vec<Vec3>, Vec<[u32; 4]>)> {
                 }
             }
         } else if line.eq_ignore_ascii_case("Tetrahedra") {
-            // Read tet count
             if let Some(count_line) = lines.next() {
                 if let Ok(count) = count_line.trim().parse::<usize>() {
                     for _ in 0..count {
@@ -82,7 +78,12 @@ fn load_mesh_file(path: &str) -> Option<(Vec<Vec3>, Vec<[u32; 4]>)> {
                                 .collect();
                             if parts.len() >= 4 {
                                 // MEDIT uses 1-based indexing
-                                tets.push([parts[0] - 1, parts[1] - 1, parts[2] - 1, parts[3] - 1]);
+                                tets.push([
+                                    parts[0] - 1,
+                                    parts[1] - 1,
+                                    parts[2] - 1,
+                                    parts[3] - 1,
+                                ]);
                             }
                         }
                     }
@@ -98,8 +99,7 @@ fn load_mesh_file(path: &str) -> Option<(Vec<Vec3>, Vec<[u32; 4]>)> {
     }
 }
 
-/// Generate a subdivided octahedron tet mesh.
-/// This creates a nice spherical-ish shape with clear interior structure.
+/// Generate a subdivided octahedron tet mesh (fallback if no file available).
 fn generate_subdivided_octahedron(
     center: Vec3,
     radius: f32,
@@ -108,48 +108,40 @@ fn generate_subdivided_octahedron(
     let mut vertices = Vec::new();
     let mut tets = Vec::new();
 
-    // Start with octahedron vertices (6 vertices)
     let oct_verts = [
-        Vec3::new(0.0, 1.0, 0.0),  // top
-        Vec3::new(0.0, -1.0, 0.0), // bottom
-        Vec3::new(1.0, 0.0, 0.0),  // +x
-        Vec3::new(-1.0, 0.0, 0.0), // -x
-        Vec3::new(0.0, 0.0, 1.0),  // +z
-        Vec3::new(0.0, 0.0, -1.0), // -z
+        Vec3::new(0.0, 1.0, 0.0),
+        Vec3::new(0.0, -1.0, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+        Vec3::new(-1.0, 0.0, 0.0),
+        Vec3::new(0.0, 0.0, 1.0),
+        Vec3::new(0.0, 0.0, -1.0),
     ];
 
-    // Add center
     vertices.push(center);
-
-    // Add octahedron vertices
     for v in oct_verts {
         vertices.push(center + v * radius);
     }
 
-    // 8 faces of octahedron, each creates a tet with center
     let oct_faces = [
         [1, 3, 5],
         [1, 5, 4],
         [1, 4, 6],
-        [1, 6, 3], // top 4
+        [1, 6, 3],
         [2, 5, 3],
         [2, 4, 5],
         [2, 6, 4],
-        [2, 3, 6], // bottom 4
+        [2, 3, 6],
     ];
 
-    // Create base tets from center to each face
     for face in oct_faces {
         tets.push([0, face[0], face[1], face[2]]);
     }
 
-    // Subdivide each tet if requested
     for _ in 0..subdivisions {
         let mut new_tets = Vec::new();
         let mut edge_midpoints: HashMap<(u32, u32), u32> = HashMap::new();
 
         for tet in &tets {
-            // Get midpoint of each edge (6 edges per tet)
             let edges = [
                 (tet[0], tet[1]),
                 (tet[0], tet[2]),
@@ -169,14 +161,10 @@ fn generate_subdivided_octahedron(
                 });
             }
 
-            // Split into 8 smaller tets
-            // Corner tets
             new_tets.push([tet[0], mids[0], mids[1], mids[2]]);
             new_tets.push([tet[1], mids[0], mids[3], mids[4]]);
             new_tets.push([tet[2], mids[1], mids[3], mids[5]]);
             new_tets.push([tet[3], mids[2], mids[4], mids[5]]);
-
-            // Inner octahedron split into 4 tets
             new_tets.push([mids[0], mids[1], mids[3], mids[4]]);
             new_tets.push([mids[1], mids[2], mids[4], mids[5]]);
             new_tets.push([mids[1], mids[3], mids[4], mids[5]]);
@@ -184,78 +172,6 @@ fn generate_subdivided_octahedron(
         }
 
         tets = new_tets;
-    }
-
-    (vertices, tets)
-}
-
-/// Generate a tet mesh bunny-like shape (ellipsoid with ears).
-fn generate_bunny_tets(center: Vec3, scale: f32) -> (Vec<Vec3>, Vec<[u32; 4]>) {
-    let mut vertices = Vec::new();
-    let mut tets = Vec::new();
-
-    // Body: subdivided octahedron scaled as ellipsoid
-    let (body_verts, body_tets) = generate_subdivided_octahedron(center, scale, 2);
-
-    // Scale to make ellipsoid (wider than tall)
-    for v in body_verts {
-        let local = v - center;
-        let scaled = Vec3::new(local.x * 0.8, local.y * 1.0, local.z * 0.7);
-        vertices.push(center + scaled);
-    }
-
-    for tet in body_tets {
-        tets.push(tet);
-    }
-
-    // Add head (smaller sphere offset forward and up)
-    let head_center = center + Vec3::new(0.0, scale * 0.6, scale * 0.5);
-    let head_scale = scale * 0.5;
-    let vertex_offset = vertices.len() as u32;
-
-    let (head_verts, head_tets) = generate_subdivided_octahedron(head_center, head_scale, 1);
-
-    for v in head_verts {
-        vertices.push(v);
-    }
-
-    for tet in head_tets {
-        tets.push([
-            tet[0] + vertex_offset,
-            tet[1] + vertex_offset,
-            tet[2] + vertex_offset,
-            tet[3] + vertex_offset,
-        ]);
-    }
-
-    // Add ears (elongated tets)
-    let ear_base_y = head_center.y + head_scale * 0.3;
-    let ear_tip_y = head_center.y + head_scale * 1.5;
-
-    for ear_x in [-0.3f32, 0.3f32] {
-        let base = vertices.len() as u32;
-        let ear_center_x = head_center.x + ear_x * scale;
-
-        // Ear base vertices (triangle)
-        vertices.push(Vec3::new(
-            ear_center_x - 0.1 * scale,
-            ear_base_y,
-            head_center.z,
-        ));
-        vertices.push(Vec3::new(
-            ear_center_x + 0.1 * scale,
-            ear_base_y,
-            head_center.z,
-        ));
-        vertices.push(Vec3::new(
-            ear_center_x,
-            ear_base_y,
-            head_center.z - 0.1 * scale,
-        ));
-        // Ear tip
-        vertices.push(Vec3::new(ear_center_x, ear_tip_y, head_center.z));
-
-        tets.push([base, base + 1, base + 2, base + 3]);
     }
 
     (vertices, tets)
@@ -275,7 +191,6 @@ fn generate_hex_grid(
     let dy = size.y / ny as f32;
     let dz = size.z / nz as f32;
 
-    // Generate vertices
     for k in 0..=nz {
         for j in 0..=ny {
             for i in 0..=nx {
@@ -284,7 +199,6 @@ fn generate_hex_grid(
         }
     }
 
-    // Generate hexes
     let stride_x = 1u32;
     let stride_y = nx + 1;
     let stride_z = (nx + 1) * (ny + 1);
@@ -308,38 +222,12 @@ fn generate_hex_grid(
     (vertices, hexes)
 }
 
-#[allow(clippy::too_many_lines)]
-fn main() {
-    env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
-
-    // Try to load a custom mesh, or use procedural generation
-    let mesh_path = "assets/armadillo.mesh";
-    let (tet_vertices, tets, mesh_name) = if Path::new(mesh_path).exists() {
-        if let Some((v, t)) = load_mesh_file(mesh_path) {
-            println!("Loaded mesh: {} vertices, {} tets", v.len(), t.len());
-            (v, t, "custom_mesh")
-        } else {
-            println!("Failed to parse {mesh_path}, using procedural mesh");
-            let (v, t) = generate_bunny_tets(Vec3::ZERO, 1.0);
-            (v, t, "tet_bunny")
-        }
-    } else {
-        println!("No custom mesh found. Generating procedural tet meshes...");
-        let (v, t) = generate_bunny_tets(Vec3::ZERO, 1.0);
-        (v, t, "tet_bunny")
-    };
-
-    // Register the tet mesh
-    let tet_mesh = polyscope::register_tet_mesh(mesh_name, tet_vertices.clone(), tets.clone());
-    tet_mesh.set_color(Vec3::new(0.2, 0.5, 0.8));
-    tet_mesh.set_edge_width(0.5);
-
-    // Compute bounding box for normalization
+/// Add scalar and color quantities to a tet mesh.
+fn add_tet_quantities(name: &str, vertices: &[Vec3], tets: &[[u32; 4]]) {
     let (min_bound, max_bound) = {
         let mut min = Vec3::splat(f32::MAX);
         let mut max = Vec3::splat(f32::MIN);
-        for v in &tet_vertices {
+        for v in vertices {
             min = min.min(*v);
             max = max.max(*v);
         }
@@ -348,28 +236,23 @@ fn main() {
     let extent = max_bound - min_bound;
     let center = (min_bound + max_bound) * 0.5;
 
-    // Add vertex scalar quantity: height (Y coordinate normalized)
-    let vertex_heights: Vec<f32> = tet_vertices
+    let vertex_heights: Vec<f32> = vertices
         .iter()
         .map(|v| (v.y - min_bound.y) / extent.y)
         .collect();
-
-    polyscope::with_volume_mesh(mesh_name, |mesh| {
-        mesh.add_vertex_scalar_quantity("height", vertex_heights.clone());
+    polyscope::with_volume_mesh(name, |mesh| {
+        mesh.add_vertex_scalar_quantity("height", vertex_heights);
     });
 
-    // Add vertex scalar quantity: distance from center
-    let vertex_distances: Vec<f32> = tet_vertices
+    let vertex_distances: Vec<f32> = vertices
         .iter()
         .map(|v| (*v - center).length() / extent.length())
         .collect();
-
-    polyscope::with_volume_mesh(mesh_name, |mesh| {
+    polyscope::with_volume_mesh(name, |mesh| {
         mesh.add_vertex_scalar_quantity("distance_from_center", vertex_distances);
     });
 
-    // Add vertex color quantity: RGB based on position
-    let vertex_colors: Vec<Vec3> = tet_vertices
+    let vertex_colors: Vec<Vec3> = vertices
         .iter()
         .map(|v| {
             Vec3::new(
@@ -379,57 +262,122 @@ fn main() {
             )
         })
         .collect();
-
-    polyscope::with_volume_mesh(mesh_name, |mesh| {
+    polyscope::with_volume_mesh(name, |mesh| {
         mesh.add_vertex_color_quantity("position_color", vertex_colors);
     });
 
-    // Add cell scalar quantity: cell volume (approximate)
     let cell_volumes: Vec<f32> = tets
         .iter()
         .map(|tet| {
-            let v0 = tet_vertices[tet[0] as usize];
-            let v1 = tet_vertices[tet[1] as usize];
-            let v2 = tet_vertices[tet[2] as usize];
-            let v3 = tet_vertices[tet[3] as usize];
-            // Tet volume = |det([v1-v0, v2-v0, v3-v0])| / 6
+            let v0 = vertices[tet[0] as usize];
+            let v1 = vertices[tet[1] as usize];
+            let v2 = vertices[tet[2] as usize];
+            let v3 = vertices[tet[3] as usize];
             let a = v1 - v0;
             let b = v2 - v0;
             let c = v3 - v0;
             (a.dot(b.cross(c))).abs() / 6.0
         })
         .collect();
-
-    // Normalize cell volumes for visualization
     let max_vol = cell_volumes.iter().copied().fold(0.0f32, f32::max);
-    let cell_volumes_normalized: Vec<f32> = cell_volumes.iter().map(|v| v / max_vol).collect();
-
-    polyscope::with_volume_mesh(mesh_name, |mesh| {
+    let cell_volumes_normalized: Vec<f32> = if max_vol > 0.0 {
+        cell_volumes.iter().map(|v| v / max_vol).collect()
+    } else {
+        cell_volumes
+    };
+    polyscope::with_volume_mesh(name, |mesh| {
         mesh.add_cell_scalar_quantity("cell_volume", cell_volumes_normalized);
     });
 
-    // Add cell color quantity: color by centroid height
     let cell_colors: Vec<Vec3> = tets
         .iter()
         .map(|tet| {
-            let centroid = (tet_vertices[tet[0] as usize]
-                + tet_vertices[tet[1] as usize]
-                + tet_vertices[tet[2] as usize]
-                + tet_vertices[tet[3] as usize])
+            let centroid = (vertices[tet[0] as usize]
+                + vertices[tet[1] as usize]
+                + vertices[tet[2] as usize]
+                + vertices[tet[3] as usize])
                 / 4.0;
             let t = (centroid.y - min_bound.y) / extent.y;
-            // Blue to red gradient
             Vec3::new(t, 0.2, 1.0 - t)
         })
         .collect();
-
-    polyscope::with_volume_mesh(mesh_name, |mesh| {
+    polyscope::with_volume_mesh(name, |mesh| {
         mesh.add_cell_color_quantity("centroid_height_color", cell_colors);
     });
+}
 
-    // Also create a hex grid to demonstrate hex mesh support
+#[allow(clippy::too_many_lines)]
+fn main() {
+    env_logger::init();
+    polyscope::init().expect("Failed to initialize polyscope");
+
+    // Load primary tet mesh: p01.mesh (rectangular channel)
+    let primary_path = "assets/p01.mesh";
+    let (tet_vertices, tets, mesh_name) = if Path::new(primary_path).exists() {
+        if let Some((v, t)) = load_mesh_file(primary_path) {
+            println!(
+                "Loaded {primary_path}: {} vertices, {} tets",
+                v.len(),
+                t.len()
+            );
+            (v, t, "channel")
+        } else {
+            println!("Failed to parse {primary_path}, using fallback");
+            let (v, t) = generate_subdivided_octahedron(Vec3::ZERO, 1.0, 2);
+            (v, t, "octahedron")
+        }
+    } else {
+        println!("No {primary_path} found, using fallback");
+        let (v, t) = generate_subdivided_octahedron(Vec3::ZERO, 1.0, 2);
+        (v, t, "octahedron")
+    };
+
+    let tet_mesh = polyscope::register_tet_mesh(mesh_name, tet_vertices.clone(), tets.clone());
+    tet_mesh.set_color(Vec3::new(0.2, 0.5, 0.8));
+    tet_mesh.set_edge_width(0.5);
+    add_tet_quantities(mesh_name, &tet_vertices, &tets);
+
+    // Load secondary tet mesh: cyl248.mesh (cylinder)
+    let secondary_path = "assets/cyl248.mesh";
+    if Path::new(secondary_path).exists() {
+        if let Some((cyl_verts, cyl_tets)) = load_mesh_file(secondary_path) {
+            println!(
+                "Loaded {secondary_path}: {} vertices, {} tets",
+                cyl_verts.len(),
+                cyl_tets.len()
+            );
+
+            let primary_max_x = tet_vertices
+                .iter()
+                .map(|v| v.x)
+                .fold(f32::MIN, f32::max);
+            let cyl_min_x = cyl_verts.iter().map(|v| v.x).fold(f32::MAX, f32::min);
+            let offset_x = primary_max_x - cyl_min_x + 0.5;
+
+            let cyl_verts_offset: Vec<Vec3> = cyl_verts
+                .iter()
+                .map(|v| *v + Vec3::new(offset_x, 0.0, 0.0))
+                .collect();
+
+            let cyl_mesh = polyscope::register_tet_mesh(
+                "cylinder",
+                cyl_verts_offset.clone(),
+                cyl_tets.clone(),
+            );
+            cyl_mesh.set_color(Vec3::new(0.7, 0.4, 0.2));
+            cyl_mesh.set_edge_width(0.5);
+            add_tet_quantities("cylinder", &cyl_verts_offset, &cyl_tets);
+        }
+    }
+
+    // Hex grid
+    let hex_offset_x = tet_vertices
+        .iter()
+        .map(|v| v.x)
+        .fold(f32::MIN, f32::max)
+        + 3.0;
     let (hex_vertices, hexes) = generate_hex_grid(
-        Vec3::new(extent.x * 1.5, 0.0, 0.0),
+        Vec3::new(hex_offset_x, 0.0, 0.0),
         Vec3::splat(1.0),
         (3, 3, 3),
     );
@@ -438,11 +386,9 @@ fn main() {
     hex_mesh.set_color(Vec3::new(0.8, 0.5, 0.2));
     hex_mesh.set_edge_width(1.0);
 
-    // Add cell scalar to hex mesh
     let hex_cell_ids: Vec<f32> = (0..hexes.len())
         .map(|i| i as f32 / hexes.len() as f32)
         .collect();
-
     polyscope::with_volume_mesh("hex_grid", |mesh| {
         mesh.add_cell_scalar_quantity("cell_id", hex_cell_ids);
     });
@@ -453,10 +399,9 @@ fn main() {
     println!();
     println!("Structures:");
     println!(
-        "  - {}: {} vertices, {} tets",
-        mesh_name,
+        "  - {mesh_name}: {} vertices, {} tets (from {primary_path})",
         tet_vertices.len(),
-        tets.len()
+        tets.len(),
     );
     println!(
         "  - hex_grid: {} vertices, {} hexes",
@@ -464,7 +409,7 @@ fn main() {
         hexes.len()
     );
     println!();
-    println!("Quantities on {mesh_name}:");
+    println!("Quantities on tet meshes:");
     println!("  - height (vertex scalar): Y-coordinate normalized");
     println!("  - distance_from_center (vertex scalar): distance from centroid");
     println!("  - position_color (vertex color): RGB from XYZ position");

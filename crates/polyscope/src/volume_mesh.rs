@@ -1,4 +1,4 @@
-use crate::{with_context, with_context_mut, Vec3, VolumeMesh};
+use crate::{Vec3, VolumeMesh, with_context, with_context_mut};
 
 /// Registers a tetrahedral mesh with polyscope.
 pub fn register_tet_mesh(

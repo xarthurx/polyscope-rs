@@ -1,6 +1,6 @@
 use crate::{
-    add_slice_plane, deselect_structure, remove_slice_plane,
-    reset_selected_transform, with_context, with_context_mut, GizmoSpace, Mat4, Vec3,
+    GizmoSpace, Mat4, Vec3, add_slice_plane, deselect_structure, remove_slice_plane,
+    reset_selected_transform, with_context, with_context_mut,
 };
 use polyscope_core::gizmo::Transform;
 

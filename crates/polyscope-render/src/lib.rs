@@ -42,11 +42,11 @@ pub mod buffer;
 pub mod camera;
 pub mod color_maps;
 pub mod curve_network_render;
+pub mod depth_peel_pass;
 pub mod engine;
 pub mod error;
 pub mod ground_plane;
 pub mod materials;
-pub mod depth_peel_pass;
 pub mod pick;
 pub mod point_cloud_render;
 pub mod reflection;
@@ -66,25 +66,25 @@ pub mod volume_grid_render;
 pub use camera::{AxisDirection, Camera, NavigationStyle, ProjectionMode};
 pub use color_maps::{ColorMap, ColorMapRegistry};
 pub use curve_network_render::{CurveNetworkRenderData, CurveNetworkUniforms};
+pub use depth_peel_pass::DepthPeelPass;
 pub use engine::RenderEngine;
 pub use error::{RenderError, RenderResult};
 pub use ground_plane::{GroundPlaneRenderData, GroundPlaneUniforms};
 pub use materials::{Material, MaterialRegistry, MaterialUniforms};
-pub use depth_peel_pass::DepthPeelPass;
 pub use pick::{
-    color_to_index, index_to_color, MeshPickUniforms, PickElementType, PickResult, PickUniforms,
-    TubePickUniforms,
+    MeshPickUniforms, PickElementType, PickResult, PickUniforms, TubePickUniforms, color_to_index,
+    index_to_color,
 };
 pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use reflection::{ground_reflection_matrix, reflection_matrix};
 pub use reflection_pass::{ReflectionPass, ReflectionUniforms};
-pub use screenshot::{save_image, save_to_buffer, ScreenshotError, ScreenshotOptions};
+pub use screenshot::{ScreenshotError, ScreenshotOptions, save_image, save_to_buffer};
 pub use shader::{ShaderBuilder, ShaderProgram};
-pub use shadow_map::{LightUniforms, ShadowMapPass, SHADOW_MAP_SIZE};
+pub use shadow_map::{LightUniforms, SHADOW_MAP_SIZE, ShadowMapPass};
 pub use slice_mesh_render::SliceMeshRenderData;
 pub use slice_plane_render::{
-    create_slice_plane_bind_group_layout, create_slice_plane_pipeline, PlaneRenderUniforms,
-    SlicePlaneRenderData,
+    PlaneRenderUniforms, SlicePlaneRenderData, create_slice_plane_bind_group_layout,
+    create_slice_plane_pipeline,
 };
 pub use ssaa_pass::SsaaPass;
 pub use ssao_pass::{SsaoPass, SsaoUniforms};

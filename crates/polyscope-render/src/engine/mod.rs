@@ -12,13 +12,13 @@ use std::sync::Arc;
 
 use wgpu::util::DeviceExt;
 
-use polyscope_core::slice_plane::{SlicePlaneUniforms, MAX_SLICE_PLANES};
+use polyscope_core::slice_plane::{MAX_SLICE_PLANES, SlicePlaneUniforms};
 
 use crate::camera::Camera;
 use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
 use crate::ground_plane::GroundPlaneRenderData;
-use crate::materials::{self, MatcapTextureSet, MaterialRegistry, Material};
+use crate::materials::{self, MatcapTextureSet, Material, MaterialRegistry};
 use crate::shadow_map::ShadowMapPass;
 use crate::slice_plane_render::SlicePlaneRenderData;
 use crate::tone_mapping::ToneMapPass;

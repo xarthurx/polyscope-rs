@@ -378,8 +378,8 @@ pub fn decode_matcap_image_from_file(
 ) -> std::result::Result<(u32, u32, Vec<f32>), String> {
     use image::GenericImageView;
 
-    let img = image::open(path)
-        .map_err(|e| format!("failed to open '{}': {}", path.display(), e))?;
+    let img =
+        image::open(path).map_err(|e| format!("failed to open '{}': {}", path.display(), e))?;
     let (width, height) = img.dimensions();
 
     if width == 0 || height == 0 {
@@ -473,7 +473,7 @@ pub fn create_matcap_sampler(device: &wgpu::Device) -> wgpu::Sampler {
 /// Initialize all matcap textures and bind groups.
 ///
 /// Returns a `HashMap` mapping material name -> `MatcapTextureSet`.
-#[must_use] 
+#[must_use]
 pub fn init_matcap_textures(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -635,7 +635,7 @@ pub fn init_matcap_textures(
 }
 
 /// Create the matcap bind group layout (5 entries: 4 textures + 1 sampler).
-#[must_use] 
+#[must_use]
 pub fn create_matcap_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Matcap Bind Group Layout"),
@@ -755,7 +755,9 @@ mod tests {
         // Built-ins should appear in canonical order
         assert_eq!(
             names,
-            vec!["clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal"]
+            vec![
+                "clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal"
+            ]
         );
     }
 
@@ -776,8 +778,16 @@ mod tests {
         let names = registry.names();
         // Built-ins first in canonical order, then custom sorted alphabetically
         let expected = vec![
-            "clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal",
-            "alpha_mat", "zebra_mat",
+            "clay",
+            "wax",
+            "candy",
+            "flat",
+            "mud",
+            "ceramic",
+            "jade",
+            "normal",
+            "alpha_mat",
+            "zebra_mat",
         ];
         assert_eq!(names, expected);
     }

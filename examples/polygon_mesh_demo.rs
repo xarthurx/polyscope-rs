@@ -36,12 +36,12 @@ fn create_quad_cube() -> (Vec<Vec3>, Vec<Vec<u32>>) {
     ];
 
     let faces: Vec<Vec<u32>> = vec![
-        vec![0, 1, 2, 3],    // front
-        vec![5, 4, 7, 6],    // back
-        vec![3, 2, 6, 7],    // top
-        vec![4, 5, 1, 0],    // bottom
-        vec![1, 5, 6, 2],    // right
-        vec![4, 0, 3, 7],    // left
+        vec![0, 1, 2, 3], // front
+        vec![5, 4, 7, 6], // back
+        vec![3, 2, 6, 7], // top
+        vec![4, 5, 1, 0], // bottom
+        vec![1, 5, 6, 2], // right
+        vec![4, 0, 3, 7], // left
     ];
 
     (vertices, faces)
@@ -55,12 +55,20 @@ fn create_polygon_prism(n: usize, height: f32, radius: f32) -> (Vec<Vec3>, Vec<V
     // Bottom ring
     for i in 0..n {
         let angle = 2.0 * PI * (i as f32) / (n as f32);
-        vertices.push(Vec3::new(radius * angle.cos(), -half_h, radius * angle.sin()));
+        vertices.push(Vec3::new(
+            radius * angle.cos(),
+            -half_h,
+            radius * angle.sin(),
+        ));
     }
     // Top ring
     for i in 0..n {
         let angle = 2.0 * PI * (i as f32) / (n as f32);
-        vertices.push(Vec3::new(radius * angle.cos(), half_h, radius * angle.sin()));
+        vertices.push(Vec3::new(
+            radius * angle.cos(),
+            half_h,
+            radius * angle.sin(),
+        ));
     }
 
     let mut faces = Vec::new();
@@ -146,7 +154,9 @@ fn main() {
         mesh.set_show_edges(true);
     });
     // Face scalar: one value per original quad face
-    let face_scalars: Vec<f32> = (0..faces.len()).map(|i| i as f32 / faces.len() as f32).collect();
+    let face_scalars: Vec<f32> = (0..faces.len())
+        .map(|i| i as f32 / faces.len() as f32)
+        .collect();
     polyscope::with_surface_mesh("quad_cube", |mesh| {
         mesh.add_face_scalar_quantity("face_id", face_scalars);
     });
@@ -159,7 +169,9 @@ fn main() {
         mesh.set_surface_color(Vec3::new(1.0, 0.6, 0.2));
         mesh.set_show_edges(true);
     });
-    let face_scalars: Vec<f32> = (0..faces.len()).map(|i| i as f32 / faces.len() as f32).collect();
+    let face_scalars: Vec<f32> = (0..faces.len())
+        .map(|i| i as f32 / faces.len() as f32)
+        .collect();
     polyscope::with_surface_mesh("hex_prism", |mesh| {
         mesh.add_face_scalar_quantity("face_id", face_scalars);
     });
@@ -172,7 +184,9 @@ fn main() {
         mesh.set_surface_color(Vec3::new(0.2, 1.0, 0.4));
         mesh.set_show_edges(true);
     });
-    let face_scalars: Vec<f32> = (0..faces.len()).map(|i| i as f32 / faces.len() as f32).collect();
+    let face_scalars: Vec<f32> = (0..faces.len())
+        .map(|i| i as f32 / faces.len() as f32)
+        .collect();
     polyscope::with_surface_mesh("oct_prism", |mesh| {
         mesh.add_face_scalar_quantity("face_id", face_scalars);
     });
@@ -185,7 +199,9 @@ fn main() {
         mesh.set_surface_color(Vec3::new(0.9, 0.3, 0.7));
         mesh.set_show_edges(true);
     });
-    let face_scalars: Vec<f32> = (0..faces.len()).map(|i| i as f32 / faces.len() as f32).collect();
+    let face_scalars: Vec<f32> = (0..faces.len())
+        .map(|i| i as f32 / faces.len() as f32)
+        .collect();
     polyscope::with_surface_mesh("truncated_pyramid", |mesh| {
         mesh.add_face_scalar_quantity("face_id", face_scalars);
     });

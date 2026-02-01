@@ -1,4 +1,4 @@
-use crate::{with_context, with_context_mut, Vec3, Vec4};
+use crate::{Vec3, Vec4, with_context, with_context_mut};
 
 /// Adds a new slice plane to cut through geometry.
 ///
@@ -208,8 +208,10 @@ impl SlicePlaneHandle {
     #[must_use]
     pub fn color(&self) -> Vec4 {
         with_context(|ctx| {
-            ctx.get_slice_plane(&self.name)
-                .map_or(Vec4::new(0.5, 0.5, 0.5, 1.0), polyscope_core::SlicePlane::color)
+            ctx.get_slice_plane(&self.name).map_or(
+                Vec4::new(0.5, 0.5, 0.5, 1.0),
+                polyscope_core::SlicePlane::color,
+            )
         })
     }
 

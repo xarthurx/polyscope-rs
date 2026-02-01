@@ -11,56 +11,71 @@
 //! - Ground plane reflections
 //! - Scene presentation settings
 //!
+//! Uses real 3D models (Spot cow, Stanford Bunny) alongside procedural geometry.
+//!
 //! Run with: cargo run --example `ground_plane_demo`
 
 use glam::Vec3;
 use std::f32::consts::PI;
 
-/// Generate a simple icosahedron mesh.
-fn create_icosahedron(center: Vec3, radius: f32) -> (Vec<Vec3>, Vec<glam::UVec3>) {
-    let phi = (1.0 + 5.0_f32.sqrt()) / 2.0;
-    let a = radius / (1.0 + phi * phi).sqrt();
-    let b = a * phi;
+/// Load an OBJ file and return vertices and triangle faces.
+fn load_obj(path: &str) -> (Vec<Vec3>, Vec<glam::UVec3>) {
+    let (models, _materials) = tobj::load_obj(
+        path,
+        &tobj::LoadOptions {
+            triangulate: true,
+            single_index: true,
+            ..Default::default()
+        },
+    )
+    .expect("Failed to load OBJ file");
 
-    let vertices = vec![
-        center + Vec3::new(-a, b, 0.0),
-        center + Vec3::new(a, b, 0.0),
-        center + Vec3::new(-a, -b, 0.0),
-        center + Vec3::new(a, -b, 0.0),
-        center + Vec3::new(0.0, -a, b),
-        center + Vec3::new(0.0, a, b),
-        center + Vec3::new(0.0, -a, -b),
-        center + Vec3::new(0.0, a, -b),
-        center + Vec3::new(b, 0.0, -a),
-        center + Vec3::new(b, 0.0, a),
-        center + Vec3::new(-b, 0.0, -a),
-        center + Vec3::new(-b, 0.0, a),
-    ];
+    let mut vertices = Vec::new();
+    let mut faces = Vec::new();
 
-    let faces = vec![
-        glam::UVec3::new(0, 11, 5),
-        glam::UVec3::new(0, 5, 1),
-        glam::UVec3::new(0, 1, 7),
-        glam::UVec3::new(0, 7, 10),
-        glam::UVec3::new(0, 10, 11),
-        glam::UVec3::new(1, 5, 9),
-        glam::UVec3::new(5, 11, 4),
-        glam::UVec3::new(11, 10, 2),
-        glam::UVec3::new(10, 7, 6),
-        glam::UVec3::new(7, 1, 8),
-        glam::UVec3::new(3, 9, 4),
-        glam::UVec3::new(3, 4, 2),
-        glam::UVec3::new(3, 2, 6),
-        glam::UVec3::new(3, 6, 8),
-        glam::UVec3::new(3, 8, 9),
-        glam::UVec3::new(4, 9, 5),
-        glam::UVec3::new(2, 4, 11),
-        glam::UVec3::new(6, 2, 10),
-        glam::UVec3::new(8, 6, 7),
-        glam::UVec3::new(9, 8, 1),
-    ];
+    for model in models {
+        let mesh = model.mesh;
+        let vertex_offset = vertices.len() as u32;
+
+        for i in (0..mesh.positions.len()).step_by(3) {
+            vertices.push(Vec3::new(
+                mesh.positions[i],
+                mesh.positions[i + 1],
+                mesh.positions[i + 2],
+            ));
+        }
+
+        for i in (0..mesh.indices.len()).step_by(3) {
+            faces.push(glam::UVec3::new(
+                mesh.indices[i] + vertex_offset,
+                mesh.indices[i + 1] + vertex_offset,
+                mesh.indices[i + 2] + vertex_offset,
+            ));
+        }
+    }
 
     (vertices, faces)
+}
+
+/// Normalize a mesh to be centered at origin with a given target size.
+fn normalize_mesh(vertices: &mut [Vec3], target_size: f32) {
+    if vertices.is_empty() {
+        return;
+    }
+    let min = vertices.iter().copied().reduce(Vec3::min).unwrap();
+    let max = vertices.iter().copied().reduce(Vec3::max).unwrap();
+    let center = (min + max) * 0.5;
+    let extent = max - min;
+    let max_extent = extent.x.max(extent.y).max(extent.z);
+    let scale = target_size / max_extent;
+    for v in vertices.iter_mut() {
+        *v = (*v - center) * scale;
+    }
+}
+
+/// Transform vertices by translating and scaling.
+fn transform_vertices(vertices: &[Vec3], translation: Vec3, scale: f32) -> Vec<Vec3> {
+    vertices.iter().map(|v| *v * scale + translation).collect()
 }
 
 /// Generate a torus mesh by creating a grid of vertices.
@@ -74,7 +89,6 @@ fn create_torus(
     let mut vertices = Vec::new();
     let mut faces = Vec::new();
 
-    // Generate vertices
     for i in 0..major_segments {
         let theta = 2.0 * PI * i as f32 / major_segments as f32;
         let cos_theta = theta.cos();
@@ -93,7 +107,6 @@ fn create_torus(
         }
     }
 
-    // Generate faces
     for i in 0..major_segments {
         let next_i = (i + 1) % major_segments;
         for j in 0..minor_segments {
@@ -112,49 +125,26 @@ fn create_torus(
     (vertices, faces)
 }
 
-/// Generate a simple box mesh.
-fn create_box(center: Vec3, size: Vec3) -> (Vec<Vec3>, Vec<glam::UVec3>) {
-    let half = size / 2.0;
-    let vertices = vec![
-        center + Vec3::new(-half.x, -half.y, -half.z),
-        center + Vec3::new(half.x, -half.y, -half.z),
-        center + Vec3::new(half.x, half.y, -half.z),
-        center + Vec3::new(-half.x, half.y, -half.z),
-        center + Vec3::new(-half.x, -half.y, half.z),
-        center + Vec3::new(half.x, -half.y, half.z),
-        center + Vec3::new(half.x, half.y, half.z),
-        center + Vec3::new(-half.x, half.y, half.z),
-    ];
-
-    let faces = vec![
-        glam::UVec3::new(0, 1, 2),
-        glam::UVec3::new(0, 2, 3),
-        glam::UVec3::new(5, 4, 7),
-        glam::UVec3::new(5, 7, 6),
-        glam::UVec3::new(3, 2, 6),
-        glam::UVec3::new(3, 6, 7),
-        glam::UVec3::new(4, 5, 1),
-        glam::UVec3::new(4, 1, 0),
-        glam::UVec3::new(1, 5, 6),
-        glam::UVec3::new(1, 6, 2),
-        glam::UVec3::new(4, 0, 3),
-        glam::UVec3::new(4, 3, 7),
-    ];
-
-    (vertices, faces)
-}
-
 fn main() {
     env_logger::init();
     polyscope::init().expect("Failed to initialize polyscope");
 
-    // Create several objects at different heights to show shadows
-
-    // Floating icosahedron (gold)
-    let (ico_verts, ico_faces) = create_icosahedron(Vec3::new(0.0, 1.5, 0.0), 0.5);
-    polyscope::register_surface_mesh("icosahedron", ico_verts, ico_faces);
-    polyscope::with_surface_mesh("icosahedron", |mesh| {
+    // Floating Spot cow (gold)
+    let (mut spot_verts, spot_faces) = load_obj("assets/spot.obj");
+    normalize_mesh(&mut spot_verts, 1.0);
+    let spot_positioned = transform_vertices(&spot_verts, Vec3::new(0.0, 1.5, 0.0), 1.0);
+    polyscope::register_surface_mesh("spot_cow", spot_positioned, spot_faces);
+    polyscope::with_surface_mesh("spot_cow", |mesh| {
         mesh.set_surface_color(Vec3::new(0.9, 0.7, 0.2));
+    });
+
+    // Stanford Bunny on the ground (terracotta)
+    let (mut bunny_verts, bunny_faces) = load_obj("assets/bunny.obj");
+    normalize_mesh(&mut bunny_verts, 1.5);
+    let bunny_positioned = transform_vertices(&bunny_verts, Vec3::new(1.5, 0.75, 0.0), 1.0);
+    polyscope::register_surface_mesh("bunny", bunny_positioned, bunny_faces);
+    polyscope::with_surface_mesh("bunny", |mesh| {
+        mesh.set_surface_color(Vec3::new(0.8, 0.35, 0.25));
     });
 
     // Torus lying on the ground (blue)
@@ -164,14 +154,7 @@ fn main() {
         mesh.set_surface_color(Vec3::new(0.2, 0.4, 0.9));
     });
 
-    // Tall box (red)
-    let (box_verts, box_faces) = create_box(Vec3::new(1.5, 0.75, 0.0), Vec3::new(0.5, 1.5, 0.5));
-    polyscope::register_surface_mesh("tall_box", box_verts, box_faces);
-    polyscope::with_surface_mesh("tall_box", |mesh| {
-        mesh.set_surface_color(Vec3::new(0.9, 0.2, 0.2));
-    });
-
-    // Small floating sphere (green)
+    // Small floating sphere (green point cloud)
     let sphere_pts: Vec<Vec3> = (0..500)
         .map(|i| {
             let phi = PI * (3.0 - 5.0_f32.sqrt()) * i as f32;
@@ -210,9 +193,9 @@ fn main() {
     println!("This demo showcases ground plane rendering with shadows.");
     println!();
     println!("Structures:");
-    println!("  - icosahedron: Floating gold shape");
+    println!("  - spot_cow: Floating gold Spot cow");
+    println!("  - bunny: Terracotta Stanford Bunny");
     println!("  - torus: Blue ring on the ground");
-    println!("  - tall_box: Red vertical box");
     println!("  - floating_sphere: Green point cloud");
     println!("  - helix: Orange spiral curve");
     println!();

@@ -506,7 +506,11 @@ impl SurfaceMesh {
     /// Builds the egui UI for this surface mesh.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, available_materials: &[&str]) {
         let mut shade_style = self.shade_style as u32;
-        let mut color = [self.surface_color.x, self.surface_color.y, self.surface_color.z];
+        let mut color = [
+            self.surface_color.x,
+            self.surface_color.y,
+            self.surface_color.z,
+        ];
         let mut transparency = self.transparency;
         let mut show_edges = self.show_edges;
         let mut edge_width = self.edge_width;
@@ -537,7 +541,12 @@ impl SurfaceMesh {
             self.transparency = transparency;
             self.show_edges = show_edges;
             self.edge_width = edge_width;
-            self.edge_color = Vec4::new(edge_color[0], edge_color[1], edge_color[2], self.edge_color.w);
+            self.edge_color = Vec4::new(
+                edge_color[0],
+                edge_color[1],
+                edge_color[2],
+                self.edge_color.w,
+            );
             self.backface_policy = match backface_policy {
                 0 => BackfacePolicy::Identical,
                 1 => BackfacePolicy::Different,

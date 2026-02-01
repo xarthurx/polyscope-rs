@@ -21,10 +21,10 @@ impl Default for SsaoConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            radius: 0.5,        // Good balance for most scenes
-            intensity: 1.5,     // Slightly stronger than linear for visible effect
-            bias: 0.025,        // Small bias to prevent self-occlusion
-            sample_count: 16,   // Good quality/performance balance
+            radius: 0.5,      // Good balance for most scenes
+            intensity: 1.5,   // Slightly stronger than linear for visible effect
+            bias: 0.025,      // Small bias to prevent self-occlusion
+            sample_count: 16, // Good quality/performance balance
         }
     }
 }
