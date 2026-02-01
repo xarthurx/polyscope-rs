@@ -131,11 +131,11 @@ impl Quantity for PointCloudScalarQuantity {
     }
 
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {
-        // TODO: Implement UI
+        // UI is handled by polyscope-ui/src/structure_ui.rs
     }
 
     fn refresh(&mut self) {
-        // TODO: Refresh GPU resources
+        // GPU refresh is handled by polyscope/src/app/render.rs
     }
 
     fn data_size(&self) -> usize {
@@ -300,11 +300,11 @@ impl Quantity for PointCloudVectorQuantity {
     }
 
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {
-        // TODO: Implement UI
+        // UI is handled by polyscope-ui/src/structure_ui.rs
     }
 
     fn refresh(&mut self) {
-        // TODO: Refresh GPU resources
+        // GPU refresh is handled by polyscope/src/app/render.rs
     }
 
     fn data_size(&self) -> usize {
@@ -384,11 +384,11 @@ impl Quantity for PointCloudColorQuantity {
     }
 
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {
-        // TODO: Implement UI
+        // UI is handled by polyscope-ui/src/structure_ui.rs
     }
 
     fn refresh(&mut self) {
-        // TODO: Refresh GPU resources
+        // GPU refresh is handled by polyscope/src/app/render.rs
     }
 
     fn data_size(&self) -> usize {

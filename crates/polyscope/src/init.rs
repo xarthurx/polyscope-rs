@@ -32,11 +32,15 @@ pub fn show() {
 /// Performs one iteration of the main loop.
 ///
 /// Use this for integration with external event loops.
+/// Not yet implemented — requires refactoring the winit event loop
+/// to support non-blocking single-frame execution.
 pub fn frame_tick() {
-    // TODO: Implement frame tick
+    unimplemented!("frame_tick() is not yet supported; use show() instead");
 }
 
 /// Requests a redraw of the scene.
+///
+/// Not yet implemented — requires access to the winit event loop proxy.
 pub fn request_redraw() {
-    // TODO: Implement redraw request
+    unimplemented!("request_redraw() is not yet supported; use show() instead");
 }

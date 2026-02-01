@@ -411,25 +411,22 @@ impl Structure for PointCloud {
     }
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {
-        if !self.enabled {}
-        // TODO: Implement point cloud rendering
+        // Rendering is handled by polyscope/src/app/render.rs
     }
 
     fn draw_pick(&self, _ctx: &mut dyn RenderContext) {
-        if !self.enabled {}
-        // TODO: Implement point cloud picking
+        // Pick rendering is handled by polyscope/src/app/render.rs
     }
 
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {
-        // TODO: Implement UI
+        // UI is handled by polyscope-ui/src/structure_ui.rs
     }
 
     fn build_pick_ui(&self, _ui: &dyn std::any::Any, _pick: &PickResult) {
-        // TODO: Implement pick UI
+        // Pick UI is handled by polyscope-ui/src/panels.rs
     }
 
     fn refresh(&mut self) {
-        // TODO: Refresh GPU buffers
         for quantity in &mut self.quantities {
             quantity.refresh();
         }

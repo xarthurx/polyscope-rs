@@ -119,5 +119,204 @@ impl Registry {
 
 #[cfg(test)]
 mod tests {
-    // TODO: Add tests once we have concrete structure implementations
+    use std::any::Any;
+
+    use super::*;
+    use crate::pick::PickResult;
+    use glam::{Mat4, Vec3};
+
+    /// Minimal mock structure for testing the registry.
+    struct MockStructure {
+        name: String,
+        type_name: &'static str,
+        enabled: bool,
+        transform: Mat4,
+    }
+
+    impl MockStructure {
+        fn new(name: &str, type_name: &'static str) -> Self {
+            Self {
+                name: name.to_string(),
+                type_name,
+                enabled: true,
+                transform: Mat4::IDENTITY,
+            }
+        }
+    }
+
+    impl Structure for MockStructure {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn type_name(&self) -> &'static str {
+            self.type_name
+        }
+        fn bounding_box(&self) -> Option<(Vec3, Vec3)> {
+            None
+        }
+        fn length_scale(&self) -> f32 {
+            1.0
+        }
+        fn transform(&self) -> Mat4 {
+            self.transform
+        }
+        fn set_transform(&mut self, transform: Mat4) {
+            self.transform = transform;
+        }
+        fn is_enabled(&self) -> bool {
+            self.enabled
+        }
+        fn set_enabled(&mut self, enabled: bool) {
+            self.enabled = enabled;
+        }
+        fn draw(&self, _ctx: &mut dyn crate::structure::RenderContext) {}
+        fn draw_pick(&self, _ctx: &mut dyn crate::structure::RenderContext) {}
+        fn build_ui(&mut self, _ui: &dyn Any) {}
+        fn build_pick_ui(&self, _ui: &dyn Any, _pick: &PickResult) {}
+        fn refresh(&mut self) {}
+    }
+
+    fn mock(name: &str, type_name: &'static str) -> Box<dyn Structure> {
+        Box::new(MockStructure::new(name, type_name))
+    }
+
+    #[test]
+    fn test_new_registry_is_empty() {
+        let reg = Registry::new();
+        assert!(reg.is_empty());
+        assert_eq!(reg.len(), 0);
+    }
+
+    #[test]
+    fn test_register_and_get() {
+        let mut reg = Registry::new();
+        reg.register(mock("bunny", "SurfaceMesh")).unwrap();
+
+        assert!(!reg.is_empty());
+        assert_eq!(reg.len(), 1);
+        assert!(reg.contains("SurfaceMesh", "bunny"));
+
+        let s = reg.get("SurfaceMesh", "bunny").unwrap();
+        assert_eq!(s.name(), "bunny");
+        assert_eq!(s.type_name(), "SurfaceMesh");
+    }
+
+    #[test]
+    fn test_register_duplicate_errors() {
+        let mut reg = Registry::new();
+        reg.register(mock("bunny", "SurfaceMesh")).unwrap();
+
+        let result = reg.register(mock("bunny", "SurfaceMesh"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_same_name_different_types() {
+        let mut reg = Registry::new();
+        reg.register(mock("data", "SurfaceMesh")).unwrap();
+        reg.register(mock("data", "PointCloud")).unwrap();
+
+        assert_eq!(reg.len(), 2);
+        assert!(reg.contains("SurfaceMesh", "data"));
+        assert!(reg.contains("PointCloud", "data"));
+    }
+
+    #[test]
+    fn test_get_nonexistent() {
+        let reg = Registry::new();
+        assert!(reg.get("SurfaceMesh", "bunny").is_none());
+        assert!(!reg.contains("SurfaceMesh", "bunny"));
+    }
+
+    #[test]
+    fn test_get_mut() {
+        let mut reg = Registry::new();
+        reg.register(mock("bunny", "SurfaceMesh")).unwrap();
+
+        let s = reg.get_mut("SurfaceMesh", "bunny").unwrap();
+        s.set_enabled(false);
+
+        let s = reg.get("SurfaceMesh", "bunny").unwrap();
+        assert!(!s.is_enabled());
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut reg = Registry::new();
+        reg.register(mock("bunny", "SurfaceMesh")).unwrap();
+
+        let removed = reg.remove("SurfaceMesh", "bunny");
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().name(), "bunny");
+        assert!(reg.get("SurfaceMesh", "bunny").is_none());
+    }
+
+    #[test]
+    fn test_remove_nonexistent() {
+        let mut reg = Registry::new();
+        assert!(reg.remove("SurfaceMesh", "bunny").is_none());
+    }
+
+    #[test]
+    fn test_remove_all_of_type() {
+        let mut reg = Registry::new();
+        reg.register(mock("a", "SurfaceMesh")).unwrap();
+        reg.register(mock("b", "SurfaceMesh")).unwrap();
+        reg.register(mock("c", "PointCloud")).unwrap();
+
+        reg.remove_all_of_type("SurfaceMesh");
+        assert_eq!(reg.len(), 1);
+        assert!(!reg.contains("SurfaceMesh", "a"));
+        assert!(reg.contains("PointCloud", "c"));
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut reg = Registry::new();
+        reg.register(mock("a", "SurfaceMesh")).unwrap();
+        reg.register(mock("b", "PointCloud")).unwrap();
+
+        reg.clear();
+        assert!(reg.is_empty());
+        assert_eq!(reg.len(), 0);
+    }
+
+    #[test]
+    fn test_iter() {
+        let mut reg = Registry::new();
+        reg.register(mock("a", "SurfaceMesh")).unwrap();
+        reg.register(mock("b", "PointCloud")).unwrap();
+        reg.register(mock("c", "SurfaceMesh")).unwrap();
+
+        let names: Vec<&str> = reg.iter().map(|s| s.name()).collect();
+        assert_eq!(names.len(), 3);
+        assert!(names.contains(&"a"));
+        assert!(names.contains(&"b"));
+        assert!(names.contains(&"c"));
+    }
+
+    #[test]
+    fn test_get_all_of_type() {
+        let mut reg = Registry::new();
+        reg.register(mock("a", "SurfaceMesh")).unwrap();
+        reg.register(mock("b", "SurfaceMesh")).unwrap();
+        reg.register(mock("c", "PointCloud")).unwrap();
+
+        let meshes: Vec<&str> = reg.get_all_of_type("SurfaceMesh").map(|s| s.name()).collect();
+        assert_eq!(meshes.len(), 2);
+        assert!(meshes.contains(&"a"));
+        assert!(meshes.contains(&"b"));
+    }
+
+    #[test]
+    fn test_get_all_of_type_empty() {
+        let reg = Registry::new();
+        assert_eq!(reg.get_all_of_type("SurfaceMesh").count(), 0);
+    }
 }
