@@ -32,6 +32,7 @@ crates/
 - **State**: Global `OnceLock<RwLock<Context>>` via `with_context()` / `with_context_mut()`
 - **Bind groups**: Group 0 = per-object uniforms, Group 1 = slice planes/reflection, Group 2 = matcap textures
 - **Render loop** (`app/render.rs`): shadow map -> slice planes -> ground plane -> depth prepass -> main pass -> surface mesh -> depth peel -> SSAO -> tone mapping
+- **Headless rendering** (`headless.rs`): `render_to_image()` / `render_to_file()` create a throwaway `App` + headless `RenderEngine`, clear stale GPU resources via `Structure::clear_gpu_resources()`, render one frame, and capture pixels
 
 ## Critical Rules
 

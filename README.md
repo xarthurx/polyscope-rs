@@ -44,6 +44,7 @@ This project is an experiment in **AI-driven software development**. I have limi
 | Tone Mapping | ✅ HDR pipeline |
 | SSAO | ✅ Ambient occlusion |
 | RGBA Colors | ✅ Per-element alpha on all structures |
+| Headless Rendering | ✅ `render_to_image()` / `render_to_file()` without a window |
 | Screenshots | ✅ PNG/JPEG export |
 | Picking | ✅ Structure/Element |
 | Camera Navigation | ✅ Turntable/Free/Planar/Arcball/First-person |
@@ -88,6 +89,28 @@ fn main() -> Result<()> {
 
     // Show the viewer
     show();
+
+    Ok(())
+}
+```
+
+## Headless Rendering
+
+Render scenes without opening a window -- useful for batch processing, automated testing, and server-side rendering:
+
+```rust
+use polyscope::*;
+
+fn main() -> Result<()> {
+    init()?;
+
+    register_point_cloud("pts", vec![Vec3::ZERO, Vec3::X, Vec3::Y]);
+
+    // Render to pixel buffer (RGBA, 4 bytes per pixel)
+    let pixels = render_to_image(800, 600)?;
+
+    // Or render directly to a PNG file
+    render_to_file("output.png", 800, 600)?;
 
     Ok(())
 }

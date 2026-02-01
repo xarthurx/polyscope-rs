@@ -41,6 +41,7 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 | Gizmos | Yes | Yes | Via egui (transform-gizmo-egui) |
 | Picking | Yes | Yes | GPU-based, element-level |
 | Screenshots | Yes | Yes | PNG/JPEG, transparent background |
+| Headless Rendering | Yes | No | `render_to_image()` / `render_to_file()` without a window |
 | RGBA Colors | Yes | Yes | Per-element alpha on all structures |
 | Camera Navigation | Yes | Yes | Turntable, Free, Planar, Arcball, First-person |
 | Ortho/Perspective | Yes | Yes | Toggle between projection modes |
