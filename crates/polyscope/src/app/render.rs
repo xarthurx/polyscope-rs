@@ -3,6 +3,7 @@ use polyscope_structures::volume_grid::{VolumeGridNodeScalarQuantity, VolumeGrid
 use polyscope_render::{GridcubeRenderData, GridcubeUniforms, IsosurfaceRenderData, SimpleMeshUniforms};
 use polyscope_core::structure::HasQuantities;
 use polyscope_core::quantity::Quantity;
+use polyscope_core::MaterialLoadRequest;
 
 impl App {
     /// Renders a single frame.
@@ -31,6 +32,26 @@ impl App {
                 if min.x.is_finite() && max.x.is_finite() && (max - min).length() > 0.0 {
                     engine.camera.look_at_box(min, max);
                     self.camera_fitted = true;
+                }
+            }
+        }
+
+        // Drain deferred material load queue
+        let pending_materials: Vec<MaterialLoadRequest> = crate::with_context_mut(|ctx| {
+            std::mem::take(&mut ctx.material_load_queue)
+        });
+        for req in pending_materials {
+            match req {
+                MaterialLoadRequest::Static { name, path } => {
+                    if let Err(e) = engine.load_static_material(&name, &path) {
+                        eprintln!("Failed to load static material '{name}': {e}");
+                    }
+                }
+                MaterialLoadRequest::Blendable { name, filenames } => {
+                    let refs: [&str; 4] = [&filenames[0], &filenames[1], &filenames[2], &filenames[3]];
+                    if let Err(e) = engine.load_blendable_material(&name, refs) {
+                        eprintln!("Failed to load blendable material '{name}': {e}");
+                    }
                 }
             }
         }
@@ -947,6 +968,42 @@ impl App {
             // Tone mapping settings panel
             polyscope_ui::panels::build_tone_mapping_section(ui, &mut self.tone_mapping_settings);
 
+            // Material loading section
+            let material_action = polyscope_ui::panels::build_material_section(
+                ui,
+                &mut self.material_load_state,
+            );
+            match material_action {
+                polyscope_ui::MaterialAction::LoadStatic { name, path } => {
+                    match engine.load_static_material(&name, &path) {
+                        Ok(()) => {
+                            self.material_load_state.status = format!("Loaded static material '{name}'");
+                        }
+                        Err(e) => {
+                            self.material_load_state.status = format!("Error: {e}");
+                        }
+                    }
+                }
+                polyscope_ui::MaterialAction::LoadBlendable { name, base_path, extension } => {
+                    let filenames = [
+                        format!("{base_path}_r{extension}"),
+                        format!("{base_path}_g{extension}"),
+                        format!("{base_path}_b{extension}"),
+                        format!("{base_path}_k{extension}"),
+                    ];
+                    let refs: [&str; 4] = [&filenames[0], &filenames[1], &filenames[2], &filenames[3]];
+                    match engine.load_blendable_material(&name, refs) {
+                        Ok(()) => {
+                            self.material_load_state.status = format!("Loaded blendable material '{name}'");
+                        }
+                        Err(e) => {
+                            self.material_load_state.status = format!("Error: {e}");
+                        }
+                    }
+                }
+                polyscope_ui::MaterialAction::None => {}
+            }
+
             // Slice Planes section
             let slice_action = polyscope_ui::panels::build_slice_planes_section(
                 ui,
@@ -1003,6 +1060,9 @@ impl App {
             let colormap_names: Vec<String> = engine.color_maps.names().map(String::from).collect();
             let colormap_name_refs: Vec<&str> = colormap_names.iter().map(String::as_str).collect();
 
+            // Collect material names for structure UI (built-in + custom)
+            let available_materials: Vec<&str> = engine.materials.names();
+
             // Collect structure info
             let structures: Vec<(String, String, bool)> = crate::with_context(|ctx| {
                 ctx.registry
@@ -1033,17 +1093,17 @@ impl App {
                         if let Some(s) = ctx.registry.get_mut(type_name, name) {
                             if type_name == "PointCloud" {
                                 if let Some(pc) = s.as_any_mut().downcast_mut::<PointCloud>() {
-                                    pc.build_egui_ui(ui);
+                                    pc.build_egui_ui(ui, &available_materials);
                                 }
                             }
                             if type_name == "SurfaceMesh" {
                                 if let Some(mesh) = s.as_any_mut().downcast_mut::<SurfaceMesh>() {
-                                    mesh.build_egui_ui(ui);
+                                    mesh.build_egui_ui(ui, &available_materials);
                                 }
                             }
                             if type_name == "CurveNetwork" {
                                 if let Some(cn) = s.as_any_mut().downcast_mut::<CurveNetwork>() {
-                                    cn.build_egui_ui(ui);
+                                    cn.build_egui_ui(ui, &available_materials);
                                 }
                             }
                             if type_name == "CameraView" {

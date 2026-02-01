@@ -40,7 +40,7 @@ pub use quantity::{Quantity, QuantityKind};
 pub use registry::Registry;
 pub use slice_plane::{SlicePlane, SlicePlaneUniforms, MAX_SLICE_PLANES};
 pub use ssao::SsaoConfig;
-pub use state::{with_context, with_context_mut, Context};
+pub use state::{with_context, with_context_mut, Context, MaterialLoadRequest};
 pub use structure::{HasQuantities, Structure};
 pub use tone_mapping::ToneMappingConfig;
 

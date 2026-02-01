@@ -504,7 +504,7 @@ impl SurfaceMesh {
     }
 
     /// Builds the egui UI for this surface mesh.
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, available_materials: &[&str]) {
         let mut shade_style = self.shade_style as u32;
         let mut color = [self.surface_color.x, self.surface_color.y, self.surface_color.z];
         let mut transparency = self.transparency;
@@ -526,6 +526,7 @@ impl SurfaceMesh {
             &mut edge_color,
             &mut backface_policy,
             &mut self.material,
+            available_materials,
         ) {
             self.shade_style = match shade_style {
                 0 => ShadeStyle::Smooth,

@@ -187,6 +187,76 @@ pub fn clear_file_drop_callback() {
     });
 }
 
+/// Loads a blendable (4-channel, RGB-tintable) matcap material from disk.
+///
+/// Takes a name and 4 image file paths for R, G, B, K matcap channels.
+/// The material becomes available in the UI material selector on the next frame.
+///
+/// Supports HDR, JPEG, PNG, EXR, and other image formats.
+///
+/// # Example
+/// ```no_run
+/// polyscope::load_blendable_material("metal", [
+///     "assets/metal_r.hdr",
+///     "assets/metal_g.hdr",
+///     "assets/metal_b.hdr",
+///     "assets/metal_k.hdr",
+/// ]);
+/// ```
+pub fn load_blendable_material(name: &str, filenames: [&str; 4]) {
+    with_context_mut(|ctx| {
+        ctx.material_load_queue.push(
+            polyscope_core::state::MaterialLoadRequest::Blendable {
+                name: name.to_string(),
+                filenames: [
+                    filenames[0].to_string(),
+                    filenames[1].to_string(),
+                    filenames[2].to_string(),
+                    filenames[3].to_string(),
+                ],
+            },
+        );
+    });
+}
+
+/// Loads a blendable material using a base path and extension.
+///
+/// Automatically expands to 4 filenames by appending `_r`, `_g`, `_b`, `_k`
+/// before the extension. For example:
+/// `load_blendable_material_ext("metal", "assets/metal", ".hdr")`
+/// loads `assets/metal_r.hdr`, `assets/metal_g.hdr`, `assets/metal_b.hdr`, `assets/metal_k.hdr`.
+pub fn load_blendable_material_ext(name: &str, base: &str, ext: &str) {
+    load_blendable_material(
+        name,
+        [
+            &format!("{base}_r{ext}"),
+            &format!("{base}_g{ext}"),
+            &format!("{base}_b{ext}"),
+            &format!("{base}_k{ext}"),
+        ],
+    );
+}
+
+/// Loads a static (single-texture, non-RGB-tintable) matcap material from disk.
+///
+/// The same texture is used for all 4 matcap channels. Static materials
+/// cannot be tinted with per-surface RGB colors.
+///
+/// # Example
+/// ```no_run
+/// polyscope::load_static_material("stone", "assets/stone.jpg");
+/// ```
+pub fn load_static_material(name: &str, filename: &str) {
+    with_context_mut(|ctx| {
+        ctx.material_load_queue.push(
+            polyscope_core::state::MaterialLoadRequest::Static {
+                name: name.to_string(),
+                path: filename.to_string(),
+            },
+        );
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -358,7 +358,7 @@ impl CurveNetwork {
     }
 
     /// Builds the egui UI for this curve network.
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, available_materials: &[&str]) {
         let mut color = [self.color.x, self.color.y, self.color.z];
         let mut radius = self.radius;
         let mut radius_is_relative = self.radius_is_relative;
@@ -373,6 +373,7 @@ impl CurveNetwork {
             &mut color,
             &mut render_mode,
             &mut self.material,
+            available_materials,
         ) {
             self.color = Vec4::new(color[0], color[1], color[2], self.color.w);
             self.radius = radius;

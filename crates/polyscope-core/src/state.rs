@@ -16,6 +16,15 @@ use crate::slice_plane::SlicePlane;
 /// Callback type for file drop events.
 pub type FileDropCallback = Box<dyn FnMut(&[std::path::PathBuf]) + Send + Sync>;
 
+/// A deferred request to load a material from disk.
+#[derive(Debug, Clone)]
+pub enum MaterialLoadRequest {
+    /// Load a static material from a single file.
+    Static { name: String, path: String },
+    /// Load a blendable material from 4 files (R, G, B, K channels).
+    Blendable { name: String, filenames: [String; 4] },
+}
+
 /// Global context singleton.
 static CONTEXT: OnceLock<RwLock<Context>> = OnceLock::new();
 
@@ -56,6 +65,9 @@ pub struct Context {
 
     /// Callback invoked when files are dropped onto the window.
     pub file_drop_callback: Option<FileDropCallback>,
+
+    /// Deferred material load requests (processed by App each frame).
+    pub material_load_queue: Vec<MaterialLoadRequest>,
 }
 
 impl Default for Context {
@@ -73,6 +85,7 @@ impl Default for Context {
             bounding_box: (Vec3::ZERO, Vec3::ONE),
             floating_quantities: Vec::new(),
             file_drop_callback: None,
+            material_load_queue: Vec::new(),
         }
     }
 }
@@ -422,6 +435,7 @@ pub fn shutdown_context() {
             ctx.selected_structure = None;
             ctx.selected_slice_plane = None;
             ctx.floating_quantities.clear();
+            ctx.material_load_queue.clear();
         }
     }
 }

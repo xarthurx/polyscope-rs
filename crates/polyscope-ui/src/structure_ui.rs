@@ -2,16 +2,28 @@
 
 use egui::Ui;
 
-/// Available material names for matcap rendering.
-const MATERIALS: &[&str] = &["clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal"];
+/// Default built-in material names (used as fallback if no registry provided).
+const DEFAULT_MATERIALS: &[&str] = &["clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal"];
 
 /// Builds a material selector `ComboBox`. Returns true if the material changed.
-pub fn build_material_selector(ui: &mut Ui, material: &mut String) -> bool {
+/// `available_materials` is the list of all registered material names (built-in + custom).
+/// If empty, falls back to the default built-in list.
+pub fn build_material_selector(
+    ui: &mut Ui,
+    material: &mut String,
+    available_materials: &[&str],
+) -> bool {
+    let materials: &[&str] = if available_materials.is_empty() {
+        DEFAULT_MATERIALS
+    } else {
+        available_materials
+    };
+
     let mut changed = false;
     egui::ComboBox::from_label("Material")
         .selected_text(material.as_str())
         .show_ui(ui, |ui| {
-            for &mat in MATERIALS {
+            for &mat in materials {
                 if ui.selectable_value(material, mat.to_string(), mat).changed() {
                     changed = true;
                 }
@@ -27,12 +39,13 @@ pub fn build_point_cloud_ui(
     point_radius: &mut f32,
     base_color: &mut [f32; 3],
     material: &mut String,
+    available_materials: &[&str],
 ) -> bool {
     let mut changed = false;
 
     ui.label(format!("{num_points} points"));
 
-    if build_material_selector(ui, material) {
+    if build_material_selector(ui, material, available_materials) {
         changed = true;
     }
 
@@ -74,12 +87,13 @@ pub fn build_surface_mesh_ui(
     edge_color: &mut [f32; 3],
     backface_policy: &mut u32,
     material: &mut String,
+    available_materials: &[&str],
 ) -> bool {
     let mut changed = false;
 
     ui.label(format!("{num_vertices} verts, {num_faces} faces, {num_edges} edges"));
 
-    if build_material_selector(ui, material) {
+    if build_material_selector(ui, material, available_materials) {
         changed = true;
     }
 
@@ -195,12 +209,13 @@ pub fn build_curve_network_ui(
     color: &mut [f32; 3],
     render_mode: &mut u32,
     material: &mut String,
+    available_materials: &[&str],
 ) -> bool {
     let mut changed = false;
 
     ui.label(format!("{num_nodes} nodes, {num_edges} edges"));
 
-    if build_material_selector(ui, material) {
+    if build_material_selector(ui, material, available_materials) {
         changed = true;
     }
 

@@ -260,11 +260,11 @@ impl PointCloud {
     }
 
     /// Builds the egui UI for this point cloud.
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, available_materials: &[&str]) {
         let mut color = [self.base_color.x, self.base_color.y, self.base_color.z];
         let mut radius = self.point_radius;
 
-        if polyscope_ui::build_point_cloud_ui(ui, self.points.len(), &mut radius, &mut color, &mut self.material) {
+        if polyscope_ui::build_point_cloud_ui(ui, self.points.len(), &mut radius, &mut color, &mut self.material, available_materials) {
             self.base_color = Vec4::new(color[0], color[1], color[2], self.base_color.w);
             self.point_radius = radius;
         }

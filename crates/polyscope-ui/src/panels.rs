@@ -309,6 +309,32 @@ pub enum ViewAction {
     Screenshot,
 }
 
+/// Actions from the material loading UI.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MaterialAction {
+    /// No action.
+    None,
+    /// Load a static material from a single file.
+    LoadStatic { name: String, path: String },
+    /// Load a blendable material from base path + extension (auto-expands _r/_g/_b/_k).
+    LoadBlendable {
+        name: String,
+        base_path: String,
+        extension: String,
+    },
+}
+
+/// UI state for the material loading panel.
+#[derive(Debug, Clone, Default)]
+pub struct MaterialLoadState {
+    /// Material name input.
+    pub name: String,
+    /// File path input.
+    pub path: String,
+    /// Status message (success or error).
+    pub status: String,
+}
+
 /// Builds the gizmo/transform section.
 /// Returns an action if one was triggered.
 pub fn build_gizmo_section(
@@ -1002,6 +1028,70 @@ pub fn build_appearance_section(ui: &mut Ui, settings: &mut AppearanceSettings) 
         });
 
     changed
+}
+
+/// Builds the material loading section in the left panel.
+/// Returns a `MaterialAction` if the user requested loading.
+pub fn build_material_section(
+    ui: &mut Ui,
+    state: &mut MaterialLoadState,
+) -> MaterialAction {
+    let mut action = MaterialAction::None;
+
+    CollapsingHeader::new("Materials")
+        .default_open(false)
+        .show(ui, |ui| {
+            egui::Grid::new("material_load_grid")
+                .num_columns(2)
+                .show(ui, |ui| {
+                    ui.label("Name:");
+                    ui.text_edit_singleline(&mut state.name);
+                    ui.end_row();
+
+                    ui.label("File path:");
+                    ui.text_edit_singleline(&mut state.path);
+                    ui.end_row();
+                });
+
+            ui.horizontal(|ui| {
+                if ui.button("Load Static").clicked()
+                    && !state.name.is_empty()
+                    && !state.path.is_empty()
+                {
+                    action = MaterialAction::LoadStatic {
+                        name: state.name.clone(),
+                        path: state.path.clone(),
+                    };
+                }
+                if ui.button("Load Blendable").clicked()
+                    && !state.name.is_empty()
+                    && !state.path.is_empty()
+                {
+                    // Split path into base + extension for _r/_g/_b/_k expansion
+                    let p = std::path::Path::new(&state.path);
+                    let ext = p
+                        .extension()
+                        .map(|e| format!(".{}", e.to_string_lossy()))
+                        .unwrap_or_default();
+                    let base = state
+                        .path
+                        .strip_suffix(&ext)
+                        .unwrap_or(&state.path)
+                        .to_string();
+                    action = MaterialAction::LoadBlendable {
+                        name: state.name.clone(),
+                        base_path: base,
+                        extension: ext,
+                    };
+                }
+            });
+
+            if !state.status.is_empty() {
+                ui.label(&state.status);
+            }
+        });
+
+    action
 }
 
 /// Builds the tone mapping settings section.

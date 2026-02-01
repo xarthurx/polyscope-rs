@@ -29,6 +29,14 @@ pub enum PolyscopeError {
     #[error("quantity '{0}' not found on structure '{1}'")]
     QuantityNotFound(String, String),
 
+    /// A material with the given name already exists.
+    #[error("material '{0}' already exists")]
+    MaterialExists(String),
+
+    /// Failed to load a material image.
+    #[error("material load error: {0}")]
+    MaterialLoadError(String),
+
     /// Data size mismatch.
     #[error("data size mismatch: expected {expected}, got {actual}")]
     SizeMismatch { expected: usize, actual: usize },

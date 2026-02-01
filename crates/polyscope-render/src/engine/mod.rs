@@ -18,7 +18,7 @@ use crate::camera::Camera;
 use crate::color_maps::ColorMapRegistry;
 use crate::error::{RenderError, RenderResult};
 use crate::ground_plane::GroundPlaneRenderData;
-use crate::materials::{self, MatcapTextureSet, MaterialRegistry};
+use crate::materials::{self, MatcapTextureSet, MaterialRegistry, Material};
 use crate::shadow_map::ShadowMapPass;
 use crate::slice_plane_render::SlicePlaneRenderData;
 use crate::tone_mapping::ToneMapPass;
@@ -1045,5 +1045,171 @@ impl RenderEngine {
             self.width * self.ssaa_factor,
             self.height * self.ssaa_factor,
         )
+    }
+
+    /// Loads a blendable (4-channel RGB-tintable) material from disk.
+    ///
+    /// Takes 4 image file paths for R, G, B, K matcap channels.
+    /// Supports HDR, JPEG, PNG, EXR, and other formats via the `image` crate.
+    pub fn load_blendable_material(
+        &mut self,
+        name: &str,
+        filenames: [&str; 4],
+    ) -> std::result::Result<(), polyscope_core::PolyscopeError> {
+        use polyscope_core::PolyscopeError;
+
+        if self.matcap_textures.contains_key(name) {
+            return Err(PolyscopeError::MaterialExists(name.to_string()));
+        }
+
+        let channel_labels = ["r", "g", "b", "k"];
+        let mut views = Vec::with_capacity(4);
+
+        for (i, filename) in filenames.iter().enumerate() {
+            let path = std::path::Path::new(filename);
+            let (w, h, rgba) = materials::decode_matcap_image_from_file(path)
+                .map_err(PolyscopeError::MaterialLoadError)?;
+            let tex = materials::upload_matcap_texture(
+                &self.device,
+                &self.queue,
+                &format!("matcap_{name}_{}", channel_labels[i]),
+                w,
+                h,
+                &rgba,
+            );
+            views.push(tex.create_view(&wgpu::TextureViewDescriptor::default()));
+        }
+
+        let sampler = materials::create_matcap_sampler(&self.device);
+
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(&format!("matcap_{name}_bind_group")),
+            layout: &self.matcap_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&views[0]),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&views[1]),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&views[2]),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&views[3]),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+
+        // Move views into individual fields
+        let mut drain = views.into_iter();
+        let tex_r = drain.next().unwrap();
+        let tex_g = drain.next().unwrap();
+        let tex_b = drain.next().unwrap();
+        let tex_k = drain.next().unwrap();
+
+        self.matcap_textures.insert(
+            name.to_string(),
+            MatcapTextureSet {
+                tex_r,
+                tex_g,
+                tex_b,
+                tex_k,
+                sampler,
+                bind_group,
+            },
+        );
+
+        self.materials
+            .register(Material::blendable(name, 0.2, 0.7, 0.3, 32.0));
+
+        Ok(())
+    }
+
+    /// Loads a static (single-texture, non-RGB-tintable) material from disk.
+    ///
+    /// The same texture is used for all 4 matcap channels.
+    /// Supports HDR, JPEG, PNG, EXR, and other formats via the `image` crate.
+    pub fn load_static_material(
+        &mut self,
+        name: &str,
+        filename: &str,
+    ) -> std::result::Result<(), polyscope_core::PolyscopeError> {
+        use polyscope_core::PolyscopeError;
+
+        if self.matcap_textures.contains_key(name) {
+            return Err(PolyscopeError::MaterialExists(name.to_string()));
+        }
+
+        let path = std::path::Path::new(filename);
+        let (w, h, rgba) = materials::decode_matcap_image_from_file(path)
+            .map_err(PolyscopeError::MaterialLoadError)?;
+        let tex = materials::upload_matcap_texture(
+            &self.device,
+            &self.queue,
+            &format!("matcap_{name}"),
+            w,
+            h,
+            &rgba,
+        );
+
+        let view_r = tex.create_view(&wgpu::TextureViewDescriptor::default());
+        let view_g = tex.create_view(&wgpu::TextureViewDescriptor::default());
+        let view_b = tex.create_view(&wgpu::TextureViewDescriptor::default());
+        let view_k = tex.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let sampler = materials::create_matcap_sampler(&self.device);
+
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(&format!("matcap_{name}_bind_group")),
+            layout: &self.matcap_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view_r),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&view_g),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&view_b),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&view_k),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+
+        self.matcap_textures.insert(
+            name.to_string(),
+            MatcapTextureSet {
+                tex_r: tex.create_view(&wgpu::TextureViewDescriptor::default()),
+                tex_g: tex.create_view(&wgpu::TextureViewDescriptor::default()),
+                tex_b: tex.create_view(&wgpu::TextureViewDescriptor::default()),
+                tex_k: tex.create_view(&wgpu::TextureViewDescriptor::default()),
+                sampler,
+                bind_group,
+            },
+        );
+
+        self.materials
+            .register(Material::static_mat(name, 0.2, 0.7, 0.3, 32.0));
+
+        Ok(())
     }
 }

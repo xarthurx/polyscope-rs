@@ -69,8 +69,8 @@ polyscope-rs has reached full feature parity with C++ Polyscope 2.x for all core
 
 ### Tier 2 — Remaining Gaps
 
-- [ ] **Volume Grid Isosurface** - Marching cubes isosurface extraction (currently node/cell scalars only)
-- [ ] **Custom Material Loading** - User-provided matcap textures (`loadBlendableMaterial` / `loadStaticMaterial`)
+- [x] **Volume Grid Isosurface** - Marching cubes isosurface extraction and gridcube rendering
+- [x] **Custom Material Loading** - User-provided matcap textures (`loadBlendableMaterial` / `loadStaticMaterial`)
 
 ### Tier 3 — Polish
 

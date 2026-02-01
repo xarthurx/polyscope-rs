@@ -241,6 +241,12 @@ impl MaterialRegistry {
         self.materials.get(name)
     }
 
+    /// Returns true if a material with the given name is registered.
+    #[must_use]
+    pub fn has(&self, name: &str) -> bool {
+        self.materials.contains_key(name)
+    }
+
     /// Gets the default material.
     #[must_use]
     pub fn default_material(&self) -> &Material {
@@ -261,13 +267,30 @@ impl MaterialRegistry {
         }
     }
 
-    /// Returns all material names.
+    /// Returns all material names, with built-in materials first in a stable order,
+    /// followed by custom materials sorted alphabetically.
     #[must_use]
     pub fn names(&self) -> Vec<&str> {
-        self.materials
+        const BUILTIN_ORDER: &[&str] = &[
+            "clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal",
+        ];
+        let mut names: Vec<&str> = Vec::new();
+        // Built-ins first, in canonical order
+        for &builtin in BUILTIN_ORDER {
+            if self.materials.contains_key(builtin) {
+                names.push(builtin);
+            }
+        }
+        // Custom materials after built-ins, sorted alphabetically
+        let mut custom: Vec<&str> = self
+            .materials
             .keys()
-            .map(std::string::String::as_str)
-            .collect()
+            .map(String::as_str)
+            .filter(|n| !BUILTIN_ORDER.contains(n))
+            .collect();
+        custom.sort();
+        names.extend(custom);
+        names
     }
 
     /// Returns the number of registered materials.
@@ -344,8 +367,42 @@ fn decode_matcap_image(data: &[u8]) -> (u32, u32, Vec<f32>) {
     (width, height, rgba)
 }
 
+/// Decode an image file from disk into float RGBA pixel data.
+///
+/// Returns `(width, height, rgba_f32_pixels)` where pixels are laid out as
+/// `[r, g, b, a, r, g, b, a, ...]` in linear float space.
+///
+/// Supports any format the `image` crate can open: HDR, JPEG, PNG, EXR, etc.
+pub fn decode_matcap_image_from_file(
+    path: &std::path::Path,
+) -> std::result::Result<(u32, u32, Vec<f32>), String> {
+    use image::GenericImageView;
+
+    let img = image::open(path)
+        .map_err(|e| format!("failed to open '{}': {}", path.display(), e))?;
+    let (width, height) = img.dimensions();
+
+    if width == 0 || height == 0 {
+        return Err(format!("image '{}' has zero dimensions", path.display()));
+    }
+
+    let rgb32f = img.to_rgb32f();
+    let pixels = rgb32f.as_raw();
+
+    // Pad RGB -> RGBA with alpha=1.0
+    let mut rgba = Vec::with_capacity((width * height * 4) as usize);
+    for chunk in pixels.chunks(3) {
+        rgba.push(chunk[0]);
+        rgba.push(chunk[1]);
+        rgba.push(chunk[2]);
+        rgba.push(1.0);
+    }
+
+    Ok((width, height, rgba))
+}
+
 /// Upload a decoded matcap image as a GPU texture.
-fn upload_matcap_texture(
+pub fn upload_matcap_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     label: &str,
@@ -398,7 +455,7 @@ fn upload_matcap_texture(
 }
 
 /// Create a linear filtering sampler for matcap textures.
-fn create_matcap_sampler(device: &wgpu::Device) -> wgpu::Sampler {
+pub fn create_matcap_sampler(device: &wgpu::Device) -> wgpu::Sampler {
     device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("Matcap Sampler"),
         address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -677,5 +734,49 @@ mod tests {
         assert!(!Material::ceramic().is_blendable);
         assert!(!Material::jade().is_blendable);
         assert!(!Material::normal().is_blendable);
+    }
+
+    #[test]
+    fn test_material_registry_has() {
+        let registry = MaterialRegistry::new();
+        assert!(registry.has("clay"));
+        assert!(registry.has("wax"));
+        assert!(registry.has("normal"));
+        assert!(!registry.has("nonexistent"));
+        assert!(!registry.has("my_custom"));
+    }
+
+    #[test]
+    fn test_material_registry_names_order() {
+        let registry = MaterialRegistry::new();
+        let names = registry.names();
+        // Built-ins should appear in canonical order
+        assert_eq!(
+            names,
+            vec!["clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal"]
+        );
+    }
+
+    #[test]
+    fn test_material_registry_custom() {
+        let mut registry = MaterialRegistry::new();
+        let mut custom = Material::clay();
+        custom.name = "zebra_mat".to_string();
+        registry.register(custom);
+
+        let mut custom2 = Material::clay();
+        custom2.name = "alpha_mat".to_string();
+        registry.register(custom2);
+
+        assert!(registry.has("zebra_mat"));
+        assert!(registry.has("alpha_mat"));
+
+        let names = registry.names();
+        // Built-ins first in canonical order, then custom sorted alphabetically
+        let expected = vec![
+            "clay", "wax", "candy", "flat", "mud", "ceramic", "jade", "normal",
+            "alpha_mat", "zebra_mat",
+        ];
+        assert_eq!(names, expected);
     }
 }

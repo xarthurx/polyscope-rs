@@ -79,6 +79,8 @@ pub struct App {
     pub(super) transform_gizmo: polyscope_ui::TransformGizmo,
     // Tone mapping settings
     pub(super) tone_mapping_settings: polyscope_ui::ToneMappingSettings,
+    // Material loading UI state
+    pub(super) material_load_state: polyscope_ui::MaterialLoadState,
     // Whether the camera has been auto-fitted to the scene
     pub(super) camera_fitted: bool,
     // Keyboard state for first-person WASD movement
@@ -121,6 +123,7 @@ impl App {
             slice_plane_selection: polyscope_ui::SlicePlaneSelectionInfo::default(),
             transform_gizmo: polyscope_ui::TransformGizmo::new(),
             tone_mapping_settings: polyscope_ui::ToneMappingSettings::default(),
+            material_load_state: polyscope_ui::MaterialLoadState::default(),
             camera_fitted: false,
             keys_down: HashSet::new(),
             last_frame_time: None,
