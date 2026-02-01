@@ -58,7 +58,7 @@ impl EguiIntegration {
     /// egui's `Grid` widget makes itself invisible on the first frame it appears
     /// (a sizing pass) and calls `ctx.request_discard()` expecting a second pass.
     /// This method starts that second pass using `take()` on the stored raw input,
-    /// which preserves time/screen_rect/modifiers but clears events — matching
+    /// which preserves `time`/`screen_rect`/`modifiers` but clears events — matching
     /// the approach used by `Context::run()`.
     pub fn begin_rerun_pass(&mut self) {
         self.context.begin_pass(self.last_raw_input.take());

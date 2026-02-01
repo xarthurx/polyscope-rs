@@ -288,7 +288,7 @@ impl MaterialRegistry {
             .map(String::as_str)
             .filter(|n| !BUILTIN_ORDER.contains(n))
             .collect();
-        custom.sort();
+        custom.sort_unstable();
         names.extend(custom);
         names
     }
@@ -402,6 +402,7 @@ pub fn decode_matcap_image_from_file(
 }
 
 /// Upload a decoded matcap image as a GPU texture.
+#[must_use]
 pub fn upload_matcap_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -455,6 +456,7 @@ pub fn upload_matcap_texture(
 }
 
 /// Create a linear filtering sampler for matcap textures.
+#[must_use]
 pub fn create_matcap_sampler(device: &wgpu::Device) -> wgpu::Sampler {
     device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("Matcap Sampler"),
