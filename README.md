@@ -20,7 +20,7 @@ This project is an experiment in **AI-driven software development**. I have limi
 
 ## Project Status
 
-**Current Version:** 0.5.0
+**Current Version:** 0.5.1
 
 **Feature Parity:** Full parity with C++ Polyscope 2.x for all core functionality
 
@@ -32,7 +32,7 @@ This project is an experiment in **AI-driven software development**. I have limi
 | Surface Meshes | ✅ Triangles + arbitrary polygons, full quantity support |
 | Curve Networks | ✅ Full support |
 | Volume Meshes | ✅ Tet/Hex cells |
-| Volume Grids | ✅ Node/cell scalars |
+| Volume Grids | ✅ Node/cell scalars, gridcube + isosurface (marching cubes) |
 | Camera Views | ✅ Full support |
 | Materials | ✅ 8 matcap materials (per-structure) |
 | Color Maps | ✅ 10+ maps |
@@ -121,6 +121,7 @@ cargo run --example <demo_name>
 | Slice Planes | `cargo run --example slice_plane_demo` | Fragment-level slicing, volume mesh capping, gizmo control |
 | Groups & Gizmos | `cargo run --example groups_and_gizmos_demo` | Hierarchical groups, transform gizmos, structure selection |
 | Ground Plane | `cargo run --example ground_plane_demo` | Ground plane modes, shadows, reflections |
+| Polygon Mesh | `cargo run --example polygon_mesh_demo` | Arbitrary n-gon faces (quads, hexagons, octagons) |
 | Materials | `cargo run --example materials_demo` | All 8 matcap materials across structure types |
 | Transparency | `cargo run --example transparency_demo` | Depth peeling (Pretty) and alpha blending (Simple) modes |
 
@@ -137,7 +138,7 @@ polyscope-rs uses a paradigm of **structures** and **quantities**:
 - A **structure** is a geometric object in the scene (point cloud, mesh, etc.)
 - A **quantity** is data associated with a structure (scalar field, vector field, colors)
 
-For a detailed comparison of the architecture and API differences between polyscope-rs and C++ Polyscope, see [docs/architecture-differences.md](docs/architecture-differences.md).
+For detailed documentation, see the [docs/](docs/) directory.
 
 ## Crate Structure
 
@@ -162,7 +163,9 @@ For a detailed comparison of the architecture and API differences between polysc
 
 For developers familiar with the C++ version or considering migration, see:
 
-- [docs/architecture-differences.md](docs/architecture-differences.md) - Detailed feature comparison and API differences
+- [Architecture Differences](docs/architecture-differences.md) - C++ vs Rust rendering implementation differences
+- [Feature Status & Roadmap](docs/feature-status.md) - Feature comparison tables and planned work
+- [Development Guide](docs/development-guide.md) - Adding structures/quantities, API patterns, migration tips
 
 ### Key Differences
 
