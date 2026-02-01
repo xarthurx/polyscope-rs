@@ -5,6 +5,7 @@ mod picking;
 mod render;
 mod render_init;
 mod render_scene;
+mod render_ui;
 
 use std::collections::HashSet;
 pub(super) use std::sync::Arc;
