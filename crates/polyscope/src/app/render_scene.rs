@@ -1,14 +1,18 @@
-use super::{PointCloud, SurfaceMesh, CurveNetwork, CameraView, VolumeGrid, VolumeMesh, Structure};
-use polyscope_structures::volume_grid::{VolumeGridNodeScalarQuantity, VolumeGridCellScalarQuantity, VolumeGridVizMode};
+use super::{CameraView, CurveNetwork, PointCloud, Structure, SurfaceMesh, VolumeGrid, VolumeMesh};
 use polyscope_core::structure::HasQuantities;
 use polyscope_render::RenderEngine;
+use polyscope_structures::volume_grid::{
+    VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,
+};
 
 /// Draw point clouds to a wgpu render pass.
 pub(super) fn draw_point_clouds<'a>(
     render_pass: &mut wgpu::RenderPass<'a>,
     engine: &'a RenderEngine,
 ) {
-    let Some(pipeline) = &engine.point_pipeline else { return };
+    let Some(pipeline) = &engine.point_pipeline else {
+        return;
+    };
     render_pass.set_pipeline(pipeline);
     render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
@@ -21,7 +25,11 @@ pub(super) fn draw_point_clouds<'a>(
                 if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
                     if let Some(render_data) = pc.render_data() {
                         render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                        render_pass.set_bind_group(2, engine.matcap_bind_group_for(pc.material()), &[]);
+                        render_pass.set_bind_group(
+                            2,
+                            engine.matcap_bind_group_for(pc.material()),
+                            &[],
+                        );
                         // 6 vertices per quad, num_points instances
                         render_pass.draw(0..6, 0..render_data.num_points);
                     }
@@ -36,7 +44,9 @@ pub(super) fn draw_vector_quantities<'a>(
     render_pass: &mut wgpu::RenderPass<'a>,
     engine: &'a RenderEngine,
 ) {
-    let Some(pipeline) = &engine.vector_pipeline else { return };
+    let Some(pipeline) = &engine.vector_pipeline else {
+        return;
+    };
     render_pass.set_pipeline(pipeline);
     render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
@@ -105,7 +115,9 @@ pub(super) fn draw_curve_networks_and_lines<'a>(
     render_pass: &mut wgpu::RenderPass<'a>,
     engine: &'a RenderEngine,
 ) {
-    let Some(pipeline) = &engine.curve_network_edge_pipeline else { return };
+    let Some(pipeline) = &engine.curve_network_edge_pipeline else {
+        return;
+    };
     render_pass.set_pipeline(pipeline);
     render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
@@ -154,7 +166,9 @@ pub(super) fn draw_curve_network_tubes<'a>(
     render_pass: &mut wgpu::RenderPass<'a>,
     engine: &'a RenderEngine,
 ) {
-    let Some(pipeline) = &engine.curve_network_tube_pipeline else { return };
+    let Some(pipeline) = &engine.curve_network_tube_pipeline else {
+        return;
+    };
     render_pass.set_pipeline(pipeline);
     render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
@@ -172,7 +186,11 @@ pub(super) fn draw_curve_network_tubes<'a>(
                                 &render_data.tube_render_bind_group,
                                 &render_data.generated_vertex_buffer,
                             ) {
-                                render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
+                                render_pass.set_bind_group(
+                                    2,
+                                    engine.matcap_bind_group_for(structure.material()),
+                                    &[],
+                                );
                                 render_pass.set_bind_group(0, tube_bg, &[]);
                                 render_pass.set_vertex_buffer(0, gen_vb.slice(..));
                                 // 36 vertices per edge (12 triangles for bounding box)
@@ -191,7 +209,9 @@ pub(super) fn draw_curve_network_nodes<'a>(
     render_pass: &mut wgpu::RenderPass<'a>,
     engine: &'a RenderEngine,
 ) {
-    let Some(pipeline) = &engine.point_pipeline else { return };
+    let Some(pipeline) = &engine.point_pipeline else {
+        return;
+    };
     render_pass.set_pipeline(pipeline);
     render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
@@ -206,7 +226,11 @@ pub(super) fn draw_curve_network_nodes<'a>(
                     if cn.render_mode() == 1 {
                         if let Some(render_data) = cn.render_data() {
                             if let Some(node_bg) = &render_data.node_render_bind_group {
-                                render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
+                                render_pass.set_bind_group(
+                                    2,
+                                    engine.matcap_bind_group_for(structure.material()),
+                                    &[],
+                                );
                                 render_pass.set_bind_group(0, node_bg, &[]);
                                 // 6 vertices per quad, num_nodes instances
                                 render_pass.draw(0..6, 0..render_data.num_nodes);
@@ -224,7 +248,9 @@ pub(super) fn draw_meshes_simple<'a>(
     render_pass: &mut wgpu::RenderPass<'a>,
     engine: &'a RenderEngine,
 ) {
-    let Some(pipeline) = &engine.mesh_pipeline else { return };
+    let Some(pipeline) = &engine.mesh_pipeline else {
+        return;
+    };
     render_pass.set_pipeline(pipeline);
     render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
@@ -246,11 +272,7 @@ pub(super) fn draw_meshes_simple<'a>(
                             render_data.index_buffer.slice(..),
                             wgpu::IndexFormat::Uint32,
                         );
-                        render_pass.draw_indexed(
-                            0..render_data.num_indices,
-                            0,
-                            0..1,
-                        );
+                        render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
                     }
                 }
             }
@@ -268,11 +290,7 @@ pub(super) fn draw_meshes_simple<'a>(
                             render_data.index_buffer.slice(..),
                             wgpu::IndexFormat::Uint32,
                         );
-                        render_pass.draw_indexed(
-                            0..render_data.num_indices,
-                            0,
-                            0..1,
-                        );
+                        render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
                     }
                     // Note: No slice cap geometry needed - we use cell culling
                     // which shows whole cells instead of cross-section caps
@@ -287,7 +305,9 @@ pub(super) fn draw_volume_grid_isosurfaces<'a>(
     render_pass: &mut wgpu::RenderPass<'a>,
     engine: &'a RenderEngine,
 ) {
-    let Some(pipeline) = &engine.simple_mesh_pipeline else { return };
+    let Some(pipeline) = &engine.simple_mesh_pipeline else {
+        return;
+    };
     render_pass.set_pipeline(pipeline);
     render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
@@ -297,12 +317,19 @@ pub(super) fn draw_volume_grid_isosurfaces<'a>(
                 continue;
             }
             if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
-                render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
+                render_pass.set_bind_group(
+                    2,
+                    engine.matcap_bind_group_for(structure.material()),
+                    &[],
+                );
                 for quantity in vg.quantities() {
                     if !quantity.is_enabled() {
                         continue;
                     }
-                    if let Some(nsq) = quantity.as_any().downcast_ref::<VolumeGridNodeScalarQuantity>() {
+                    if let Some(nsq) = quantity
+                        .as_any()
+                        .downcast_ref::<VolumeGridNodeScalarQuantity>()
+                    {
                         if nsq.viz_mode() == VolumeGridVizMode::Isosurface {
                             if let Some(rd) = nsq.isosurface_render_data() {
                                 render_pass.set_bind_group(0, &rd.bind_group, &[]);
@@ -321,7 +348,9 @@ pub(super) fn draw_volume_grid_gridcubes<'a>(
     render_pass: &mut wgpu::RenderPass<'a>,
     engine: &'a RenderEngine,
 ) {
-    let Some(pipeline) = &engine.gridcube_pipeline else { return };
+    let Some(pipeline) = &engine.gridcube_pipeline else {
+        return;
+    };
     render_pass.set_pipeline(pipeline);
     render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
@@ -331,12 +360,19 @@ pub(super) fn draw_volume_grid_gridcubes<'a>(
                 continue;
             }
             if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
-                render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
+                render_pass.set_bind_group(
+                    2,
+                    engine.matcap_bind_group_for(structure.material()),
+                    &[],
+                );
                 for quantity in vg.quantities() {
                     if !quantity.is_enabled() {
                         continue;
                     }
-                    if let Some(nsq) = quantity.as_any().downcast_ref::<VolumeGridNodeScalarQuantity>() {
+                    if let Some(nsq) = quantity
+                        .as_any()
+                        .downcast_ref::<VolumeGridNodeScalarQuantity>()
+                    {
                         if nsq.viz_mode() == VolumeGridVizMode::Gridcube {
                             if let Some(rd) = nsq.gridcube_render_data() {
                                 render_pass.set_bind_group(0, &rd.bind_group, &[]);
@@ -345,7 +381,10 @@ pub(super) fn draw_volume_grid_gridcubes<'a>(
                             }
                         }
                     }
-                    if let Some(csq) = quantity.as_any().downcast_ref::<VolumeGridCellScalarQuantity>() {
+                    if let Some(csq) = quantity
+                        .as_any()
+                        .downcast_ref::<VolumeGridCellScalarQuantity>()
+                    {
                         if let Some(rd) = csq.gridcube_render_data() {
                             render_pass.set_bind_group(0, &rd.bind_group, &[]);
                             render_pass.draw(0..rd.num_instances * 36, 0..1);

@@ -1,6 +1,6 @@
 //! Screenshot capture and headless rendering.
 
-use super::{render_scene, App, GroundPlaneMode};
+use super::{App, GroundPlaneMode, render_scene};
 
 impl App {
     /// Captures a screenshot by re-rendering to a dedicated texture.

@@ -1,4 +1,4 @@
-use super::{App, Vec3, PointCloud, SurfaceMesh, VolumeMesh, CurveNetwork};
+use super::{App, CurveNetwork, PointCloud, SurfaceMesh, Vec3, VolumeMesh};
 
 impl App {
     /// Performs GPU-based picking to find which structure and element is at the given screen position.
@@ -216,7 +216,11 @@ impl App {
     }
 
     /// Tests whether a ray intersects a visible slice plane quad.
-    pub(super) fn pick_slice_plane_at_ray(&self, ray_origin: Vec3, ray_dir: Vec3) -> Option<(String, f32)> {
+    pub(super) fn pick_slice_plane_at_ray(
+        &self,
+        ray_origin: Vec3,
+        ray_dir: Vec3,
+    ) -> Option<(String, f32)> {
         let mut best_hit: Option<(String, f32)> = None;
         crate::with_context(|ctx| {
             for plane in ctx.slice_planes() {
@@ -291,11 +295,7 @@ impl App {
             return None;
         }
         let t = f * edge2.dot(q);
-        if t > eps {
-            Some(t)
-        } else {
-            None
-        }
+        if t > eps { Some(t) } else { None }
     }
 
     pub(super) fn ray_segment_closest_t(

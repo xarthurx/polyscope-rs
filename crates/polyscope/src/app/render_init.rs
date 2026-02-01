@@ -1,7 +1,7 @@
 // Shared GPU initialization code for windowed and headless rendering
 
 use glam::Vec3;
-use polyscope_core::{slice_plane::SlicePlaneUniforms, MaterialLoadRequest};
+use polyscope_core::{MaterialLoadRequest, slice_plane::SlicePlaneUniforms};
 use polyscope_render::RenderEngine;
 use polyscope_structures::{
     CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh,

@@ -1,8 +1,15 @@
-use super::{App, Structure, PointCloud, SurfaceMesh, CurveNetwork, VolumeGrid, VolumeMesh, Vec3, GroundPlaneMode, reflection, ScreenDescriptor, render_scene};
-use polyscope_structures::volume_grid::{VolumeGridNodeScalarQuantity, VolumeGridCellScalarQuantity, VolumeGridVizMode};
-use polyscope_render::{GridcubeRenderData, GridcubeUniforms, IsosurfaceRenderData, SimpleMeshUniforms};
-use polyscope_core::structure::HasQuantities;
+use super::{
+    App, CurveNetwork, GroundPlaneMode, PointCloud, ScreenDescriptor, Structure, SurfaceMesh, Vec3,
+    VolumeGrid, VolumeMesh, reflection, render_scene,
+};
 use polyscope_core::quantity::Quantity;
+use polyscope_core::structure::HasQuantities;
+use polyscope_render::{
+    GridcubeRenderData, GridcubeUniforms, IsosurfaceRenderData, SimpleMeshUniforms,
+};
+use polyscope_structures::volume_grid::{
+    VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,
+};
 
 impl App {
     /// Renders a single frame.
@@ -60,11 +67,8 @@ impl App {
                         // Initialize pick resources (after render data init by shared function)
                         if mesh.pick_bind_group().is_none() && mesh.render_data().is_some() {
                             let num_faces = mesh.num_faces() as u32;
-                            let global_start = engine.assign_pick_range(
-                                "SurfaceMesh",
-                                mesh.name(),
-                                num_faces,
-                            );
+                            let global_start =
+                                engine.assign_pick_range("SurfaceMesh", mesh.name(), num_faces);
                             mesh.init_pick_resources(
                                 &engine.device,
                                 engine.mesh_pick_bind_group_layout(),
@@ -131,10 +135,15 @@ impl App {
                             }
 
                             // Node scalar quantities: gridcube + isosurface
-                            if let Some(nsq) = quantity.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                            if let Some(nsq) = quantity
+                                .as_any_mut()
+                                .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                            {
                                 match nsq.viz_mode() {
                                     VolumeGridVizMode::Gridcube => {
-                                        if nsq.gridcube_render_data().is_none() || nsq.gridcube_dirty() {
+                                        if nsq.gridcube_render_data().is_none()
+                                            || nsq.gridcube_dirty()
+                                        {
                                             // Generate node center positions
                                             let mut centers = Vec::new();
                                             let cell_dim_f = Vec3::new(
@@ -145,15 +154,23 @@ impl App {
                                             for k in 0..node_dim.z {
                                                 for j in 0..node_dim.y {
                                                     for i in 0..node_dim.x {
-                                                        let t = Vec3::new(i as f32, j as f32, k as f32) / cell_dim_f;
-                                                        centers.push(bound_min + t * (bound_max - bound_min));
+                                                        let t =
+                                                            Vec3::new(i as f32, j as f32, k as f32)
+                                                                / cell_dim_f;
+                                                        centers.push(
+                                                            bound_min + t * (bound_max - bound_min),
+                                                        );
                                                     }
                                                 }
                                             }
-                                            let half_size = grid_spacing.min_element() * 0.5 * cube_size_factor.max(0.5);
+                                            let half_size = grid_spacing.min_element()
+                                                * 0.5
+                                                * cube_size_factor.max(0.5);
 
                                             // Sample colormap
-                                            let colormap_colors: Vec<Vec3> = if let Some(cm) = engine.color_maps.get(nsq.color_map()) {
+                                            let colormap_colors: Vec<Vec3> = if let Some(cm) =
+                                                engine.color_maps.get(nsq.color_map())
+                                            {
                                                 cm.colors.clone()
                                             } else {
                                                 vec![Vec3::ZERO, Vec3::ONE]
@@ -173,7 +190,9 @@ impl App {
                                         }
                                     }
                                     VolumeGridVizMode::Isosurface => {
-                                        if nsq.isosurface_render_data().is_none() || nsq.isosurface_dirty() {
+                                        if nsq.isosurface_render_data().is_none()
+                                            || nsq.isosurface_dirty()
+                                        {
                                             let mesh = nsq.extract_isosurface();
                                             if mesh.vertices.is_empty() {
                                                 // Isovalue outside data range — clear old surface
@@ -224,11 +243,16 @@ impl App {
                             }
 
                             // Check for "Register as Surface Mesh" request
-                            if let Some(nsq) = quantity.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                            if let Some(nsq) = quantity
+                                .as_any_mut()
+                                .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                            {
                                 if nsq.register_as_mesh_requested() {
                                     if let Some(mesh) = nsq.isosurface_mesh() {
                                         let verts = mesh.vertices.clone();
-                                        let tris: Vec<[u32; 3]> = mesh.indices.chunks(3)
+                                        let tris: Vec<[u32; 3]> = mesh
+                                            .indices
+                                            .chunks(3)
                                             .map(|c| [c[0], c[1], c[2]])
                                             .collect();
                                         let name = format!("{} isosurface", nsq.name());
@@ -239,14 +263,18 @@ impl App {
                             }
 
                             // Cell scalar quantities: gridcube only
-                            if let Some(csq) = quantity.as_any_mut().downcast_mut::<VolumeGridCellScalarQuantity>() {
+                            if let Some(csq) = quantity
+                                .as_any_mut()
+                                .downcast_mut::<VolumeGridCellScalarQuantity>()
+                            {
                                 if csq.gridcube_render_data().is_none() || csq.gridcube_dirty() {
                                     let cell_dim = node_dim.saturating_sub(glam::UVec3::ONE);
-                                    let cell_spacing = (bound_max - bound_min) / Vec3::new(
-                                        cell_dim.x.max(1) as f32,
-                                        cell_dim.y.max(1) as f32,
-                                        cell_dim.z.max(1) as f32,
-                                    );
+                                    let cell_spacing = (bound_max - bound_min)
+                                        / Vec3::new(
+                                            cell_dim.x.max(1) as f32,
+                                            cell_dim.y.max(1) as f32,
+                                            cell_dim.z.max(1) as f32,
+                                        );
                                     let half_cell_spacing = cell_spacing * 0.5;
 
                                     // Generate cell center positions
@@ -254,18 +282,23 @@ impl App {
                                     for k in 0..cell_dim.z {
                                         for j in 0..cell_dim.y {
                                             for i in 0..cell_dim.x {
-                                                let node_pos = bound_min + Vec3::new(i as f32, j as f32, k as f32) * cell_spacing;
+                                                let node_pos = bound_min
+                                                    + Vec3::new(i as f32, j as f32, k as f32)
+                                                        * cell_spacing;
                                                 centers.push(node_pos + half_cell_spacing);
                                             }
                                         }
                                     }
-                                    let half_size = cell_spacing.min_element() * 0.5 * cube_size_factor.max(0.5);
+                                    let half_size = cell_spacing.min_element()
+                                        * 0.5
+                                        * cube_size_factor.max(0.5);
 
-                                    let colormap_colors: Vec<Vec3> = if let Some(cm) = engine.color_maps.get(csq.color_map()) {
-                                        cm.colors.clone()
-                                    } else {
-                                        vec![Vec3::ZERO, Vec3::ONE]
-                                    };
+                                    let colormap_colors: Vec<Vec3> =
+                                        if let Some(cm) = engine.color_maps.get(csq.color_map()) {
+                                            cm.colors.clone()
+                                        } else {
+                                            vec![Vec3::ZERO, Vec3::ONE]
+                                        };
 
                                     let data = GridcubeRenderData::new(
                                         &engine.device,
@@ -302,9 +335,15 @@ impl App {
                         if !engine.has_gridcube_pick_pipeline() {
                             // Only init if there are any enabled gridcube quantities
                             let has_enabled_gridcube = vg.quantities().iter().any(|q| {
-                                if let Some(nsq) = q.as_any().downcast_ref::<VolumeGridNodeScalarQuantity>() {
-                                    nsq.is_enabled() && nsq.viz_mode() == VolumeGridVizMode::Gridcube && nsq.gridcube_render_data().is_some()
-                                } else if let Some(csq) = q.as_any().downcast_ref::<VolumeGridCellScalarQuantity>() {
+                                if let Some(nsq) =
+                                    q.as_any().downcast_ref::<VolumeGridNodeScalarQuantity>()
+                                {
+                                    nsq.is_enabled()
+                                        && nsq.viz_mode() == VolumeGridVizMode::Gridcube
+                                        && nsq.gridcube_render_data().is_some()
+                                } else if let Some(csq) =
+                                    q.as_any().downcast_ref::<VolumeGridCellScalarQuantity>()
+                                {
                                     csq.is_enabled() && csq.gridcube_render_data().is_some()
                                 } else {
                                     false
@@ -323,7 +362,10 @@ impl App {
                                     continue;
                                 }
 
-                                if let Some(nsq) = quantity.as_any_mut().downcast_mut::<VolumeGridNodeScalarQuantity>() {
+                                if let Some(nsq) = quantity
+                                    .as_any_mut()
+                                    .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                                {
                                     if nsq.viz_mode() == VolumeGridVizMode::Gridcube
                                         && nsq.gridcube_render_data().is_some()
                                         && nsq.pick_bind_group().is_none()
@@ -350,7 +392,10 @@ impl App {
                                     );
                                 }
 
-                                if let Some(csq) = quantity.as_any_mut().downcast_mut::<VolumeGridCellScalarQuantity>() {
+                                if let Some(csq) = quantity
+                                    .as_any_mut()
+                                    .downcast_mut::<VolumeGridCellScalarQuantity>()
+                                {
                                     if csq.gridcube_render_data().is_some()
                                         && csq.pick_bind_group().is_none()
                                     {
@@ -390,11 +435,8 @@ impl App {
                                 engine.init_mesh_pick_pipeline();
                             }
                             let num_cells = vm.num_cells() as u32;
-                            let global_start = engine.assign_pick_range(
-                                "VolumeMesh",
-                                vm.name(),
-                                num_cells,
-                            );
+                            let global_start =
+                                engine.assign_pick_range("VolumeMesh", vm.name(), num_cells);
                             vm.init_pick_resources(
                                 &engine.device,
                                 engine.mesh_pick_bind_group_layout(),
@@ -470,9 +512,13 @@ impl App {
                                     && render_data.generated_vertex_buffer.is_some()
                                 {
                                     // Use tube-based picking (ray-cylinder intersection)
-                                    pick_pass.set_pipeline(engine.curve_network_tube_pick_pipeline());
                                     pick_pass
-                                        .set_bind_group(0, cn.tube_pick_bind_group().unwrap(), &[]);
+                                        .set_pipeline(engine.curve_network_tube_pick_pipeline());
+                                    pick_pass.set_bind_group(
+                                        0,
+                                        cn.tube_pick_bind_group().unwrap(),
+                                        &[],
+                                    );
                                     pick_pass.set_vertex_buffer(
                                         0,
                                         render_data
@@ -486,7 +532,8 @@ impl App {
                                 } else if engine.has_curve_network_pick_pipeline() {
                                     // Fallback to line-based picking
                                     if let Some(pick_bind_group) = cn.pick_bind_group() {
-                                        pick_pass.set_pipeline(engine.curve_network_pick_pipeline());
+                                        pick_pass
+                                            .set_pipeline(engine.curve_network_pick_pipeline());
                                         pick_pass.set_bind_group(0, pick_bind_group, &[]);
                                         // 2 vertices per edge (LineList topology)
                                         pick_pass.draw(0..render_data.num_edges * 2, 0..1);
@@ -507,30 +554,19 @@ impl App {
                                 continue;
                             }
                             if structure.type_name() == "SurfaceMesh" {
-                                if let Some(mesh) =
-                                    structure.as_any().downcast_ref::<SurfaceMesh>()
+                                if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>()
                                 {
                                     if let Some(pick_bind_group) = mesh.pick_bind_group() {
-                                        pick_pass
-                                            .set_bind_group(0, pick_bind_group, &[]);
-                                        pick_pass.draw(
-                                            0..mesh.num_triangulation_vertices(),
-                                            0..1,
-                                        );
+                                        pick_pass.set_bind_group(0, pick_bind_group, &[]);
+                                        pick_pass.draw(0..mesh.num_triangulation_vertices(), 0..1);
                                     }
                                 }
                             }
                             if structure.type_name() == "VolumeMesh" {
-                                if let Some(vm) =
-                                    structure.as_any().downcast_ref::<VolumeMesh>()
-                                {
+                                if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
                                     if let Some(pick_bind_group) = vm.pick_bind_group() {
-                                        pick_pass
-                                            .set_bind_group(0, pick_bind_group, &[]);
-                                        pick_pass.draw(
-                                            0..vm.num_render_vertices(),
-                                            0..1,
-                                        );
+                                        pick_pass.set_bind_group(0, pick_bind_group, &[]);
+                                        pick_pass.draw(0..vm.num_render_vertices(), 0..1);
                                     }
                                 }
                             }
@@ -547,22 +583,27 @@ impl App {
                                 continue;
                             }
                             if structure.type_name() == "VolumeGrid" {
-                                if let Some(vg) =
-                                    structure.as_any().downcast_ref::<VolumeGrid>()
-                                {
+                                if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
                                     for quantity in vg.quantities() {
                                         if !quantity.is_enabled() {
                                             continue;
                                         }
-                                        if let Some(nsq) = quantity.as_any().downcast_ref::<VolumeGridNodeScalarQuantity>() {
+                                        if let Some(nsq) = quantity
+                                            .as_any()
+                                            .downcast_ref::<VolumeGridNodeScalarQuantity>(
+                                        ) {
                                             if nsq.viz_mode() == VolumeGridVizMode::Gridcube {
                                                 if let Some(pick_bg) = nsq.pick_bind_group() {
                                                     pick_pass.set_bind_group(0, pick_bg, &[]);
-                                                    pick_pass.draw(0..nsq.pick_total_vertices(), 0..1);
+                                                    pick_pass
+                                                        .draw(0..nsq.pick_total_vertices(), 0..1);
                                                 }
                                             }
                                         }
-                                        if let Some(csq) = quantity.as_any().downcast_ref::<VolumeGridCellScalarQuantity>() {
+                                        if let Some(csq) = quantity
+                                            .as_any()
+                                            .downcast_ref::<VolumeGridCellScalarQuantity>(
+                                        ) {
                                             if let Some(pick_bg) = csq.pick_bind_group() {
                                                 pick_pass.set_bind_group(0, pick_bg, &[]);
                                                 pick_pass.draw(0..csq.pick_total_vertices(), 0..1);
@@ -592,7 +633,6 @@ impl App {
         let engine = self.engine.as_mut().unwrap();
         let egui = self.egui.as_mut().unwrap();
         let window = self.window.as_ref().unwrap();
-
 
         // Now borrow surface for rendering
         let surface = engine.surface.as_ref().expect("surface checked above");
@@ -672,17 +712,17 @@ impl App {
                     if !ctx.is_structure_visible(structure) {
                         continue;
                     }
-                        if structure.type_name() == "CurveNetwork" {
-                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
-                                if let Some(render_data) = cn.render_data() {
-                                    if let Some(compute_bg) = &render_data.compute_bind_group {
-                                        compute_pass.set_bind_group(0, compute_bg, &[]);
-                                        let num_workgroups = render_data.num_edges.div_ceil(64);
-                                        compute_pass.dispatch_workgroups(num_workgroups, 1, 1);
-                                    }
+                    if structure.type_name() == "CurveNetwork" {
+                        if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                            if let Some(render_data) = cn.render_data() {
+                                if let Some(compute_bg) = &render_data.compute_bind_group {
+                                    compute_pass.set_bind_group(0, compute_bg, &[]);
+                                    let num_workgroups = render_data.num_edges.div_ceil(64);
+                                    compute_pass.dispatch_workgroups(num_workgroups, 1, 1);
                                 }
                             }
                         }
+                    }
                 }
             });
         }
@@ -853,8 +893,7 @@ impl App {
                         }
                         // VolumeMesh (uses SurfaceMeshRenderData)
                         if structure.type_name() == "VolumeMesh" {
-                            if let Some(vol_mesh) =
-                                structure.as_any().downcast_ref::<VolumeMesh>()
+                            if let Some(vol_mesh) = structure.as_any().downcast_ref::<VolumeMesh>()
                             {
                                 if let Some(mesh_data) = vol_mesh.render_data() {
                                     if let Some(bind_group) =
@@ -1123,11 +1162,7 @@ impl App {
                                         render_data.index_buffer.slice(..),
                                         wgpu::IndexFormat::Uint32,
                                     );
-                                    render_pass.draw_indexed(
-                                        0..render_data.num_indices,
-                                        0,
-                                        0..1,
-                                    );
+                                    render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
                                 }
                             }
                         }
@@ -1155,11 +1190,7 @@ impl App {
                                         render_data.index_buffer.slice(..),
                                         wgpu::IndexFormat::Uint32,
                                     );
-                                    render_pass.draw_indexed(
-                                        0..render_data.num_indices,
-                                        0,
-                                        0..1,
-                                    );
+                                    render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
                                 }
                                 // Note: No slice cap geometry needed - we use cell culling
                                 // which shows whole cells instead of cross-section caps
@@ -1201,9 +1232,8 @@ impl App {
             if has_surface_meshes {
                 engine.ensure_depth_peel_pass();
 
-                let num_passes = polyscope_core::with_context(|ctx| {
-                    ctx.options.transparency_render_passes
-                });
+                let num_passes =
+                    polyscope_core::with_context(|ctx| ctx.options.transparency_render_passes);
 
                 // Clear final buffer to transparent black
                 {
@@ -1247,40 +1277,43 @@ impl App {
                     // Peel pass: render all surface meshes, discarding already-peeled fragments
                     {
                         let peel = engine.depth_peel_pass().unwrap();
-                        let mut peel_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                            label: Some("Peel: geometry pass"),
-                            color_attachments: &[
-                                // Color output (premultiplied alpha)
-                                Some(wgpu::RenderPassColorAttachment {
-                                    view: peel.peel_color_view(),
-                                    resolve_target: None,
-                                    ops: wgpu::Operations {
-                                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                                        store: wgpu::StoreOp::Store,
+                        let mut peel_pass =
+                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                label: Some("Peel: geometry pass"),
+                                color_attachments: &[
+                                    // Color output (premultiplied alpha)
+                                    Some(wgpu::RenderPassColorAttachment {
+                                        view: peel.peel_color_view(),
+                                        resolve_target: None,
+                                        ops: wgpu::Operations {
+                                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                                            store: wgpu::StoreOp::Store,
+                                        },
+                                        depth_slice: None,
+                                    }),
+                                    // Depth-as-color output
+                                    Some(wgpu::RenderPassColorAttachment {
+                                        view: peel.peel_depth_color_view(),
+                                        resolve_target: None,
+                                        ops: wgpu::Operations {
+                                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                                            store: wgpu::StoreOp::Store,
+                                        },
+                                        depth_slice: None,
+                                    }),
+                                ],
+                                depth_stencil_attachment: Some(
+                                    wgpu::RenderPassDepthStencilAttachment {
+                                        view: peel.peel_depth_view(),
+                                        depth_ops: Some(wgpu::Operations {
+                                            load: wgpu::LoadOp::Clear(1.0),
+                                            store: wgpu::StoreOp::Store,
+                                        }),
+                                        stencil_ops: None,
                                     },
-                                    depth_slice: None,
-                                }),
-                                // Depth-as-color output
-                                Some(wgpu::RenderPassColorAttachment {
-                                    view: peel.peel_depth_color_view(),
-                                    resolve_target: None,
-                                    ops: wgpu::Operations {
-                                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                                        store: wgpu::StoreOp::Store,
-                                    },
-                                    depth_slice: None,
-                                }),
-                            ],
-                            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                                view: peel.peel_depth_view(),
-                                depth_ops: Some(wgpu::Operations {
-                                    load: wgpu::LoadOp::Clear(1.0),
-                                    store: wgpu::StoreOp::Store,
-                                }),
-                                stencil_ops: None,
-                            }),
-                            ..Default::default()
-                        });
+                                ),
+                                ..Default::default()
+                            });
 
                         peel_pass.set_pipeline(peel.peel_pipeline());
                         peel_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
@@ -1301,8 +1334,11 @@ impl App {
                                                 engine.matcap_bind_group_for(structure.material()),
                                                 &[],
                                             );
-                                            peel_pass
-                                                .set_bind_group(0, &render_data.bind_group, &[]);
+                                            peel_pass.set_bind_group(
+                                                0,
+                                                &render_data.bind_group,
+                                                &[],
+                                            );
                                             peel_pass.set_index_buffer(
                                                 render_data.index_buffer.slice(..),
                                                 wgpu::IndexFormat::Uint32,

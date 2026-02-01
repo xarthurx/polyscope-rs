@@ -23,7 +23,7 @@ pub(super) use winit::{
 };
 
 pub(super) use polyscope_core::{GroundPlaneConfig, GroundPlaneMode, Structure};
-pub(super) use polyscope_render::{reflection, PickResult, RenderEngine};
+pub(super) use polyscope_render::{PickResult, RenderEngine, reflection};
 pub(super) use polyscope_structures::{
     CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh,
 };

@@ -1,4 +1,8 @@
-use super::{ApplicationHandler, App, ActiveEventLoop, Window, LogicalSize, Arc, FutureExt, RenderEngine, EguiIntegration, WindowId, WindowEvent, MouseButton, ElementState, Vec3, KeyCode, PickResult};
+use super::{
+    ActiveEventLoop, App, ApplicationHandler, Arc, EguiIntegration, ElementState, FutureExt,
+    KeyCode, LogicalSize, MouseButton, PickResult, RenderEngine, Vec3, Window, WindowEvent,
+    WindowId,
+};
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -130,11 +134,8 @@ impl ApplicationHandler for App {
                                     .position
                                     .distance(engine.camera.target)
                                     .max(1.0);
-                                let speed =
-                                    length_scale * dt * engine.camera.move_speed;
-                                engine
-                                    .camera
-                                    .move_first_person(delta.normalize() * speed);
+                                let speed = length_scale * dt * engine.camera.move_speed;
+                                engine.camera.move_first_person(delta.normalize() * speed);
                             }
                         }
                     }
@@ -175,16 +176,14 @@ impl ApplicationHandler for App {
                     if is_rotate {
                         match nav {
                             NavigationStyle::Turntable => {
-                                engine.camera.orbit_turntable(
-                                    delta_x as f32 * 0.01,
-                                    delta_y as f32 * 0.01,
-                                );
+                                engine
+                                    .camera
+                                    .orbit_turntable(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
                             }
                             NavigationStyle::Free => {
-                                engine.camera.orbit_free(
-                                    delta_x as f32 * 0.01,
-                                    delta_y as f32 * 0.01,
-                                );
+                                engine
+                                    .camera
+                                    .orbit_free(delta_x as f32 * 0.01, delta_y as f32 * 0.01);
                             }
                             NavigationStyle::Arcball => {
                                 // Arcball needs normalized screen coordinates [-1, 1]
@@ -197,22 +196,16 @@ impl ApplicationHandler for App {
                                     let cur_x = self.mouse_pos.0 as f32;
                                     let cur_y = self.mouse_pos.1 as f32;
 
-                                    let start = [
-                                        (prev_x / w) * 2.0 - 1.0,
-                                        -((prev_y / h) * 2.0 - 1.0),
-                                    ];
-                                    let end = [
-                                        (cur_x / w) * 2.0 - 1.0,
-                                        -((cur_y / h) * 2.0 - 1.0),
-                                    ];
+                                    let start =
+                                        [(prev_x / w) * 2.0 - 1.0, -((prev_y / h) * 2.0 - 1.0)];
+                                    let end = [(cur_x / w) * 2.0 - 1.0, -((cur_y / h) * 2.0 - 1.0)];
                                     engine.camera.orbit_arcball(start, end);
                                 }
                             }
                             NavigationStyle::FirstPerson => {
-                                engine.camera.mouse_look(
-                                    delta_x as f32 * 0.005,
-                                    delta_y as f32 * 0.005,
-                                );
+                                engine
+                                    .camera
+                                    .mouse_look(delta_x as f32 * 0.005, delta_y as f32 * 0.005);
                             }
                             NavigationStyle::Planar | NavigationStyle::None => {
                                 // No rotation in these modes
@@ -248,7 +241,12 @@ impl ApplicationHandler for App {
                     // DEBUG: Log click event
                     log::debug!(
                         "[CLICK DEBUG] Left mouse released at ({:.1}, {:.1}), drag_distance={:.2}, mouse_in_ui_panel={}, egui_using_pointer={}, egui_consumed={}",
-                        self.mouse_pos.0, self.mouse_pos.1, self.drag_distance, mouse_in_ui_panel, egui_using_pointer, egui_consumed
+                        self.mouse_pos.0,
+                        self.mouse_pos.1,
+                        self.drag_distance,
+                        mouse_in_ui_panel,
+                        egui_using_pointer,
+                        egui_consumed
                     );
 
                     // Skip if egui is actively using pointer AND this was a drag (gizmo being dragged)
@@ -511,7 +509,9 @@ impl ApplicationHandler for App {
                                     },
                                     t,
                                 )) => {
-                                    log::debug!("[CLICK DEBUG] Hit structure '{type_name}::{name}' element {element_index} at t={t}");
+                                    log::debug!(
+                                        "[CLICK DEBUG] Hit structure '{type_name}::{name}' element {element_index} at t={t}"
+                                    );
                                     self.selected_element_index = Some(*element_index);
                                     self.deselect_slice_plane_selection();
 
@@ -558,7 +558,9 @@ impl ApplicationHandler for App {
                     } else {
                         log::debug!(
                             "[CLICK DEBUG] SKIPPED: mouse_in_ui_panel={} or drag_distance={:.2} >= {}",
-                            mouse_in_ui_panel, self.drag_distance, DRAG_THRESHOLD
+                            mouse_in_ui_panel,
+                            self.drag_distance,
+                            DRAG_THRESHOLD
                         );
                     }
                     self.last_click_pos = None;
