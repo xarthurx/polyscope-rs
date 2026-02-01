@@ -3,6 +3,7 @@
 mod input;
 mod picking;
 mod render;
+mod render_init;
 mod render_scene;
 
 use std::collections::HashSet;
@@ -19,7 +20,6 @@ pub(super) use winit::{
     window::{Window, WindowId},
 };
 
-pub(super) use polyscope_core::slice_plane::SlicePlaneUniforms;
 pub(super) use polyscope_core::{GroundPlaneConfig, GroundPlaneMode, Structure};
 pub(super) use polyscope_render::{reflection, PickResult, RenderEngine};
 pub(super) use polyscope_structures::{
