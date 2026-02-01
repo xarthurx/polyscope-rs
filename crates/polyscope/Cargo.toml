@@ -73,5 +73,9 @@ path = "../../examples/ground_plane_demo.rs"
 name = "materials_demo"
 path = "../../examples/materials_demo.rs"
 
+[[example]]
+name = "polygon_mesh_demo"
+path = "../../examples/polygon_mesh_demo.rs"
+
 [lints]
 workspace = true
