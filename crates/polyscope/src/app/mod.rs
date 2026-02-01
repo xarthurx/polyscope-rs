@@ -3,6 +3,7 @@
 mod input;
 mod picking;
 mod render;
+mod render_scene;
 
 use std::collections::HashSet;
 pub(super) use std::sync::Arc;

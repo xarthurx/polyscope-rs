@@ -42,6 +42,8 @@ crates/
 
 3. **Clippy**: Must be zero warnings at all times.
 
+4. **File size limit (2000 lines)**: No single source file should exceed 2,000 lines. When adding functionality causes a file to approach or exceed this limit, **stop and notify the user** before proceeding. Propose a split strategy (e.g., extract a submodule, move quantities into their own file, separate rendering logic from data logic) and get approval before restructuring. This keeps files navigable and avoids monolithic modules that are hard to review and maintain.
+
 ## Documentation
 
 | Document | Contents |
