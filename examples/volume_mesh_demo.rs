@@ -6,16 +6,14 @@
 //! Volume mesh demonstration showcasing tet and hex mesh visualization.
 //!
 //! This demo showcases:
-//! - Loading real tetrahedral meshes from MEDIT .mesh format files
+//! - Loading a real tetrahedral mesh from MEDIT .mesh format
 //! - Tetrahedral and hexahedral mesh rendering
 //! - Interior face detection (only exterior faces rendered)
 //! - Vertex and cell scalar quantities
 //! - Vertex and cell color quantities
 //!
 //! Mesh assets:
-//! - `assets/bunny.mesh`: Stanford Bunny (2503 vertices, ~16k tetrahedra)
-//! - `assets/p01.mesh`: Rectangular channel (584 vertices, 2568 tetrahedra)
-//! - `assets/cyl248.mesh`: Cylinder (92 vertices, 248 tetrahedra)
+//! - `assets/bunny.mesh`: Stanford Bunny (~10k vertices, ~48k tetrahedra)
 //!
 //! Run with: cargo run --example `volume_mesh_demo`
 
@@ -302,14 +300,30 @@ fn add_tet_quantities(name: &str, vertices: &[Vec3], tets: &[[u32; 4]]) {
     });
 }
 
+/// Normalize mesh vertices: center at origin and scale to target size.
+fn normalize_tet_mesh(vertices: &mut [Vec3], target_size: f32) {
+    if vertices.is_empty() {
+        return;
+    }
+    let min = vertices.iter().copied().reduce(Vec3::min).unwrap();
+    let max = vertices.iter().copied().reduce(Vec3::max).unwrap();
+    let center = (min + max) * 0.5;
+    let extent = max - min;
+    let max_extent = extent.x.max(extent.y).max(extent.z);
+    let scale = target_size / max_extent;
+    for v in vertices.iter_mut() {
+        *v = (*v - center) * scale;
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 fn main() {
     env_logger::init();
     polyscope::init().expect("Failed to initialize polyscope");
 
-    // Load primary tet mesh: bunny.mesh (Stanford Bunny)
+    // Load tet mesh: bunny.mesh (Stanford Bunny)
     let bunny_path = "assets/bunny.mesh";
-    let (bunny_vertices, bunny_tets, bunny_name) = if Path::new(bunny_path).exists() {
+    let (mut bunny_vertices, bunny_tets, bunny_name) = if Path::new(bunny_path).exists() {
         if let Some((v, t)) = load_mesh_file(bunny_path) {
             println!(
                 "Loaded {bunny_path}: {} vertices, {} tets",
@@ -328,57 +342,23 @@ fn main() {
         (v, t, "octahedron")
     };
 
+    // Normalize bunny to a reasonable size (1.5 units), centered at origin
+    normalize_tet_mesh(&mut bunny_vertices, 1.5);
+
     let bunny_mesh =
         polyscope::register_tet_mesh(bunny_name, bunny_vertices.clone(), bunny_tets.clone());
     bunny_mesh.set_color(Vec3::new(0.2, 0.5, 0.8));
     bunny_mesh.set_edge_width(0.5);
     add_tet_quantities(bunny_name, &bunny_vertices, &bunny_tets);
 
-    // Load secondary tet mesh: p01.mesh (rectangular channel)
-    let channel_path = "assets/p01.mesh";
-    let mut channel_verts_final = Vec::new();
-    let mut channel_tets_final = Vec::new();
-    if Path::new(channel_path).exists() {
-        if let Some((ch_verts, ch_tets)) = load_mesh_file(channel_path) {
-            println!(
-                "Loaded {channel_path}: {} vertices, {} tets",
-                ch_verts.len(),
-                ch_tets.len()
-            );
-
-            let bunny_max_x = bunny_vertices.iter().map(|v| v.x).fold(f32::MIN, f32::max);
-            let ch_min_x = ch_verts.iter().map(|v| v.x).fold(f32::MAX, f32::min);
-            let offset_x = bunny_max_x - ch_min_x + 0.5;
-
-            channel_verts_final = ch_verts
-                .iter()
-                .map(|v| *v + Vec3::new(offset_x, 0.0, 0.0))
-                .collect();
-            channel_tets_final = ch_tets.clone();
-
-            let ch_mesh = polyscope::register_tet_mesh(
-                "channel",
-                channel_verts_final.clone(),
-                ch_tets,
-            );
-            ch_mesh.set_color(Vec3::new(0.7, 0.4, 0.2));
-            ch_mesh.set_edge_width(0.5);
-            add_tet_quantities("channel", &channel_verts_final, &channel_tets_final);
-        }
-    }
-
-    // Hex grid - position to the right of the rightmost tet mesh
-    let rightmost_x = if channel_verts_final.is_empty() {
-        bunny_vertices.iter().map(|v| v.x).fold(f32::MIN, f32::max)
-    } else {
-        channel_verts_final
-            .iter()
-            .map(|v| v.x)
-            .fold(f32::MIN, f32::max)
-    };
-    let hex_offset_x = rightmost_x + 1.0;
+    // Hex grid - position to the right of the bunny
+    let bunny_max_x = bunny_vertices
+        .iter()
+        .map(|v| v.x)
+        .fold(f32::MIN, f32::max);
+    let hex_offset_x = bunny_max_x + 0.5;
     let (hex_vertices, hexes) = generate_hex_grid(
-        Vec3::new(hex_offset_x, 0.0, 0.0),
+        Vec3::new(hex_offset_x, -0.5, -0.5),
         Vec3::splat(1.0),
         (3, 3, 3),
     );
@@ -404,20 +384,13 @@ fn main() {
         bunny_vertices.len(),
         bunny_tets.len(),
     );
-    if !channel_verts_final.is_empty() {
-        println!(
-            "  - channel: {} vertices, {} tets (from {channel_path})",
-            channel_verts_final.len(),
-            channel_tets_final.len(),
-        );
-    }
     println!(
         "  - hex_grid: {} vertices, {} hexes",
         hex_vertices.len(),
         hexes.len()
     );
     println!();
-    println!("Quantities on tet meshes:");
+    println!("Quantities on tet mesh:");
     println!("  - height (vertex scalar): Y-coordinate normalized");
     println!("  - distance_from_center (vertex scalar): distance from centroid");
     println!("  - position_color (vertex color): RGB from XYZ position");
