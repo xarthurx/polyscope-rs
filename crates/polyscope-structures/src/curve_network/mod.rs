@@ -791,6 +791,17 @@ impl Structure for CurveNetwork {
         // Pick UI is handled by polyscope-ui/src/panels.rs
     }
 
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
+        self.tube_pick_uniform_buffer = None;
+        self.tube_pick_bind_group = None;
+        for quantity in &mut self.quantities {
+            quantity.clear_gpu_resources();
+        }
+    }
+
     fn refresh(&mut self) {
         self.recompute_geometry();
         for quantity in &mut self.quantities {

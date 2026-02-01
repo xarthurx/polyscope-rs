@@ -1334,6 +1334,19 @@ impl Structure for VolumeMesh {
         // Pick UI not implemented
     }
 
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
+        self.pick_cell_index_buffer = None;
+        self.slice_render_data = None;
+        self.slice_plane_cache = None;
+        self.culling_plane_cache = None;
+        for quantity in &mut self.quantities {
+            quantity.clear_gpu_resources();
+        }
+    }
+
     fn refresh(&mut self) {
         self.render_data = None;
         self.pick_uniform_buffer = None;

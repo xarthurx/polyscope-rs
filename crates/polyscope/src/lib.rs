@@ -78,6 +78,7 @@ mod curve_network;
 mod floating;
 mod gizmo;
 mod groups;
+mod headless;
 mod init;
 mod point_cloud;
 mod screenshot;
@@ -137,6 +138,7 @@ pub use slice_plane::*;
 pub use surface_mesh::*;
 pub use transform::*;
 pub use ui_sync::*;
+pub use headless::*;
 pub use volume_grid::*;
 pub use volume_mesh::*;
 

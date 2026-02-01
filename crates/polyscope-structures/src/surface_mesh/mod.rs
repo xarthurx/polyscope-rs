@@ -1509,6 +1509,16 @@ impl Structure for SurfaceMesh {
         // Pick UI is handled by polyscope-ui/src/panels.rs
     }
 
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
+        self.pick_face_index_buffer = None;
+        for quantity in &mut self.quantities {
+            quantity.clear_gpu_resources();
+        }
+    }
+
     fn refresh(&mut self) {
         self.recompute();
         for quantity in &mut self.quantities {

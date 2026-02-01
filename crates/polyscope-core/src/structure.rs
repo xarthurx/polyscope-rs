@@ -78,6 +78,15 @@ pub trait Structure: Any + Send + Sync {
         self.set_transform(Mat4::IDENTITY);
     }
 
+    /// Clears all GPU resources (render data, pick buffers, etc.).
+    ///
+    /// After calling this, the structure's GPU resources will be lazily
+    /// re-initialized on the next render frame. This is needed when switching
+    /// wgpu devices (e.g., between headless render calls).
+    fn clear_gpu_resources(&mut self) {
+        // Default no-op; each structure type overrides this
+    }
+
     /// Returns the material name for this structure (e.g., "clay", "wax").
     #[allow(clippy::unnecessary_literal_bound)]
     fn material(&self) -> &str {

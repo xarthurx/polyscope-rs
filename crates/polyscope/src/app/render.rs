@@ -2806,4 +2806,654 @@ impl App {
             }
         }
     }
+
+    /// Renders a single frame in headless mode (no window, no egui).
+    ///
+    /// Initializes GPU resources for all structures, updates uniforms,
+    /// and renders the scene to the screenshot target texture.
+    /// Call `capture_to_buffer()` after this to retrieve pixel data.
+    pub(crate) fn render_frame_headless(&mut self) {
+        let Some(engine) = &mut self.engine else {
+            return;
+        };
+
+        // Auto-fit camera to scene
+        if !self.camera_fitted {
+            let (has_structures, bbox) = crate::with_context(|ctx| {
+                (!ctx.registry.is_empty(), ctx.bounding_box)
+            });
+            if has_structures {
+                let (min, max) = bbox;
+                if min.x.is_finite() && max.x.is_finite() && (max - min).length() > 0.0 {
+                    engine.camera.look_at_box(min, max);
+                    self.camera_fitted = true;
+                }
+            }
+        }
+
+        // Drain deferred material load queue
+        let pending_materials: Vec<polyscope_core::MaterialLoadRequest> =
+            crate::with_context_mut(|ctx| std::mem::take(&mut ctx.material_load_queue));
+        for req in pending_materials {
+            match req {
+                polyscope_core::MaterialLoadRequest::Static { name, path } => {
+                    if let Err(e) = engine.load_static_material(&name, &path) {
+                        eprintln!("Failed to load static material '{name}': {e}");
+                    }
+                }
+                polyscope_core::MaterialLoadRequest::Blendable { name, filenames } => {
+                    let refs: [&str; 4] =
+                        [&filenames[0], &filenames[1], &filenames[2], &filenames[3]];
+                    if let Err(e) = engine.load_blendable_material(&name, refs) {
+                        eprintln!("Failed to load blendable material '{name}': {e}");
+                    }
+                }
+            }
+        }
+
+        // Update camera uniforms
+        engine.update_camera_uniforms();
+
+        // Update slice plane uniforms
+        crate::with_context(|ctx| {
+            engine.update_slice_plane_uniforms(ctx.slice_planes().map(SlicePlaneUniforms::from));
+        });
+
+        // Initialize GPU resources for all structures
+        crate::with_context_mut(|ctx| {
+            let slice_planes: Vec<_> = ctx.slice_planes().cloned().collect();
+
+            for structure in ctx.registry.iter_mut() {
+                if structure.type_name() == "PointCloud" {
+                    if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>() {
+                        if pc.render_data().is_none() {
+                            pc.init_gpu_resources(
+                                &engine.device,
+                                engine.point_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                        let points = pc.points().to_vec();
+                        if let Some(vq) = pc.active_vector_quantity_mut() {
+                            if vq.render_data().is_none() {
+                                vq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &points,
+                                );
+                            }
+                        }
+                    }
+                }
+
+                if structure.type_name() == "SurfaceMesh" {
+                    if let Some(mesh) = structure.as_any_mut().downcast_mut::<SurfaceMesh>() {
+                        if mesh.render_data().is_none() {
+                            mesh.init_gpu_resources(
+                                &engine.device,
+                                engine.mesh_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                        // Shadow resources
+                        if mesh.render_data().is_some() && !mesh.has_shadow_resources() {
+                            if let (Some(shadow_layout), Some(shadow_pass)) =
+                                (engine.shadow_bind_group_layout(), engine.shadow_map_pass())
+                            {
+                                mesh.init_shadow_resources(
+                                    &engine.device,
+                                    shadow_layout,
+                                    shadow_pass.light_buffer(),
+                                );
+                            }
+                        }
+                        // Vector quantities
+                        let vertices = mesh.vertices().to_vec();
+                        if let Some(vq) = mesh.active_vertex_vector_quantity_mut() {
+                            if vq.render_data().is_none() {
+                                vq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &vertices,
+                                );
+                            }
+                        }
+                        let centroids = mesh.face_centroids();
+                        if let Some(vq) = mesh.active_face_vector_quantity_mut() {
+                            if vq.render_data().is_none() {
+                                vq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &centroids,
+                                );
+                            }
+                        }
+                        let vertices = mesh.vertices().to_vec();
+                        if let Some(iq) = mesh.active_vertex_intrinsic_vector_quantity_mut() {
+                            if iq.render_data().is_none() {
+                                iq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &vertices,
+                                );
+                            }
+                        }
+                        let centroids = mesh.face_centroids();
+                        if let Some(iq) = mesh.active_face_intrinsic_vector_quantity_mut() {
+                            if iq.render_data().is_none() {
+                                iq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &centroids,
+                                );
+                            }
+                        }
+                        let vertices = mesh.vertices().to_vec();
+                        let edges = mesh.edges().to_vec();
+                        if let Some(oq) = mesh.active_one_form_quantity_mut() {
+                            if oq.render_data().is_none() {
+                                oq.init_gpu_resources(
+                                    &engine.device,
+                                    engine.vector_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    &vertices,
+                                    &edges,
+                                );
+                            }
+                        }
+                    }
+                }
+
+                if structure.type_name() == "CurveNetwork" {
+                    if let Some(cn) = structure.as_any_mut().downcast_mut::<CurveNetwork>() {
+                        if cn.render_data().is_none() {
+                            cn.init_gpu_resources(
+                                &engine.device,
+                                engine.curve_network_edge_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                        let needs_tube =
+                            cn.render_data().is_some_and(|rd| !rd.has_tube_resources());
+                        let needs_node = cn
+                            .render_data()
+                            .is_some_and(|rd| !rd.has_node_render_resources());
+                        if needs_tube {
+                            cn.init_tube_resources(
+                                &engine.device,
+                                engine.curve_network_tube_compute_bind_group_layout(),
+                                engine.curve_network_tube_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                        if needs_node {
+                            cn.init_node_render_resources(
+                                &engine.device,
+                                engine.point_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                    }
+                }
+
+                if structure.type_name() == "CameraView" {
+                    if let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>() {
+                        if cv.render_data().is_none() {
+                            cv.init_render_data(
+                                &engine.device,
+                                engine.curve_network_edge_bind_group_layout(),
+                                engine.camera_buffer(),
+                                &engine.queue,
+                                ctx.length_scale,
+                            );
+                        }
+                    }
+                }
+
+                if structure.type_name() == "VolumeGrid" {
+                    if let Some(vg) = structure.as_any_mut().downcast_mut::<VolumeGrid>() {
+                        if vg.render_data().is_none() {
+                            vg.init_render_data(
+                                &engine.device,
+                                engine.curve_network_edge_bind_group_layout(),
+                                engine.camera_buffer(),
+                                &engine.queue,
+                            );
+                        }
+                    }
+                }
+
+                if structure.type_name() == "VolumeMesh" {
+                    if let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>() {
+                        let mut enabled_planes: Vec<(String, Vec3, Vec3)> = slice_planes
+                            .iter()
+                            .filter(|p| p.is_enabled())
+                            .map(|p| (p.name().to_string(), p.origin(), p.normal()))
+                            .collect();
+                        enabled_planes.sort_by(|a, b| a.0.cmp(&b.0));
+                        let plane_params: Vec<(Vec3, Vec3)> = enabled_planes
+                            .iter()
+                            .map(|(_, origin, normal)| (*origin, *normal))
+                            .collect();
+
+                        if !plane_params.is_empty() {
+                            vm.update_render_data_with_culling(
+                                &engine.device,
+                                engine.mesh_bind_group_layout(),
+                                engine.camera_buffer(),
+                                &plane_params,
+                            );
+                        } else if vm.is_culled() {
+                            vm.reset_render_data(
+                                &engine.device,
+                                engine.mesh_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        } else if vm.render_data().is_none() {
+                            vm.init_render_data(
+                                &engine.device,
+                                engine.mesh_bind_group_layout(),
+                                engine.camera_buffer(),
+                            );
+                        }
+                    }
+                }
+            }
+        });
+
+        // Update GPU buffers
+        crate::with_context(|ctx| {
+            for structure in ctx.registry.iter() {
+                if structure.type_name() == "PointCloud" {
+                    if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                        pc.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                        let model = structure.transform();
+                        if let Some(vq) = pc.active_vector_quantity() {
+                            vq.update_uniforms(&engine.queue, &model);
+                        }
+                    }
+                }
+                if structure.type_name() == "SurfaceMesh" {
+                    if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                        mesh.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                        let model = structure.transform();
+                        if let Some(vq) = mesh.active_vertex_vector_quantity() {
+                            vq.update_uniforms(&engine.queue, &model);
+                        }
+                        if let Some(vq) = mesh.active_face_vector_quantity() {
+                            vq.update_uniforms(&engine.queue, &model);
+                        }
+                        if let Some(iq) = mesh.active_vertex_intrinsic_vector_quantity() {
+                            iq.update_uniforms(&engine.queue, &model);
+                        }
+                        if let Some(iq) = mesh.active_face_intrinsic_vector_quantity() {
+                            iq.update_uniforms(&engine.queue, &model);
+                        }
+                        if let Some(oq) = mesh.active_one_form_quantity() {
+                            oq.update_uniforms(&engine.queue, &model);
+                        }
+                    }
+                }
+                if structure.type_name() == "CurveNetwork" {
+                    if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                        cn.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                    }
+                }
+                if structure.type_name() == "VolumeGrid" {
+                    if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
+                        vg.update_gpu_buffers(&engine.queue);
+                    }
+                }
+                if structure.type_name() == "VolumeMesh" {
+                    if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                        vm.update_gpu_buffers(&engine.queue);
+                    }
+                }
+            }
+        });
+
+        // Now render to screenshot target (reuses existing capture_screenshot rendering)
+        self.capture_screenshot_headless();
+    }
+
+    /// Renders the scene to the screenshot target texture without saving to file.
+    /// The pixel data can be retrieved via `capture_to_buffer()`.
+    fn capture_screenshot_headless(&mut self) {
+        let Some(engine) = &mut self.engine else {
+            return;
+        };
+
+        let screenshot_view = engine.create_screenshot_target();
+
+        let mut encoder = engine
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("headless render encoder"),
+            });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("headless render pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &screenshot_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: f64::from(self.background_color.x),
+                            g: f64::from(self.background_color.y),
+                            b: f64::from(self.background_color.z),
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: engine.screenshot_depth_view(),
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+
+            // Draw point clouds
+            if let Some(pipeline) = &engine.point_pipeline {
+                render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !ctx.is_structure_visible(structure) {
+                            continue;
+                        }
+                        if structure.type_name() == "PointCloud" {
+                            if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                                if let Some(render_data) = pc.render_data() {
+                                    render_pass.set_bind_group(
+                                        2,
+                                        engine.matcap_bind_group_for(structure.material()),
+                                        &[],
+                                    );
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.draw(0..6, 0..render_data.num_points);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Draw vector quantities
+            if let Some(pipeline) = &engine.vector_pipeline {
+                render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !ctx.is_structure_visible(structure) {
+                            continue;
+                        }
+                        render_pass.set_bind_group(
+                            2,
+                            engine.matcap_bind_group_for(structure.material()),
+                            &[],
+                        );
+                        if structure.type_name() == "PointCloud" {
+                            if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
+                                if let Some(vq) = pc.active_vector_quantity() {
+                                    if let Some(render_data) = vq.render_data() {
+                                        render_pass
+                                            .set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                            }
+                        }
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                if let Some(vq) = mesh.active_vertex_vector_quantity() {
+                                    if let Some(render_data) = vq.render_data() {
+                                        render_pass
+                                            .set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                if let Some(vq) = mesh.active_face_vector_quantity() {
+                                    if let Some(render_data) = vq.render_data() {
+                                        render_pass
+                                            .set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                if let Some(iq) = mesh.active_vertex_intrinsic_vector_quantity() {
+                                    if let Some(render_data) = iq.render_data() {
+                                        render_pass
+                                            .set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                if let Some(iq) = mesh.active_face_intrinsic_vector_quantity() {
+                                    if let Some(render_data) = iq.render_data() {
+                                        render_pass
+                                            .set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                                if let Some(oq) = mesh.active_one_form_quantity() {
+                                    if let Some(render_data) = oq.render_data() {
+                                        render_pass
+                                            .set_bind_group(0, &render_data.bind_group, &[]);
+                                        render_pass.draw(0..120, 0..render_data.num_vectors);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Draw curve networks and camera views
+            if let Some(pipeline) = &engine.curve_network_edge_pipeline {
+                render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !ctx.is_structure_visible(structure) {
+                            continue;
+                        }
+                        render_pass.set_bind_group(
+                            2,
+                            engine.matcap_bind_group_for(structure.material()),
+                            &[],
+                        );
+                        if structure.type_name() == "CurveNetwork" {
+                            if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
+                                if let Some(render_data) = cn.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                }
+                            }
+                        }
+                        if structure.type_name() == "CameraView" {
+                            if let Some(cv) = structure.as_any().downcast_ref::<CameraView>() {
+                                if let Some(render_data) = cv.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                }
+                            }
+                        }
+                        if structure.type_name() == "VolumeGrid" {
+                            if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
+                                if let Some(render_data) = vg.render_data() {
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Surface mesh / volume mesh pass (MRT: HDR + normal G-buffer)
+        // The mesh pipeline expects 2 color attachments, so we need a separate pass.
+        // Ensure normal texture exists before borrowing mesh_pipeline
+        if engine.mesh_pipeline.is_some() && engine.normal_view().is_none() {
+            let (w, h) = engine.dimensions();
+            engine.create_normal_texture_with_size(w, h);
+        }
+        if let Some(mesh_pipeline) = &engine.mesh_pipeline {
+            if let Some(normal_view) = engine.normal_view() {
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("headless mesh pass (MRT)"),
+                    color_attachments: &[
+                        Some(wgpu::RenderPassColorAttachment {
+                            view: &screenshot_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            },
+                            depth_slice: None,
+                        }),
+                        Some(wgpu::RenderPassColorAttachment {
+                            view: normal_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 0.5,
+                                    g: 0.5,
+                                    b: 1.0,
+                                    a: 0.0,
+                                }),
+                                store: wgpu::StoreOp::Store,
+                            },
+                            depth_slice: None,
+                        }),
+                    ],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: engine.screenshot_depth_view(),
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    }),
+                    ..Default::default()
+                });
+
+                render_pass.set_pipeline(mesh_pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
+
+                crate::with_context(|ctx| {
+                    for structure in ctx.registry.iter() {
+                        if !ctx.is_structure_visible(structure) {
+                            continue;
+                        }
+                        if structure.type_name() == "SurfaceMesh" {
+                            if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
+                                if let Some(render_data) = mesh.render_data() {
+                                    render_pass.set_bind_group(
+                                        2,
+                                        engine.matcap_bind_group_for(structure.material()),
+                                        &[],
+                                    );
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.set_index_buffer(
+                                        render_data.index_buffer.slice(..),
+                                        wgpu::IndexFormat::Uint32,
+                                    );
+                                    render_pass.draw_indexed(
+                                        0..render_data.num_indices,
+                                        0,
+                                        0..1,
+                                    );
+                                }
+                            }
+                        }
+                        if structure.type_name() == "VolumeMesh" {
+                            if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
+                                if let Some(render_data) = vm.render_data() {
+                                    render_pass.set_bind_group(
+                                        2,
+                                        engine.matcap_bind_group_for(structure.material()),
+                                        &[],
+                                    );
+                                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                                    render_pass.set_index_buffer(
+                                        render_data.index_buffer.slice(..),
+                                        wgpu::IndexFormat::Uint32,
+                                    );
+                                    render_pass.draw_indexed(
+                                        0..render_data.num_indices,
+                                        0,
+                                        0..1,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Render ground plane
+        let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
+            let center = ctx.center();
+            (
+                [center.x, center.y, center.z],
+                ctx.bounding_box.0.y,
+                ctx.length_scale,
+            )
+        });
+        let height_override = if self.ground_plane.height_is_relative {
+            None
+        } else {
+            Some(self.ground_plane.height)
+        };
+        let gp_shadow_mode = match self.ground_plane.mode {
+            GroundPlaneMode::None => 0u32,
+            GroundPlaneMode::ShadowOnly => 1u32,
+            GroundPlaneMode::Tile | GroundPlaneMode::TileReflection => 2u32,
+        };
+        engine.render_ground_plane(
+            &mut encoder,
+            &screenshot_view,
+            self.ground_plane.mode != GroundPlaneMode::None,
+            scene_center,
+            scene_min_y,
+            length_scale,
+            height_override,
+            self.ground_plane.shadow_darkness,
+            gp_shadow_mode,
+            0.0,
+        );
+
+        // Apply tone mapping
+        engine.apply_screenshot_tone_mapping(&mut encoder);
+
+        engine.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    /// Captures the rendered frame to a raw RGBA pixel buffer.
+    /// Must be called after `render_frame_headless()`.
+    pub(crate) fn capture_to_buffer(&mut self) -> crate::Result<Vec<u8>> {
+        let engine = self
+            .engine
+            .as_mut()
+            .ok_or_else(|| crate::PolyscopeError::RenderError("Engine not initialized".into()))?;
+
+        engine.capture_screenshot().map_err(|e| {
+            crate::PolyscopeError::RenderError(format!("Failed to capture screenshot: {e}"))
+        })
+    }
 }

@@ -48,7 +48,7 @@ impl RenderEngine {
     }
 
     /// Creates normal G-buffer texture at specified size.
-    pub(crate) fn create_normal_texture_with_size(&mut self, width: u32, height: u32) {
+    pub fn create_normal_texture_with_size(&mut self, width: u32, height: u32) {
         let normal_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Normal G-Buffer Texture"),
             size: wgpu::Extent3d {

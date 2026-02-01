@@ -239,6 +239,9 @@ impl Quantity for MeshOneFormQuantity {
     }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
+    }
     fn data_size(&self) -> usize {
         self.values.len()
     }

@@ -248,6 +248,9 @@ impl Quantity for MeshVertexIntrinsicVectorQuantity {
     }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
+    }
     fn data_size(&self) -> usize {
         self.vectors.len()
     }
@@ -491,6 +494,9 @@ impl Quantity for MeshFaceIntrinsicVectorQuantity {
     }
     fn build_ui(&mut self, _ui: &dyn std::any::Any) {}
     fn refresh(&mut self) {}
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
+    }
     fn data_size(&self) -> usize {
         self.vectors.len()
     }

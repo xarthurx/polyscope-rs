@@ -426,6 +426,15 @@ impl Structure for PointCloud {
         // Pick UI is handled by polyscope-ui/src/panels.rs
     }
 
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
+        for quantity in &mut self.quantities {
+            quantity.clear_gpu_resources();
+        }
+    }
+
     fn refresh(&mut self) {
         for quantity in &mut self.quantities {
             quantity.refresh();

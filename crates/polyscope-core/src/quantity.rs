@@ -57,6 +57,11 @@ pub trait Quantity: Any + Send + Sync {
 
     /// Returns the number of data elements.
     fn data_size(&self) -> usize;
+
+    /// Clears GPU render resources so they can be re-initialized with a new device.
+    fn clear_gpu_resources(&mut self) {
+        // Default no-op; quantity types with GPU resources override this
+    }
 }
 
 /// Marker trait for quantities defined on vertices.

@@ -436,6 +436,13 @@ impl Structure for VolumeGrid {
         // Pick UI not implemented
     }
 
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
+        for quantity in &mut self.quantities {
+            quantity.clear_gpu_resources();
+        }
+    }
+
     fn refresh(&mut self) {
         self.render_data = None;
         for quantity in &mut self.quantities {

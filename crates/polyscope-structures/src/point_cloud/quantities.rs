@@ -307,6 +307,10 @@ impl Quantity for PointCloudVectorQuantity {
         // GPU refresh is handled by polyscope/src/app/render.rs
     }
 
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
+    }
+
     fn data_size(&self) -> usize {
         self.vectors.len()
     }
