@@ -855,10 +855,13 @@ impl App {
             engine.queue.submit(std::iter::once(encoder.finish()));
         }
 
-        // Begin egui frame
-        egui.begin_frame(window);
+        // Multi-pass egui layout: egui's Grid widget makes itself invisible on its
+        // first frame (sizing pass) and calls ctx.request_discard() expecting a second
+        // pass. We loop to handle this, preventing a one-frame blink when panels open.
+        let max_egui_passes: u32 = 2;
+        let mut egui_output = egui::FullOutput::default();
 
-        // Build UI
+        // Build UI (declare mutable state before the loop so it persists across passes)
         let mut bg_color = [
             self.background_color.x,
             self.background_color.y,
@@ -889,6 +892,19 @@ impl App {
         let mut screenshot_requested = false;
         let mut reset_view_requested = false;
         let mut ssaa_changed = false;
+
+        for egui_pass in 0..max_egui_passes {
+        if egui_pass == 0 {
+            egui.begin_frame(window);
+        } else {
+            egui.begin_rerun_pass();
+            // Reset mutable flags for the re-run pass
+            camera_changed = false;
+            scene_extents_changed = false;
+            screenshot_requested = false;
+            reset_view_requested = false;
+            ssaa_changed = false;
+        }
 
         let panel_width = polyscope_ui::build_left_panel(&egui.context, |ui| {
             let view_action = polyscope_ui::build_controls_section(ui, &mut bg_color);
@@ -1359,8 +1375,19 @@ impl App {
             }
         }
 
-        // End egui frame
-        let egui_output = egui.end_frame(window);
+        // End egui pass and check for discard request (multi-pass layout)
+        let pass_output = egui.end_pass();
+        egui_output.append(pass_output);
+
+        if !egui_output.platform_output.requested_discard() {
+            break;
+        }
+        // Clear discard reasons before the next pass
+        egui_output.platform_output.request_discard_reasons.clear();
+        } // end multi-pass egui loop
+
+        // Handle platform output (clipboard, cursor, etc.) once after all passes
+        egui.handle_platform_output(window, &egui_output.platform_output);
 
         // Now borrow surface for rendering
         let surface = engine.surface.as_ref().expect("surface checked above");

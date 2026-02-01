@@ -12,6 +12,8 @@ pub struct EguiIntegration {
     pub context: Context,
     pub state: EguiWinitState,
     pub renderer: EguiRenderer,
+    /// Stored raw input from the most recent `begin_frame`, used for multi-pass rerun.
+    last_raw_input: egui::RawInput,
 }
 
 impl EguiIntegration {
@@ -33,6 +35,7 @@ impl EguiIntegration {
             context,
             state,
             renderer,
+            last_raw_input: egui::RawInput::default(),
         }
     }
 
@@ -43,17 +46,42 @@ impl EguiIntegration {
         response.consumed
     }
 
-    /// Begins a new frame.
+    /// Begins a new frame by collecting input events and starting the egui pass.
     pub fn begin_frame(&mut self, window: &Window) {
         let raw_input = self.state.take_egui_input(window);
+        self.last_raw_input = raw_input.clone();
         self.context.begin_pass(raw_input);
     }
 
-    /// Ends the frame and returns paint jobs.
-    pub fn end_frame(&mut self, window: &Window) -> egui::FullOutput {
-        let output = self.context.end_pass();
+    /// Begins a re-run pass for multi-pass layout.
+    ///
+    /// egui's `Grid` widget makes itself invisible on the first frame it appears
+    /// (a sizing pass) and calls `ctx.request_discard()` expecting a second pass.
+    /// This method starts that second pass using `take()` on the stored raw input,
+    /// which preserves time/screen_rect/modifiers but clears events — matching
+    /// the approach used by `Context::run()`.
+    pub fn begin_rerun_pass(&mut self) {
+        self.context.begin_pass(self.last_raw_input.take());
+    }
+
+    /// Ends the current egui pass and returns the output without handling platform events.
+    ///
+    /// Use this in a multi-pass loop. Call [`Self::handle_platform_output`] once
+    /// after the final pass.
+    pub fn end_pass(&mut self) -> egui::FullOutput {
+        self.context.end_pass()
+    }
+
+    /// Handles platform output (clipboard, cursor, IME, etc.).
+    pub fn handle_platform_output(&mut self, window: &Window, output: &egui::PlatformOutput) {
         self.state
-            .handle_platform_output(window, output.platform_output.clone());
+            .handle_platform_output(window, output.clone());
+    }
+
+    /// Ends the frame and returns paint jobs (convenience for single-pass usage).
+    pub fn end_frame(&mut self, window: &Window) -> egui::FullOutput {
+        let output = self.end_pass();
+        self.handle_platform_output(window, &output.platform_output);
         output
     }
 
