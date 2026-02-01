@@ -229,7 +229,7 @@ pub struct RenderEngine {
     pub(crate) pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Pick pipeline for surface meshes (face picking).
     pub(crate) mesh_pick_pipeline: Option<wgpu::RenderPipeline>,
-    /// Mesh pick bind group layout (has extra face_indices binding).
+    /// Mesh pick bind group layout (has extra `face_indices` binding).
     pub(crate) mesh_pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
     /// Pick pipeline for volume grid gridcube instances.
     pub(crate) gridcube_pick_pipeline: Option<wgpu::RenderPipeline>,

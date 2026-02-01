@@ -1,7 +1,16 @@
 //! Marching Cubes isosurface extraction algorithm.
 //!
-//! Ported from the C++ MarchingCubeCpp library (public domain) used by C++ Polyscope.
+//! Ported from the C++ `MarchingCubeCpp` library (public domain) used by C++ Polyscope.
 //! Extracts a triangle mesh representing the isosurface of a 3D scalar field.
+
+#![allow(
+    clippy::unreadable_literal,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss
+)]
 
 use glam::Vec3;
 
@@ -340,7 +349,7 @@ fn accumulate_normal(mesh: &mut McmMesh, a: u32, b: u32, c: u32) {
 /// - Bits [3:0]: Number of triangles (0-5)
 /// - Bits [7:4], [11:8], ...: Edge indices (0-11) for each triangle vertex, 4 bits each
 ///
-/// Ported from MarchingCubeCpp (public domain).
+/// Ported from `MarchingCubeCpp` (public domain).
 #[rustfmt::skip]
 static MC_TRIS: [u64; 256] = [
     0, 33793, 36945, 159668546,

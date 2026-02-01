@@ -213,7 +213,7 @@ impl VolumeGridNodeScalarQuantity {
     /// Extracts the isosurface mesh using marching cubes.
     ///
     /// MC output vertices are in grid index space: vertex (i,j,k) has coords
-    /// that need swizzle(z,y,x) * grid_spacing + bound_min to transform to world space.
+    /// that need swizzle(z,y,x) * `grid_spacing` + `bound_min` to transform to world space.
     pub fn extract_isosurface(&mut self) -> &McmMesh {
         if self.isosurface_mesh_cache.is_none() || self.isosurface_dirty {
             let nx = self.node_dim.x;
@@ -325,9 +325,8 @@ impl VolumeGridNodeScalarQuantity {
     ) {
         self.global_start = global_start;
 
-        let gridcube_rd = match &self.gridcube_render_data {
-            Some(rd) => rd,
-            None => return,
+        let Some(gridcube_rd) = &self.gridcube_render_data else {
+            return;
         };
 
         let uniforms = GridcubePickUniforms {
@@ -767,9 +766,8 @@ impl VolumeGridCellScalarQuantity {
     ) {
         self.global_start = global_start;
 
-        let gridcube_rd = match &self.gridcube_render_data {
-            Some(rd) => rd,
-            None => return,
+        let Some(gridcube_rd) = &self.gridcube_render_data else {
+            return;
         };
 
         let uniforms = GridcubePickUniforms {

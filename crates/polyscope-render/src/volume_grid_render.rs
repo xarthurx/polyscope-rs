@@ -289,7 +289,7 @@ impl IsosurfaceRenderData {
 /// GPU resources for gridcube visualization.
 pub struct GridcubeRenderData {
     /// Combined buffer: first 36 entries are unit cube template vertices (vec4),
-    /// followed by per-instance data (vec4: xyz=center, w=half_size).
+    /// followed by per-instance data (vec4: xyz=center, w=`half_size`).
     pub position_buffer: wgpu::Buffer,
     /// Cube template normals (36 entries, vec4).
     pub normal_buffer: wgpu::Buffer,

@@ -861,9 +861,9 @@ pub fn build_scene_extents_section(ui: &mut Ui, extents: &mut SceneExtents) -> b
 
             // Compute center and display
             let center = [
-                (extents.bbox_min[0] + extents.bbox_max[0]) / 2.0,
-                (extents.bbox_min[1] + extents.bbox_max[1]) / 2.0,
-                (extents.bbox_min[2] + extents.bbox_max[2]) / 2.0,
+                f32::midpoint(extents.bbox_min[0], extents.bbox_max[0]),
+                f32::midpoint(extents.bbox_min[1], extents.bbox_max[1]),
+                f32::midpoint(extents.bbox_min[2], extents.bbox_max[2]),
             ];
             ui.horizontal(|ui| {
                 ui.label("Center:");

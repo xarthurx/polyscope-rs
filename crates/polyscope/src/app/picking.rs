@@ -252,7 +252,7 @@ impl App {
                 let size = plane.plane_size();
 
                 if y.abs() <= size && z.abs() <= size {
-                    let is_better = best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                    let is_better = best_hit.as_ref().is_none_or(|(_, best_t)| t < *best_t);
                     if is_better {
                         best_hit = Some((plane.name().to_string(), t));
                     }
@@ -377,7 +377,7 @@ impl App {
 
                         if let Some(t) = hit_t {
                             let is_better =
-                                best_hit.as_ref().map_or(true, |(_, _, best_t)| t < *best_t);
+                                best_hit.as_ref().is_none_or(|(_, _, best_t)| t < *best_t);
                             if is_better {
                                 best_hit = Some((
                                     structure.type_name().to_string(),
@@ -415,7 +415,7 @@ impl App {
 
                         if let Some(t) = hit_t {
                             let is_better =
-                                best_hit.as_ref().map_or(true, |(_, _, best_t)| t < *best_t);
+                                best_hit.as_ref().is_none_or(|(_, _, best_t)| t < *best_t);
                             if is_better {
                                 best_hit = Some((
                                     structure.type_name().to_string(),

@@ -435,7 +435,7 @@ impl ApplicationHandler for App {
 
                             if let Some((type_name, name, t)) = structure_hit {
                                 let is_better =
-                                    best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                    best_hit.as_ref().is_none_or(|(_, best_t)| t < *best_t);
                                 if is_better {
                                     best_hit = Some((
                                         ClickHit::Structure {
@@ -450,7 +450,7 @@ impl ApplicationHandler for App {
 
                             if let Some((name, idx, t)) = point_hit {
                                 let is_better =
-                                    best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                    best_hit.as_ref().is_none_or(|(_, best_t)| t < *best_t);
                                 if is_better {
                                     best_hit = Some((
                                         ClickHit::Structure {
@@ -465,7 +465,7 @@ impl ApplicationHandler for App {
 
                             if let Some((name, idx, t)) = curve_hit {
                                 let is_better =
-                                    best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                    best_hit.as_ref().is_none_or(|(_, best_t)| t < *best_t);
                                 if is_better {
                                     best_hit = Some((
                                         ClickHit::Structure {
@@ -480,7 +480,7 @@ impl ApplicationHandler for App {
 
                             if let Some((name, idx, t)) = mesh_hit {
                                 let is_better =
-                                    best_hit.as_ref().map_or(true, |(_, best_t)| t < *best_t);
+                                    best_hit.as_ref().is_none_or(|(_, best_t)| t < *best_t);
                                 if is_better {
                                     best_hit = Some((
                                         ClickHit::Structure {

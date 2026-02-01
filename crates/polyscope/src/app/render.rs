@@ -348,7 +348,10 @@ impl App {
                                     VolumeGridVizMode::Isosurface => {
                                         if nsq.isosurface_render_data().is_none() || nsq.isosurface_dirty() {
                                             let mesh = nsq.extract_isosurface();
-                                            if !mesh.vertices.is_empty() {
+                                            if mesh.vertices.is_empty() {
+                                                // Isovalue outside data range — clear old surface
+                                                nsq.clear_isosurface_render_data();
+                                            } else {
                                                 let vertices = mesh.vertices.clone();
                                                 let normals = mesh.normals.clone();
                                                 let indices = mesh.indices.clone();
@@ -361,9 +364,6 @@ impl App {
                                                     &indices,
                                                 );
                                                 nsq.set_isosurface_render_data(data);
-                                            } else {
-                                                // Isovalue outside data range — clear old surface
-                                                nsq.clear_isosurface_render_data();
                                             }
                                         }
                                     }
