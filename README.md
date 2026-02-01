@@ -6,6 +6,17 @@ A Rust-native 3D visualization library for geometric data, inspired by [Polyscop
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+<table>
+  <tr>
+    <td><img src="docs/images/polyscope_materials.png" alt="Materials" width="400"/></td>
+    <td><img src="docs/images/polyscope_tet_mesh.png" alt="Volume Mesh" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/polyscope_camera_view.png" alt="Camera View" width="400"/></td>
+    <td><img src="docs/images/polyscope_volume_grid.png" alt="Volume Grid" width="400"/></td>
+  </tr>
+</table>
+
 ## Overview
 
 polyscope-rs is a viewer and user interface for 3D data such as meshes and point clouds. It allows you to register your data and quickly generate informative visualizations, either programmatically or via a dynamic GUI.
