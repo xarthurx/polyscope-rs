@@ -93,7 +93,7 @@ pub enum ParamVizStyle {
 /// How to interpret UV coordinates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ParamCoordsType {
-    /// Coordinates in [0,1] range.
+    /// Coordinates in `[0,1]` range.
     #[default]
     Unit,
     /// Coordinates scaled like world-space mesh positions.

@@ -1,4 +1,38 @@
-use crate::{SurfaceMesh, Vec2, Vec3, Vec4, with_context, with_context_mut};
+//! Surface mesh registration and manipulation.
+//!
+//! Surface meshes are triangular or polygonal meshes. This module provides
+//! functions to register meshes and add quantities to them.
+//!
+//! polyscope-rs supports arbitrary n-gon faces (triangles, quads, pentagons, etc.).
+//! Polygonal faces are automatically fan-triangulated for rendering while
+//! preserving the original face structure for wireframe display.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use polyscope::*;
+//!
+//! fn main() -> Result<()> {
+//!     init()?;
+//!
+//!     let vertices = vec![
+//!         Vec3::new(0.0, 0.0, 0.0),
+//!         Vec3::new(1.0, 0.0, 0.0),
+//!         Vec3::new(1.0, 1.0, 0.0),
+//!         Vec3::new(0.0, 1.0, 0.0),
+//!     ];
+//!     let faces = vec![[0u32, 1, 2], [0, 2, 3]];
+//!
+//!     let mesh = register_surface_mesh("quad", vertices, faces);
+//!     mesh.set_surface_color(Vec3::new(0.2, 0.5, 0.8))
+//!         .set_show_edges(true);
+//!
+//!     show();
+//!     Ok(())
+//! }
+//! ```
+
+use crate::{with_context, with_context_mut, SurfaceMesh, Vec2, Vec3, Vec4};
 use glam::UVec3;
 
 /// Trait for face data that can be converted to the internal polygon format.
@@ -94,6 +128,23 @@ pub fn get_surface_mesh(name: &str) -> Option<SurfaceMeshHandle> {
 }
 
 /// Handle for a registered surface mesh.
+///
+/// This handle provides methods to add quantities and configure the
+/// appearance of a surface mesh. Methods return `&Self` to allow chaining.
+///
+/// # Example
+///
+/// ```no_run
+/// use polyscope::*;
+///
+/// init().unwrap();
+/// let vertices = vec![Vec3::ZERO, Vec3::X, Vec3::Y];
+/// let faces = vec![[0u32, 1, 2]];
+/// let mesh = register_surface_mesh("mesh", vertices, faces);
+/// mesh.set_surface_color(Vec3::new(1.0, 0.5, 0.0))
+///     .set_show_edges(true)
+///     .add_vertex_scalar_quantity("height", vec![0.0, 1.0, 0.5]);
+/// ```
 #[derive(Clone)]
 pub struct SurfaceMeshHandle {
     name: String,

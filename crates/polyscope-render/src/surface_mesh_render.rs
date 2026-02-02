@@ -5,7 +5,7 @@ use wgpu::util::DeviceExt;
 
 /// Uniforms for surface mesh rendering.
 /// Note: Layout must match WGSL `MeshUniforms` exactly.
-/// WGSL vec3<f32> has 16-byte alignment, requiring extra padding.
+/// WGSL `vec3<f32>` has 16-byte alignment, requiring extra padding.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[allow(clippy::pub_underscore_fields)]
@@ -97,7 +97,7 @@ pub struct SurfaceMeshRenderData {
     /// Normal buffer (vertex normals, vec4 for alignment).
     pub normal_buffer: wgpu::Buffer,
     /// Barycentric coordinate buffer for wireframe rendering.
-    /// Each triangle vertex gets [1,0,0], [0,1,0], [0,0,1].
+    /// Each triangle vertex gets `[1,0,0]`, `[0,1,0]`, `[0,0,1]`.
     pub barycentric_buffer: wgpu::Buffer,
     /// Color buffer (per-vertex colors for quantities, vec4).
     pub color_buffer: wgpu::Buffer,
