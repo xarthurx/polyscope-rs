@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-polyscope-rs is a Rust-native 3D visualization library for geometric data, ported from C++ [Polyscope](https://polyscope.run). **Core paradigm**: Structures (geometric objects) + Quantities (data on structures). Version 0.5.3, ~100% feature parity with C++ Polyscope 2.x.
+polyscope-rs is a Rust-native 3D visualization library for geometric data, ported from C++ [Polyscope](https://polyscope.run). **Core paradigm**: Structures (geometric objects) + Quantities (data on structures). Version 0.5.4, ~100% feature parity with C++ Polyscope 2.x.
 
 ## Build Commands
 
