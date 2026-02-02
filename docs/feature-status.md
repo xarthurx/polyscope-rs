@@ -41,8 +41,9 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 | Gizmos | Yes | Yes | Via egui (transform-gizmo-egui) |
 | Picking | Yes | Yes | GPU-based, element-level |
 | Screenshots | Yes | Yes | PNG/JPEG, transparent background |
-| Headless Rendering | Yes | No | `render_to_image()` / `render_to_file()` without a window |
+| Headless Rendering | Yes | Yes | `render_to_image()` / `render_to_file()` without a window |
 | RGBA Colors | Yes | Yes | Per-element alpha on all structures |
+| Camera Flight Animation | Yes | Yes | Smooth "fly to" via quaternion interpolation, 0.4s default |
 | Camera Navigation | Yes | Yes | Turntable, Free, Planar, Arcball, First-person |
 | Ortho/Perspective | Yes | Yes | Toggle between projection modes |
 | Double-click View Center | Yes | Yes | Set view center at click position |
@@ -70,6 +71,9 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 - [x] Double-click to set view center (upstream commit 61fc32a)
 - [x] Turntable orbit drift prevention (upstream commit 129c680)
 - [x] Drag & drop file callback (upstream commit 0ff26c2)
+- [x] Camera flight animation (smooth "fly to" on CameraView structures)
+- [x] FOV-aware auto-fit camera (proper bounding sphere framing)
+- [x] CameraView frustum visibility fixes (length_scale regeneration, color/thickness invalidation)
 
 ---
 
