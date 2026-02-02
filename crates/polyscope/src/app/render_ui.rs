@@ -601,7 +601,11 @@ impl App {
                 let (_, up, _) = params.camera_frame();
                 // Build target view matrix using look_at_rh (same convention as Camera::view_matrix)
                 let current_dist = (engine.camera.position - engine.camera.target).length();
-                let dist = if current_dist > 0.01 { current_dist } else { 1.0 };
+                let dist = if current_dist > 0.01 {
+                    current_dist
+                } else {
+                    1.0
+                };
                 let target_point = position + look_dir * dist;
                 let target_view = glam::Mat4::look_at_rh(position, target_point, up);
                 let target_fov = params.fov_vertical_degrees().to_radians();

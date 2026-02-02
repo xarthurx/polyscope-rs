@@ -352,10 +352,7 @@ fn main() {
     add_tet_quantities(bunny_name, &bunny_vertices, &bunny_tets);
 
     // Hex grid - position to the right of the bunny
-    let bunny_max_x = bunny_vertices
-        .iter()
-        .map(|v| v.x)
-        .fold(f32::MIN, f32::max);
+    let bunny_max_x = bunny_vertices.iter().map(|v| v.x).fold(f32::MIN, f32::max);
     let hex_offset_x = bunny_max_x + 0.5;
     let (hex_vertices, hexes) = generate_hex_grid(
         Vec3::new(hex_offset_x, -0.5, -0.5),

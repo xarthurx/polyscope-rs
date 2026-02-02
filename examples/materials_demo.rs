@@ -143,11 +143,7 @@ fn main() {
     for (i, &material) in MATERIALS.iter().enumerate() {
         let col = (i % 4) as f32;
         let row = (i / 4) as f32;
-        let pos = Vec3::new(
-            col * spacing - 1.5 * spacing,
-            -row * spacing,
-            0.0,
-        );
+        let pos = Vec3::new(col * spacing - 1.5 * spacing, -row * spacing, 0.0);
 
         let name = format!("sphere_{material}");
         let verts = transform_vertices(&sphere_verts, pos, 1.0);

@@ -590,12 +590,9 @@ impl ApplicationHandler for App {
                         };
                         // Scale zoom delta based on projection mode.
                         // Use length_scale (matches C++ Polyscope's processZoom).
-                        let length_scale =
-                            crate::with_context(|ctx| ctx.length_scale);
+                        let length_scale = crate::with_context(|ctx| ctx.length_scale);
                         let scale = match engine.camera.projection_mode {
-                            polyscope_render::ProjectionMode::Perspective => {
-                                length_scale * 0.1
-                            }
+                            polyscope_render::ProjectionMode::Perspective => length_scale * 0.1,
                             polyscope_render::ProjectionMode::Orthographic => {
                                 engine.camera.ortho_scale * 0.2
                             }

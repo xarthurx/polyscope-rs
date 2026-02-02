@@ -656,12 +656,7 @@ impl Camera {
     /// The `target_view` is a 4x4 view matrix (world-to-eye). The `target_fov`
     /// is in radians. `duration_secs` controls the flight length (C++ Polyscope
     /// default is 0.4 seconds).
-    pub fn start_flight_to(
-        &mut self,
-        target_view: Mat4,
-        target_fov: f32,
-        duration_secs: f32,
-    ) {
+    pub fn start_flight_to(&mut self, target_view: Mat4, target_fov: f32, duration_secs: f32) {
         let current_view = self.view_matrix();
         let current_dist = (self.position - self.target).length().max(0.01);
 

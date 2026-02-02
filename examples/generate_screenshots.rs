@@ -215,7 +215,10 @@ fn scene_materials() {
 
     for (i, &mat) in materials.iter().enumerate() {
         let x = (i as f32 - 1.5) * 2.5;
-        let verts: Vec<Vec3> = sphere_verts.iter().map(|v| *v + Vec3::new(x, 0.0, 0.0)).collect();
+        let verts: Vec<Vec3> = sphere_verts
+            .iter()
+            .map(|v| *v + Vec3::new(x, 0.0, 0.0))
+            .collect();
         let name = format!("sphere_{mat}");
         polyscope::register_surface_mesh(&name, verts, sphere_faces.clone());
         polyscope::with_surface_mesh(&name, |mesh| {

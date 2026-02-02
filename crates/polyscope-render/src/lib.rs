@@ -41,9 +41,9 @@
 pub mod buffer;
 pub mod camera;
 pub mod color_maps;
-pub mod dual_quat;
 pub mod curve_network_render;
 pub mod depth_peel_pass;
+pub mod dual_quat;
 pub mod engine;
 pub mod error;
 pub mod ground_plane;
