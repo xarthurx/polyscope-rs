@@ -26,7 +26,7 @@
 //! }
 //! ```
 
-use crate::{with_context, with_context_mut, PointCloud, Vec3};
+use crate::{PointCloud, Vec3, with_context, with_context_mut};
 
 /// Registers a point cloud with polyscope.
 ///

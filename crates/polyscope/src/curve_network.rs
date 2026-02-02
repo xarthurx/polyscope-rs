@@ -27,7 +27,7 @@
 //! }
 //! ```
 
-use crate::{with_context, with_context_mut, CurveNetwork, Vec3};
+use crate::{CurveNetwork, Vec3, with_context, with_context_mut};
 
 /// Registers a curve network with explicit edges.
 pub fn register_curve_network(

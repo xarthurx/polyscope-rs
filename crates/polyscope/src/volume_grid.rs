@@ -38,7 +38,7 @@
 //! }
 //! ```
 
-use crate::{with_context, with_context_mut, Vec3, VolumeGrid};
+use crate::{Vec3, VolumeGrid, with_context, with_context_mut};
 use polyscope_core::structure::HasQuantities;
 use polyscope_structures::volume_grid::{
     VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,

@@ -32,7 +32,7 @@
 //! }
 //! ```
 
-use crate::{with_context, with_context_mut, SurfaceMesh, Vec2, Vec3, Vec4};
+use crate::{SurfaceMesh, Vec2, Vec3, Vec4, with_context, with_context_mut};
 use glam::UVec3;
 
 /// Trait for face data that can be converted to the internal polygon format.

@@ -25,7 +25,7 @@
 //! }
 //! ```
 
-use crate::{with_context, with_context_mut, Vec3, Vec4};
+use crate::{Vec3, Vec4, with_context, with_context_mut};
 
 /// Adds a new slice plane to cut through geometry.
 ///

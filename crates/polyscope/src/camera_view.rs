@@ -27,7 +27,7 @@
 //! }
 //! ```
 
-use crate::{with_context, with_context_mut, CameraParameters, CameraView, Vec3};
+use crate::{CameraParameters, CameraView, Vec3, with_context, with_context_mut};
 
 /// Registers a camera view with polyscope using camera parameters.
 pub fn register_camera_view(name: impl Into<String>, params: CameraParameters) -> CameraViewHandle {
