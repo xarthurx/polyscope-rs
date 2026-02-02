@@ -1,4 +1,33 @@
-use crate::{CurveNetwork, Vec3, with_context, with_context_mut};
+//! Curve network registration and manipulation.
+//!
+//! Curve networks represent graphs, paths, or lines as nodes connected by edges.
+//! They can be rendered as lines or tubes, with quantities (scalar, vector, color)
+//! defined on nodes or edges.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use polyscope::*;
+//!
+//! fn main() -> Result<()> {
+//!     init()?;
+//!
+//!     // Create a simple path
+//!     let nodes = vec![
+//!         Vec3::new(0.0, 0.0, 0.0),
+//!         Vec3::new(1.0, 0.5, 0.0),
+//!         Vec3::new(2.0, 0.0, 0.0),
+//!     ];
+//!     let cn = register_curve_network_line("my path", nodes);
+//!     cn.set_radius(0.02, false); // absolute radius
+//!     cn.set_color(Vec3::new(1.0, 0.5, 0.0));
+//!
+//!     show();
+//!     Ok(())
+//! }
+//! ```
+
+use crate::{with_context, with_context_mut, CurveNetwork, Vec3};
 
 /// Registers a curve network with explicit edges.
 pub fn register_curve_network(

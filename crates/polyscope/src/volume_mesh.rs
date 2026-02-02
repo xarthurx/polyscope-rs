@@ -1,4 +1,34 @@
-use crate::{Vec3, VolumeMesh, with_context, with_context_mut};
+//! Volume mesh registration and manipulation.
+//!
+//! Volume meshes represent 3D volumetric data as tetrahedral or hexahedral cells.
+//! Quantities (scalar, vector, color) can be defined on vertices or cells.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use polyscope::*;
+//!
+//! fn main() -> Result<()> {
+//!     init()?;
+//!
+//!     // A single tetrahedron
+//!     let vertices = vec![
+//!         Vec3::new(0.0, 0.0, 0.0),
+//!         Vec3::new(1.0, 0.0, 0.0),
+//!         Vec3::new(0.5, 1.0, 0.0),
+//!         Vec3::new(0.5, 0.5, 1.0),
+//!     ];
+//!     let tets = vec![[0, 1, 2, 3]];
+//!
+//!     let vm = register_tet_mesh("my tet", vertices, tets);
+//!     vm.add_vertex_scalar_quantity("height", vec![0.0, 0.0, 0.0, 1.0]);
+//!
+//!     show();
+//!     Ok(())
+//! }
+//! ```
+
+use crate::{with_context, with_context_mut, Vec3, VolumeMesh};
 
 /// Registers a tetrahedral mesh with polyscope.
 pub fn register_tet_mesh(

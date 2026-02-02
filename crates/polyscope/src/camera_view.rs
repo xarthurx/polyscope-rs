@@ -1,4 +1,33 @@
-use crate::{CameraParameters, CameraView, Vec3, with_context, with_context_mut};
+//! Camera view registration and manipulation.
+//!
+//! Camera views visualize camera poses as frustum widgets in the scene.
+//! Useful for visualizing camera trajectories, multi-view setups, or
+//! debugging camera calibration.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use polyscope::*;
+//!
+//! fn main() -> Result<()> {
+//!     init()?;
+//!
+//!     let cam = register_camera_view_look_at(
+//!         "my camera",
+//!         Vec3::new(2.0, 1.0, 2.0),  // position
+//!         Vec3::ZERO,                 // target
+//!         Vec3::Y,                    // up
+//!         60.0,                       // fov (degrees)
+//!         1.5,                        // aspect ratio
+//!     );
+//!     cam.set_widget_focal_length(0.3, false); // absolute length
+//!
+//!     show();
+//!     Ok(())
+//! }
+//! ```
+
+use crate::{with_context, with_context_mut, CameraParameters, CameraView, Vec3};
 
 /// Registers a camera view with polyscope using camera parameters.
 pub fn register_camera_view(name: impl Into<String>, params: CameraParameters) -> CameraViewHandle {

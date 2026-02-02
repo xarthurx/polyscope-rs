@@ -1,3 +1,33 @@
+//! Group management for organizing structures.
+//!
+//! Groups provide hierarchical organization of structures. When a group is
+//! disabled, all structures within it (and child groups) are hidden.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use polyscope::*;
+//!
+//! fn main() -> Result<()> {
+//!     init()?;
+//!
+//!     // Create structures
+//!     register_point_cloud("points1", vec![Vec3::ZERO]);
+//!     register_point_cloud("points2", vec![Vec3::X]);
+//!
+//!     // Organize into a group
+//!     let group = create_group("my group");
+//!     group.add_point_cloud("points1");
+//!     group.add_point_cloud("points2");
+//!
+//!     // Toggle visibility of entire group
+//!     group.set_enabled(false);
+//!
+//!     show();
+//!     Ok(())
+//! }
+//! ```
+
 use crate::{with_context, with_context_mut};
 
 /// Creates a new group for organizing structures.

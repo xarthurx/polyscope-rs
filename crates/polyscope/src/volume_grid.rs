@@ -1,4 +1,44 @@
-use crate::{Vec3, VolumeGrid, with_context, with_context_mut};
+//! Volume grid registration and manipulation.
+//!
+//! Volume grids are regular 3D grids for visualizing scalar fields. They support
+//! node-centered and cell-centered data, with visualization modes including
+//! gridcubes (voxels) and isosurfaces (marching cubes).
+//!
+//! # Example
+//!
+//! ```no_run
+//! use polyscope::*;
+//!
+//! fn main() -> Result<()> {
+//!     init()?;
+//!
+//!     // Create a 10x10x10 grid
+//!     let grid = register_volume_grid(
+//!         "my grid",
+//!         glam::UVec3::new(10, 10, 10),
+//!         Vec3::new(-1.0, -1.0, -1.0),
+//!         Vec3::new(1.0, 1.0, 1.0),
+//!     );
+//!
+//!     // Add a scalar field (e.g., signed distance to sphere)
+//!     let mut values = Vec::new();
+//!     for k in 0..10 {
+//!         for j in 0..10 {
+//!             for i in 0..10 {
+//!                 let p = Vec3::new(i as f32, j as f32, k as f32) / 9.0 * 2.0 - 1.0;
+//!                 values.push(p.length() - 0.5); // sphere SDF
+//!             }
+//!         }
+//!     }
+//!     grid.add_node_scalar_quantity("sdf", values);
+//!     grid.set_quantity_enabled("sdf", true);
+//!
+//!     show();
+//!     Ok(())
+//! }
+//! ```
+
+use crate::{with_context, with_context_mut, Vec3, VolumeGrid};
 use polyscope_core::structure::HasQuantities;
 use polyscope_structures::volume_grid::{
     VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,

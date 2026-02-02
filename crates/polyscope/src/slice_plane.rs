@@ -1,4 +1,31 @@
-use crate::{Vec3, Vec4, with_context, with_context_mut};
+//! Slice plane management.
+//!
+//! Slice planes cut through geometry to reveal interior structure.
+//! They can be positioned interactively via gizmos or programmatically.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use polyscope::*;
+//!
+//! fn main() -> Result<()> {
+//!     init()?;
+//!
+//!     // Register some geometry first...
+//!     register_point_cloud("points", vec![Vec3::ZERO, Vec3::X, Vec3::Y]);
+//!
+//!     // Add a slice plane
+//!     let plane = add_slice_plane("my slice");
+//!     plane.set_pose(Vec3::ZERO, Vec3::X); // origin and normal
+//!     plane.set_draw_plane(true);
+//!     plane.set_draw_widget(true);
+//!
+//!     show();
+//!     Ok(())
+//! }
+//! ```
+
+use crate::{with_context, with_context_mut, Vec3, Vec4};
 
 /// Adds a new slice plane to cut through geometry.
 ///
