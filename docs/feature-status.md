@@ -88,7 +88,6 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 ### Polish
 - [x] More examples and documentation (13 demos, getting-started guide)
 - [ ] Platform testing (macOS, WebGPU targets)
-- [ ] Integration tests (visual regression testing)
 - [x] API documentation (rustdoc with examples)
 
 ---
