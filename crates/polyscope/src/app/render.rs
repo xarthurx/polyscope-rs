@@ -28,6 +28,9 @@ impl App {
         // Auto-fit camera to scene on first render with structures
         self.camera_fitted = super::render_init::auto_fit_camera(engine, self.camera_fitted);
 
+        // Update camera flight animation (before uniforms so interpolated position is used)
+        engine.camera.update_flight();
+
         // Drain deferred material load queue
         super::render_init::drain_material_queue(engine);
 

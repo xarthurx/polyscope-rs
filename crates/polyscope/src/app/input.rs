@@ -129,6 +129,7 @@ impl ApplicationHandler for App {
                                 delta.z -= 1.0; // backward
                             }
                             if delta.length_squared() > 0.0 {
+                                engine.camera.cancel_flight();
                                 let length_scale = engine
                                     .camera
                                     .position
@@ -172,6 +173,10 @@ impl ApplicationHandler for App {
                         self.left_mouse_down && self.shift_down && !egui_using_pointer;
                     // Right drag pan: always works regardless of selection/gizmo
                     let is_right_pan = self.right_mouse_down;
+
+                    if is_rotate || is_left_pan || is_right_pan {
+                        engine.camera.cancel_flight();
+                    }
 
                     if is_rotate {
                         match nav {
@@ -578,18 +583,21 @@ impl ApplicationHandler for App {
 
                     // Zoom disabled for None and FirstPerson modes
                     if nav != NavigationStyle::None && nav != NavigationStyle::FirstPerson {
+                        engine.camera.cancel_flight();
                         let scroll = match delta {
                             winit::event::MouseScrollDelta::LineDelta(_, y) => y,
                             winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32 * 0.1,
                         };
-                        // Scale zoom delta based on projection mode
+                        // Scale zoom delta based on projection mode.
+                        // Use length_scale (matches C++ Polyscope's processZoom).
+                        let length_scale =
+                            crate::with_context(|ctx| ctx.length_scale);
                         let scale = match engine.camera.projection_mode {
                             polyscope_render::ProjectionMode::Perspective => {
-                                engine.camera.position.distance(engine.camera.target) * 0.1
+                                length_scale * 0.1
                             }
                             polyscope_render::ProjectionMode::Orthographic => {
-                                // For orthographic, scale based on current ortho_scale
-                                engine.camera.ortho_scale * 0.5
+                                engine.camera.ortho_scale * 0.2
                             }
                         };
                         engine.camera.zoom(scroll * scale);

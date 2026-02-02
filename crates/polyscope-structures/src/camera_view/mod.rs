@@ -30,6 +30,8 @@ pub struct CameraView {
 
     // GPU resources (reuses CurveNetwork edge rendering)
     render_data: Option<CurveNetworkRenderData>,
+    /// Length scale used when geometry was last generated (to regenerate if it changes).
+    prepared_length_scale: f32,
 
     // UI state: set to true when user clicks "fly to" button
     fly_to_requested: bool,
@@ -45,10 +47,11 @@ impl CameraView {
             transform: Mat4::IDENTITY,
             quantities: Vec::new(),
             color: Vec4::new(0.0, 0.0, 0.0, 1.0),
-            widget_focal_length: 0.05,
+            widget_focal_length: 0.20,
             widget_focal_length_is_relative: true,
             widget_thickness: 0.02,
             render_data: None,
+            prepared_length_scale: 0.0,
             fly_to_requested: false,
         }
     }
@@ -95,7 +98,8 @@ impl CameraView {
     /// Sets the widget color.
     pub fn set_color(&mut self, color: Vec3) -> &mut Self {
         self.color = color.extend(1.0);
-        // Note: render_data will be refreshed on next frame
+        // Invalidate cached geometry so it regenerates with the new color
+        self.render_data = None;
         self
     }
 
@@ -122,7 +126,7 @@ impl CameraView {
     /// Sets the widget thickness.
     pub fn set_widget_thickness(&mut self, thickness: f32) -> &mut Self {
         self.widget_thickness = thickness;
-        // Note: render_data will need to be refreshed to apply new thickness
+        self.render_data = None; // Invalidate cached geometry
         self
     }
 
@@ -202,6 +206,14 @@ impl CameraView {
         (nodes, edges)
     }
 
+    /// Returns true if geometry needs to be (re-)initialized because `length_scale` changed.
+    #[must_use]
+    pub fn needs_reinit(&self, length_scale: f32) -> bool {
+        self.render_data.is_none()
+            || (self.widget_focal_length_is_relative
+                && (self.prepared_length_scale - length_scale).abs() > 1e-6)
+    }
+
     /// Initializes GPU render data.
     pub fn init_render_data(
         &mut self,
@@ -237,6 +249,7 @@ impl CameraView {
         render_data.update_uniforms(queue, &uniforms);
 
         self.render_data = Some(render_data);
+        self.prepared_length_scale = length_scale;
     }
 
     /// Returns the render data if available.

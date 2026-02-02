@@ -230,7 +230,7 @@ pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
 
             if structure.type_name() == "CameraView" {
                 if let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>() {
-                    if cv.render_data().is_none() {
+                    if cv.needs_reinit(ctx.length_scale) {
                         cv.init_render_data(
                             &engine.device,
                             engine.curve_network_edge_bind_group_layout(),

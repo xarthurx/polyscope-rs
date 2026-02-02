@@ -594,19 +594,18 @@ impl App {
                 }
             }
 
-            // Fly to a camera view (matching C++ Polyscope's setViewToThisCamera)
+            // Fly to a camera view with smooth animation (matching C++ Polyscope's startFlightTo)
             if let Some(params) = &fly_to_camera {
                 let position = params.position();
                 let look_dir = params.look_dir();
                 let (_, up, _) = params.camera_frame();
-                // Compute target point: place it at a reasonable distance along look direction.
-                // Use current camera's distance to target as reference, or scene length scale.
+                // Build target view matrix using look_at_rh (same convention as Camera::view_matrix)
                 let current_dist = (engine.camera.position - engine.camera.target).length();
                 let dist = if current_dist > 0.01 { current_dist } else { 1.0 };
-                engine.camera.position = position;
-                engine.camera.target = position + look_dir * dist;
-                engine.camera.up = up;
-                engine.camera.fov = params.fov_vertical_degrees().to_radians();
+                let target_point = position + look_dir * dist;
+                let target_view = glam::Mat4::look_at_rh(position, target_point, up);
+                let target_fov = params.fov_vertical_degrees().to_radians();
+                engine.camera.start_flight_to(target_view, target_fov, 0.4);
             }
 
             // End egui pass and check for discard request (multi-pass layout)

@@ -1,6 +1,7 @@
 //! Camera and view management.
 
 use glam::{Mat3, Mat4, Quat, Vec3};
+use std::time::Instant;
 
 /// Camera navigation/interaction style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -125,6 +126,33 @@ impl AxisDirection {
     }
 }
 
+/// State for an in-progress camera flight animation.
+///
+/// Stores start and end view matrices decomposed into rotation quaternion +
+/// translation, matching C++ Polyscope's `startFlightTo()` / `updateFlight()`.
+/// The C++ code uses `glm::dualquat` but only for the rotation part (dual=0),
+/// so this is effectively quaternion lerp for rotation + linear lerp for
+/// translation, both with smoothstep easing.
+#[derive(Debug, Clone)]
+pub struct CameraFlight {
+    start_time: Instant,
+    duration_secs: f32,
+    /// Start view matrix rotation as quaternion.
+    initial_rot: Quat,
+    /// End view matrix rotation as quaternion.
+    target_rot: Quat,
+    /// Start view matrix translation component.
+    initial_t: Vec3,
+    /// End view matrix translation component.
+    target_t: Vec3,
+    /// Start FOV in radians.
+    initial_fov: f32,
+    /// End FOV in radians.
+    target_fov: f32,
+    /// Camera-to-target distance (preserved throughout flight).
+    target_dist: f32,
+}
+
 /// A 3D camera for viewing the scene.
 #[derive(Debug, Clone)]
 pub struct Camera {
@@ -154,6 +182,8 @@ pub struct Camera {
     pub move_speed: f32,
     /// Orthographic scale (used when `projection_mode` is Orthographic).
     pub ortho_scale: f32,
+    /// Active camera flight animation (if any).
+    pub flight: Option<CameraFlight>,
 }
 
 impl Camera {
@@ -174,6 +204,7 @@ impl Camera {
             front_direction: AxisDirection::NegZ,
             move_speed: 1.0,
             ortho_scale: 1.0,
+            flight: None,
         }
     }
 
@@ -526,7 +557,17 @@ impl Camera {
         let extents = max - min;
 
         self.target = center;
-        self.position = center + Vec3::new(0.0, 0.0, size * 1.5);
+
+        // Compute camera distance using FOV so the bounding sphere is fully visible.
+        // self.fov is in radians already.
+        let half_fov_v = self.fov * 0.5;
+        let half_fov_h = (half_fov_v.tan() * self.aspect_ratio).atan();
+        let half_fov = half_fov_v.min(half_fov_h); // use the tighter angle
+        let radius = size * 0.5;
+        // Add a small margin (1.1x) so objects don't touch the viewport edge
+        let distance = (radius / half_fov.tan()) * 1.1;
+        self.position = center + Vec3::new(0.0, 0.0, distance);
+
         self.near = size * 0.001;
         self.far = size * 100.0;
 
@@ -577,6 +618,128 @@ impl Camera {
     /// Sets the far clipping plane.
     pub fn set_far(&mut self, far: f32) {
         self.far = far.max(self.near + 0.1);
+    }
+
+    // ========================================================================
+    // Camera flight animation
+    // ========================================================================
+
+    /// Decomposes a 4x4 view matrix into a rotation quaternion and translation vector.
+    fn decompose_view_matrix(view: &Mat4) -> (Quat, Vec3) {
+        let rot_mat = Mat3::from_cols(
+            view.x_axis.truncate(),
+            view.y_axis.truncate(),
+            view.z_axis.truncate(),
+        );
+        let rot = Quat::from_mat3(&rot_mat);
+        let t = Vec3::new(view.w_axis.x, view.w_axis.y, view.w_axis.z);
+        (rot, t)
+    }
+
+    /// Reconstructs camera position, target, and up from a view matrix rotation
+    /// and translation, preserving the given camera-to-target distance.
+    fn camera_from_view_matrix(rot: &Quat, t: &Vec3, target_dist: f32) -> (Vec3, Vec3, Vec3) {
+        let rot_mat = Mat3::from_quat(*rot);
+        let rot_t = rot_mat.transpose();
+        // Camera position in world space: -R^T * t
+        let position = -(rot_t * *t);
+        // Forward direction: camera looks down -Z in eye space
+        let forward = -(rot_t * Vec3::Z);
+        // Up direction: +Y in eye space
+        let up = rot_t * Vec3::Y;
+        let target = position + forward * target_dist;
+        (position, target, up)
+    }
+
+    /// Starts a smooth animated flight to the given view matrix and FOV.
+    ///
+    /// The `target_view` is a 4x4 view matrix (world-to-eye). The `target_fov`
+    /// is in radians. `duration_secs` controls the flight length (C++ Polyscope
+    /// default is 0.4 seconds).
+    pub fn start_flight_to(
+        &mut self,
+        target_view: Mat4,
+        target_fov: f32,
+        duration_secs: f32,
+    ) {
+        let current_view = self.view_matrix();
+        let current_dist = (self.position - self.target).length().max(0.01);
+
+        let (rot_start, t_start) = Self::decompose_view_matrix(&current_view);
+        let (rot_end, t_end) = Self::decompose_view_matrix(&target_view);
+
+        self.flight = Some(CameraFlight {
+            start_time: Instant::now(),
+            duration_secs,
+            initial_rot: rot_start,
+            target_rot: rot_end,
+            initial_t: t_start,
+            target_t: t_end,
+            initial_fov: self.fov,
+            target_fov,
+            target_dist: current_dist,
+        });
+    }
+
+    /// Updates the camera flight animation. Call once per frame.
+    ///
+    /// When the flight completes, the camera is set exactly to the target
+    /// position and `self.flight` is cleared.
+    pub fn update_flight(&mut self) {
+        let Some(flight) = &self.flight else {
+            return;
+        };
+
+        let elapsed = flight.start_time.elapsed().as_secs_f32();
+        let t = (elapsed / flight.duration_secs).min(1.0);
+        let dist = flight.target_dist;
+
+        if t >= 1.0 {
+            // Flight complete — set final position exactly
+            let (position, target, up) =
+                Self::camera_from_view_matrix(&flight.target_rot, &flight.target_t, dist);
+            self.position = position;
+            self.target = target;
+            self.up = up;
+            self.fov = flight.target_fov;
+            self.flight = None;
+        } else {
+            // Smoothstep easing: 3t^2 - 2t^3
+            let t_smooth = t * t * (3.0 - 2.0 * t);
+
+            // Quaternion lerp for rotation (matching C++ glm::lerp on dualquat with dual=0)
+            // Ensure shortest path
+            let target_rot = if flight.initial_rot.dot(flight.target_rot) < 0.0 {
+                -flight.target_rot
+            } else {
+                flight.target_rot
+            };
+            let interp_rot = flight.initial_rot.lerp(target_rot, t_smooth).normalize();
+
+            // Linear interpolation for translation with smoothstep
+            let interp_t = flight.initial_t.lerp(flight.target_t, t_smooth);
+
+            // Interpolate FOV with raw t (matching C++ Polyscope)
+            let fov = (1.0 - t) * flight.initial_fov + t * flight.target_fov;
+
+            let (position, target, up) =
+                Self::camera_from_view_matrix(&interp_rot, &interp_t, dist);
+            self.position = position;
+            self.target = target;
+            self.up = up;
+            self.fov = fov;
+        }
+    }
+
+    /// Cancels any active camera flight animation.
+    pub fn cancel_flight(&mut self) {
+        self.flight = None;
+    }
+
+    /// Returns whether a camera flight animation is currently active.
+    #[must_use]
+    pub fn is_in_flight(&self) -> bool {
+        self.flight.is_some()
     }
 
     /// Returns FOV in degrees.
