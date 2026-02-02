@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.2] - 2026-02-03
+## [0.5.3] - 2025-02-03
+
+### Added
+- Comprehensive API coverage tests for slice planes, groups, transforms, and quantities
+- Getting-started guide with full documentation of all structure types and quantities
+- Improved rustdoc coverage with examples for init, point_cloud, and surface_mesh modules
+
+### Fixed
+- Rustdoc warnings for escaped brackets and code formatting
+
+## [0.5.2] - 2025-02-03
 
 ### Changed
 - **Code Refactoring:** Split `surface_mesh/mod.rs` into `geometry.rs` and `quantity_methods.rs` modules for improved maintainability
@@ -17,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Camera navigation issues
 - Asset regeneration for bunny mesh with proper tetrahedralization
 
-## [0.5.1] - 2026-02-01
+## [0.5.1] - 2025-02-01
 
 ### Added
 - GPU picking for VolumeMesh cells and VolumeGrid gridcubes
@@ -32,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-pass egui layout to prevent Grid widget blink
 - Various warning fixes
 
-## [0.5.0] - 2026-01-30
+## [0.5.0] - 2025-01-30
 
 ### Added
 - Full RGBA color support with per-element alpha
@@ -53,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exposure default to match C++ Polyscope
 - All clippy warnings resolved (zero warnings policy)
 
-## [0.2.0] - 2026-01-25
+## [0.2.0] - 2025-01-25
 
 ### Added
 - Surface mesh rendering with quantities (scalar, color, vector)
@@ -66,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPU picking for structure and element selection
 - egui-based UI with structure tree, quantity controls
 
-## [0.1.0] - 2026-01-21
+## [0.1.0] - 2025-01-21
 
 ### Added
 - Initial project scaffolding
