@@ -510,28 +510,20 @@ impl App {
                                 };
 
                                 // Use tube picking when available - provides larger clickable area
-                                if engine.has_curve_network_tube_pick_pipeline()
-                                    && cn.tube_pick_bind_group().is_some()
-                                    && render_data.generated_vertex_buffer.is_some()
-                                {
-                                    // Use tube-based picking (ray-cylinder intersection)
-                                    pick_pass
-                                        .set_pipeline(engine.curve_network_tube_pick_pipeline());
-                                    pick_pass.set_bind_group(
-                                        0,
-                                        cn.tube_pick_bind_group().unwrap(),
-                                        &[],
-                                    );
-                                    pick_pass.set_vertex_buffer(
-                                        0,
-                                        render_data
-                                            .generated_vertex_buffer
-                                            .as_ref()
-                                            .unwrap()
-                                            .slice(..),
-                                    );
-                                    // 36 vertices per edge (bounding box triangles)
-                                    pick_pass.draw(0..render_data.num_edges * 36, 0..1);
+                                if engine.has_curve_network_tube_pick_pipeline() {
+                                    if let (Some(tube_bind_group), Some(vertex_buffer)) = (
+                                        cn.tube_pick_bind_group(),
+                                        render_data.generated_vertex_buffer.as_ref(),
+                                    ) {
+                                        // Use tube-based picking (ray-cylinder intersection)
+                                        pick_pass.set_pipeline(
+                                            engine.curve_network_tube_pick_pipeline(),
+                                        );
+                                        pick_pass.set_bind_group(0, tube_bind_group, &[]);
+                                        pick_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                                        // 36 vertices per edge (bounding box triangles)
+                                        pick_pass.draw(0..render_data.num_edges * 36, 0..1);
+                                    }
                                 } else if engine.has_curve_network_pick_pipeline() {
                                     // Fallback to line-based picking
                                     if let Some(pick_bind_group) = cn.pick_bind_group() {

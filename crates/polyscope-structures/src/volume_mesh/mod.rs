@@ -48,7 +48,7 @@ mod vector_quantity;
 
 pub use color_quantity::*;
 pub use scalar_quantity::*;
-pub use slice_geometry::{slice_hex, slice_tet, CellSliceResult};
+pub use slice_geometry::{CellSliceResult, slice_hex, slice_tet};
 pub use vector_quantity::*;
 
 // Re-export SliceMeshData from this module
