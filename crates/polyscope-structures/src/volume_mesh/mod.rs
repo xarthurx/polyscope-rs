@@ -48,7 +48,7 @@ mod vector_quantity;
 
 pub use color_quantity::*;
 pub use scalar_quantity::*;
-pub use slice_geometry::{CellSliceResult, slice_hex, slice_tet};
+pub use slice_geometry::{slice_hex, slice_tet, CellSliceResult};
 pub use vector_quantity::*;
 
 // Re-export SliceMeshData from this module
@@ -968,8 +968,10 @@ impl VolumeMesh {
                 && (n - plane_normal).length_squared() < 1e-10
         });
 
-        if cache_valid && self.slice_render_data.is_some() {
-            return !self.slice_render_data.as_ref().unwrap().is_empty();
+        if cache_valid {
+            if let Some(ref data) = self.slice_render_data {
+                return !data.is_empty();
+            }
         }
 
         // Generate new slice geometry
