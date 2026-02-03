@@ -13,7 +13,7 @@
 //! - Selection panel (left-click to select, right-click to clear)
 //! - Camera controls (orbit, pan, zoom)
 
-use polyscope::{
+use polyscope_rs::{
     HasQuantities, Result, Vec3, init, register_point_cloud, show, shutdown, with_context_mut,
 };
 use polyscope_structures::PointCloud;

@@ -53,7 +53,7 @@ fn load_obj(path: &str) -> (Vec<Vec3>, Vec<glam::UVec3>) {
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // Load the Stanford Bunny
     let (vertices, faces) = load_obj("assets/bunny.obj");
@@ -89,10 +89,10 @@ fn main() {
         *n = n.normalize_or_zero();
     }
 
-    let _mesh = polyscope::register_surface_mesh("bunny", vertices.clone(), faces);
+    let _mesh = polyscope_rs::register_surface_mesh("bunny", vertices.clone(), faces);
 
     // Get handle and add quantities via with_mesh
-    polyscope::with_surface_mesh("bunny", |mesh| {
+    polyscope_rs::with_surface_mesh("bunny", |mesh| {
         // Add vertex height scalar quantity (Y coordinate)
         let vertex_heights: Vec<f32> = vertices.iter().map(|v| v.y).collect();
         mesh.add_vertex_scalar_quantity("height", vertex_heights);
@@ -160,5 +160,5 @@ fn main() {
     println!("  - Scroll: Zoom");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

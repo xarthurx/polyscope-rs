@@ -127,14 +127,14 @@ fn create_torus(
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // Floating Spot cow (gold)
     let (mut spot_verts, spot_faces) = load_obj("assets/spot.obj");
     normalize_mesh(&mut spot_verts, 1.0);
     let spot_positioned = transform_vertices(&spot_verts, Vec3::new(0.0, 1.5, 0.0), 1.0);
-    polyscope::register_surface_mesh("spot_cow", spot_positioned, spot_faces);
-    polyscope::with_surface_mesh("spot_cow", |mesh| {
+    polyscope_rs::register_surface_mesh("spot_cow", spot_positioned, spot_faces);
+    polyscope_rs::with_surface_mesh("spot_cow", |mesh| {
         mesh.set_surface_color(Vec3::new(0.9, 0.7, 0.2));
     });
 
@@ -142,15 +142,15 @@ fn main() {
     let (mut bunny_verts, bunny_faces) = load_obj("assets/bunny.obj");
     normalize_mesh(&mut bunny_verts, 1.5);
     let bunny_positioned = transform_vertices(&bunny_verts, Vec3::new(1.5, 0.75, 0.0), 1.0);
-    polyscope::register_surface_mesh("bunny", bunny_positioned, bunny_faces);
-    polyscope::with_surface_mesh("bunny", |mesh| {
+    polyscope_rs::register_surface_mesh("bunny", bunny_positioned, bunny_faces);
+    polyscope_rs::with_surface_mesh("bunny", |mesh| {
         mesh.set_surface_color(Vec3::new(0.8, 0.35, 0.25));
     });
 
     // Torus lying on the ground (blue)
     let (torus_verts, torus_faces) = create_torus(Vec3::new(-1.5, 0.25, 0.0), 0.5, 0.15, 24, 12);
-    polyscope::register_surface_mesh("torus", torus_verts, torus_faces);
-    polyscope::with_surface_mesh("torus", |mesh| {
+    polyscope_rs::register_surface_mesh("torus", torus_verts, torus_faces);
+    polyscope_rs::with_surface_mesh("torus", |mesh| {
         mesh.set_surface_color(Vec3::new(0.2, 0.4, 0.9));
     });
 
@@ -163,7 +163,7 @@ fn main() {
             Vec3::new(0.0, 2.5, -1.2) + Vec3::new(r * phi.cos(), y, r * phi.sin()) * 0.3
         })
         .collect();
-    let sphere = polyscope::register_point_cloud("floating_sphere", sphere_pts);
+    let sphere = polyscope_rs::register_point_cloud("floating_sphere", sphere_pts);
     sphere.add_color_quantity(
         "green",
         (0..500).map(|_| Vec3::new(0.2, 0.9, 0.3)).collect(),
@@ -181,8 +181,8 @@ fn main() {
             )
         })
         .collect();
-    polyscope::register_curve_network_line("helix", helix_pts);
-    polyscope::with_curve_network("helix", |cn| {
+    polyscope_rs::register_curve_network_line("helix", helix_pts);
+    polyscope_rs::with_curve_network("helix", |cn| {
         cn.set_color(Vec3::new(0.9, 0.5, 0.1));
         cn.set_radius(0.03, true);
     });
@@ -215,5 +215,5 @@ fn main() {
     println!("  - Scroll: Zoom");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

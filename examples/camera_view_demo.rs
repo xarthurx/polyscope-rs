@@ -8,7 +8,7 @@
 //! Loads the Utah Teapot model and surrounds it with camera frustum
 //! visualizations from multiple viewpoints (4 fixed + 5 random).
 
-use polyscope::{self, CameraExtrinsics, CameraIntrinsics, CameraParameters, Vec3};
+use polyscope_rs::{self, CameraExtrinsics, CameraIntrinsics, CameraParameters, Vec3};
 use std::f32::consts::PI;
 
 /// Load an OBJ file and return vertices and triangle faces.
@@ -93,20 +93,20 @@ impl Rng {
 }
 
 fn main() {
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // Load the teapot as the reference model (larger size)
     let (mut verts, faces) = load_obj("assets/teapot.obj");
     normalize_mesh(&mut verts, 4.0);
-    polyscope::register_surface_mesh("teapot", verts, faces);
-    polyscope::with_surface_mesh("teapot", |mesh| {
+    polyscope_rs::register_surface_mesh("teapot", verts, faces);
+    polyscope_rs::with_surface_mesh("teapot", |mesh| {
         mesh.set_surface_color(Vec3::new(0.7, 0.5, 0.3));
     });
 
     // --- Fixed cameras ---
 
     // Camera 1: Looking at the teapot from the front
-    let cam1 = polyscope::register_camera_view_look_at(
+    let cam1 = polyscope_rs::register_camera_view_look_at(
         "front camera",
         Vec3::new(0.0, 0.0, 7.0),
         Vec3::ZERO,
@@ -117,7 +117,7 @@ fn main() {
     cam1.set_color(Vec3::new(1.0, 0.0, 0.0)); // Red
 
     // Camera 2: Looking from the side
-    let cam2 = polyscope::register_camera_view_look_at(
+    let cam2 = polyscope_rs::register_camera_view_look_at(
         "side camera",
         Vec3::new(7.0, 1.0, 0.0),
         Vec3::ZERO,
@@ -128,7 +128,7 @@ fn main() {
     cam2.set_color(Vec3::new(0.0, 1.0, 0.0)); // Green
 
     // Camera 3: Looking from above
-    let cam3 = polyscope::register_camera_view_look_at(
+    let cam3 = polyscope_rs::register_camera_view_look_at(
         "top camera",
         Vec3::new(0.0, 7.0, 1.0),
         Vec3::ZERO,
@@ -147,7 +147,7 @@ fn main() {
             Vec3::Y,
         ),
     );
-    let cam4 = polyscope::register_camera_view("custom camera", params);
+    let cam4 = polyscope_rs::register_camera_view("custom camera", params);
     cam4.set_color(Vec3::new(1.0, 1.0, 0.0)); // Yellow
 
     // --- 5 randomly placed cameras around the teapot ---
@@ -178,7 +178,7 @@ fn main() {
         let fov = rng.range(40.0, 75.0);
         let aspect = rng.range(1.0, 2.0);
 
-        let cam = polyscope::register_camera_view_look_at(
+        let cam = polyscope_rs::register_camera_view_look_at(
             format!("random camera {}", i + 1),
             position,
             Vec3::ZERO,
@@ -201,5 +201,5 @@ fn main() {
     println!("  - Scroll: Zoom");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

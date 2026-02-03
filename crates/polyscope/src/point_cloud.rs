@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use polyscope::*;
+//! use polyscope_rs::*;
 //!
 //! fn main() -> Result<()> {
 //!     init()?;
@@ -46,7 +46,7 @@ use crate::{PointCloud, Vec3, with_context_mut};
 /// # Example
 ///
 /// ```no_run
-/// use polyscope::*;
+/// use polyscope_rs::*;
 ///
 /// init().unwrap();
 /// let pc = register_point_cloud("my points", vec![Vec3::ZERO, Vec3::X, Vec3::Y]);
@@ -84,7 +84,7 @@ impl_structure_accessors! {
 /// # Example
 ///
 /// ```no_run
-/// use polyscope::*;
+/// use polyscope_rs::*;
 ///
 /// init().unwrap();
 /// register_point_cloud("pts", vec![Vec3::ZERO, Vec3::X])

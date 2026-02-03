@@ -64,13 +64,13 @@ fn generate_sphere_volume(radius: f32, count: usize, seed: u64) -> Vec<Vec3> {
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // === Point Cloud 1: Torus with surface quantities ===
     let torus_points = generate_torus(1.0, 0.3, 40, 20);
     let num_torus = torus_points.len();
 
-    let torus = polyscope::register_point_cloud("torus", torus_points.clone());
+    let torus = polyscope_rs::register_point_cloud("torus", torus_points.clone());
 
     // Scalar quantity: height (Z coordinate)
     let heights: Vec<f32> = torus_points.iter().map(|p| p.z).collect();
@@ -116,7 +116,7 @@ fn main() {
         .collect();
     let num_sphere = sphere_points.len();
 
-    let sphere = polyscope::register_point_cloud("sphere_volume", sphere_points.clone());
+    let sphere = polyscope_rs::register_point_cloud("sphere_volume", sphere_points.clone());
 
     // Scalar quantity: distance from sphere center
     let center_dist: Vec<f32> = sphere_points
@@ -160,7 +160,7 @@ fn main() {
     }
     let num_grid = grid_points.len();
 
-    let grid = polyscope::register_point_cloud("grid", grid_points.clone());
+    let grid = polyscope_rs::register_point_cloud("grid", grid_points.clone());
 
     // Scalar quantity: sinusoidal field
     let field_values: Vec<f32> = grid_points
@@ -218,5 +218,5 @@ fn main() {
     println!("  - Click structures in UI to see quantities");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

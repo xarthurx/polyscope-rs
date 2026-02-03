@@ -7,6 +7,9 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "../../README.md"
+keywords = ["visualization", "3d", "graphics", "rendering", "wgpu"]
+categories = ["visualization", "graphics", "rendering"]
 
 [dependencies]
 polyscope-core.workspace = true

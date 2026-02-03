@@ -143,13 +143,13 @@ fn translate(vertices: &[Vec3], offset: Vec3) -> Vec<Vec3> {
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // 1. Quad cube — all faces are quads (4-gons)
     let (verts, faces) = create_quad_cube();
     let verts = translate(&verts, Vec3::new(-2.5, 0.0, 0.0));
-    polyscope::register_surface_mesh("quad_cube", verts, faces.clone());
-    polyscope::with_surface_mesh("quad_cube", |mesh| {
+    polyscope_rs::register_surface_mesh("quad_cube", verts, faces.clone());
+    polyscope_rs::with_surface_mesh("quad_cube", |mesh| {
         mesh.set_surface_color(Vec3::new(0.2, 0.6, 1.0));
         mesh.set_show_edges(true);
     });
@@ -157,52 +157,52 @@ fn main() {
     let face_scalars: Vec<f32> = (0..faces.len())
         .map(|i| i as f32 / faces.len() as f32)
         .collect();
-    polyscope::with_surface_mesh("quad_cube", |mesh| {
+    polyscope_rs::with_surface_mesh("quad_cube", |mesh| {
         mesh.add_face_scalar_quantity("face_id", face_scalars);
     });
 
     // 2. Hexagonal prism — top and bottom are hexagons, sides are quads
     let (verts, faces) = create_polygon_prism(6, 1.0, 0.8);
     let verts = translate(&verts, Vec3::new(0.0, 0.0, 0.0));
-    polyscope::register_surface_mesh("hex_prism", verts, faces.clone());
-    polyscope::with_surface_mesh("hex_prism", |mesh| {
+    polyscope_rs::register_surface_mesh("hex_prism", verts, faces.clone());
+    polyscope_rs::with_surface_mesh("hex_prism", |mesh| {
         mesh.set_surface_color(Vec3::new(1.0, 0.6, 0.2));
         mesh.set_show_edges(true);
     });
     let face_scalars: Vec<f32> = (0..faces.len())
         .map(|i| i as f32 / faces.len() as f32)
         .collect();
-    polyscope::with_surface_mesh("hex_prism", |mesh| {
+    polyscope_rs::with_surface_mesh("hex_prism", |mesh| {
         mesh.add_face_scalar_quantity("face_id", face_scalars);
     });
 
     // 3. Octagonal prism — top and bottom are octagons
     let (verts, faces) = create_polygon_prism(8, 0.8, 0.7);
     let verts = translate(&verts, Vec3::new(2.5, 0.0, 0.0));
-    polyscope::register_surface_mesh("oct_prism", verts, faces.clone());
-    polyscope::with_surface_mesh("oct_prism", |mesh| {
+    polyscope_rs::register_surface_mesh("oct_prism", verts, faces.clone());
+    polyscope_rs::with_surface_mesh("oct_prism", |mesh| {
         mesh.set_surface_color(Vec3::new(0.2, 1.0, 0.4));
         mesh.set_show_edges(true);
     });
     let face_scalars: Vec<f32> = (0..faces.len())
         .map(|i| i as f32 / faces.len() as f32)
         .collect();
-    polyscope::with_surface_mesh("oct_prism", |mesh| {
+    polyscope_rs::with_surface_mesh("oct_prism", |mesh| {
         mesh.add_face_scalar_quantity("face_id", face_scalars);
     });
 
     // 4. Truncated pyramid — pentagons + quads mixed
     let (verts, faces) = create_truncated_pyramid();
     let verts = translate(&verts, Vec3::new(0.0, 0.0, 2.5));
-    polyscope::register_surface_mesh("truncated_pyramid", verts, faces.clone());
-    polyscope::with_surface_mesh("truncated_pyramid", |mesh| {
+    polyscope_rs::register_surface_mesh("truncated_pyramid", verts, faces.clone());
+    polyscope_rs::with_surface_mesh("truncated_pyramid", |mesh| {
         mesh.set_surface_color(Vec3::new(0.9, 0.3, 0.7));
         mesh.set_show_edges(true);
     });
     let face_scalars: Vec<f32> = (0..faces.len())
         .map(|i| i as f32 / faces.len() as f32)
         .collect();
-    polyscope::with_surface_mesh("truncated_pyramid", |mesh| {
+    polyscope_rs::with_surface_mesh("truncated_pyramid", |mesh| {
         mesh.add_face_scalar_quantity("face_id", face_scalars);
     });
 
@@ -229,5 +229,5 @@ fn main() {
     println!("  - Scroll: Zoom");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

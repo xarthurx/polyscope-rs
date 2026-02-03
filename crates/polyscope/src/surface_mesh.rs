@@ -10,7 +10,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use polyscope::*;
+//! use polyscope_rs::*;
 //!
 //! fn main() -> Result<()> {
 //!     init()?;
@@ -131,7 +131,7 @@ impl_structure_accessors! {
 /// # Example
 ///
 /// ```no_run
-/// use polyscope::*;
+/// use polyscope_rs::*;
 ///
 /// init().unwrap();
 /// let vertices = vec![Vec3::ZERO, Vec3::X, Vec3::Y];

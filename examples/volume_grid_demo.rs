@@ -10,17 +10,17 @@
 //! - Isosurface mode: marching cubes isosurface extraction
 //! - Cell scalar quantities
 
-use polyscope::{self, Vec3, VolumeGridVizMode};
+use polyscope_rs::{self, Vec3, VolumeGridVizMode};
 
 fn main() {
     // Initialize polyscope
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // --- Grid 1: Sphere SDF with isosurface ---
     let nx = 30u32;
     let ny = 30u32;
     let nz = 30u32;
-    let grid = polyscope::register_volume_grid(
+    let grid = polyscope_rs::register_volume_grid(
         "sphere SDF",
         glam::UVec3::new(nx, ny, nz),
         Vec3::new(-1.5, -1.5, -1.5),
@@ -51,7 +51,7 @@ fn main() {
     grid.set_isosurface_color("SDF", Vec3::new(0.047, 0.451, 0.690));
 
     // --- Grid 2: Gridcube visualization ---
-    let grid2 = polyscope::register_volume_grid(
+    let grid2 = polyscope_rs::register_volume_grid(
         "density field",
         glam::UVec3::new(10, 10, 10),
         Vec3::new(3.0, -1.0, -1.0),
@@ -78,7 +78,7 @@ fn main() {
     grid2.set_node_scalar_viz_mode("distance", VolumeGridVizMode::Gridcube);
 
     // --- Grid 3: Cell scalar quantity ---
-    let grid3 = polyscope::register_volume_grid(
+    let grid3 = polyscope_rs::register_volume_grid(
         "temperature",
         glam::UVec3::new(6, 6, 6),
         Vec3::new(-4.0, -1.0, -1.0),
@@ -117,5 +117,5 @@ fn main() {
     println!("  - ESC: Exit");
 
     // Show the viewer
-    polyscope::show();
+    polyscope_rs::show();
 }

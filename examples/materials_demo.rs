@@ -18,7 +18,7 @@
 //! - Scroll: Zoom
 
 use glam::{UVec3, Vec3};
-use polyscope::Structure;
+use polyscope_rs::Structure;
 
 /// All available matcap material names.
 const MATERIALS: &[&str] = &[
@@ -121,7 +121,7 @@ fn transform_vertices(vertices: &[Vec3], translation: Vec3, scale: f32) -> Vec<V
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // Generate a base icosphere with 2 subdivisions (320 faces - smooth enough)
     let (sphere_verts, sphere_faces) = create_icosphere(2);
@@ -147,8 +147,8 @@ fn main() {
 
         let name = format!("sphere_{material}");
         let verts = transform_vertices(&sphere_verts, pos, 1.0);
-        polyscope::register_surface_mesh(&name, verts, sphere_faces.clone());
-        polyscope::with_surface_mesh(&name, |mesh| {
+        polyscope_rs::register_surface_mesh(&name, verts, sphere_faces.clone());
+        polyscope_rs::with_surface_mesh(&name, |mesh| {
             mesh.set_surface_color(colors[i]);
             mesh.set_material(material);
         });
@@ -167,8 +167,8 @@ fn main() {
             (t - 0.5) * 4.0,
         ));
     }
-    polyscope::register_point_cloud("point_cloud_wax", pc_points);
-    polyscope::with_point_cloud("point_cloud_wax", |pc| {
+    polyscope_rs::register_point_cloud("point_cloud_wax", pc_points);
+    polyscope_rs::with_point_cloud("point_cloud_wax", |pc| {
         pc.set_base_color(Vec3::new(0.9, 0.7, 0.3));
         pc.set_point_radius(0.03);
         pc.set_material("wax");
@@ -186,8 +186,8 @@ fn main() {
             (t - 0.5) * 4.0,
         ));
     }
-    polyscope::register_curve_network_line("curve_ceramic", cn_nodes);
-    polyscope::with_curve_network("curve_ceramic", |cn| {
+    polyscope_rs::register_curve_network_line("curve_ceramic", cn_nodes);
+    polyscope_rs::with_curve_network("curve_ceramic", |cn| {
         cn.set_color(Vec3::new(0.7, 0.8, 0.9));
         cn.set_material("ceramic");
     });
@@ -217,5 +217,5 @@ fn main() {
     println!("  - Scroll: Zoom");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

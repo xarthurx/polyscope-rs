@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use polyscope::*;
+//! use polyscope_rs::*;
 //!
 //! fn main() -> Result<()> {
 //!     init()?;

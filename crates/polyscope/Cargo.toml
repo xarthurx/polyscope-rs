@@ -1,5 +1,5 @@
 [package]
-name = "polyscope"
+name = "polyscope-rs"
 description = "A Rust-native 3D visualization library for geometric data"
 version.workspace = true
 edition.workspace = true
@@ -7,6 +7,9 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "../../README.md"
+keywords = ["visualization", "3d", "graphics", "mesh", "point-cloud"]
+categories = ["visualization", "graphics", "rendering", "science"]
 
 [dependencies]
 polyscope-core.workspace = true

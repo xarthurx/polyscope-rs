@@ -6,7 +6,7 @@
 //! Note: Due to polyscope using global state that can only be initialized once
 //! per process (OnceLock), all tests are combined into a single test function.
 
-use polyscope::*;
+use polyscope_rs::*;
 
 /// Main API coverage test that runs all subtests in sequence.
 #[test]

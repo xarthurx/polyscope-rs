@@ -6,7 +6,7 @@
 //! Tests that require a window (show()) are marked #[ignore]
 //! and should be run manually with: cargo test -- --ignored
 
-use polyscope::*;
+use polyscope_rs::*;
 
 /// Main integration test that runs all basic tests in sequence.
 ///

@@ -17,7 +17,7 @@ use crate::Result;
 /// # Example
 ///
 /// ```no_run
-/// use polyscope::*;
+/// use polyscope_rs::*;
 ///
 /// fn main() -> Result<()> {
 ///     init()?;
@@ -63,7 +63,7 @@ pub fn shutdown() {
 /// # Example
 ///
 /// ```no_run
-/// use polyscope::*;
+/// use polyscope_rs::*;
 ///
 /// fn main() -> Result<()> {
 ///     init()?;

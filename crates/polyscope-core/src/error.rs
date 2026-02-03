@@ -6,7 +6,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum PolyscopeError {
     /// Polyscope has not been initialized.
-    #[error("polyscope not initialized - call polyscope::init() first")]
+    #[error("polyscope not initialized - call polyscope_rs::init() first")]
     NotInitialized,
 
     /// Polyscope has already been initialized.

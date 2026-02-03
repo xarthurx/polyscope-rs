@@ -234,7 +234,7 @@ fn add_tet_quantities(name: &str, vertices: &[Vec3], tets: &[[u32; 4]]) {
         .iter()
         .map(|v| (v.y - min_bound.y) / extent.y)
         .collect();
-    polyscope::with_volume_mesh(name, |mesh| {
+    polyscope_rs::with_volume_mesh(name, |mesh| {
         mesh.add_vertex_scalar_quantity("height", vertex_heights);
     });
 
@@ -242,7 +242,7 @@ fn add_tet_quantities(name: &str, vertices: &[Vec3], tets: &[[u32; 4]]) {
         .iter()
         .map(|v| (*v - center).length() / extent.length())
         .collect();
-    polyscope::with_volume_mesh(name, |mesh| {
+    polyscope_rs::with_volume_mesh(name, |mesh| {
         mesh.add_vertex_scalar_quantity("distance_from_center", vertex_distances);
     });
 
@@ -256,7 +256,7 @@ fn add_tet_quantities(name: &str, vertices: &[Vec3], tets: &[[u32; 4]]) {
             )
         })
         .collect();
-    polyscope::with_volume_mesh(name, |mesh| {
+    polyscope_rs::with_volume_mesh(name, |mesh| {
         mesh.add_vertex_color_quantity("position_color", vertex_colors);
     });
 
@@ -279,7 +279,7 @@ fn add_tet_quantities(name: &str, vertices: &[Vec3], tets: &[[u32; 4]]) {
     } else {
         cell_volumes
     };
-    polyscope::with_volume_mesh(name, |mesh| {
+    polyscope_rs::with_volume_mesh(name, |mesh| {
         mesh.add_cell_scalar_quantity("cell_volume", cell_volumes_normalized);
     });
 
@@ -295,7 +295,7 @@ fn add_tet_quantities(name: &str, vertices: &[Vec3], tets: &[[u32; 4]]) {
             Vec3::new(t, 0.2, 1.0 - t)
         })
         .collect();
-    polyscope::with_volume_mesh(name, |mesh| {
+    polyscope_rs::with_volume_mesh(name, |mesh| {
         mesh.add_cell_color_quantity("centroid_height_color", cell_colors);
     });
 }
@@ -319,7 +319,7 @@ fn normalize_tet_mesh(vertices: &mut [Vec3], target_size: f32) {
 #[allow(clippy::too_many_lines)]
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // Load tet mesh: bunny.mesh (Stanford Bunny)
     let bunny_path = "assets/bunny.mesh";
@@ -346,7 +346,7 @@ fn main() {
     normalize_tet_mesh(&mut bunny_vertices, 1.5);
 
     let bunny_mesh =
-        polyscope::register_tet_mesh(bunny_name, bunny_vertices.clone(), bunny_tets.clone());
+        polyscope_rs::register_tet_mesh(bunny_name, bunny_vertices.clone(), bunny_tets.clone());
     bunny_mesh.set_color(Vec3::new(0.2, 0.5, 0.8));
     bunny_mesh.set_edge_width(0.5);
     add_tet_quantities(bunny_name, &bunny_vertices, &bunny_tets);
@@ -360,14 +360,14 @@ fn main() {
         (3, 3, 3),
     );
 
-    let hex_mesh = polyscope::register_hex_mesh("hex_grid", hex_vertices.clone(), hexes.clone());
+    let hex_mesh = polyscope_rs::register_hex_mesh("hex_grid", hex_vertices.clone(), hexes.clone());
     hex_mesh.set_color(Vec3::new(0.8, 0.5, 0.2));
     hex_mesh.set_edge_width(1.0);
 
     let hex_cell_ids: Vec<f32> = (0..hexes.len())
         .map(|i| i as f32 / hexes.len() as f32)
         .collect();
-    polyscope::with_volume_mesh("hex_grid", |mesh| {
+    polyscope_rs::with_volume_mesh("hex_grid", |mesh| {
         mesh.add_cell_scalar_quantity("cell_id", hex_cell_ids);
     });
 
@@ -404,5 +404,5 @@ fn main() {
     println!("  - Click structure in UI to see quantities");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

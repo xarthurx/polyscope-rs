@@ -113,7 +113,7 @@ fn generate_tet_cube(size: f32, subdivisions: usize) -> (Vec<Vec3>, Vec<[u32; 4]
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     println!("Slice Plane Demo");
     println!("================");
@@ -128,9 +128,9 @@ fn main() {
         bunny_faces.len()
     );
 
-    let _bunny = polyscope::register_surface_mesh("bunny", bunny_verts.clone(), bunny_faces);
+    let _bunny = polyscope_rs::register_surface_mesh("bunny", bunny_verts.clone(), bunny_faces);
 
-    polyscope::with_surface_mesh("bunny", |mesh| {
+    polyscope_rs::with_surface_mesh("bunny", |mesh| {
         mesh.set_surface_color(Vec3::new(0.8, 0.6, 0.4));
     });
 
@@ -151,7 +151,7 @@ fn main() {
 
     println!("Created point cloud: {} points", points.len());
 
-    let pc_handle = polyscope::register_point_cloud("point_sphere", points.clone());
+    let pc_handle = polyscope_rs::register_point_cloud("point_sphere", points.clone());
 
     // Add scalar quantity based on height
     let heights: Vec<f32> = points.iter().map(|p| p.y).collect();
@@ -168,7 +168,7 @@ fn main() {
         tets.len()
     );
 
-    let tet_handle = polyscope::register_tet_mesh("tet_cube", tet_verts.clone(), tets);
+    let tet_handle = polyscope_rs::register_tet_mesh("tet_cube", tet_verts.clone(), tets);
 
     // Add vertex color quantity for visualization
     let colors: Vec<Vec3> = tet_verts
@@ -185,20 +185,20 @@ fn main() {
         .set_interior_color(Vec3::new(0.6, 0.3, 0.3));
 
     // 4. Create groups to organize structures
-    let surface_group = polyscope::create_group("Surface Objects");
+    let surface_group = polyscope_rs::create_group("Surface Objects");
     surface_group
         .add_surface_mesh("bunny")
         .add_point_cloud("point_sphere");
 
-    let volume_group = polyscope::create_group("Volume Objects");
+    let volume_group = polyscope_rs::create_group("Volume Objects");
     volume_group.add_volume_mesh("tet_cube");
 
     // 5. Add slice planes
     println!();
     println!("Adding slice planes...");
 
-    let slice_handle = polyscope::add_slice_plane("main_slicer");
-    let slice_handle_b = polyscope::add_slice_plane("secondary_slicer");
+    let slice_handle = polyscope_rs::add_slice_plane("main_slicer");
+    let slice_handle_b = polyscope_rs::add_slice_plane("secondary_slicer");
 
     // Position the planes to cut through all structures
     slice_handle
@@ -229,5 +229,5 @@ fn main() {
     );
     println!();
 
-    polyscope::show();
+    polyscope_rs::show();
 }

@@ -10,7 +10,7 @@
 //! Outputs PNG files to docs/images/
 
 use glam::{UVec3, Vec3};
-use polyscope::Structure;
+use polyscope_rs::Structure;
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::fs::File;
@@ -202,7 +202,7 @@ fn load_mesh_file(path: &str) -> Option<(Vec<Vec3>, Vec<[u32; 4]>)> {
 
 /// Screenshot 1: Materials - 4 icospheres with different materials
 fn scene_materials() {
-    polyscope::remove_all_structures();
+    polyscope_rs::remove_all_structures();
 
     let (sphere_verts, sphere_faces) = create_icosphere(3);
     let materials = ["clay", "wax", "candy", "ceramic"];
@@ -220,8 +220,8 @@ fn scene_materials() {
             .map(|v| *v + Vec3::new(x, 0.0, 0.0))
             .collect();
         let name = format!("sphere_{mat}");
-        polyscope::register_surface_mesh(&name, verts, sphere_faces.clone());
-        polyscope::with_surface_mesh(&name, |mesh| {
+        polyscope_rs::register_surface_mesh(&name, verts, sphere_faces.clone());
+        polyscope_rs::with_surface_mesh(&name, |mesh| {
             mesh.set_surface_color(colors[i]);
             mesh.set_material(mat);
         });
@@ -230,7 +230,7 @@ fn scene_materials() {
 
 /// Screenshot 2: Point cloud with color quantity
 fn scene_point_cloud() {
-    polyscope::remove_all_structures();
+    polyscope_rs::remove_all_structures();
 
     // Fibonacci sphere + spiral
     let n = 2000;
@@ -256,16 +256,16 @@ fn scene_point_cloud() {
         ));
     }
 
-    let pc = polyscope::register_point_cloud("fibonacci_sphere", points);
+    let pc = polyscope_rs::register_point_cloud("fibonacci_sphere", points);
     pc.add_color_quantity("position_color", colors);
-    polyscope::with_point_cloud("fibonacci_sphere", |pc| {
+    polyscope_rs::with_point_cloud("fibonacci_sphere", |pc| {
         pc.set_point_radius(0.008);
     });
 }
 
 /// Screenshot 3: Surface mesh (Spot cow) with vertex color
 fn scene_surface_mesh() {
-    polyscope::remove_all_structures();
+    polyscope_rs::remove_all_structures();
 
     let (mut verts, faces) = load_obj("assets/spot.obj");
     normalize_mesh(&mut verts, 2.0);
@@ -282,13 +282,13 @@ fn scene_surface_mesh() {
         })
         .collect();
 
-    let handle = polyscope::register_surface_mesh("spot", verts, faces);
+    let handle = polyscope_rs::register_surface_mesh("spot", verts, faces);
     handle.add_vertex_color_quantity("height_color", colors);
 }
 
 /// Screenshot 4: Curve network
 fn scene_curve_network() {
-    polyscope::remove_all_structures();
+    polyscope_rs::remove_all_structures();
 
     // Trefoil knot
     let n = 300;
@@ -300,8 +300,8 @@ fn scene_curve_network() {
         let z = (3.0 * t).sin();
         nodes.push(Vec3::new(x, y, z));
     }
-    polyscope::register_curve_network_line("trefoil_knot", nodes.clone());
-    polyscope::with_curve_network("trefoil_knot", |cn| {
+    polyscope_rs::register_curve_network_line("trefoil_knot", nodes.clone());
+    polyscope_rs::with_curve_network("trefoil_knot", |cn| {
         cn.set_color(Vec3::new(0.9, 0.4, 0.1));
         cn.set_radius(0.08, true);
         cn.set_material("candy");
@@ -319,8 +319,8 @@ fn scene_curve_network() {
             0.8 * angle.sin(),
         ));
     }
-    polyscope::register_curve_network_line("helix", helix);
-    polyscope::with_curve_network("helix", |cn| {
+    polyscope_rs::register_curve_network_line("helix", helix);
+    polyscope_rs::with_curve_network("helix", |cn| {
         cn.set_color(Vec3::new(0.2, 0.6, 0.9));
         cn.set_radius(0.06, true);
         cn.set_material("ceramic");
@@ -329,7 +329,7 @@ fn scene_curve_network() {
 
 /// Screenshot 5: Volume mesh (bunny)
 fn scene_volume_mesh() {
-    polyscope::remove_all_structures();
+    polyscope_rs::remove_all_structures();
 
     if let Some((mut verts, tets)) = load_mesh_file("assets/bunny.mesh") {
         // Normalize to a good size
@@ -342,10 +342,10 @@ fn scene_volume_mesh() {
             .map(|v| (v.y - min_y) / (max_y - min_y))
             .collect();
 
-        let mesh = polyscope::register_tet_mesh("bunny", verts, tets);
+        let mesh = polyscope_rs::register_tet_mesh("bunny", verts, tets);
         mesh.set_color(Vec3::new(0.2, 0.5, 0.8));
         mesh.set_edge_width(0.5);
-        polyscope::with_volume_mesh("bunny", |m| {
+        polyscope_rs::with_volume_mesh("bunny", |m| {
             m.add_vertex_scalar_quantity("height", scalars);
         });
     }
@@ -353,13 +353,13 @@ fn scene_volume_mesh() {
 
 /// Screenshot 6: Volume grid with scalar field
 fn scene_volume_grid() {
-    polyscope::remove_all_structures();
+    polyscope_rs::remove_all_structures();
 
     let dim = UVec3::new(20, 20, 20);
     let bound_min = Vec3::new(-2.0, -2.0, -2.0);
     let bound_max = Vec3::new(2.0, 2.0, 2.0);
 
-    let vg = polyscope::register_volume_grid("scalar_field", dim, bound_min, bound_max);
+    let vg = polyscope_rs::register_volume_grid("scalar_field", dim, bound_min, bound_max);
 
     // Scalar field: distance-based function with oscillation
     let nx = dim.x as usize;
@@ -399,7 +399,7 @@ fn normalize_mesh_f32(vertices: &mut [Vec3], target_size: f32) {
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     std::fs::create_dir_all(OUT_DIR).expect("Failed to create output directory");
 
@@ -416,7 +416,7 @@ fn main() {
         print!("Rendering {name}... ");
         setup();
         let path = format!("{OUT_DIR}/{name}.png");
-        match polyscope::render_to_file(&path, WIDTH, HEIGHT) {
+        match polyscope_rs::render_to_file(&path, WIDTH, HEIGHT) {
             Ok(()) => println!("OK -> {path}"),
             Err(e) => println!("FAILED: {e}"),
         }

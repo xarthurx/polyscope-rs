@@ -79,7 +79,7 @@ fn transform_vertices(vertices: &[Vec3], translation: Vec3, scale: f32) -> Vec<V
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // Load and normalize all three models to a common size
     let (mut spot_verts, spot_faces) = load_obj("assets/spot.obj");
@@ -93,30 +93,30 @@ fn main() {
 
     // Position the three transparent models with slight overlap
     let spot_positioned = transform_vertices(&spot_verts, Vec3::new(-0.4, 0.0, 0.0), 1.0);
-    polyscope::register_surface_mesh("spot_cow", spot_positioned, spot_faces.clone());
-    polyscope::with_surface_mesh("spot_cow", |mesh| {
+    polyscope_rs::register_surface_mesh("spot_cow", spot_positioned, spot_faces.clone());
+    polyscope_rs::with_surface_mesh("spot_cow", |mesh| {
         mesh.set_surface_color(Vec3::new(1.0, 0.6, 0.2)); // warm orange
         mesh.set_transparency(0.5);
     });
 
     let teapot_positioned = transform_vertices(&teapot_verts, Vec3::new(0.0, 0.0, 0.2), 1.0);
-    polyscope::register_surface_mesh("teapot", teapot_positioned, teapot_faces.clone());
-    polyscope::with_surface_mesh("teapot", |mesh| {
+    polyscope_rs::register_surface_mesh("teapot", teapot_positioned, teapot_faces.clone());
+    polyscope_rs::with_surface_mesh("teapot", |mesh| {
         mesh.set_surface_color(Vec3::new(0.2, 0.5, 1.0)); // cool blue
         mesh.set_transparency(0.5);
     });
 
     let bunny_positioned = transform_vertices(&bunny_verts, Vec3::new(0.4, 0.0, -0.2), 1.0);
-    polyscope::register_surface_mesh("bunny", bunny_positioned, bunny_faces.clone());
-    polyscope::with_surface_mesh("bunny", |mesh| {
+    polyscope_rs::register_surface_mesh("bunny", bunny_positioned, bunny_faces.clone());
+    polyscope_rs::with_surface_mesh("bunny", |mesh| {
         mesh.set_surface_color(Vec3::new(0.2, 0.9, 0.3)); // green
         mesh.set_transparency(0.5);
     });
 
     // Opaque reference mesh behind the transparent ones
     let spot_opaque = transform_vertices(&spot_verts, Vec3::new(0.0, 0.0, -1.5), 1.8);
-    polyscope::register_surface_mesh("opaque_spot", spot_opaque, spot_faces);
-    polyscope::with_surface_mesh("opaque_spot", |mesh| {
+    polyscope_rs::register_surface_mesh("opaque_spot", spot_opaque, spot_faces);
+    polyscope_rs::with_surface_mesh("opaque_spot", |mesh| {
         mesh.set_surface_color(Vec3::new(0.5, 0.5, 0.5));
     });
 
@@ -142,5 +142,5 @@ fn main() {
     println!("  - Scroll: Zoom");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

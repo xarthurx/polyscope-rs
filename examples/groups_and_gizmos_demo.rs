@@ -88,28 +88,28 @@ fn create_helix(center: Vec3, radius: f32, height: f32, turns: f32, points: usiz
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // === Create structures for Group A (geometric primitives) ===
 
     // Red cube
     let (cube_verts, cube_faces) = create_cube(Vec3::new(-1.5, 0.0, 0.0), 0.8);
-    polyscope::register_surface_mesh("red_cube", cube_verts, cube_faces);
-    polyscope::with_surface_mesh("red_cube", |mesh| {
+    polyscope_rs::register_surface_mesh("red_cube", cube_verts, cube_faces);
+    polyscope_rs::with_surface_mesh("red_cube", |mesh| {
         mesh.set_surface_color(Vec3::new(0.9, 0.2, 0.2));
     });
 
     // Green cube
     let (cube_verts, cube_faces) = create_cube(Vec3::new(0.0, 0.0, 0.0), 0.8);
-    polyscope::register_surface_mesh("green_cube", cube_verts, cube_faces);
-    polyscope::with_surface_mesh("green_cube", |mesh| {
+    polyscope_rs::register_surface_mesh("green_cube", cube_verts, cube_faces);
+    polyscope_rs::with_surface_mesh("green_cube", |mesh| {
         mesh.set_surface_color(Vec3::new(0.2, 0.9, 0.2));
     });
 
     // Blue cube
     let (cube_verts, cube_faces) = create_cube(Vec3::new(1.5, 0.0, 0.0), 0.8);
-    polyscope::register_surface_mesh("blue_cube", cube_verts, cube_faces);
-    polyscope::with_surface_mesh("blue_cube", |mesh| {
+    polyscope_rs::register_surface_mesh("blue_cube", cube_verts, cube_faces);
+    polyscope_rs::with_surface_mesh("blue_cube", |mesh| {
         mesh.set_surface_color(Vec3::new(0.2, 0.2, 0.9));
     });
 
@@ -117,7 +117,7 @@ fn main() {
 
     // Sphere point cloud 1
     let sphere1_pts = create_sphere_points(Vec3::new(-1.5, 2.0, 0.0), 0.4, 200);
-    let sphere1 = polyscope::register_point_cloud("sphere_1", sphere1_pts);
+    let sphere1 = polyscope_rs::register_point_cloud("sphere_1", sphere1_pts);
     sphere1.add_color_quantity(
         "color",
         (0..200).map(|_| Vec3::new(1.0, 0.6, 0.2)).collect(),
@@ -125,7 +125,7 @@ fn main() {
 
     // Sphere point cloud 2
     let sphere2_pts = create_sphere_points(Vec3::new(0.0, 2.0, 0.0), 0.4, 200);
-    let sphere2 = polyscope::register_point_cloud("sphere_2", sphere2_pts);
+    let sphere2 = polyscope_rs::register_point_cloud("sphere_2", sphere2_pts);
     sphere2.add_color_quantity(
         "color",
         (0..200).map(|_| Vec3::new(0.6, 0.2, 1.0)).collect(),
@@ -133,7 +133,7 @@ fn main() {
 
     // Sphere point cloud 3
     let sphere3_pts = create_sphere_points(Vec3::new(1.5, 2.0, 0.0), 0.4, 200);
-    let sphere3 = polyscope::register_point_cloud("sphere_3", sphere3_pts);
+    let sphere3 = polyscope_rs::register_point_cloud("sphere_3", sphere3_pts);
     sphere3.add_color_quantity(
         "color",
         (0..200).map(|_| Vec3::new(0.2, 1.0, 0.6)).collect(),
@@ -143,24 +143,24 @@ fn main() {
 
     // Helix 1
     let helix1_pts = create_helix(Vec3::new(-1.5, -2.0, 0.0), 0.3, 1.0, 2.0, 50);
-    polyscope::register_curve_network_line("helix_1", helix1_pts);
-    polyscope::with_curve_network("helix_1", |cn| {
+    polyscope_rs::register_curve_network_line("helix_1", helix1_pts);
+    polyscope_rs::with_curve_network("helix_1", |cn| {
         cn.set_color(Vec3::new(1.0, 0.8, 0.0));
         cn.set_radius(0.02, true);
     });
 
     // Helix 2
     let helix2_pts = create_helix(Vec3::new(0.0, -2.0, 0.0), 0.3, 1.0, 3.0, 75);
-    polyscope::register_curve_network_line("helix_2", helix2_pts);
-    polyscope::with_curve_network("helix_2", |cn| {
+    polyscope_rs::register_curve_network_line("helix_2", helix2_pts);
+    polyscope_rs::with_curve_network("helix_2", |cn| {
         cn.set_color(Vec3::new(0.0, 0.8, 1.0));
         cn.set_radius(0.02, true);
     });
 
     // Helix 3
     let helix3_pts = create_helix(Vec3::new(1.5, -2.0, 0.0), 0.3, 1.0, 4.0, 100);
-    polyscope::register_curve_network_line("helix_3", helix3_pts);
-    polyscope::with_curve_network("helix_3", |cn| {
+    polyscope_rs::register_curve_network_line("helix_3", helix3_pts);
+    polyscope_rs::with_curve_network("helix_3", |cn| {
         cn.set_color(Vec3::new(1.0, 0.0, 0.8));
         cn.set_radius(0.02, true);
     });
@@ -171,25 +171,25 @@ fn main() {
     // which groups by type.
 
     // Main parent group
-    let all_objects = polyscope::create_group("All Objects");
+    let all_objects = polyscope_rs::create_group("All Objects");
     all_objects.set_show_child_details(true);
 
     // Group 1: all "red/1" objects
-    let group_1 = polyscope::create_group("Group 1 (Red)");
+    let group_1 = polyscope_rs::create_group("Group 1 (Red)");
     group_1
         .add_surface_mesh("red_cube")
         .add_point_cloud("sphere_1")
         .add_curve_network("helix_1");
 
     // Group 2: all "green/2" objects
-    let group_2 = polyscope::create_group("Group 2 (Green)");
+    let group_2 = polyscope_rs::create_group("Group 2 (Green)");
     group_2
         .add_surface_mesh("green_cube")
         .add_point_cloud("sphere_2")
         .add_curve_network("helix_2");
 
     // Group 3: all "blue/3" objects
-    let group_3 = polyscope::create_group("Group 3 (Blue)");
+    let group_3 = polyscope_rs::create_group("Group 3 (Blue)");
     group_3
         .add_surface_mesh("blue_cube")
         .add_point_cloud("sphere_3")
@@ -204,15 +204,15 @@ fn main() {
     // === Select a structure and set up gizmo ===
 
     // Select the green cube for manipulation
-    polyscope::select_structure("SurfaceMesh", "green_cube");
-    polyscope::set_gizmo_visible(true);
-    polyscope::set_gizmo_mode(polyscope::GizmoMode::Translate);
-    polyscope::set_gizmo_space(polyscope::GizmoSpace::World);
+    polyscope_rs::select_structure("SurfaceMesh", "green_cube");
+    polyscope_rs::set_gizmo_visible(true);
+    polyscope_rs::set_gizmo_mode(polyscope_rs::GizmoMode::Translate);
+    polyscope_rs::set_gizmo_space(polyscope_rs::GizmoSpace::World);
 
     // Set up snap values
-    polyscope::set_gizmo_snap_translate(0.1); // Snap to 0.1 units
-    polyscope::set_gizmo_snap_rotate(15.0); // Snap to 15 degrees
-    polyscope::set_gizmo_snap_scale(0.1); // Snap to 0.1 increments
+    polyscope_rs::set_gizmo_snap_translate(0.1); // Snap to 0.1 units
+    polyscope_rs::set_gizmo_snap_rotate(15.0); // Snap to 15 degrees
+    polyscope_rs::set_gizmo_snap_scale(0.1); // Snap to 0.1 increments
 
     println!("Groups and Gizmos Demo");
     println!("======================");
@@ -248,5 +248,5 @@ fn main() {
     println!("  - Scroll: Zoom");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

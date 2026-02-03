@@ -6,7 +6,7 @@
 //! # Quick Start
 //!
 //! ```no_run
-//! use polyscope::*;
+//! use polyscope_rs::*;
 //!
 //! fn main() -> Result<()> {
 //!     // Initialize polyscope
@@ -224,7 +224,7 @@ pub fn remove_all_structures() {
 ///
 /// # Example
 /// ```no_run
-/// polyscope::set_file_drop_callback(|paths| {
+/// polyscope_rs::set_file_drop_callback(|paths| {
 ///     for path in paths {
 ///         println!("Dropped: {}", path.display());
 ///     }
@@ -252,7 +252,7 @@ pub fn clear_file_drop_callback() {
 ///
 /// # Example
 /// ```no_run
-/// polyscope::load_blendable_material("metal", [
+/// polyscope_rs::load_blendable_material("metal", [
 ///     "assets/metal_r.hdr",
 ///     "assets/metal_g.hdr",
 ///     "assets/metal_b.hdr",
@@ -299,7 +299,7 @@ pub fn load_blendable_material_ext(name: &str, base: &str, ext: &str) {
 ///
 /// # Example
 /// ```no_run
-/// polyscope::load_static_material("stone", "assets/stone.jpg");
+/// polyscope_rs::load_static_material("stone", "assets/stone.jpg");
 /// ```
 pub fn load_static_material(name: &str, filename: &str) {
     with_context_mut(|ctx| {

@@ -26,7 +26,7 @@ pub struct ScreenshotRequest {
 /// # Example
 ///
 /// ```no_run
-/// use polyscope::*;
+/// use polyscope_rs::*;
 ///
 /// init().unwrap();
 /// // ... register structures ...
@@ -61,7 +61,7 @@ pub fn screenshot_with_options(options: ScreenshotOptions) {
 /// # Example
 ///
 /// ```no_run
-/// use polyscope::*;
+/// use polyscope_rs::*;
 ///
 /// init().unwrap();
 /// // ... register structures ...

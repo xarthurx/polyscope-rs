@@ -12,7 +12,7 @@ use std::f32::consts::PI;
 
 fn main() {
     env_logger::init();
-    polyscope::init().expect("Failed to initialize polyscope");
+    polyscope_rs::init().expect("Failed to initialize polyscope");
 
     // Create a helix curve
     let helix_nodes: Vec<Vec3> = (0..100)
@@ -30,9 +30,9 @@ fn main() {
         })
         .collect();
 
-    let _helix = polyscope::register_curve_network_line("helix", helix_nodes.clone());
+    let _helix = polyscope_rs::register_curve_network_line("helix", helix_nodes.clone());
 
-    polyscope::with_curve_network("helix", |c| {
+    polyscope_rs::with_curve_network("helix", |c| {
         c.set_radius(0.02, true);
         c.set_color(Vec3::new(0.2, 0.8, 0.4));
 
@@ -66,9 +66,9 @@ fn main() {
         })
         .collect();
 
-    let _circle = polyscope::register_curve_network_loop("circle", circle_nodes);
+    let _circle = polyscope_rs::register_curve_network_loop("circle", circle_nodes);
 
-    polyscope::with_curve_network("circle", |c| {
+    polyscope_rs::with_curve_network("circle", |c| {
         c.set_radius(0.015, true);
         c.set_color(Vec3::new(0.8, 0.2, 0.4));
     });
@@ -100,9 +100,9 @@ fn main() {
         }
     }
 
-    let _grid = polyscope::register_curve_network("grid", grid_nodes, grid_edges);
+    let _grid = polyscope_rs::register_curve_network("grid", grid_nodes, grid_edges);
 
-    polyscope::with_curve_network("grid", |c| {
+    polyscope_rs::with_curve_network("grid", |c| {
         c.set_radius(0.01, true);
         c.set_color(Vec3::new(0.9, 0.7, 0.2));
     });
@@ -117,9 +117,9 @@ fn main() {
         Vec3::new(0.5, -0.3, 0.0),
     ];
 
-    let _segments = polyscope::register_curve_network_segments("segments", segment_nodes);
+    let _segments = polyscope_rs::register_curve_network_segments("segments", segment_nodes);
 
-    polyscope::with_curve_network("segments", |c| {
+    polyscope_rs::with_curve_network("segments", |c| {
         c.set_radius(0.025, true);
         c.set_color(Vec3::new(0.4, 0.4, 0.8));
     });
@@ -140,5 +140,5 @@ fn main() {
     println!("  - Scroll: Zoom");
     println!("  - ESC: Exit");
 
-    polyscope::show();
+    polyscope_rs::show();
 }

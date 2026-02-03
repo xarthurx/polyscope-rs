@@ -39,7 +39,7 @@ Add polyscope-rs to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polyscope = "0.5"
+polyscope-rs = "0.5"
 ```
 
 ## Basic Usage
@@ -47,7 +47,7 @@ polyscope = "0.5"
 Every polyscope-rs program follows this pattern:
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     // 1. Initialize polyscope
@@ -84,7 +84,7 @@ Structures are geometric objects in the scene. Each structure type has a dedicat
 Point clouds are sets of points in 3D space, rendered as spheres.
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     init()?;
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
 Surface meshes are triangular or polygonal meshes. polyscope-rs supports arbitrary n-gon faces.
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     init()?;
@@ -163,7 +163,7 @@ mesh.set_surface_color(Vec3::new(0.2, 0.5, 0.8))  // Blue surface
 Curve networks are collections of nodes connected by edges.
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     init()?;
@@ -198,7 +198,7 @@ fn main() -> Result<()> {
 Volume meshes contain tetrahedral or hexahedral cells.
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     init()?;
@@ -226,7 +226,7 @@ fn main() -> Result<()> {
 Volume grids are regular 3D grids with scalar data, useful for implicit surfaces.
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     init()?;
@@ -267,7 +267,7 @@ fn main() -> Result<()> {
 Camera views visualize camera frustums.
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     init()?;
@@ -464,7 +464,7 @@ Configure via the Appearance panel in the UI.
 Slice planes cut through geometry to reveal interiors. Up to 4 slice planes are supported.
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 // Add a slice plane
 let plane_id = add_slice_plane()?;
@@ -539,7 +539,7 @@ screenshot_with_options(ScreenshotOptions {
 Render without opening a window (useful for batch processing, testing, CI):
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     init()?;
@@ -626,7 +626,7 @@ let vertex_count = with_surface_mesh_ref("mesh", |mesh| {
 polyscope-rs uses `Result<T, PolyscopeError>` for fallible operations:
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     init()?;  // Returns Result

@@ -31,7 +31,7 @@ This project is an experiment in **AI-driven software development**. I have limi
 
 ## Project Status
 
-**Current Version:** 0.5.5
+**Current Version:** 0.5.6
 
 **Feature Parity:** Full parity with C++ Polyscope 2.x for all core functionality
 
@@ -81,7 +81,7 @@ See [docs/architecture-differences.md](docs/architecture-differences.md) for a d
 ## Quick Start
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     // Initialize polyscope
@@ -110,7 +110,7 @@ fn main() -> Result<()> {
 Render scenes without opening a window -- useful for batch processing, automated testing, and server-side rendering:
 
 ```rust
-use polyscope::*;
+use polyscope_rs::*;
 
 fn main() -> Result<()> {
     init()?;
@@ -133,7 +133,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polyscope = "0.5"
+polyscope-rs = "0.5"
 ```
 
 ## Demos

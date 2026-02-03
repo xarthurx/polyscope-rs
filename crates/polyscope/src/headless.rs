@@ -20,7 +20,7 @@ use polyscope_render::RenderEngine;
 ///
 /// # Example
 /// ```no_run
-/// use polyscope::*;
+/// use polyscope_rs::*;
 ///
 /// init().unwrap();
 /// register_point_cloud("pts", vec![Vec3::ZERO, Vec3::X, Vec3::Y]);
@@ -42,7 +42,7 @@ pub fn render_to_file(filename: &str, width: u32, height: u32) -> Result<()> {
 ///
 /// # Example
 /// ```no_run
-/// use polyscope::*;
+/// use polyscope_rs::*;
 ///
 /// init().unwrap();
 /// register_point_cloud("pts", vec![Vec3::ZERO, Vec3::X, Vec3::Y]);

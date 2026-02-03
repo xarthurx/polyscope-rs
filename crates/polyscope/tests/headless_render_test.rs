@@ -5,7 +5,7 @@
 //! GPU support, they will fail at engine creation and can be skipped
 //! with `cargo test -- --skip headless`.
 
-use polyscope::*;
+use polyscope_rs::*;
 
 /// Helper: check that a pixel buffer is not all-black and not all-background.
 fn has_nontrivial_content(pixels: &[u8], width: u32, height: u32) -> bool {
