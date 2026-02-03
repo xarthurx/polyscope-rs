@@ -27,7 +27,7 @@
 //! }
 //! ```
 
-use crate::{CameraParameters, CameraView, Vec3, with_context, with_context_mut};
+use crate::{CameraParameters, CameraView, Vec3, with_context_mut};
 
 /// Registers a camera view with polyscope using camera parameters.
 pub fn register_camera_view(name: impl Into<String>, params: CameraParameters) -> CameraViewHandle {
@@ -58,18 +58,14 @@ pub fn register_camera_view_look_at(
     register_camera_view(name, params)
 }
 
-/// Gets a registered camera view by name.
-#[must_use]
-pub fn get_camera_view(name: &str) -> Option<CameraViewHandle> {
-    with_context(|ctx| {
-        if ctx.registry.contains("CameraView", name) {
-            Some(CameraViewHandle {
-                name: name.to_string(),
-            })
-        } else {
-            None
-        }
-    })
+impl_structure_accessors! {
+    get_fn = get_camera_view,
+    with_fn = with_camera_view,
+    with_ref_fn = with_camera_view_ref,
+    handle = CameraViewHandle,
+    type_name = "CameraView",
+    rust_type = CameraView,
+    doc_name = "camera view"
 }
 
 /// Handle for a registered camera view.
@@ -116,34 +112,4 @@ impl CameraViewHandle {
         });
         self
     }
-}
-
-/// Executes a closure with mutable access to a registered camera view.
-///
-/// Returns `None` if the camera view does not exist.
-pub fn with_camera_view<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&mut CameraView) -> R,
-{
-    with_context_mut(|ctx| {
-        ctx.registry
-            .get_mut("CameraView", name)
-            .and_then(|s| s.as_any_mut().downcast_mut::<CameraView>())
-            .map(f)
-    })
-}
-
-/// Executes a closure with immutable access to a registered camera view.
-///
-/// Returns `None` if the camera view does not exist.
-pub fn with_camera_view_ref<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&CameraView) -> R,
-{
-    with_context(|ctx| {
-        ctx.registry
-            .get("CameraView", name)
-            .and_then(|s| s.as_any().downcast_ref::<CameraView>())
-            .map(f)
-    })
 }

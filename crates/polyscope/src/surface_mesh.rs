@@ -32,7 +32,7 @@
 //! }
 //! ```
 
-use crate::{SurfaceMesh, Vec2, Vec3, Vec4, with_context, with_context_mut};
+use crate::{SurfaceMesh, Vec2, Vec3, Vec4, with_context_mut};
 use glam::UVec3;
 
 /// Trait for face data that can be converted to the internal polygon format.
@@ -113,18 +113,14 @@ pub fn register_surface_mesh(
     SurfaceMeshHandle { name }
 }
 
-/// Gets a registered surface mesh by name.
-#[must_use]
-pub fn get_surface_mesh(name: &str) -> Option<SurfaceMeshHandle> {
-    with_context(|ctx| {
-        if ctx.registry.contains("SurfaceMesh", name) {
-            Some(SurfaceMeshHandle {
-                name: name.to_string(),
-            })
-        } else {
-            None
-        }
-    })
+impl_structure_accessors! {
+    get_fn = get_surface_mesh,
+    with_fn = with_surface_mesh,
+    with_ref_fn = with_surface_mesh_ref,
+    handle = SurfaceMeshHandle,
+    type_name = "SurfaceMesh",
+    rust_type = SurfaceMesh,
+    doc_name = "surface mesh"
 }
 
 /// Handle for a registered surface mesh.
@@ -364,34 +360,4 @@ impl SurfaceMeshHandle {
         });
         self
     }
-}
-
-/// Executes a closure with mutable access to a registered surface mesh.
-///
-/// Returns `None` if the mesh does not exist.
-pub fn with_surface_mesh<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&mut SurfaceMesh) -> R,
-{
-    with_context_mut(|ctx| {
-        ctx.registry
-            .get_mut("SurfaceMesh", name)
-            .and_then(|s| s.as_any_mut().downcast_mut::<SurfaceMesh>())
-            .map(f)
-    })
-}
-
-/// Executes a closure with immutable access to a registered surface mesh.
-///
-/// Returns `None` if the mesh does not exist.
-pub fn with_surface_mesh_ref<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&SurfaceMesh) -> R,
-{
-    with_context(|ctx| {
-        ctx.registry
-            .get("SurfaceMesh", name)
-            .and_then(|s| s.as_any().downcast_ref::<SurfaceMesh>())
-            .map(f)
-    })
 }

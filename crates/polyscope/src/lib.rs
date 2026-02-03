@@ -72,6 +72,60 @@
 // Documentation formatting: Backtick linting is too strict for doc comments.
 #![allow(clippy::doc_markdown)]
 
+/// Generates `get_<prefix>`, `with_<prefix>`, and `with_<prefix>_ref` accessor functions
+/// for a structure type registered in the global context.
+macro_rules! impl_structure_accessors {
+    (
+        get_fn = $get_fn:ident,
+        with_fn = $with_fn:ident,
+        with_ref_fn = $with_ref_fn:ident,
+        handle = $handle:ident,
+        type_name = $type_name:expr,
+        rust_type = $rust_type:ty,
+        doc_name = $doc_name:expr
+    ) => {
+        #[doc = concat!("Gets a registered ", $doc_name, " by name.")]
+        #[must_use]
+        pub fn $get_fn(name: &str) -> Option<$handle> {
+            crate::with_context(|ctx| {
+                if ctx.registry.contains($type_name, name) {
+                    Some($handle {
+                        name: name.to_string(),
+                    })
+                } else {
+                    None
+                }
+            })
+        }
+
+        #[doc = concat!("Executes a closure with mutable access to a registered ", $doc_name, ".\n\nReturns `None` if the ", $doc_name, " does not exist.")]
+        pub fn $with_fn<F, R>(name: &str, f: F) -> Option<R>
+        where
+            F: FnOnce(&mut $rust_type) -> R,
+        {
+            crate::with_context_mut(|ctx| {
+                ctx.registry
+                    .get_mut($type_name, name)
+                    .and_then(|s| s.as_any_mut().downcast_mut::<$rust_type>())
+                    .map(f)
+            })
+        }
+
+        #[doc = concat!("Executes a closure with immutable access to a registered ", $doc_name, ".\n\nReturns `None` if the ", $doc_name, " does not exist.")]
+        pub fn $with_ref_fn<F, R>(name: &str, f: F) -> Option<R>
+        where
+            F: FnOnce(&$rust_type) -> R,
+        {
+            crate::with_context(|ctx| {
+                ctx.registry
+                    .get($type_name, name)
+                    .and_then(|s| s.as_any().downcast_ref::<$rust_type>())
+                    .map(f)
+            })
+        }
+    };
+}
+
 mod app;
 mod camera_view;
 mod curve_network;

@@ -26,7 +26,7 @@
 //! }
 //! ```
 
-use crate::{PointCloud, Vec3, with_context, with_context_mut};
+use crate::{PointCloud, Vec3, with_context_mut};
 
 /// Registers a point cloud with polyscope.
 ///
@@ -66,18 +66,14 @@ pub fn register_point_cloud(name: impl Into<String>, points: Vec<Vec3>) -> Point
     PointCloudHandle { name }
 }
 
-/// Gets a registered point cloud by name.
-#[must_use]
-pub fn get_point_cloud(name: &str) -> Option<PointCloudHandle> {
-    with_context(|ctx| {
-        if ctx.registry.contains("PointCloud", name) {
-            Some(PointCloudHandle {
-                name: name.to_string(),
-            })
-        } else {
-            None
-        }
-    })
+impl_structure_accessors! {
+    get_fn = get_point_cloud,
+    with_fn = with_point_cloud,
+    with_ref_fn = with_point_cloud_ref,
+    handle = PointCloudHandle,
+    type_name = "PointCloud",
+    rust_type = PointCloud,
+    doc_name = "point cloud"
 }
 
 /// Handle for a registered point cloud.
@@ -169,34 +165,4 @@ impl PointCloudHandle {
         });
         self
     }
-}
-
-/// Executes a closure with mutable access to a registered point cloud.
-///
-/// Returns `None` if the point cloud does not exist.
-pub fn with_point_cloud<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&mut PointCloud) -> R,
-{
-    with_context_mut(|ctx| {
-        ctx.registry
-            .get_mut("PointCloud", name)
-            .and_then(|s| s.as_any_mut().downcast_mut::<PointCloud>())
-            .map(f)
-    })
-}
-
-/// Executes a closure with immutable access to a registered point cloud.
-///
-/// Returns `None` if the point cloud does not exist.
-pub fn with_point_cloud_ref<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&PointCloud) -> R,
-{
-    with_context(|ctx| {
-        ctx.registry
-            .get("PointCloud", name)
-            .and_then(|s| s.as_any().downcast_ref::<PointCloud>())
-            .map(f)
-    })
 }

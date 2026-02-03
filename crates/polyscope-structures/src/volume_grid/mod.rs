@@ -17,7 +17,6 @@ use polyscope_render::CurveNetworkRenderData;
 /// - Bounding box (min and max corners in world space)
 ///
 /// Node values are at grid vertices, cell values are at grid cell centers.
-#[allow(dead_code)]
 pub struct VolumeGrid {
     name: String,
 

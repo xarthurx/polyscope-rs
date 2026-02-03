@@ -1439,19 +1439,6 @@ pub struct VolumeMeshRenderGeometry {
     pub vertex_colors: Option<Vec<Vec3>>,
 }
 
-/// Rotation map for hex vertices to place vertex 0 in canonical position.
-#[allow(dead_code)]
-const HEX_ROTATION_MAP: [[usize; 8]; 8] = [
-    [0, 1, 2, 3, 4, 5, 6, 7],
-    [1, 0, 4, 5, 2, 3, 7, 6],
-    [2, 1, 5, 6, 3, 0, 4, 7],
-    [3, 0, 1, 2, 7, 4, 5, 6],
-    [4, 0, 3, 7, 5, 1, 2, 6],
-    [5, 1, 0, 4, 6, 2, 3, 7],
-    [6, 2, 1, 5, 7, 3, 0, 4],
-    [7, 3, 2, 6, 4, 0, 1, 5],
-];
-
 /// Diagonal decomposition patterns (5 tets).
 const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
     [0, 1, 2, 5],

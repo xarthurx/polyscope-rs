@@ -82,19 +82,3 @@ pub fn show() {
     let _ = env_logger::try_init();
     crate::app::run_app();
 }
-
-/// Performs one iteration of the main loop.
-///
-/// Use this for integration with external event loops.
-/// Not yet implemented — requires refactoring the winit event loop
-/// to support non-blocking single-frame execution.
-pub fn frame_tick() {
-    unimplemented!("frame_tick() is not yet supported; use show() instead");
-}
-
-/// Requests a redraw of the scene.
-///
-/// Not yet implemented — requires access to the winit event loop proxy.
-pub fn request_redraw() {
-    unimplemented!("request_redraw() is not yet supported; use show() instead");
-}

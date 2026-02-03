@@ -15,7 +15,6 @@ use wgpu::util::DeviceExt;
 pub use quantities::*;
 
 /// A curve network structure (nodes connected by edges).
-#[allow(dead_code)]
 pub struct CurveNetwork {
     name: String,
 
@@ -41,10 +40,14 @@ pub struct CurveNetwork {
     /// Render mode: 0 = line, 1 = tube (cylinder)
     render_mode: u32,
 
-    // Variable radius
+    // Variable radius (reserved for future use)
+    #[allow(dead_code)]
     node_radius_quantity_name: Option<String>,
+    #[allow(dead_code)]
     edge_radius_quantity_name: Option<String>,
+    #[allow(dead_code)]
     node_radius_autoscale: bool,
+    #[allow(dead_code)]
     edge_radius_autoscale: bool,
 
     // GPU resources

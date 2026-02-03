@@ -9,32 +9,9 @@ pub fn apply_camera_settings(
     camera: &mut polyscope_render::Camera,
     settings: &polyscope_ui::CameraSettings,
 ) {
-    use polyscope_render::{AxisDirection, NavigationStyle, ProjectionMode};
-
-    camera.navigation_style = match settings.navigation_style {
-        0 => NavigationStyle::Turntable,
-        1 => NavigationStyle::Free,
-        2 => NavigationStyle::Planar,
-        3 => NavigationStyle::Arcball,
-        4 => NavigationStyle::FirstPerson,
-        _ => NavigationStyle::None,
-    };
-
-    camera.projection_mode = match settings.projection_mode {
-        0 => ProjectionMode::Perspective,
-        _ => ProjectionMode::Orthographic,
-    };
-
-    camera.set_up_direction(match settings.up_direction {
-        0 => AxisDirection::PosX,
-        1 => AxisDirection::NegX,
-        2 => AxisDirection::PosY,
-        3 => AxisDirection::NegY,
-        4 => AxisDirection::PosZ,
-        _ => AxisDirection::NegZ,
-    });
-    // Note: front_direction is now auto-derived by set_up_direction()
-
+    camera.navigation_style = settings.navigation_style.into();
+    camera.projection_mode = settings.projection_mode.into();
+    camera.set_up_direction(settings.up_direction.into());
     camera.set_fov_degrees(settings.fov_degrees);
     camera.set_near(settings.near);
     camera.set_far(settings.far);
@@ -45,30 +22,10 @@ pub fn apply_camera_settings(
 /// Creates `CameraSettings` from the current Camera state.
 #[must_use]
 pub fn camera_to_settings(camera: &polyscope_render::Camera) -> polyscope_ui::CameraSettings {
-    use polyscope_render::{AxisDirection, NavigationStyle, ProjectionMode};
-
     polyscope_ui::CameraSettings {
-        navigation_style: match camera.navigation_style {
-            NavigationStyle::Turntable => 0,
-            NavigationStyle::Free => 1,
-            NavigationStyle::Planar => 2,
-            NavigationStyle::Arcball => 3,
-            NavigationStyle::FirstPerson => 4,
-            NavigationStyle::None => 5,
-        },
-        projection_mode: match camera.projection_mode {
-            ProjectionMode::Perspective => 0,
-            ProjectionMode::Orthographic => 1,
-        },
-        up_direction: match camera.up_direction {
-            AxisDirection::PosX => 0,
-            AxisDirection::NegX => 1,
-            AxisDirection::PosY => 2,
-            AxisDirection::NegY => 3,
-            AxisDirection::PosZ => 4,
-            AxisDirection::NegZ => 5,
-        },
-        // Note: front_direction is auto-derived from up_direction
+        navigation_style: camera.navigation_style.into(),
+        projection_mode: camera.projection_mode.into(),
+        up_direction: camera.up_direction.into(),
         fov_degrees: camera.fov_degrees(),
         near: camera.near,
         far: camera.far,

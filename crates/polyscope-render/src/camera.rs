@@ -21,6 +21,32 @@ pub enum NavigationStyle {
     None,
 }
 
+impl From<u32> for NavigationStyle {
+    fn from(v: u32) -> Self {
+        match v {
+            0 => Self::Turntable,
+            1 => Self::Free,
+            2 => Self::Planar,
+            3 => Self::Arcball,
+            4 => Self::FirstPerson,
+            _ => Self::None,
+        }
+    }
+}
+
+impl From<NavigationStyle> for u32 {
+    fn from(v: NavigationStyle) -> Self {
+        match v {
+            NavigationStyle::Turntable => 0,
+            NavigationStyle::Free => 1,
+            NavigationStyle::Planar => 2,
+            NavigationStyle::Arcball => 3,
+            NavigationStyle::FirstPerson => 4,
+            NavigationStyle::None => 5,
+        }
+    }
+}
+
 /// Camera projection mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ProjectionMode {
@@ -29,6 +55,24 @@ pub enum ProjectionMode {
     Perspective,
     /// Orthographic projection.
     Orthographic,
+}
+
+impl From<u32> for ProjectionMode {
+    fn from(v: u32) -> Self {
+        match v {
+            0 => Self::Perspective,
+            _ => Self::Orthographic,
+        }
+    }
+}
+
+impl From<ProjectionMode> for u32 {
+    fn from(v: ProjectionMode) -> Self {
+        match v {
+            ProjectionMode::Perspective => 0,
+            ProjectionMode::Orthographic => 1,
+        }
+    }
 }
 
 /// Axis direction for up/front vectors.
@@ -47,6 +91,32 @@ pub enum AxisDirection {
     PosZ,
     /// Negative Z axis (default front).
     NegZ,
+}
+
+impl From<u32> for AxisDirection {
+    fn from(v: u32) -> Self {
+        match v {
+            0 => Self::PosX,
+            1 => Self::NegX,
+            2 => Self::PosY,
+            3 => Self::NegY,
+            4 => Self::PosZ,
+            _ => Self::NegZ,
+        }
+    }
+}
+
+impl From<AxisDirection> for u32 {
+    fn from(v: AxisDirection) -> Self {
+        match v {
+            AxisDirection::PosX => 0,
+            AxisDirection::NegX => 1,
+            AxisDirection::PosY => 2,
+            AxisDirection::NegY => 3,
+            AxisDirection::PosZ => 4,
+            AxisDirection::NegZ => 5,
+        }
+    }
 }
 
 impl AxisDirection {

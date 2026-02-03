@@ -27,7 +27,7 @@
 //! }
 //! ```
 
-use crate::{CurveNetwork, Vec3, with_context, with_context_mut};
+use crate::{CurveNetwork, Vec3, with_context_mut};
 
 /// Registers a curve network with explicit edges.
 pub fn register_curve_network(
@@ -102,18 +102,14 @@ pub fn register_curve_network_segments(
     CurveNetworkHandle { name }
 }
 
-/// Gets a registered curve network by name.
-#[must_use]
-pub fn get_curve_network(name: &str) -> Option<CurveNetworkHandle> {
-    with_context(|ctx| {
-        if ctx.registry.contains("CurveNetwork", name) {
-            Some(CurveNetworkHandle {
-                name: name.to_string(),
-            })
-        } else {
-            None
-        }
-    })
+impl_structure_accessors! {
+    get_fn = get_curve_network,
+    with_fn = with_curve_network,
+    with_ref_fn = with_curve_network_ref,
+    handle = CurveNetworkHandle,
+    type_name = "CurveNetwork",
+    rust_type = CurveNetwork,
+    doc_name = "curve network"
 }
 
 /// Handle for a registered curve network.
@@ -152,34 +148,4 @@ impl CurveNetworkHandle {
         });
         self
     }
-}
-
-/// Executes a closure with mutable access to a registered curve network.
-///
-/// Returns `None` if the curve network does not exist.
-pub fn with_curve_network<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&mut CurveNetwork) -> R,
-{
-    with_context_mut(|ctx| {
-        ctx.registry
-            .get_mut("CurveNetwork", name)
-            .and_then(|s| s.as_any_mut().downcast_mut::<CurveNetwork>())
-            .map(f)
-    })
-}
-
-/// Executes a closure with immutable access to a registered curve network.
-///
-/// Returns `None` if the curve network does not exist.
-pub fn with_curve_network_ref<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&CurveNetwork) -> R,
-{
-    with_context(|ctx| {
-        ctx.registry
-            .get("CurveNetwork", name)
-            .and_then(|s| s.as_any().downcast_ref::<CurveNetwork>())
-            .map(f)
-    })
 }

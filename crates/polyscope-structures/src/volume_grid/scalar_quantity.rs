@@ -606,7 +606,6 @@ impl Quantity for VolumeGridNodeScalarQuantity {
 }
 
 /// A scalar quantity defined at grid cells.
-#[allow(dead_code)]
 pub struct VolumeGridCellScalarQuantity {
     name: String,
     structure_name: String,
@@ -623,8 +622,10 @@ pub struct VolumeGridCellScalarQuantity {
     gridcube_render_data: Option<GridcubeRenderData>,
     gridcube_dirty: bool,
 
-    // Grid geometry
+    // Grid geometry (reserved for future gridcube world-space mapping)
+    #[allow(dead_code)]
     bound_min: Vec3,
+    #[allow(dead_code)]
     bound_max: Vec3,
 
     // Pick state

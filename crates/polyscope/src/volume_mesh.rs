@@ -28,7 +28,7 @@
 //! }
 //! ```
 
-use crate::{Vec3, VolumeMesh, with_context, with_context_mut};
+use crate::{Vec3, VolumeMesh, with_context_mut};
 
 /// Registers a tetrahedral mesh with polyscope.
 pub fn register_tet_mesh(
@@ -89,18 +89,14 @@ pub fn register_volume_mesh(
     VolumeMeshHandle { name }
 }
 
-/// Gets a registered volume mesh by name.
-#[must_use]
-pub fn get_volume_mesh(name: &str) -> Option<VolumeMeshHandle> {
-    with_context(|ctx| {
-        if ctx.registry.contains("VolumeMesh", name) {
-            Some(VolumeMeshHandle {
-                name: name.to_string(),
-            })
-        } else {
-            None
-        }
-    })
+impl_structure_accessors! {
+    get_fn = get_volume_mesh,
+    with_fn = with_volume_mesh,
+    with_ref_fn = with_volume_mesh_ref,
+    handle = VolumeMeshHandle,
+    type_name = "VolumeMesh",
+    rust_type = VolumeMesh,
+    doc_name = "volume mesh"
 }
 
 /// Handle for a registered volume mesh.
@@ -201,34 +197,4 @@ impl VolumeMeshHandle {
         });
         self
     }
-}
-
-/// Executes a closure with mutable access to a registered volume mesh.
-///
-/// Returns `None` if the volume mesh does not exist.
-pub fn with_volume_mesh<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&mut VolumeMesh) -> R,
-{
-    with_context_mut(|ctx| {
-        ctx.registry
-            .get_mut("VolumeMesh", name)
-            .and_then(|s| s.as_any_mut().downcast_mut::<VolumeMesh>())
-            .map(f)
-    })
-}
-
-/// Executes a closure with immutable access to a registered volume mesh.
-///
-/// Returns `None` if the volume mesh does not exist.
-pub fn with_volume_mesh_ref<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&VolumeMesh) -> R,
-{
-    with_context(|ctx| {
-        ctx.registry
-            .get("VolumeMesh", name)
-            .and_then(|s| s.as_any().downcast_ref::<VolumeMesh>())
-            .map(f)
-    })
 }

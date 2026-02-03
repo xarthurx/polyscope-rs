@@ -139,12 +139,6 @@ impl App {
         self.screenshot_counter += 1;
         self.screenshot_pending = Some(filename);
     }
-
-    /// Sets the background color.
-    #[allow(dead_code)]
-    pub fn set_background_color(&mut self, color: Vec3) {
-        self.background_color = color;
-    }
 }
 
 impl Default for App {

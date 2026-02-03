@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-02-03
+
+### Changed
+- **Code cleanup:** Removed dead code (unused `HEX_ROTATION_MAP`, `pick_structure_at_screen_pos`, `set_background_color`, `frame_tick`, `request_redraw`)
+- **Code cleanup:** Narrowed `#[allow(dead_code)]` from struct-level to field-level on `ShadowMapPass`, `CurveNetwork`, `VolumeGridCellScalarQuantity`; removed unnecessary annotation from `VolumeGrid`
+- **Code consolidation:** Introduced `impl_transform_accessors!` macro to deduplicate transform getter/setter boilerplate
+- **Code consolidation:** Introduced `impl_structure_accessors!` macro to deduplicate `get_*`/`with_*`/`with_*_ref` across 6 structure modules
+- **Code consolidation:** Added `From<u32>` / `From<Enum> for u32` impls on `NavigationStyle`, `ProjectionMode`, `AxisDirection` to simplify `ui_sync.rs`
+- Net reduction of ~350 lines of boilerplate
+
 ## [0.5.5] - 2025-02-03
 
 ### Added

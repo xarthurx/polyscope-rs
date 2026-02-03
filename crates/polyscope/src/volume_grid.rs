@@ -38,7 +38,7 @@
 //! }
 //! ```
 
-use crate::{Vec3, VolumeGrid, with_context, with_context_mut};
+use crate::{Vec3, VolumeGrid, with_context_mut};
 use polyscope_core::structure::HasQuantities;
 use polyscope_structures::volume_grid::{
     VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,
@@ -74,18 +74,14 @@ pub fn register_volume_grid_uniform(
     register_volume_grid(name, glam::UVec3::splat(dim), bound_min, bound_max)
 }
 
-/// Gets a registered volume grid by name.
-#[must_use]
-pub fn get_volume_grid(name: &str) -> Option<VolumeGridHandle> {
-    with_context(|ctx| {
-        if ctx.registry.contains("VolumeGrid", name) {
-            Some(VolumeGridHandle {
-                name: name.to_string(),
-            })
-        } else {
-            None
-        }
-    })
+impl_structure_accessors! {
+    get_fn = get_volume_grid,
+    with_fn = with_volume_grid,
+    with_ref_fn = with_volume_grid_ref,
+    handle = VolumeGridHandle,
+    type_name = "VolumeGrid",
+    rust_type = VolumeGrid,
+    doc_name = "volume grid"
 }
 
 /// Handle for a registered volume grid.
@@ -215,34 +211,4 @@ impl VolumeGridHandle {
         });
         self
     }
-}
-
-/// Executes a closure with mutable access to a registered volume grid.
-///
-/// Returns `None` if the volume grid does not exist.
-pub fn with_volume_grid<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&mut VolumeGrid) -> R,
-{
-    with_context_mut(|ctx| {
-        ctx.registry
-            .get_mut("VolumeGrid", name)
-            .and_then(|s| s.as_any_mut().downcast_mut::<VolumeGrid>())
-            .map(f)
-    })
-}
-
-/// Executes a closure with immutable access to a registered volume grid.
-///
-/// Returns `None` if the volume grid does not exist.
-pub fn with_volume_grid_ref<F, R>(name: &str, f: F) -> Option<R>
-where
-    F: FnOnce(&VolumeGrid) -> R,
-{
-    with_context(|ctx| {
-        ctx.registry
-            .get("VolumeGrid", name)
-            .and_then(|s| s.as_any().downcast_ref::<VolumeGrid>())
-            .map(f)
-    })
 }
