@@ -346,8 +346,8 @@ fn accumulate_normal(mesh: &mut McmMesh, a: u32, b: u32, c: u32) {
 /// Look-up table for triangle configurations (256 entries, one per cube configuration).
 ///
 /// Each entry is a `u64` encoding:
-/// - Bits [3:0]: Number of triangles (0-5)
-/// - Bits [7:4], [11:8], ...: Edge indices (0-11) for each triangle vertex, 4 bits each
+/// - Bits `[3:0]`: Number of triangles (0-5)
+/// - Bits `[7:4]`, `[11:8]`, ...: Edge indices (0-11) for each triangle vertex, 4 bits each
 ///
 /// Ported from `MarchingCubeCpp` (public domain).
 #[rustfmt::skip]
@@ -479,11 +479,7 @@ mod tests {
         // Normals should be unit length
         for normal in &mesh.normals {
             let len = normal.length();
-            assert!(
-                (len - 1.0).abs() < 0.01,
-                "Normal length {} is not unit",
-                len
-            );
+            assert!((len - 1.0).abs() < 0.01, "Normal length {len} is not unit",);
         }
 
         // Vertices should be near the sphere surface (within grid spacing)
@@ -491,10 +487,7 @@ mod tests {
             let dist = (Vec3::new(v.z, v.y, v.x) - center).length(); // swizzle back
             assert!(
                 (dist - radius).abs() < 2.0,
-                "Vertex {:?} is {} from sphere (radius {})",
-                v,
-                dist,
-                radius
+                "Vertex {v:?} is {dist} from sphere (radius {radius})",
             );
         }
     }

@@ -294,7 +294,10 @@ mod tests {
         reg.register(mock("b", "PointCloud")).unwrap();
         reg.register(mock("c", "SurfaceMesh")).unwrap();
 
-        let names: Vec<&str> = reg.iter().map(|s| s.name()).collect();
+        let names: Vec<&str> = reg
+            .iter()
+            .map(super::super::structure::Structure::name)
+            .collect();
         assert_eq!(names.len(), 3);
         assert!(names.contains(&"a"));
         assert!(names.contains(&"b"));

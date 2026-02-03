@@ -159,14 +159,22 @@ mod tests {
     #[test]
     fn test_color_index_roundtrip() {
         // Test various indices
-        for index in [0, 1, 255, 256, 65535, 65536, 0xFFFFFF, 12345678 & 0xFFFFFF] {
+        for index in [
+            0,
+            1,
+            255,
+            256,
+            65535,
+            65536,
+            0x00FF_FFFF,
+            12_345_678 & 0x00FF_FFFF,
+        ] {
             let color = index_to_color(index);
             let decoded = color_to_index(color[0], color[1], color[2]);
             assert_eq!(
                 decoded,
-                index & 0xFFFFFF,
-                "Roundtrip failed for index {}",
-                index
+                index & 0x00FF_FFFF,
+                "Roundtrip failed for index {index}",
             );
         }
     }
@@ -178,8 +186,8 @@ mod tests {
         assert_eq!(index_to_color(1), [0, 0, 1]);
         assert_eq!(index_to_color(255), [0, 0, 255]);
         assert_eq!(index_to_color(256), [0, 1, 0]);
-        assert_eq!(index_to_color(0xFF0000), [255, 0, 0]);
-        assert_eq!(index_to_color(0x00FF00), [0, 255, 0]);
-        assert_eq!(index_to_color(0x0000FF), [0, 0, 255]);
+        assert_eq!(index_to_color(0x00FF_0000), [255, 0, 0]);
+        assert_eq!(index_to_color(0x0000_FF00), [0, 255, 0]);
+        assert_eq!(index_to_color(0x0000_00FF), [0, 0, 255]);
     }
 }
