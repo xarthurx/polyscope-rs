@@ -31,7 +31,7 @@ This project is an experiment in **AI-driven software development**. I have limi
 
 ## Project Status
 
-**Current Version:** 0.5.4
+**Current Version:** 0.5.5
 
 **Feature Parity:** Full parity with C++ Polyscope 2.x for all core functionality
 
