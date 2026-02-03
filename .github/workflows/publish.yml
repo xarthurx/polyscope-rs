@@ -1,0 +1,68 @@
+name: Publish to crates.io
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-publish-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Verify version matches tag
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match Cargo.toml version ($CARGO_VERSION)"
+            exit 1
+          fi
+          echo "Version verified: $TAG_VERSION"
+
+      - name: Run tests
+        run: cargo test --lib --bins
+
+      - name: Publish polyscope-core
+        run: cargo publish -p polyscope-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for crates.io to index polyscope-core
+        run: sleep 30
+
+      - name: Publish polyscope-render
+        run: cargo publish -p polyscope-render --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for crates.io to index polyscope-render
+        run: sleep 30
+
+      - name: Publish polyscope-ui
+        run: cargo publish -p polyscope-ui --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for crates.io to index polyscope-ui
+        run: sleep 30
+
+      - name: Publish polyscope-structures
+        run: cargo publish -p polyscope-structures --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for crates.io to index polyscope-structures
+        run: sleep 30
+
+      - name: Publish polyscope-rs
+        run: cargo publish -p polyscope-rs --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
