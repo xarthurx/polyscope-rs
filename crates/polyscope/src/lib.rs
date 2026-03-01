@@ -889,4 +889,18 @@ mod tests {
 
         deselect_structure();
     }
+
+    #[test]
+    fn test_degenerate_bounding_box() {
+        setup();
+        let name = unique_name("degen_bbox");
+        // Register a point cloud where all points are at the same location
+        register_point_cloud(&name, vec![Vec3::ONE, Vec3::ONE, Vec3::ONE]);
+
+        let (bb_min, bb_max) = with_context(|ctx| ctx.bounding_box);
+        // Bounding box should be perturbed so min != max
+        assert!(bb_max.x > bb_min.x, "degenerate bbox not perturbed: min={bb_min}, max={bb_max}");
+        assert!(bb_max.y > bb_min.y);
+        assert!(bb_max.z > bb_min.z);
+    }
 }

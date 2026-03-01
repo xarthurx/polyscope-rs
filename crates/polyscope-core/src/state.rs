@@ -132,6 +132,18 @@ impl Context {
         if has_extent {
             self.bounding_box = (min, max);
             self.length_scale = (max - min).length();
+
+            // Handle degenerate bounding box (all points coincide).
+            // Matches C++ Polyscope commit 3198ab5 — tolerance 1e-3.
+            if min == max {
+                let offset_scale = if self.length_scale == 0.0 {
+                    1e-3
+                } else {
+                    self.length_scale * 1e-3
+                };
+                let offset = Vec3::splat(offset_scale / 2.0);
+                self.bounding_box = (min - offset, max + offset);
+            }
         } else {
             self.bounding_box = (Vec3::ZERO, Vec3::ONE);
             self.length_scale = 1.0;
