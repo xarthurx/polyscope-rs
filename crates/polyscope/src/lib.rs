@@ -942,6 +942,8 @@ mod tests {
     #[test]
     fn test_degenerate_bounding_box() {
         setup();
+        // Clear all structures so only our degenerate point cloud contributes
+        remove_all_structures();
         let name = unique_name("degen_bbox");
         // Register a point cloud where all points are at the same location
         register_point_cloud(&name, vec![Vec3::ONE, Vec3::ONE, Vec3::ONE]);
