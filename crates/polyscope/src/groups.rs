@@ -65,6 +65,15 @@ pub fn remove_group(name: &str) {
     });
 }
 
+/// Removes all groups.
+///
+/// Note: This does not remove structures, only the groups themselves.
+pub fn remove_all_groups() {
+    with_context_mut(|ctx| {
+        ctx.groups.clear();
+    });
+}
+
 /// Returns all group names.
 #[must_use]
 pub fn get_all_groups() -> Vec<String> {

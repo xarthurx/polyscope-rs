@@ -218,6 +218,20 @@ pub fn remove_all_structures() {
     });
 }
 
+/// Removes all structures, groups, slice planes, floating quantities,
+/// and clears callbacks.
+///
+/// Unlike shutting down, this preserves render engine state and options.
+/// Useful for resetting the scene while keeping the app running.
+/// Matches C++ Polyscope's `removeEverything()` (commit f34f403).
+pub fn remove_everything() {
+    remove_all_structures();
+    remove_all_groups();
+    remove_all_slice_planes();
+    remove_all_floating_quantities();
+    clear_file_drop_callback();
+}
+
 /// Sets a callback that is invoked when files are dropped onto the polyscope window.
 ///
 /// The callback receives a slice of file paths that were dropped.
@@ -888,6 +902,41 @@ mod tests {
         assert!((translation - Vec3::new(1.0, 2.0, 3.0)).length() < 0.001);
 
         deselect_structure();
+    }
+
+    #[test]
+    fn test_remove_all_groups() {
+        setup();
+        let g1 = unique_name("rag_group1");
+        let g2 = unique_name("rag_group2");
+        create_group(&g1);
+        create_group(&g2);
+
+        assert!(get_group(&g1).is_some());
+        assert!(get_group(&g2).is_some());
+
+        remove_all_groups();
+
+        assert!(get_group(&g1).is_none());
+        assert!(get_group(&g2).is_none());
+    }
+
+    #[test]
+    fn test_remove_everything() {
+        setup();
+        let pc_name = unique_name("re_pc");
+        let group_name = unique_name("re_group");
+        let sp_name = unique_name("re_slice");
+
+        register_point_cloud(&pc_name, vec![Vec3::ZERO]);
+        create_group(&group_name);
+        add_slice_plane(&sp_name);
+
+        remove_everything();
+
+        assert!(get_point_cloud(&pc_name).is_none());
+        assert!(get_group(&group_name).is_none());
+        assert!(get_all_slice_planes().is_empty());
     }
 
     #[test]
