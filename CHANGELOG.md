@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] - 2026-03-01
+
+### Added
+- `remove_all_groups()` — bulk removal of all groups (upstream commit f34f403)
+- `remove_everything()` — unified scene reset: removes all structures, groups, slice planes, floating quantities, and clears callbacks (upstream commit f34f403)
+
+### Fixed
+- Degenerate bounding box handling — when all points coincide, the bounding box is now perturbed by 1e-3 tolerance to prevent broken camera framing (upstream commit 3198ab5)
+- Smoother camera flight animation — interpolates the inverse view matrix (camera-to-world) instead of the view matrix directly, producing more natural motion when far from the origin (upstream commit 067f760)
+
 ## [0.5.6] - 2025-02-03
 
 ### Changed
