@@ -74,6 +74,9 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 - [x] Camera flight animation (smooth "fly to" on CameraView structures)
 - [x] FOV-aware auto-fit camera (proper bounding sphere framing)
 - [x] CameraView frustum visibility fixes (length_scale regeneration, color/thickness invalidation)
+- [x] Degenerate bounding box tolerance (upstream commit 3198ab5)
+- [x] `remove_everything()` / `remove_all_groups()` scene reset (upstream commit f34f403)
+- [x] Improved camera flight interpolation via inverse view matrix (upstream commit 067f760)
 
 ---
 
@@ -84,6 +87,13 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 - **Pretty mode f16 depth precision** — Min-depth uses `Rgba16Float` (WebGPU `R32Float` not blendable without `float32-blendable` feature). Requires epsilon `2e-3` vs C++'s `1e-6`. Closely spaced layers within 0.002 NDC depth may not be distinguished.
 
 ## Planned Work
+
+### Upstream Ports (Medium-Term)
+- [ ] View save/restore JSON — serialize/deserialize camera state (upstream 7570a40, d034498)
+- [ ] Configurable right panel width — user-settable UI panel width (upstream 18f99ed)
+- [ ] Double-click/selection improvements — better logic around clicks (upstream 022deea)
+- [ ] Onscreen colorbar — floating colorbar widget on viewport (upstream 994acb0)
+- [ ] Sparse Volume Grid — new structure for sparse volumetric data (upstream 3fa1cb7)
 
 ### Polish
 - [x] More examples and documentation (13 demos, getting-started guide)
