@@ -706,17 +706,16 @@ impl Camera {
         (rot, t)
     }
 
-    /// Reconstructs camera position, target, and up from a view matrix rotation
-    /// and translation, preserving the given camera-to-target distance.
-    fn camera_from_view_matrix(rot: &Quat, t: &Vec3, target_dist: f32) -> (Vec3, Vec3, Vec3) {
+    /// Reconstructs camera position, target, and up from an *inverse* view matrix
+    /// (camera-to-world) rotation and translation, preserving the given distance.
+    fn camera_from_inverse_view(rot: &Quat, t: &Vec3, target_dist: f32) -> (Vec3, Vec3, Vec3) {
         let rot_mat = Mat3::from_quat(*rot);
-        let rot_t = rot_mat.transpose();
-        // Camera position in world space: -R^T * t
-        let position = -(rot_t * *t);
-        // Forward direction: camera looks down -Z in eye space
-        let forward = -(rot_t * Vec3::Z);
-        // Up direction: +Y in eye space
-        let up = rot_t * Vec3::Y;
+        // For the inverse view matrix (camera-to-world), position IS the translation
+        let position = *t;
+        // Forward: camera looks down -Z in eye space; in world space that's -rot_mat * Z
+        let forward = -(rot_mat * Vec3::Z);
+        // Up: +Y in eye space; in world space that's rot_mat * Y
+        let up = rot_mat * Vec3::Y;
         let target = position + forward * target_dist;
         (position, target, up)
     }
@@ -730,8 +729,10 @@ impl Camera {
         let current_view = self.view_matrix();
         let current_dist = (self.position - self.target).length().max(0.01);
 
-        let (rot_start, t_start) = Self::decompose_view_matrix(&current_view);
-        let (rot_end, t_end) = Self::decompose_view_matrix(&target_view);
+        // Interpolate the *inverse* view matrix (camera-to-world), then invert back.
+        // This produces smoother motion when far from the origin (C++ commit 067f760).
+        let (rot_start, t_start) = Self::decompose_view_matrix(&current_view.inverse());
+        let (rot_end, t_end) = Self::decompose_view_matrix(&target_view.inverse());
 
         self.flight = Some(CameraFlight {
             start_time: Instant::now(),
@@ -762,7 +763,7 @@ impl Camera {
         if t >= 1.0 {
             // Flight complete — set final position exactly
             let (position, target, up) =
-                Self::camera_from_view_matrix(&flight.target_rot, &flight.target_t, dist);
+                Self::camera_from_inverse_view(&flight.target_rot, &flight.target_t, dist);
             self.position = position;
             self.target = target;
             self.up = up;
@@ -788,7 +789,7 @@ impl Camera {
             let fov = (1.0 - t) * flight.initial_fov + t * flight.target_fov;
 
             let (position, target, up) =
-                Self::camera_from_view_matrix(&interp_rot, &interp_t, dist);
+                Self::camera_from_inverse_view(&interp_rot, &interp_t, dist);
             self.position = position;
             self.target = target;
             self.up = up;
