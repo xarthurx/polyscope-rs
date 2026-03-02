@@ -950,7 +950,10 @@ mod tests {
 
         let (bb_min, bb_max) = with_context(|ctx| ctx.bounding_box);
         // Bounding box should be perturbed so min != max
-        assert!(bb_max.x > bb_min.x, "degenerate bbox not perturbed: min={bb_min}, max={bb_max}");
+        assert!(
+            bb_max.x > bb_min.x,
+            "degenerate bbox not perturbed: min={bb_min}, max={bb_max}"
+        );
         assert!(bb_max.y > bb_min.y);
         assert!(bb_max.z > bb_min.z);
     }
