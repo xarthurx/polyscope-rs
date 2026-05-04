@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.10] - 2026-05-04
 
 ### Fixed
 - VolumeGrid isosurface indexing bug — VolumeGrid stores values as `i + j*nx + k*nx*ny` (z-slowest) but `marching_cubes` indexes as `(i*ny+j)*nz + k` (x-slowest), so isosurfaces were silently X/Z-transposed on uniform grids and visibly broken on non-uniform grids. Fixed by passing dims as `(nz, ny, nx)`, swizzling output positions/normals, and reversing triangle winding (the X↔Z swap is a reflection that flips handedness — without re-winding, `front_facing` shader checks and registered-mesh face normals were inverted). Added regression tests for non-uniform dimensions, anisotropic spacing, and winding consistency (upstream commit e91a709)
