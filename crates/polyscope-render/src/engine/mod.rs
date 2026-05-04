@@ -24,16 +24,20 @@ use crate::slice_plane_render::SlicePlaneRenderData;
 use crate::tone_mapping::ToneMapPass;
 
 /// Camera uniforms for GPU.
+///
+/// `is_orthographic` is encoded as a float (0.0 = perspective, 1.0 = ortho) so that
+/// shaders aliasing `camera_pos` as `vec4<f32>` can read it as the `.w` component
+/// without type punning. Ray-cast primitive shaders (curve tubes) branch on this to
+/// emit parallel rays in ortho mode instead of perspective rays.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[allow(clippy::pub_underscore_fields)]
 pub struct CameraUniforms {
     pub view: [[f32; 4]; 4],
     pub proj: [[f32; 4]; 4],
     pub view_proj: [[f32; 4]; 4],
     pub inv_proj: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
-    pub _padding: f32,
+    pub is_orthographic: f32,
 }
 
 impl Default for CameraUniforms {
@@ -44,7 +48,32 @@ impl Default for CameraUniforms {
             view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
             inv_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
             camera_pos: [0.0, 0.0, 5.0],
-            _padding: 0.0,
+            is_orthographic: 0.0,
+        }
+    }
+}
+
+impl CameraUniforms {
+    /// Packs a `Camera` into the GPU uniform layout. Single source of truth for
+    /// matrix derivation and the `is_orthographic` flag — `update_camera_uniforms`
+    /// uses this, and tests assert against this directly to catch field drift.
+    #[must_use]
+    pub fn from_camera(camera: &crate::camera::Camera) -> Self {
+        let view = camera.view_matrix();
+        let proj = camera.projection_matrix();
+        let view_proj = proj * view;
+        let inv_proj = proj.inverse();
+        let is_orthographic = match camera.projection_mode {
+            crate::camera::ProjectionMode::Orthographic => 1.0,
+            crate::camera::ProjectionMode::Perspective => 0.0,
+        };
+        Self {
+            view: view.to_cols_array_2d(),
+            proj: proj.to_cols_array_2d(),
+            view_proj: view_proj.to_cols_array_2d(),
+            inv_proj: inv_proj.to_cols_array_2d(),
+            camera_pos: camera.position.to_array(),
+            is_orthographic,
         }
     }
 }
@@ -980,20 +1009,7 @@ impl RenderEngine {
 
     /// Updates camera uniforms.
     pub fn update_camera_uniforms(&self) {
-        let view = self.camera.view_matrix();
-        let proj = self.camera.projection_matrix();
-        let view_proj = proj * view;
-        let inv_proj = proj.inverse();
-
-        let uniforms = CameraUniforms {
-            view: view.to_cols_array_2d(),
-            proj: proj.to_cols_array_2d(),
-            view_proj: view_proj.to_cols_array_2d(),
-            inv_proj: inv_proj.to_cols_array_2d(),
-            camera_pos: self.camera.position.to_array(),
-            _padding: 0.0,
-        };
-
+        let uniforms = CameraUniforms::from_camera(&self.camera);
         self.queue
             .write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[uniforms]));
     }

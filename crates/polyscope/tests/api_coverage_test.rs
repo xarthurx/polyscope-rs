@@ -148,6 +148,44 @@ fn api_coverage_tests() {
         assert!(get_all_slice_planes().is_empty());
     }
 
+    // --- Test: add_slice_plane_auto generates "Scene Slice Plane N" names ---
+    {
+        remove_all_slice_planes();
+
+        let p0 = add_slice_plane_auto();
+        let p1 = add_slice_plane_auto();
+        let p2 = add_slice_plane_auto();
+
+        assert_eq!(p0.name(), "Scene Slice Plane 0");
+        assert_eq!(p1.name(), "Scene Slice Plane 1");
+        assert_eq!(p2.name(), "Scene Slice Plane 2");
+        assert_eq!(get_all_slice_planes().len(), 3);
+    }
+
+    // --- Test: add_slice_plane_auto skips already-used indices ---
+    {
+        remove_all_slice_planes();
+
+        // Manually claim indices 0 and 2; auto should pick 1 first, then 3.
+        add_slice_plane("Scene Slice Plane 0");
+        add_slice_plane("Scene Slice Plane 2");
+        let auto1 = add_slice_plane_auto();
+        let auto2 = add_slice_plane_auto();
+        assert_eq!(auto1.name(), "Scene Slice Plane 1");
+        assert_eq!(auto2.name(), "Scene Slice Plane 3");
+    }
+
+    // --- Test: SlicePlaneHandle::remove() consumes handle and removes plane ---
+    {
+        remove_all_slice_planes();
+
+        let plane = add_slice_plane("handle_remove_test");
+        assert!(get_slice_plane("handle_remove_test").is_some());
+
+        plane.remove();
+        assert!(get_slice_plane("handle_remove_test").is_none());
+    }
+
     // ========================================================================
     // GROUP TESTS
     // ========================================================================

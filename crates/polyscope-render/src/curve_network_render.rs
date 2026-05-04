@@ -421,4 +421,129 @@ mod tests {
         // Must be 16-byte aligned for GPU uniform buffers
         assert_eq!(size % 16, 0, "CurveNetworkUniforms must be 16-byte aligned");
     }
+
+    // ========================================================================
+    // Shader-math validation: parallel-ray cylinder intersection.
+    //
+    // The three tube shaders (`curve_network_tube.wgsl`,
+    // `reflected_curve_network_tube.wgsl`, `pick_curve_tube.wgsl`) include a
+    // parallel-ray branch needed for ortho viewing straight down a tube. This
+    // module mirrors that branch in Rust so its math can be unit-tested
+    // (no GPU required). If the WGSL diverges from this Rust port, the
+    // ortho head-on tube case will silently regress.
+    // ========================================================================
+
+    use glam::Vec3;
+
+    /// Mirrors the parallel-ray branch in the three tube shaders.
+    /// Returns Some((t, hit_point)) on hit, None on miss.
+    /// Ignores normal direction since pick variant doesn't compute one.
+    fn ray_cylinder_parallel_intersect(
+        ray_origin: Vec3,
+        ray_dir: Vec3,
+        cyl_start: Vec3,
+        cyl_end: Vec3,
+        cyl_radius: f32,
+    ) -> Option<(f32, Vec3)> {
+        let cyl_axis = cyl_end - cyl_start;
+        let cyl_dir = cyl_axis.normalize();
+        let delta = ray_origin - cyl_start;
+        let delta_perp = delta - cyl_dir.dot(delta) * cyl_dir;
+
+        if delta_perp.length_squared() > cyl_radius * cyl_radius {
+            return None;
+        }
+        let ray_dot_cyl = ray_dir.dot(cyl_dir);
+        if ray_dot_cyl.abs() < 1e-8 {
+            return None;
+        }
+        let t_start = (cyl_start - ray_origin).dot(cyl_dir) / ray_dot_cyl;
+        let t_end = (cyl_end - ray_origin).dot(cyl_dir) / ray_dot_cyl;
+        let mut t_cap = t_start.min(t_end);
+        if t_cap < 0.001 {
+            t_cap = t_start.max(t_end);
+            if t_cap < 0.001 {
+                return None;
+            }
+        }
+        Some((t_cap, ray_origin + t_cap * ray_dir))
+    }
+
+    /// Camera looks straight down a Z-aligned tube in ortho mode. Ray origin
+    /// is pushed back so t > 0. Should hit the front end cap (closer to camera).
+    #[test]
+    fn parallel_ray_through_axis_hits_front_cap() {
+        let cyl_start = Vec3::new(0.0, 0.0, 0.0);
+        let cyl_end = Vec3::new(0.0, 0.0, 5.0);
+        let radius = 0.1_f32;
+        // Camera at +Z looking down -Z (toward origin)
+        let ray_dir = Vec3::new(0.0, 0.0, -1.0);
+        let world_position = Vec3::new(0.0, 0.0, 5.5); // on bbox front (toward camera)
+        let extent = (cyl_end - cyl_start).length() + 2.0 * radius;
+        let ray_origin = world_position - extent * ray_dir;
+
+        let hit = ray_cylinder_parallel_intersect(ray_origin, ray_dir, cyl_start, cyl_end, radius);
+        let (t, p) = hit.expect("parallel ray through axis should hit cylinder cap");
+        assert!(t > 0.001, "t must be positive, got {t}");
+        // Front cap is cyl_end (z=5.0); hit point z must equal cyl_end.z
+        assert!(
+            (p.z - cyl_end.z).abs() < 1e-4,
+            "expected hit at z={}, got {p:?}",
+            cyl_end.z
+        );
+    }
+
+    /// Same setup, ray offset within radius — must still hit the cap (the
+    /// disk is filled, not just the rim).
+    #[test]
+    fn parallel_ray_offset_within_radius_hits() {
+        let cyl_start = Vec3::ZERO;
+        let cyl_end = Vec3::new(0.0, 0.0, 5.0);
+        let radius = 0.1_f32;
+        let ray_dir = Vec3::new(0.0, 0.0, -1.0);
+        // Offset 0.05 from axis (within radius=0.1)
+        let world_position = Vec3::new(0.05, 0.0, 5.5);
+        let extent = (cyl_end - cyl_start).length() + 2.0 * radius;
+        let ray_origin = world_position - extent * ray_dir;
+
+        let hit = ray_cylinder_parallel_intersect(ray_origin, ray_dir, cyl_start, cyl_end, radius);
+        assert!(hit.is_some(), "ray within radius should hit cap");
+    }
+
+    /// Ray offset beyond radius — must miss.
+    #[test]
+    fn parallel_ray_offset_beyond_radius_misses() {
+        let cyl_start = Vec3::ZERO;
+        let cyl_end = Vec3::new(0.0, 0.0, 5.0);
+        let radius = 0.1_f32;
+        let ray_dir = Vec3::new(0.0, 0.0, -1.0);
+        let world_position = Vec3::new(0.5, 0.0, 5.5); // 5x radius from axis
+        let ray_origin = world_position - 10.0 * ray_dir;
+
+        let hit = ray_cylinder_parallel_intersect(ray_origin, ray_dir, cyl_start, cyl_end, radius);
+        assert!(hit.is_none(), "ray outside radius must miss");
+    }
+
+    /// Reverse-direction ray (looking from -Z toward +Z) must hit the OTHER
+    /// cap (cyl_start side, since that's now nearer to the camera).
+    #[test]
+    fn parallel_ray_reverse_direction_hits_other_cap() {
+        let cyl_start = Vec3::new(0.0, 0.0, 0.0);
+        let cyl_end = Vec3::new(0.0, 0.0, 5.0);
+        let radius = 0.1_f32;
+        let ray_dir = Vec3::new(0.0, 0.0, 1.0); // looking down +Z now
+        let world_position = Vec3::new(0.0, 0.0, -0.5);
+        let extent = (cyl_end - cyl_start).length() + 2.0 * radius;
+        let ray_origin = world_position - extent * ray_dir;
+
+        let (t, p) =
+            ray_cylinder_parallel_intersect(ray_origin, ray_dir, cyl_start, cyl_end, radius)
+                .expect("reverse-direction parallel ray should hit");
+        assert!(t > 0.001);
+        assert!(
+            (p.z - cyl_start.z).abs() < 1e-4,
+            "expected hit at z={}, got {p:?}",
+            cyl_start.z
+        );
+    }
 }

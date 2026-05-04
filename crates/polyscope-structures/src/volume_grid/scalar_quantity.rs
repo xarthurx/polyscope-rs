@@ -208,19 +208,25 @@ impl VolumeGridNodeScalarQuantity {
 
     /// Extracts the isosurface mesh using marching cubes.
     ///
-    /// MC output vertices are in grid index space: vertex (i,j,k) has coords
-    /// that need swizzle(z,y,x) * `grid_spacing` + `bound_min` to transform to world space.
+    /// `VolumeGrid` stores values as `idx = i + j*nx + k*nx*ny` (z-slowest, x-fastest),
+    /// but `marching_cubes` indexes as `(i_mc*ny + j_mc)*nz + k_mc` (x-slowest, z-fastest).
+    /// We pass dims in `(nz, ny, nx)` order so MC's inner loop steps over our X axis,
+    /// then map output vertices/normals back to world space:
+    ///   `world_x = k_mc, world_y = j_mc, world_z = i_mc`
+    /// (i.e. swap the X and Z components of every position and normal).
+    ///
+    /// That swap has determinant -1, which flips triangle handedness. We restore
+    /// CCW winding by swapping two indices in every triangle — required for the
+    /// `front_facing` test in `simple_mesh.wgsl` and for `register_isosurface_as_mesh`
+    /// which recomputes per-face normals from winding.
     pub fn extract_isosurface(&mut self) -> &McmMesh {
         if self.isosurface_mesh_cache.is_none() || self.isosurface_dirty {
             let nx = self.node_dim.x;
             let ny = self.node_dim.y;
             let nz = self.node_dim.z;
 
-            let mut mesh = marching_cubes(&self.values, self.isosurface_level, nx, ny, nz);
+            let mut mesh = marching_cubes(&self.values, self.isosurface_level, nz, ny, nx);
 
-            // Transform from MC index space to world space
-            // MC uses indexing (i * ny + j) * nz + k, output coords are in (i,j,k) space
-            // Need to map: x_world = x_mc * spacing_z + bound_min.z (swizzle z,y,x)
             let cell_dim = Vec3::new(
                 (nx - 1).max(1) as f32,
                 (ny - 1).max(1) as f32,
@@ -229,24 +235,23 @@ impl VolumeGridNodeScalarQuantity {
             let spacing = (self.bound_max - self.bound_min) / cell_dim;
 
             for v in &mut mesh.vertices {
-                // MC output: v.x is in i-dimension, v.y in j-dimension, v.z in k-dimension
-                // Grid layout: i maps to x, j maps to y, k maps to z (no swizzle needed
-                // since our MC uses same indexing as the grid)
                 *v = Vec3::new(
-                    v.x * spacing.x + self.bound_min.x,
+                    v.z * spacing.x + self.bound_min.x,
                     v.y * spacing.y + self.bound_min.y,
-                    v.z * spacing.z + self.bound_min.z,
+                    v.x * spacing.z + self.bound_min.z,
                 );
             }
 
-            // Transform normals (only need to scale, then renormalize)
             for n in &mut mesh.normals {
-                // Scale normals by inverse spacing to account for non-uniform grid
-                *n = Vec3::new(n.x / spacing.x, n.y / spacing.y, n.z / spacing.z);
+                *n = Vec3::new(n.z / spacing.x, n.y / spacing.y, n.x / spacing.z);
                 let len = n.length();
                 if len > 0.0 {
                     *n /= len;
                 }
+            }
+
+            for tri in mesh.indices.chunks_exact_mut(3) {
+                tri.swap(1, 2);
             }
 
             self.isosurface_mesh_cache = Some(mesh);
@@ -936,5 +941,162 @@ impl Quantity for VolumeGridCellScalarQuantity {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a non-uniform 3x4x5 grid with field value = `world_x` and verify the
+    /// isosurface lies on the plane `world_x` = level. Regression test for an
+    /// indexing-order mismatch between `VolumeGrid` storage (z-slowest) and
+    /// `marching_cubes` (x-slowest) — equivalent to upstream C++ commit e91a709.
+    /// Also verifies that triangle winding stays consistent after the
+    /// handedness-flipping swizzle.
+    #[test]
+    fn isosurface_x_aligned_non_uniform_grid() {
+        let nx: u32 = 3;
+        let ny: u32 = 4;
+        let nz: u32 = 5;
+        let bound_min = Vec3::new(0.0, 0.0, 0.0);
+        let bound_max = Vec3::new(2.0, 3.0, 4.0); // spacing = (1, 1, 1)
+
+        let mut values = Vec::with_capacity((nx * ny * nz) as usize);
+        for _k in 0..nz {
+            for _j in 0..ny {
+                for i in 0..nx {
+                    values.push(i as f32);
+                }
+            }
+        }
+
+        let mut q = VolumeGridNodeScalarQuantity::new(
+            "test",
+            "grid",
+            values,
+            UVec3::new(nx, ny, nz),
+            bound_min,
+            bound_max,
+        );
+        q.set_isosurface_level(1.5);
+
+        let mesh = q.extract_isosurface();
+        assert!(!mesh.vertices.is_empty(), "isosurface should not be empty");
+        for v in &mesh.vertices {
+            assert!(
+                (v.x - 1.5).abs() < 1e-4,
+                "vertex {v:?} should lie on plane world_x = 1.5"
+            );
+            assert!(
+                v.y >= bound_min.y - 1e-4 && v.y <= bound_max.y + 1e-4,
+                "vertex {v:?} world_y outside [0, 3]"
+            );
+            assert!(
+                v.z >= bound_min.z - 1e-4 && v.z <= bound_max.z + 1e-4,
+                "vertex {v:?} world_z outside [0, 4]"
+            );
+        }
+
+        // Field gradient is +X everywhere, so outward normals point in +X.
+        // Stored normals must agree, AND face normals computed from triangle
+        // winding must agree — otherwise `front_facing` and registered-mesh
+        // normals will be inverted.
+        for n in &mesh.normals {
+            assert!(
+                n.x > 0.5,
+                "stored normal {n:?} should point in +X direction"
+            );
+        }
+        for tri in mesh.indices.chunks_exact(3) {
+            let v0 = mesh.vertices[tri[0] as usize];
+            let v1 = mesh.vertices[tri[1] as usize];
+            let v2 = mesh.vertices[tri[2] as usize];
+            let geom_normal = (v1 - v0).cross(v2 - v0);
+            assert!(
+                geom_normal.x > 0.0,
+                "triangle winding gives normal {geom_normal:?}, expected +X"
+            );
+        }
+    }
+
+    /// Anisotropic-spacing variant: 3x4x5 grid with `bound_max = (20, 3, 4)` so
+    /// `spacing = (10, 1, 1)`. Field is `world_x / 10` (i.e. integer i), level
+    /// is 1.5 — vertices should land on plane `world_x = 15`. Catches a bug
+    /// where someone swizzles indices but uses the wrong `spacing` axis.
+    #[test]
+    fn isosurface_anisotropic_spacing_x_axis() {
+        let nx: u32 = 3;
+        let ny: u32 = 4;
+        let nz: u32 = 5;
+        let bound_min = Vec3::new(0.0, 0.0, 0.0);
+        let bound_max = Vec3::new(20.0, 3.0, 4.0);
+
+        let mut values = Vec::with_capacity((nx * ny * nz) as usize);
+        for _k in 0..nz {
+            for _j in 0..ny {
+                for i in 0..nx {
+                    values.push(i as f32);
+                }
+            }
+        }
+
+        let mut q = VolumeGridNodeScalarQuantity::new(
+            "test",
+            "grid",
+            values,
+            UVec3::new(nx, ny, nz),
+            bound_min,
+            bound_max,
+        );
+        q.set_isosurface_level(1.5);
+
+        let mesh = q.extract_isosurface();
+        assert!(!mesh.vertices.is_empty());
+        for v in &mesh.vertices {
+            assert!(
+                (v.x - 15.0).abs() < 1e-3,
+                "vertex {v:?} should lie on plane world_x = 15.0"
+            );
+        }
+    }
+
+    /// Same setup but field value = `world_z`, so the isosurface should lie on a
+    /// plane `world_z` = level. Catches axis-confusion regressions on Z specifically.
+    #[test]
+    fn isosurface_z_aligned_non_uniform_grid() {
+        let nx: u32 = 3;
+        let ny: u32 = 4;
+        let nz: u32 = 5;
+        let bound_min = Vec3::new(0.0, 0.0, 0.0);
+        let bound_max = Vec3::new(2.0, 3.0, 4.0);
+
+        let mut values = Vec::with_capacity((nx * ny * nz) as usize);
+        for k in 0..nz {
+            for _j in 0..ny {
+                for _i in 0..nx {
+                    values.push(k as f32);
+                }
+            }
+        }
+
+        let mut q = VolumeGridNodeScalarQuantity::new(
+            "test",
+            "grid",
+            values,
+            UVec3::new(nx, ny, nz),
+            bound_min,
+            bound_max,
+        );
+        q.set_isosurface_level(2.5);
+
+        let mesh = q.extract_isosurface();
+        assert!(!mesh.vertices.is_empty(), "isosurface should not be empty");
+        for v in &mesh.vertices {
+            assert!(
+                (v.z - 2.5).abs() < 1e-4,
+                "vertex {v:?} should lie on plane world_z = 2.5"
+            );
+        }
     }
 }

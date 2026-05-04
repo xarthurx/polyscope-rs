@@ -890,4 +890,86 @@ mod tests {
             "Orthographic zoom in should decrease scale"
         );
     }
+
+    /// Mirrors the WGSL formula used by the curve tube ortho fix:
+    /// `forward = -vec3<f32>(view[0].z, view[1].z, view[2].z)`.
+    /// glam's `view.x_axis` is column 0, `view.x_axis.z` is `view[0].z` in WGSL.
+    fn shader_forward_from_view(view: Mat4) -> Vec3 {
+        -Vec3::new(view.x_axis.z, view.y_axis.z, view.z_axis.z)
+    }
+
+    /// The shader's view-forward extraction must match `Camera::forward()` for
+    /// every camera pose, otherwise ortho ray casting in `curve_network_tube.wgsl`,
+    /// `reflected_curve_network_tube.wgsl`, and `pick_curve_tube.wgsl` will use
+    /// the wrong ray direction.
+    #[test]
+    fn shader_view_forward_matches_camera_forward() {
+        let cases: &[(Vec3, Vec3, Vec3)] = &[
+            // (eye, target, up)
+            (Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO, Vec3::Y),
+            (Vec3::new(5.0, 0.0, 0.0), Vec3::ZERO, Vec3::Y),
+            (Vec3::new(0.0, 5.0, 0.0), Vec3::ZERO, Vec3::Z),
+            (Vec3::new(3.0, 4.0, 5.0), Vec3::ZERO, Vec3::Y),
+            (
+                Vec3::new(-2.0, 1.0, -3.0),
+                Vec3::new(1.0, 1.0, 1.0),
+                Vec3::Y,
+            ),
+            (
+                Vec3::new(7.0, -2.0, 0.5),
+                Vec3::new(-1.0, 0.0, 2.0),
+                Vec3::Z,
+            ),
+        ];
+        for &(eye, target, up) in cases {
+            let view = Mat4::look_at_rh(eye, target, up);
+            let extracted = shader_forward_from_view(view);
+            let expected = (target - eye).normalize();
+            assert!(
+                extracted.distance(expected) < 1e-5,
+                "case eye={eye:?} target={target:?} up={up:?}: \
+                 extracted={extracted:?} expected={expected:?}"
+            );
+        }
+    }
+
+    /// `CameraUniforms` must be exactly 272 bytes: four mat4x4 (256) + vec3 +
+    /// f32 flag. If anyone changes the layout, every shader that aliases
+    /// `camera_pos` as `vec4<f32>` and reads `.w` as the ortho flag breaks
+    /// silently.
+    #[test]
+    fn camera_uniforms_layout_is_stable() {
+        use crate::engine::CameraUniforms;
+        assert_eq!(std::mem::size_of::<CameraUniforms>(), 272);
+        assert_eq!(std::mem::align_of::<CameraUniforms>(), 4);
+    }
+
+    /// Setting `Camera::projection_mode` to `Orthographic` must propagate to
+    /// the GPU uniform's `is_orthographic` field as 1.0; perspective gives 0.0.
+    /// The three tube shaders branch on `camera.camera_pos.w > 0.5`, so the
+    /// exact float values matter.
+    ///
+    /// Calls the same `CameraUniforms::from_camera` that `update_camera_uniforms`
+    /// uses on the render path, so this test catches drift if either side changes.
+    #[test]
+    fn ortho_flag_propagates_to_uniform() {
+        use crate::engine::CameraUniforms;
+
+        let mut camera = Camera::new(1.0);
+        camera.projection_mode = ProjectionMode::Perspective;
+        let u_persp = CameraUniforms::from_camera(&camera);
+        assert!(
+            u_persp.is_orthographic < 0.5,
+            "perspective should produce flag below the 0.5 shader threshold, got {}",
+            u_persp.is_orthographic
+        );
+
+        camera.projection_mode = ProjectionMode::Orthographic;
+        let u_ortho = CameraUniforms::from_camera(&camera);
+        assert!(
+            u_ortho.is_orthographic > 0.5,
+            "orthographic must clear the `> 0.5` shader threshold, got {}",
+            u_ortho.is_orthographic
+        );
+    }
 }

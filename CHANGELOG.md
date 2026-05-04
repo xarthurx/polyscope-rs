@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- VolumeGrid isosurface indexing bug — VolumeGrid stores values as `i + j*nx + k*nx*ny` (z-slowest) but `marching_cubes` indexes as `(i*ny+j)*nz + k` (x-slowest), so isosurfaces were silently X/Z-transposed on uniform grids and visibly broken on non-uniform grids. Fixed by passing dims as `(nz, ny, nx)`, swizzling output positions/normals, and reversing triangle winding (the X↔Z swap is a reflection that flips handedness — without re-winding, `front_facing` shader checks and registered-mesh face normals were inverted). Added regression tests for non-uniform dimensions, anisotropic spacing, and winding consistency (upstream commit e91a709)
+- Curve network tube rendering in orthographic projection — `curve_network_tube.wgsl`, `reflected_curve_network_tube.wgsl`, and `pick_curve_tube.wgsl` constructed perspective rays unconditionally (`normalize(world_pos - camera_pos)`), distorting tubes in ortho mode. The shaders now branch on a new `is_orthographic` flag in `CameraUniforms` and emit parallel rays along the world-space view forward direction in ortho mode. The ray-cylinder intersection routine also now handles parallel rays via end-cap intersection — without this, ortho viewing straight down a tube would produce NaN and the tube would disappear or fail to pick (upstream commit 51953c2)
+
+### Added
+- `add_slice_plane_auto()` — convenience constructor that picks the smallest unused "Scene Slice Plane N" index, mirroring C++ Polyscope's no-args `addSlicePlane()` (upstream commit 24ec7e3)
+- `SlicePlaneHandle::remove(self)` — consume-self method for removing a slice plane, mirroring C++ `SlicePlane::remove()`
+
 ## [0.5.9] - 2026-03-02
 
 ### Changed
