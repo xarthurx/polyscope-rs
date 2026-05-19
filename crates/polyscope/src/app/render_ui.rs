@@ -55,6 +55,8 @@ impl App {
         let mut scene_extents_changed = false;
         let mut screenshot_requested = false;
         let mut reset_view_requested = false;
+        let mut view_save_requested = false;
+        let mut view_load_requested = false;
         let mut ssaa_changed = false;
         let mut fly_to_camera: Option<polyscope_structures::CameraParameters> = None;
 
@@ -80,6 +82,12 @@ impl App {
                     }
                     polyscope_ui::ViewAction::ResetView => {
                         reset_view_requested = true;
+                    }
+                    polyscope_ui::ViewAction::RequestSaveView => {
+                        view_save_requested = true;
+                    }
+                    polyscope_ui::ViewAction::RequestLoadView => {
+                        view_load_requested = true;
                     }
                     polyscope_ui::ViewAction::None => {}
                 }
