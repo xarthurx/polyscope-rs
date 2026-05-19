@@ -90,5 +90,9 @@ path = "../../examples/polygon_mesh_demo.rs"
 name = "generate_screenshots"
 path = "../../examples/generate_screenshots.rs"
 
+[[example]]
+name = "view_state_demo"
+path = "../../examples/view_state_demo.rs"
+
 [lints]
 workspace = true
