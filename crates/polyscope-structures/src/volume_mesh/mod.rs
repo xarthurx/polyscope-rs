@@ -179,6 +179,41 @@ impl VolumeMesh {
         Self::new(name, vertices, hexes)
     }
 
+    /// Creates a triangular-prism (wedge) mesh.
+    ///
+    /// Each prism has 6 vertices: slots 0..2 form the bottom triangle and
+    /// slots 3..5 form the top triangle (slot `i+3` should be the vertex
+    /// above slot `i`). Cells are stored as 8-index arrays with the last two
+    /// slots set to `u32::MAX` for sentinel detection.
+    pub fn new_prism_mesh(
+        name: impl Into<String>,
+        vertices: Vec<Vec3>,
+        prisms: Vec<[u32; 6]>,
+    ) -> Self {
+        let cells: Vec<[u32; 8]> = prisms
+            .into_iter()
+            .map(|p| [p[0], p[1], p[2], p[3], p[4], p[5], u32::MAX, u32::MAX])
+            .collect();
+        Self::new(name, vertices, cells)
+    }
+
+    /// Creates a square-pyramid mesh.
+    ///
+    /// Each pyramid has 5 vertices: slots 0..3 form the base quad (in CCW
+    /// order viewed from outside the cell) and slot 4 is the apex. Cells are
+    /// stored as 8-index arrays with the last three slots set to `u32::MAX`.
+    pub fn new_pyramid_mesh(
+        name: impl Into<String>,
+        vertices: Vec<Vec3>,
+        pyramids: Vec<[u32; 5]>,
+    ) -> Self {
+        let cells: Vec<[u32; 8]> = pyramids
+            .into_iter()
+            .map(|p| [p[0], p[1], p[2], p[3], p[4], u32::MAX, u32::MAX, u32::MAX])
+            .collect();
+        Self::new(name, vertices, cells)
+    }
+
     /// Returns the number of vertices.
     #[must_use]
     pub fn num_vertices(&self) -> usize {
@@ -1315,6 +1350,37 @@ pub struct VolumeMeshRenderGeometry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_new_prism_mesh_constructor() {
+        let verts = vec![
+            Vec3::ZERO,
+            Vec3::X,
+            Vec3::Y,
+            Vec3::Z,
+            Vec3::X + Vec3::Z,
+            Vec3::Y + Vec3::Z,
+        ];
+        let prisms = vec![[0u32, 1, 2, 3, 4, 5]];
+        let mesh = VolumeMesh::new_prism_mesh("p", verts, prisms);
+        assert_eq!(mesh.num_cells(), 1);
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Prism);
+    }
+
+    #[test]
+    fn test_new_pyramid_mesh_constructor() {
+        let verts = vec![
+            Vec3::ZERO,
+            Vec3::X,
+            Vec3::X + Vec3::Y,
+            Vec3::Y,
+            Vec3::splat(0.5) + Vec3::Z,
+        ];
+        let pyramids = vec![[0u32, 1, 2, 3, 4]];
+        let mesh = VolumeMesh::new_pyramid_mesh("py", verts, pyramids);
+        assert_eq!(mesh.num_cells(), 1);
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Pyramid);
+    }
 
     #[test]
     fn test_single_prism_all_exterior() {

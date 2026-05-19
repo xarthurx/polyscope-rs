@@ -68,6 +68,50 @@ pub fn register_hex_mesh(
     VolumeMeshHandle { name }
 }
 
+/// Registers a triangular-prism (wedge) mesh with polyscope.
+///
+/// Each entry in `prisms` is 6 vertex indices: slots 0..2 = bottom triangle,
+/// slots 3..5 = top triangle (with slot `i+3` directly above slot `i`).
+pub fn register_prism_mesh(
+    name: impl Into<String>,
+    vertices: Vec<Vec3>,
+    prisms: Vec<[u32; 6]>,
+) -> VolumeMeshHandle {
+    let name = name.into();
+    let mesh = VolumeMesh::new_prism_mesh(name.clone(), vertices, prisms);
+
+    with_context_mut(|ctx| {
+        ctx.registry
+            .register(Box::new(mesh))
+            .expect("failed to register prism mesh");
+        ctx.update_extents();
+    });
+
+    VolumeMeshHandle { name }
+}
+
+/// Registers a square-pyramid mesh with polyscope.
+///
+/// Each entry in `pyramids` is 5 vertex indices: slots 0..3 = base quad (CCW
+/// from outside), slot 4 = apex.
+pub fn register_pyramid_mesh(
+    name: impl Into<String>,
+    vertices: Vec<Vec3>,
+    pyramids: Vec<[u32; 5]>,
+) -> VolumeMeshHandle {
+    let name = name.into();
+    let mesh = VolumeMesh::new_pyramid_mesh(name.clone(), vertices, pyramids);
+
+    with_context_mut(|ctx| {
+        ctx.registry
+            .register(Box::new(mesh))
+            .expect("failed to register pyramid mesh");
+        ctx.update_extents();
+    });
+
+    VolumeMeshHandle { name }
+}
+
 /// Registers a generic volume mesh with polyscope.
 ///
 /// Cells are stored as 8-index arrays. For tetrahedra, indices 4-7 should be `u32::MAX`.
