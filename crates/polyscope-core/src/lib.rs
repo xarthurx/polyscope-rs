@@ -28,25 +28,7 @@ pub mod ssao;
 pub mod state;
 pub mod structure;
 pub mod tone_mapping;
-
-/// Placeholder module — real implementation lands in Task 4 of the
-/// view-save-restore plan. Only `ViewTransition` and `ViewState` are
-/// referenced before then.
-pub mod view_state {
-    /// Placeholder, replaced in Task 4.
-    #[derive(Debug, Clone, PartialEq)]
-    pub struct ViewState;
-
-    /// Placeholder, replaced in Task 4.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-    pub enum ViewTransition {
-        /// Snap instantly.
-        #[default]
-        Instant,
-        /// Animate.
-        FlyTo,
-    }
-}
+pub mod view_state;
 
 pub use error::{PolyscopeError, Result};
 pub use gizmo::{GizmoAxis, GizmoConfig, GizmoMode, GizmoSpace, GizmoUniforms, Transform};

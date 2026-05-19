@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// SSAO configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SsaoConfig {
     /// Whether SSAO is enabled.
     pub enabled: bool,
