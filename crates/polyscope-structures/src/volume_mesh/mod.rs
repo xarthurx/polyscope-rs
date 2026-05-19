@@ -49,7 +49,7 @@ mod vector_quantity;
 
 pub use color_quantity::*;
 pub use scalar_quantity::*;
-pub use slice_geometry::{CellSliceResult, slice_hex, slice_tet};
+pub use slice_geometry::{CellSliceResult, slice_hex, slice_prism, slice_pyramid, slice_tet};
 pub use vector_quantity::*;
 
 // Re-export SliceMeshData from this module
@@ -1083,8 +1083,16 @@ impl VolumeMesh {
                         std::array::from_fn(|i| self.vertices[cell[i] as usize]);
                     slice_hex(hex_verts, plane_origin, plane_normal)
                 }
-                // Prism/Pyramid slice geometry wired in Task 5 of upstream-port plan.
-                VolumeCellType::Prism | VolumeCellType::Pyramid => CellSliceResult::empty(),
+                VolumeCellType::Prism => {
+                    let prism_verts: [Vec3; 6] =
+                        std::array::from_fn(|i| self.vertices[cell[i] as usize]);
+                    slice_prism(prism_verts, plane_origin, plane_normal)
+                }
+                VolumeCellType::Pyramid => {
+                    let pyr_verts: [Vec3; 5] =
+                        std::array::from_fn(|i| self.vertices[cell[i] as usize]);
+                    slice_pyramid(pyr_verts, plane_origin, plane_normal)
+                }
             };
 
             if slice.has_intersection() {
