@@ -264,7 +264,7 @@ fn rotate_prism_in_place(p: &mut [u32; 6], rot: usize) {
 }
 
 /// Decomposes a square pyramid into 2 tetrahedra by splitting the base quad
-/// along the diagonal containing the smaller of {p[0], p[2]} vs {p[1], p[3]}.
+/// along the diagonal containing the smaller of `{p[0], p[2]}` vs `{p[1], p[3]}`.
 /// Consistent split ensures adjacent cells tessellate the shared face the same way.
 #[must_use]
 pub fn decompose_pyramid(cell: &[u32; 8]) -> [[u32; 4]; 2] {
