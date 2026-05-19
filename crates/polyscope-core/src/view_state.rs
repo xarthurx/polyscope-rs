@@ -84,9 +84,281 @@ pub fn parse_transparency_mode(s: &str) -> Option<TransparencyMode> {
     })
 }
 
-// Placeholder — replaced in Task 5.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ViewState;
+use crate::error::{PolyscopeError, Result};
+
+/// Plain DTO mirroring `polyscope_render::CameraState` but living in core
+/// (avoids a render → core dependency for the wrapper).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CameraStateOwned {
+    pub position: [f32; 3],
+    pub target: [f32; 3],
+    pub up: [f32; 3],
+    pub fov: f32,
+    pub near: f32,
+    pub far: f32,
+    pub projection_mode: String,
+    pub ortho_scale: f32,
+    pub navigation_style: String,
+    pub up_direction: String,
+    pub front_direction: String,
+}
+
+/// Top-level view state. Composes camera + render-look.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ViewState {
+    pub version: u32,
+    pub camera: CameraStateOwned,
+    pub render: RenderState,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PartialViewState {
+    version: u32,
+    #[serde(default)]
+    camera: Option<PartialCameraState>,
+    #[serde(default)]
+    render: Option<PartialRenderState>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PartialCameraState {
+    position: Option<[f32; 3]>,
+    target: Option<[f32; 3]>,
+    up: Option<[f32; 3]>,
+    fov: Option<f32>,
+    near: Option<f32>,
+    far: Option<f32>,
+    projection_mode: Option<String>,
+    ortho_scale: Option<f32>,
+    navigation_style: Option<String>,
+    up_direction: Option<String>,
+    front_direction: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PartialRenderState {
+    background_color: Option<[f32; 3]>,
+    ground_plane: Option<PartialGroundPlaneState>,
+    transparency: Option<PartialTransparencyState>,
+    ssao: Option<SsaoConfig>,
+    ssaa_factor: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PartialGroundPlaneState {
+    enabled: Option<bool>,
+    mode: Option<String>,
+    height: Option<f32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PartialTransparencyState {
+    enabled: Option<bool>,
+    mode: Option<String>,
+    render_passes: Option<u32>,
+}
+
+impl ViewState {
+    /// JSON format version this build writes and accepts.
+    pub const CURRENT_VERSION: u32 = 1;
+
+    /// Parse a JSON string permissively (missing fields preserve `current`),
+    /// then validate the resulting full state.
+    pub fn from_json_partial_then_validate(json: &str, current: &ViewState) -> Result<ViewState> {
+        let partial: PartialViewState = serde_json::from_str(json)?;
+        if partial.version != Self::CURRENT_VERSION {
+            return Err(PolyscopeError::InvalidViewState(format!(
+                "unsupported view version {} (this build accepts {})",
+                partial.version,
+                Self::CURRENT_VERSION
+            )));
+        }
+        let merged = Self::merge(partial, current);
+        Self::validate(&merged)?;
+        Ok(merged)
+    }
+
+    fn merge(partial: PartialViewState, current: &ViewState) -> ViewState {
+        let cam_p = partial.camera.unwrap_or(PartialCameraState {
+            position: None,
+            target: None,
+            up: None,
+            fov: None,
+            near: None,
+            far: None,
+            projection_mode: None,
+            ortho_scale: None,
+            navigation_style: None,
+            up_direction: None,
+            front_direction: None,
+        });
+        let camera = CameraStateOwned {
+            position: cam_p.position.unwrap_or(current.camera.position),
+            target: cam_p.target.unwrap_or(current.camera.target),
+            up: cam_p.up.unwrap_or(current.camera.up),
+            fov: cam_p.fov.unwrap_or(current.camera.fov),
+            near: cam_p.near.unwrap_or(current.camera.near),
+            far: cam_p.far.unwrap_or(current.camera.far),
+            projection_mode: cam_p
+                .projection_mode
+                .unwrap_or_else(|| current.camera.projection_mode.clone()),
+            ortho_scale: cam_p.ortho_scale.unwrap_or(current.camera.ortho_scale),
+            navigation_style: cam_p
+                .navigation_style
+                .unwrap_or_else(|| current.camera.navigation_style.clone()),
+            up_direction: cam_p
+                .up_direction
+                .unwrap_or_else(|| current.camera.up_direction.clone()),
+            front_direction: cam_p
+                .front_direction
+                .unwrap_or_else(|| current.camera.front_direction.clone()),
+        };
+
+        let render_p = partial.render.unwrap_or(PartialRenderState {
+            background_color: None,
+            ground_plane: None,
+            transparency: None,
+            ssao: None,
+            ssaa_factor: None,
+        });
+        let gp_p = render_p.ground_plane.unwrap_or(PartialGroundPlaneState {
+            enabled: None,
+            mode: None,
+            height: None,
+        });
+        let tp_p = render_p.transparency.unwrap_or(PartialTransparencyState {
+            enabled: None,
+            mode: None,
+            render_passes: None,
+        });
+
+        let render = RenderState {
+            background_color: render_p
+                .background_color
+                .unwrap_or(current.render.background_color),
+            ground_plane: GroundPlaneState {
+                enabled: gp_p.enabled.unwrap_or(current.render.ground_plane.enabled),
+                mode: gp_p
+                    .mode
+                    .unwrap_or_else(|| current.render.ground_plane.mode.clone()),
+                height: gp_p.height.unwrap_or(current.render.ground_plane.height),
+            },
+            transparency: TransparencyState {
+                enabled: tp_p.enabled.unwrap_or(current.render.transparency.enabled),
+                mode: tp_p
+                    .mode
+                    .unwrap_or_else(|| current.render.transparency.mode.clone()),
+                render_passes: tp_p
+                    .render_passes
+                    .unwrap_or(current.render.transparency.render_passes),
+            },
+            ssao: render_p.ssao.unwrap_or_else(|| current.render.ssao.clone()),
+            ssaa_factor: render_p.ssaa_factor.unwrap_or(current.render.ssaa_factor),
+        };
+
+        ViewState {
+            version: Self::CURRENT_VERSION,
+            camera,
+            render,
+        }
+    }
+
+    /// Validate that all field values are sensible.
+    pub fn validate(s: &ViewState) -> Result<()> {
+        const KNOWN_PROJ: &[&str] = &["perspective", "orthographic"];
+        const KNOWN_NAV: &[&str] = &[
+            "turntable",
+            "free",
+            "planar",
+            "arcball",
+            "first_person",
+            "none",
+        ];
+        const KNOWN_AXIS: &[&str] = &["pos_x", "neg_x", "pos_y", "neg_y", "pos_z", "neg_z"];
+        const KNOWN_GP: &[&str] = &["none", "tile", "shadow_only", "tile_reflection"];
+        const KNOWN_TR: &[&str] = &["simple", "pretty", "none"];
+        const KNOWN_SSAA: &[u32] = &[1, 2, 4, 8];
+
+        let invalid = |reason: &str| Err(PolyscopeError::InvalidViewState(reason.to_string()));
+
+        let finite_arr = |a: &[f32; 3]| a.iter().all(|x| x.is_finite());
+        if !finite_arr(&s.camera.position) {
+            return invalid("camera.position has non-finite values");
+        }
+        if !finite_arr(&s.camera.target) {
+            return invalid("camera.target has non-finite values");
+        }
+        if !finite_arr(&s.camera.up) {
+            return invalid("camera.up has non-finite values");
+        }
+        if !s.camera.fov.is_finite() || s.camera.fov <= 0.0 || s.camera.fov >= std::f32::consts::PI
+        {
+            return invalid("camera.fov must be in (0, π)");
+        }
+        if !s.camera.near.is_finite() || s.camera.near <= 0.0 {
+            return invalid("camera.near must be > 0");
+        }
+        if !s.camera.far.is_finite() || s.camera.far <= s.camera.near {
+            return invalid("camera.far must be > camera.near");
+        }
+        if !s.camera.ortho_scale.is_finite() || s.camera.ortho_scale <= 0.0 {
+            return invalid("camera.ortho_scale must be > 0");
+        }
+        if !KNOWN_PROJ.contains(&s.camera.projection_mode.as_str()) {
+            return invalid(&format!(
+                "unknown projection_mode: {}",
+                s.camera.projection_mode
+            ));
+        }
+        if !KNOWN_NAV.contains(&s.camera.navigation_style.as_str()) {
+            return invalid(&format!(
+                "unknown navigation_style: {}",
+                s.camera.navigation_style
+            ));
+        }
+        if !KNOWN_AXIS.contains(&s.camera.up_direction.as_str()) {
+            return invalid(&format!("unknown up_direction: {}", s.camera.up_direction));
+        }
+        if !KNOWN_AXIS.contains(&s.camera.front_direction.as_str()) {
+            return invalid(&format!(
+                "unknown front_direction: {}",
+                s.camera.front_direction
+            ));
+        }
+
+        if !s.render.background_color.iter().all(|x| x.is_finite()) {
+            return invalid("render.background_color has non-finite values");
+        }
+        if !KNOWN_GP.contains(&s.render.ground_plane.mode.as_str()) {
+            return invalid(&format!(
+                "unknown ground_plane.mode: {}",
+                s.render.ground_plane.mode
+            ));
+        }
+        if !KNOWN_TR.contains(&s.render.transparency.mode.as_str()) {
+            return invalid(&format!(
+                "unknown transparency.mode: {}",
+                s.render.transparency.mode
+            ));
+        }
+        if s.render.transparency.render_passes == 0 {
+            return invalid("render.transparency.render_passes must be ≥ 1");
+        }
+        if !s.render.ground_plane.height.is_finite() {
+            return invalid("render.ground_plane.height must be finite");
+        }
+        if !KNOWN_SSAA.contains(&s.render.ssaa_factor) {
+            return invalid(&format!("render.ssaa_factor must be one of {KNOWN_SSAA:?}"));
+        }
+        if s.render.ssao.sample_count == 0 || s.render.ssao.sample_count > 256 {
+            return invalid("render.ssao.sample_count must be in [1, 256]");
+        }
+        if !(s.render.ssao.radius.is_finite() && s.render.ssao.radius > 0.0) {
+            return invalid("render.ssao.radius must be > 0");
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -112,6 +384,133 @@ mod tests {
             parse_transparency_mode("simple"),
             Some(TransparencyMode::Simple)
         );
+    }
+
+    fn dummy_view_state() -> ViewState {
+        ViewState {
+            version: ViewState::CURRENT_VERSION,
+            camera: CameraStateOwned {
+                position: [0.0, 0.0, 3.0],
+                target: [0.0, 0.0, 0.0],
+                up: [0.0, 1.0, 0.0],
+                fov: 0.7854,
+                near: 0.01,
+                far: 1000.0,
+                projection_mode: "perspective".to_string(),
+                ortho_scale: 1.0,
+                navigation_style: "turntable".to_string(),
+                up_direction: "pos_y".to_string(),
+                front_direction: "neg_z".to_string(),
+            },
+            render: RenderState {
+                background_color: [1.0, 1.0, 1.0],
+                ground_plane: GroundPlaneState {
+                    enabled: true,
+                    mode: "tile_reflection".to_string(),
+                    height: 0.0,
+                },
+                transparency: TransparencyState {
+                    enabled: true,
+                    mode: "simple".to_string(),
+                    render_passes: 8,
+                },
+                ssao: SsaoConfig::default(),
+                ssaa_factor: 1,
+            },
+        }
+    }
+
+    fn make_view_state_with_fov(fov: f32) -> ViewState {
+        let mut s = dummy_view_state();
+        s.camera.fov = fov;
+        s
+    }
+
+    #[test]
+    fn test_view_state_unknown_version_rejected() {
+        let json = r#"{"version": 99}"#;
+        let err =
+            ViewState::from_json_partial_then_validate(json, &dummy_view_state()).unwrap_err();
+        match err {
+            crate::error::PolyscopeError::InvalidViewState(reason) => {
+                assert!(reason.contains("version"), "{reason}");
+            }
+            other => panic!("expected InvalidViewState, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_view_state_missing_version_rejected() {
+        let json = r#"{}"#;
+        let err =
+            ViewState::from_json_partial_then_validate(json, &dummy_view_state()).unwrap_err();
+        match err {
+            crate::error::PolyscopeError::InvalidViewState(_)
+            | crate::error::PolyscopeError::JsonError(_) => {}
+            other => panic!("expected InvalidViewState or JsonError, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_view_state_missing_fields_preserve_current() {
+        let json = r#"{"version": 1}"#;
+        let current = make_view_state_with_fov(0.5);
+        let merged = ViewState::from_json_partial_then_validate(json, &current).unwrap();
+        assert!((merged.camera.fov - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_view_state_partial_camera_overrides_only_specified() {
+        let current = make_view_state_with_fov(0.5);
+        let json = r#"{"version": 1, "camera": {"fov": 1.2}}"#;
+        let merged = ViewState::from_json_partial_then_validate(json, &current).unwrap();
+        assert!((merged.camera.fov - 1.2).abs() < 1e-6);
+        assert_eq!(
+            merged.camera.projection_mode,
+            current.camera.projection_mode
+        );
+    }
+
+    #[test]
+    fn test_validation_rejects_nonfinite_fov() {
+        let mut s = dummy_view_state();
+        s.camera.fov = f32::NAN;
+        let err = ViewState::validate(&s).unwrap_err();
+        assert!(matches!(
+            err,
+            crate::error::PolyscopeError::InvalidViewState(_)
+        ));
+    }
+
+    #[test]
+    fn test_validation_rejects_fov_out_of_range() {
+        let mut s = dummy_view_state();
+        s.camera.fov = 0.0;
+        assert!(ViewState::validate(&s).is_err());
+        s.camera.fov = std::f32::consts::PI + 0.1;
+        assert!(ViewState::validate(&s).is_err());
+    }
+
+    #[test]
+    fn test_validation_rejects_near_geq_far() {
+        let mut s = dummy_view_state();
+        s.camera.near = 10.0;
+        s.camera.far = 1.0;
+        assert!(ViewState::validate(&s).is_err());
+    }
+
+    #[test]
+    fn test_validation_rejects_zero_ssaa_factor() {
+        let mut s = dummy_view_state();
+        s.render.ssaa_factor = 0;
+        assert!(ViewState::validate(&s).is_err());
+    }
+
+    #[test]
+    fn test_validation_rejects_unknown_enum_strings() {
+        let mut s = dummy_view_state();
+        s.camera.projection_mode = "definitely_not_a_mode".to_string();
+        assert!(ViewState::validate(&s).is_err());
     }
 
     #[test]
