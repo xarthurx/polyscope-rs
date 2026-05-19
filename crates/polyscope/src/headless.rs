@@ -70,7 +70,21 @@ pub fn render_to_image(width: u32, height: u32) -> Result<Vec<u8>> {
         }
     });
 
+    // Drain any queued view-state. `apply_view_state` sets
+    // `camera_fitted = true`, which makes the per-frame `auto_fit_camera`
+    // call inside `render_frame_headless` a no-op — preserving the loaded
+    // camera pose for reproducible scripted figures.
+    let pending = with_context_mut(polyscope_core::Context::take_pending_view_apply);
+    if let Some((state, transition)) = pending {
+        app.apply_view_state(&state, transition);
+    }
+
     // Render one frame and capture
     app.render_frame_headless();
+
+    // Publish a fresh view-state snapshot for callers querying after a headless render.
+    let snapshot = app.current_view_state();
+    with_context_mut(|ctx| ctx.set_view_state_snapshot(snapshot));
+
     app.capture_to_buffer()
 }
