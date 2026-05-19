@@ -89,8 +89,8 @@ const PRISM_FACES: &[FaceData] = &[
     }, // Side quad 1
     FaceData {
         polygon: &[2, 5, 4, 1],
-        triangulation: &[[2, 4, 5], [2, 1, 4]],
-    }, // Side quad 2
+        triangulation: &[[2, 5, 4], [4, 1, 2]],
+    }, // Side quad 2 (winding fixed vs. upstream stencilPrism, which is inward here)
     FaceData {
         polygon: &[0, 1, 4, 3],
         triangulation: &[[3, 0, 4], [0, 1, 4]],
