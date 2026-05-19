@@ -279,29 +279,19 @@ impl VolumeMesh {
     }
 
     /// Decomposes all cells into tetrahedra.
-    /// Tets pass through unchanged, hexes are decomposed into 5 tets.
+    ///
+    /// Decomposition counts per cell type:
+    /// - Tet → 1 tet (passthrough)
+    /// - Hex → 5 tets (fixed diagonal pattern)
+    /// - Prism → 3 tets (consistent diagonal split)
+    /// - Pyramid → 2 tets (consistent diagonal split)
     #[must_use]
     pub fn decompose_to_tets(&self) -> Vec<[u32; 4]> {
         let mut tets = Vec::new();
-
-        for cell in &self.cells {
-            if cell[4] == u32::MAX {
-                // Already a tet
-                tets.push([cell[0], cell[1], cell[2], cell[3]]);
-            } else {
-                // Hex - decompose using diagonal pattern (5 tets)
-                for tet_local in &HEX_TO_TET_PATTERN {
-                    let tet = [
-                        cell[tet_local[0]],
-                        cell[tet_local[1]],
-                        cell[tet_local[2]],
-                        cell[tet_local[3]],
-                    ];
-                    tets.push(tet);
-                }
-            }
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
+            let ct = self.cell_type(cell_idx);
+            tets.extend(cell_data::decompose_cell_to_tets(cell, ct));
         }
-
         tets
     }
 
@@ -339,22 +329,17 @@ impl VolumeMesh {
         face_counts
     }
 
-    /// Computes the centroid of a cell.
-    fn cell_centroid(&self, cell: &[u32; 8]) -> Vec3 {
-        if cell[4] == u32::MAX {
-            // Tetrahedron: average of 4 vertices
-            let sum = self.vertices[cell[0] as usize]
-                + self.vertices[cell[1] as usize]
-                + self.vertices[cell[2] as usize]
-                + self.vertices[cell[3] as usize];
-            sum / 4.0
-        } else {
-            // Hexahedron: average of 8 vertices
-            let sum = (0..8)
-                .map(|i| self.vertices[cell[i] as usize])
-                .fold(Vec3::ZERO, |a, b| a + b);
-            sum / 8.0
+    /// Computes the centroid of a cell as the mean of its real (non-sentinel) vertices.
+    pub(crate) fn cell_centroid(&self, cell: &[u32; 8]) -> Vec3 {
+        let mut sum = Vec3::ZERO;
+        let mut count = 0u32;
+        for &v in cell {
+            if v != u32::MAX {
+                sum += self.vertices[v as usize];
+                count += 1;
+            }
         }
+        sum / count as f32
     }
 
     /// Tests if a cell should be visible based on slice planes.
@@ -1463,18 +1448,76 @@ pub struct VolumeMeshRenderGeometry {
     pub vertex_colors: Option<Vec<Vec3>>,
 }
 
-/// Diagonal decomposition patterns (5 tets).
-const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
-    [0, 1, 2, 5],
-    [0, 2, 7, 5],
-    [0, 2, 3, 7],
-    [0, 5, 7, 4],
-    [2, 7, 5, 6],
-];
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_decompose_prism_to_tets() {
+        let verts = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(0.5, 1.0, 1.0),
+        ];
+        let mesh = VolumeMesh::new(
+            "prism_only",
+            verts,
+            vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]],
+        );
+        let tets = mesh.decompose_to_tets();
+        assert_eq!(tets.len(), 3, "prism should decompose to 3 tets");
+        for tet in &tets {
+            for &v in tet {
+                assert!(v < 6, "tet vertex index {v} out of range for prism");
+            }
+        }
+    }
+
+    #[test]
+    fn test_decompose_pyramid_to_tets() {
+        let verts = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let mesh = VolumeMesh::new(
+            "pyr_only",
+            verts,
+            vec![[0, 1, 2, 3, 4, u32::MAX, u32::MAX, u32::MAX]],
+        );
+        let tets = mesh.decompose_to_tets();
+        assert_eq!(tets.len(), 2, "pyramid should decompose to 2 tets");
+        for tet in &tets {
+            for &v in tet {
+                assert!(v < 5, "tet vertex index {v} out of range for pyramid");
+            }
+        }
+    }
+
+    #[test]
+    fn test_cell_centroid_prism() {
+        let verts = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 0.0),
+            Vec3::new(1.0, 2.0, 0.0),
+            Vec3::new(0.0, 0.0, 4.0),
+            Vec3::new(2.0, 0.0, 4.0),
+            Vec3::new(1.0, 2.0, 4.0),
+        ];
+        let mesh = VolumeMesh::new(
+            "p",
+            verts.clone(),
+            vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]],
+        );
+        let expected: Vec3 = verts.iter().copied().sum::<Vec3>() / 6.0;
+        let centroid = mesh.cell_centroid(&mesh.cells()[0]);
+        assert!((centroid - expected).length() < 1e-5);
+    }
 
     #[test]
     fn test_cell_type_detection_tet() {

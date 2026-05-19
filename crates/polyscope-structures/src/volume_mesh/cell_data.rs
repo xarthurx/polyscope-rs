@@ -107,3 +107,107 @@ pub fn canonical_face_key(cell: &[u32; 8], polygon: &[usize]) -> [u32; 4] {
     key.sort_unstable();
     key
 }
+
+/// Decomposes a hex cell into 5 tetrahedra using a fixed diagonal pattern.
+///
+/// Central-diagonal pattern from Dompierre et al.; the 5-tet split works for
+/// any convex hex. Matches the previous polyscope-rs decomposition.
+const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
+    [0, 1, 2, 5],
+    [0, 2, 7, 5],
+    [0, 2, 3, 7],
+    [0, 5, 7, 4],
+    [2, 7, 5, 6],
+];
+
+/// Decomposes a triangular prism into 3 tetrahedra.
+///
+/// Picks a consistent diagonal split on the quad face opposite the
+/// lowest-numbered vertex, matching the upstream algorithm (`decomposePrism` in
+/// `polyscope/src/volume_mesh.cpp`). Consistency across adjacent cells matters
+/// so that shared faces are tessellated identically and no gaps appear in
+/// slice caps for mixed meshes.
+#[must_use]
+pub fn decompose_prism(cell: &[u32; 8]) -> [[u32; 4]; 3] {
+    let mut p: [u32; 6] = [cell[0], cell[1], cell[2], cell[3], cell[4], cell[5]];
+
+    let min_idx = (0..6).min_by_key(|&i| p[i]).unwrap();
+
+    if min_idx < 3 {
+        let rot = match min_idx {
+            0 => 0,
+            1 => 2,
+            _ => 1,
+        };
+        rotate_prism_in_place(&mut p, rot);
+    } else {
+        let top_pos = min_idx - 3;
+        let rot = match top_pos {
+            0 => 0,
+            1 => 2,
+            _ => 1,
+        };
+        p.swap(0, 3);
+        p.swap(1, 4);
+        p.swap(2, 5);
+        rotate_prism_in_place(&mut p, rot);
+    }
+
+    if p[2].min(p[4]) < p[1].min(p[5]) {
+        [
+            [p[0], p[5], p[4], p[3]],
+            [p[0], p[4], p[5], p[2]],
+            [p[0], p[4], p[2], p[1]],
+        ]
+    } else {
+        [
+            [p[0], p[5], p[4], p[3]],
+            [p[0], p[1], p[5], p[2]],
+            [p[0], p[5], p[1], p[4]],
+        ]
+    }
+}
+
+fn rotate_prism_in_place(p: &mut [u32; 6], rot: usize) {
+    const BOTTOM_ROT: [[usize; 3]; 3] = [[0, 1, 2], [1, 2, 0], [2, 0, 1]];
+    const TOP_ROT: [[usize; 3]; 3] = [[3, 4, 5], [4, 5, 3], [5, 3, 4]];
+    let src = *p;
+    for i in 0..3 {
+        p[i] = src[BOTTOM_ROT[rot][i]];
+        p[i + 3] = src[TOP_ROT[rot][i]];
+    }
+}
+
+/// Decomposes a square pyramid into 2 tetrahedra by splitting the base quad
+/// along the diagonal containing the smaller of {p[0], p[2]} vs {p[1], p[3]}.
+/// Consistent split ensures adjacent cells tessellate the shared face the same way.
+#[must_use]
+pub fn decompose_pyramid(cell: &[u32; 8]) -> [[u32; 4]; 2] {
+    let p: [u32; 5] = [cell[0], cell[1], cell[2], cell[3], cell[4]];
+
+    if p[0].min(p[2]) < p[1].min(p[3]) {
+        [
+            [p[0], p[2], p[4], p[1]],
+            [p[0], p[4], p[2], p[3]],
+        ]
+    } else {
+        [
+            [p[1], p[3], p[4], p[2]],
+            [p[1], p[4], p[3], p[0]],
+        ]
+    }
+}
+
+/// Returns the tet-decomposition for any cell, dispatching on cell type.
+#[must_use]
+pub fn decompose_cell_to_tets(cell: &[u32; 8], cell_type: VolumeCellType) -> Vec<[u32; 4]> {
+    match cell_type {
+        VolumeCellType::Tet => vec![[cell[0], cell[1], cell[2], cell[3]]],
+        VolumeCellType::Hex => HEX_TO_TET_PATTERN
+            .iter()
+            .map(|t| [cell[t[0]], cell[t[1]], cell[t[2]], cell[t[3]]])
+            .collect(),
+        VolumeCellType::Prism => decompose_prism(cell).to_vec(),
+        VolumeCellType::Pyramid => decompose_pyramid(cell).to_vec(),
+    }
+}
