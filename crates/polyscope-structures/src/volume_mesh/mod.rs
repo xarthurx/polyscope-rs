@@ -41,6 +41,7 @@
 //! mesh.add_vertex_scalar_quantity("temperature", vec![0.0, 0.5, 1.0, 0.25]);
 //! ```
 
+mod cell_data;
 mod color_quantity;
 mod scalar_quantity;
 pub mod slice_geometry;
@@ -64,10 +65,14 @@ use polyscope_render::{
 /// Cell type for volume meshes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VolumeCellType {
-    /// Tetrahedron (4 vertices)
+    /// Tetrahedron (4 vertices, 4 triangular faces)
     Tet,
-    /// Hexahedron (8 vertices)
+    /// Hexahedron (8 vertices, 6 quadrilateral faces)
     Hex,
+    /// Triangular prism / wedge (6 vertices, 2 tri + 3 quad faces)
+    Prism,
+    /// Square pyramid (5 vertices, 1 quad + 4 tri faces)
+    Pyramid,
 }
 
 /// A volume mesh structure (tetrahedral or hexahedral).
@@ -1199,6 +1204,8 @@ impl VolumeMesh {
                         std::array::from_fn(|i| self.vertices[cell[i] as usize]);
                     slice_hex(hex_verts, plane_origin, plane_normal)
                 }
+                // Prism/Pyramid slice geometry wired in Task 5 of upstream-port plan.
+                VolumeCellType::Prism | VolumeCellType::Pyramid => CellSliceResult::empty(),
             };
 
             if slice.has_intersection() {
@@ -1451,6 +1458,26 @@ const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_cell_type_enum_has_prism_and_pyramid() {
+        // Compile-time check: pattern match must be exhaustive over all 4 variants.
+        let types = [
+            VolumeCellType::Tet,
+            VolumeCellType::Hex,
+            VolumeCellType::Prism,
+            VolumeCellType::Pyramid,
+        ];
+        for t in types {
+            let label = match t {
+                VolumeCellType::Tet => "tet",
+                VolumeCellType::Hex => "hex",
+                VolumeCellType::Prism => "prism",
+                VolumeCellType::Pyramid => "pyramid",
+            };
+            assert!(!label.is_empty());
+        }
+    }
 
     #[test]
     fn test_interior_face_detection() {
