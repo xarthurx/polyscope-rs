@@ -75,10 +75,11 @@ pub enum VolumeCellType {
     Pyramid,
 }
 
-/// A volume mesh structure (tetrahedral or hexahedral).
+/// A volume mesh structure with mixed cell types (tet / hex / prism / pyramid).
 ///
-/// Cells are stored as arrays of 8 vertex indices. For tetrahedra,
-/// only the first 4 indices are used (indices 4-7 are set to `u32::MAX`).
+/// Cells are stored as arrays of 8 vertex indices. Unused trailing slots are
+/// set to `u32::MAX`: tets use 4 slots, pyramids 5, prisms 6, hexes all 8.
+/// The cell type is recovered from the sentinel pattern via [`Self::cell_type`].
 pub struct VolumeMesh {
     name: String,
 
@@ -228,31 +229,12 @@ impl VolumeMesh {
 
     /// Returns the cell type of the given cell.
     ///
-    /// Cell type is determined by the number of sentinel (`u32::MAX`) indices
-    /// in the 8-slot cell array (matches upstream C++ Polyscope):
-    /// - 0 sentinels → `Hex` (8 verts)
-    /// - 2 sentinels → `Prism` (6 verts)
-    /// - 3 sentinels → `Pyramid` (5 verts)
-    /// - 4 sentinels → `Tet` (4 verts)
-    ///
-    /// # Panics
-    /// Panics if `cell_idx` is out of range or the sentinel count is invalid
-    /// (1, 5, 6, 7, or 8 sentinels).
+    /// Sentinels are placed at the end of the 8-slot array, so the type is
+    /// determined by which of slots 4/5/6 holds `u32::MAX` (matches upstream
+    /// C++ Polyscope's sentinel-count classification).
     #[must_use]
     pub fn cell_type(&self, cell_idx: usize) -> VolumeCellType {
-        let sentinels = self.cells[cell_idx]
-            .iter()
-            .filter(|&&v| v == u32::MAX)
-            .count();
-        match sentinels {
-            0 => VolumeCellType::Hex,
-            2 => VolumeCellType::Prism,
-            3 => VolumeCellType::Pyramid,
-            4 => VolumeCellType::Tet,
-            n => {
-                panic!("VolumeMesh cell {cell_idx}: invalid sentinel count {n} (expected 0/2/3/4)")
-            }
-        }
+        cell_data::cell_type_of(&self.cells[cell_idx])
     }
 
     /// Returns the vertices.
@@ -324,18 +306,20 @@ impl VolumeMesh {
     /// - Pyramid → 2 tets (consistent diagonal split)
     #[must_use]
     pub fn decompose_to_tets(&self) -> Vec<[u32; 4]> {
-        let mut tets = Vec::new();
-        for (cell_idx, cell) in self.cells.iter().enumerate() {
-            let ct = self.cell_type(cell_idx);
-            tets.extend(cell_data::decompose_cell_to_tets(cell, ct));
+        let mut tets = Vec::with_capacity(self.cells.len() * 2);
+        for cell in &self.cells {
+            cell_data::for_each_tet(cell, cell_data::cell_type_of(cell), |t| tets.push(t));
         }
         tets
     }
 
-    /// Returns the number of tetrahedra (including decomposed hexes).
+    /// Returns the number of tetrahedra (including decomposed cells).
     #[must_use]
     pub fn num_tets(&self) -> usize {
-        self.decompose_to_tets().len()
+        self.cells
+            .iter()
+            .map(|c| cell_data::num_tets_in_cell(cell_data::cell_type_of(c)))
+            .sum()
     }
 
     /// Computes face counts for interior/exterior detection.
@@ -353,15 +337,12 @@ impl VolumeMesh {
 
     /// Computes the centroid of a cell as the mean of its real (non-sentinel) vertices.
     pub(crate) fn cell_centroid(&self, cell: &[u32; 8]) -> Vec3 {
+        let n = cell_data::num_real_verts(cell_data::cell_type_of(cell));
         let mut sum = Vec3::ZERO;
-        let mut count = 0u32;
-        for &v in cell {
-            if v != u32::MAX {
-                sum += self.vertices[v as usize];
-                count += 1;
-            }
+        for &v in &cell[..n] {
+            sum += self.vertices[v as usize];
         }
-        sum / count as f32
+        sum / n as f32
     }
 
     /// Tests if a cell should be visible based on slice planes.
@@ -949,15 +930,19 @@ impl VolumeMesh {
 
     /// Builds the egui UI for this volume mesh.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
-        // Info
-        let num_tets = self.cells.iter().filter(|c| c[4] == u32::MAX).count();
-        let num_hexes = self.num_cells() - num_tets;
+        // Info — count each cell type
+        let mut counts = [0usize; 4]; // Tet, Hex, Prism, Pyramid
+        for cell in &self.cells {
+            counts[cell_data::cell_type_of(cell) as usize] += 1;
+        }
         ui.label(format!(
-            "{} verts, {} cells ({} tets, {} hexes)",
+            "{} verts, {} cells ({} tet, {} hex, {} prism, {} pyramid)",
             self.num_vertices(),
             self.num_cells(),
-            num_tets,
-            num_hexes
+            counts[VolumeCellType::Tet as usize],
+            counts[VolumeCellType::Hex as usize],
+            counts[VolumeCellType::Prism as usize],
+            counts[VolumeCellType::Pyramid as usize],
         ));
 
         // Color

@@ -138,6 +138,46 @@ pub fn face_data_for(cell_type: VolumeCellType) -> &'static [FaceData] {
     }
 }
 
+/// Classifies a cell by examining its trailing sentinel slots.
+///
+/// Sentinels are always placed at the end of the 8-slot array, so the cell
+/// type is fully determined by which of slots 4/5/6 are sentinel: this
+/// requires at most 3 comparisons (Tet hits the first).
+#[must_use]
+pub fn cell_type_of(cell: &[u32; 8]) -> VolumeCellType {
+    if cell[4] == u32::MAX {
+        VolumeCellType::Tet // 4 sentinels in slots 4..7
+    } else if cell[5] == u32::MAX {
+        VolumeCellType::Pyramid // 3 sentinels in slots 5..7
+    } else if cell[6] == u32::MAX {
+        VolumeCellType::Prism // 2 sentinels in slots 6..7
+    } else {
+        VolumeCellType::Hex // 0 sentinels
+    }
+}
+
+/// Number of real (non-sentinel) vertices in each cell type.
+#[must_use]
+pub fn num_real_verts(cell_type: VolumeCellType) -> usize {
+    match cell_type {
+        VolumeCellType::Tet => 4,
+        VolumeCellType::Pyramid => 5,
+        VolumeCellType::Prism => 6,
+        VolumeCellType::Hex => 8,
+    }
+}
+
+/// Number of tetrahedra produced by `decompose_cell_to_tets` for each cell type.
+#[must_use]
+pub fn num_tets_in_cell(cell_type: VolumeCellType) -> usize {
+    match cell_type {
+        VolumeCellType::Tet => 1,
+        VolumeCellType::Pyramid => 2,
+        VolumeCellType::Prism => 3,
+        VolumeCellType::Hex => 5,
+    }
+}
+
 /// Builds a canonical (sorted) face key for hashing.
 ///
 /// Face polygons can have 3 or 4 unique vertices. Triangular faces leave slot 3
@@ -157,7 +197,7 @@ pub fn canonical_face_key(cell: &[u32; 8], polygon: &[usize]) -> [u32; 4] {
 ///
 /// Central-diagonal pattern from Dompierre et al.; the 5-tet split works for
 /// any convex hex. Matches the previous polyscope-rs decomposition.
-const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
+pub(super) const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
     [0, 1, 2, 5],
     [0, 2, 7, 5],
     [0, 2, 3, 7],
@@ -237,16 +277,25 @@ pub fn decompose_pyramid(cell: &[u32; 8]) -> [[u32; 4]; 2] {
     }
 }
 
-/// Returns the tet-decomposition for any cell, dispatching on cell type.
-#[must_use]
-pub fn decompose_cell_to_tets(cell: &[u32; 8], cell_type: VolumeCellType) -> Vec<[u32; 4]> {
+/// Invokes `f` once per tet in the decomposition of `cell`, dispatching on
+/// cell type. Avoids the per-cell `Vec` allocation of returning a collection.
+pub fn for_each_tet<F: FnMut([u32; 4])>(cell: &[u32; 8], cell_type: VolumeCellType, mut f: F) {
     match cell_type {
-        VolumeCellType::Tet => vec![[cell[0], cell[1], cell[2], cell[3]]],
-        VolumeCellType::Hex => HEX_TO_TET_PATTERN
-            .iter()
-            .map(|t| [cell[t[0]], cell[t[1]], cell[t[2]], cell[t[3]]])
-            .collect(),
-        VolumeCellType::Prism => decompose_prism(cell).to_vec(),
-        VolumeCellType::Pyramid => decompose_pyramid(cell).to_vec(),
+        VolumeCellType::Tet => f([cell[0], cell[1], cell[2], cell[3]]),
+        VolumeCellType::Hex => {
+            for t in &HEX_TO_TET_PATTERN {
+                f([cell[t[0]], cell[t[1]], cell[t[2]], cell[t[3]]]);
+            }
+        }
+        VolumeCellType::Prism => {
+            for tet in decompose_prism(cell) {
+                f(tet);
+            }
+        }
+        VolumeCellType::Pyramid => {
+            for tet in decompose_pyramid(cell) {
+                f(tet);
+            }
+        }
     }
 }

@@ -88,152 +88,87 @@ pub fn slice_tet(
     }
 }
 
+/// Slice a polyhedral cell by decomposing it into tetrahedra, slicing each,
+/// and merging the resulting polygons.
+///
+/// Used by `slice_hex`, `slice_prism`, and `slice_pyramid`. The tet table's
+/// local indices (0..3) are remapped back to cell-local indices via the table.
+fn slice_via_tet_decomposition(
+    vertices: &[Vec3],
+    tet_indices: &[[usize; 4]],
+    plane_origin: Vec3,
+    plane_normal: Vec3,
+) -> CellSliceResult {
+    let mut all_vertices = Vec::new();
+    let mut all_interp = Vec::new();
+
+    for tet in tet_indices {
+        let r = slice_tet(
+            vertices[tet[0]],
+            vertices[tet[1]],
+            vertices[tet[2]],
+            vertices[tet[3]],
+            plane_origin,
+            plane_normal,
+        );
+        for (local_a, local_b, t) in r.interpolation {
+            all_interp.push((
+                tet[local_a as usize] as u32,
+                tet[local_b as usize] as u32,
+                t,
+            ));
+        }
+        all_vertices.extend(r.vertices);
+    }
+
+    merge_slice_vertices(&mut all_vertices, &mut all_interp);
+    if all_vertices.len() >= 3 {
+        order_polygon_vertices(&mut all_vertices, &mut all_interp, plane_normal);
+    }
+
+    CellSliceResult {
+        vertices: all_vertices,
+        interpolation: all_interp,
+    }
+}
+
 /// Slice a hexahedron by decomposing into 5 tetrahedra.
-///
-/// Hexahedra are sliced by treating them as 5 tetrahedra (using the standard
-/// symmetric decomposition), then merging the resulting polygons.
-///
-/// # Arguments
-/// * `vertices` - The 8 vertices of the hexahedron in standard ordering
-/// * `plane_origin` - A point on the plane
-/// * `plane_normal` - The plane normal (points toward kept geometry)
 ///
 /// # Returns
 /// A `CellSliceResult` containing 0, 3-6 vertices depending on the intersection.
 #[must_use]
 pub fn slice_hex(vertices: [Vec3; 8], plane_origin: Vec3, plane_normal: Vec3) -> CellSliceResult {
-    // Standard decomposition of a hex into 5 tets
-    // This decomposition is symmetric and works for any hex orientation
-    let tet_indices = [
+    // Symmetric 5-tet decomposition that works for any hex orientation.
+    const TETS: [[usize; 4]; 5] = [
         [0, 1, 3, 4],
         [1, 2, 3, 6],
         [1, 4, 5, 6],
         [3, 4, 6, 7],
         [1, 3, 4, 6], // Central tet connecting all others
     ];
-
-    let mut all_vertices = Vec::new();
-    let mut all_interp = Vec::new();
-
-    for tet in &tet_indices {
-        let result = slice_tet(
-            vertices[tet[0]],
-            vertices[tet[1]],
-            vertices[tet[2]],
-            vertices[tet[3]],
-            plane_origin,
-            plane_normal,
-        );
-
-        // Remap interpolation indices from local tet indices to hex indices
-        for (local_a, local_b, t) in result.interpolation {
-            let hex_a = tet[local_a as usize] as u32;
-            let hex_b = tet[local_b as usize] as u32;
-            all_interp.push((hex_a, hex_b, t));
-        }
-        all_vertices.extend(result.vertices);
-    }
-
-    // Merge and deduplicate vertices that are close together
-    merge_slice_vertices(&mut all_vertices, &mut all_interp);
-
-    // Order vertices to form valid polygon
-    if all_vertices.len() >= 3 {
-        order_polygon_vertices(&mut all_vertices, &mut all_interp, plane_normal);
-    }
-
-    CellSliceResult {
-        vertices: all_vertices,
-        interpolation: all_interp,
-    }
+    slice_via_tet_decomposition(&vertices, &TETS, plane_origin, plane_normal)
 }
 
 /// Slice a triangular prism by decomposing into 3 tetrahedra.
 ///
-/// # Arguments
-/// * `vertices` - The 6 vertices of the prism (slots 0..2 = bottom tri, 3..5 = top tri)
-/// * `plane_origin` - A point on the plane
-/// * `plane_normal` - The plane normal (points toward kept geometry)
+/// Slots 0..2 form the bottom triangle, 3..5 the top.
 #[must_use]
 pub fn slice_prism(vertices: [Vec3; 6], plane_origin: Vec3, plane_normal: Vec3) -> CellSliceResult {
-    // Symmetric 3-tet decomposition. Cross-cell consistency is not required for
-    // isolated slicing — the choice doesn't affect correctness.
-    let tet_indices = [[0usize, 5, 4, 3], [0, 4, 5, 2], [0, 4, 2, 1]];
-
-    let mut all_vertices = Vec::new();
-    let mut all_interp = Vec::new();
-
-    for tet in &tet_indices {
-        let r = slice_tet(
-            vertices[tet[0]],
-            vertices[tet[1]],
-            vertices[tet[2]],
-            vertices[tet[3]],
-            plane_origin,
-            plane_normal,
-        );
-        for (local_a, local_b, t) in r.interpolation {
-            let pa = tet[local_a as usize] as u32;
-            let pb = tet[local_b as usize] as u32;
-            all_interp.push((pa, pb, t));
-        }
-        all_vertices.extend(r.vertices);
-    }
-
-    merge_slice_vertices(&mut all_vertices, &mut all_interp);
-    if all_vertices.len() >= 3 {
-        order_polygon_vertices(&mut all_vertices, &mut all_interp, plane_normal);
-    }
-
-    CellSliceResult {
-        vertices: all_vertices,
-        interpolation: all_interp,
-    }
+    const TETS: [[usize; 4]; 3] = [[0, 5, 4, 3], [0, 4, 5, 2], [0, 4, 2, 1]];
+    slice_via_tet_decomposition(&vertices, &TETS, plane_origin, plane_normal)
 }
 
 /// Slice a square pyramid by decomposing into 2 tetrahedra.
 ///
-/// # Arguments
-/// * `vertices` - The 5 vertices of the pyramid (slots 0..3 = base quad, 4 = apex)
-/// * `plane_origin` - A point on the plane
-/// * `plane_normal` - The plane normal (points toward kept geometry)
+/// Slots 0..3 form the base quad, slot 4 is the apex.
 #[must_use]
 pub fn slice_pyramid(
     vertices: [Vec3; 5],
     plane_origin: Vec3,
     plane_normal: Vec3,
 ) -> CellSliceResult {
-    let tet_indices = [[0usize, 2, 4, 1], [0, 4, 2, 3]];
-
-    let mut all_vertices = Vec::new();
-    let mut all_interp = Vec::new();
-
-    for tet in &tet_indices {
-        let r = slice_tet(
-            vertices[tet[0]],
-            vertices[tet[1]],
-            vertices[tet[2]],
-            vertices[tet[3]],
-            plane_origin,
-            plane_normal,
-        );
-        for (local_a, local_b, t) in r.interpolation {
-            let pa = tet[local_a as usize] as u32;
-            let pb = tet[local_b as usize] as u32;
-            all_interp.push((pa, pb, t));
-        }
-        all_vertices.extend(r.vertices);
-    }
-
-    merge_slice_vertices(&mut all_vertices, &mut all_interp);
-    if all_vertices.len() >= 3 {
-        order_polygon_vertices(&mut all_vertices, &mut all_interp, plane_normal);
-    }
-
-    CellSliceResult {
-        vertices: all_vertices,
-        interpolation: all_interp,
-    }
+    const TETS: [[usize; 4]; 2] = [[0, 2, 4, 1], [0, 4, 2, 3]];
+    slice_via_tet_decomposition(&vertices, &TETS, plane_origin, plane_normal)
 }
 
 /// Orders polygon vertices in counter-clockwise order around the centroid.
