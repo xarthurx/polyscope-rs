@@ -1,7 +1,3 @@
-// Items are wired in by subsequent tasks (tet decomposition + face dispatch).
-// The allow is removed at that point.
-#![allow(dead_code)]
-
 //! Static shape data for each `VolumeCellType`.
 //!
 //! Defines, for each cell type:
@@ -79,17 +75,6 @@ pub fn face_data_for(cell_type: VolumeCellType) -> &'static [FaceData] {
         VolumeCellType::Hex => HEX_FACES,
         VolumeCellType::Prism => PRISM_FACES,
         VolumeCellType::Pyramid => PYRAMID_FACES,
-    }
-}
-
-/// Number of vertices used by a cell type (non-sentinel slots in the `[u32; 8]`).
-#[must_use]
-pub fn num_verts_in_cell(cell_type: VolumeCellType) -> usize {
-    match cell_type {
-        VolumeCellType::Tet => 4,
-        VolumeCellType::Hex => 8,
-        VolumeCellType::Prism => 6,
-        VolumeCellType::Pyramid => 5,
     }
 }
 
