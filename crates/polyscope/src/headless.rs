@@ -83,8 +83,10 @@ pub fn render_to_image(width: u32, height: u32) -> Result<Vec<u8>> {
     app.render_frame_headless();
 
     // Publish a fresh view-state snapshot for callers querying after a headless render.
-    let snapshot = app.current_view_state();
-    with_context_mut(|ctx| ctx.set_view_state_snapshot(snapshot));
+    with_context_mut(|ctx| {
+        let snapshot = app.view_state_from_options(&ctx.options);
+        ctx.set_view_state_snapshot(snapshot);
+    });
 
     app.capture_to_buffer()
 }

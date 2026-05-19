@@ -31,57 +31,15 @@ pub struct RenderState {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GroundPlaneState {
     pub enabled: bool,
-    pub mode: String,
+    pub mode: GroundPlaneMode,
     pub height: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TransparencyState {
     pub enabled: bool,
-    pub mode: String,
+    pub mode: TransparencyMode,
     pub render_passes: u32,
-}
-
-/// Convert a `GroundPlaneMode` to the JSON string used in `RenderState`.
-#[must_use]
-pub fn ground_plane_mode_name(m: GroundPlaneMode) -> &'static str {
-    match m {
-        GroundPlaneMode::None => "none",
-        GroundPlaneMode::Tile => "tile",
-        GroundPlaneMode::ShadowOnly => "shadow_only",
-        GroundPlaneMode::TileReflection => "tile_reflection",
-    }
-}
-
-/// Parse a `GroundPlaneMode` from its JSON string form.
-#[must_use]
-pub fn parse_ground_plane_mode(s: &str) -> Option<GroundPlaneMode> {
-    Some(match s {
-        "none" => GroundPlaneMode::None,
-        "tile" => GroundPlaneMode::Tile,
-        "shadow_only" => GroundPlaneMode::ShadowOnly,
-        "tile_reflection" => GroundPlaneMode::TileReflection,
-        _ => return None,
-    })
-}
-
-#[must_use]
-pub fn transparency_mode_name(m: TransparencyMode) -> &'static str {
-    match m {
-        TransparencyMode::Simple => "simple",
-        TransparencyMode::Pretty => "pretty",
-        TransparencyMode::None => "none",
-    }
-}
-
-#[must_use]
-pub fn parse_transparency_mode(s: &str) -> Option<TransparencyMode> {
-    Some(match s {
-        "simple" => TransparencyMode::Simple,
-        "pretty" => TransparencyMode::Pretty,
-        "none" => TransparencyMode::None,
-        _ => return None,
-    })
 }
 
 use crate::error::{PolyscopeError, Result};
@@ -91,8 +49,8 @@ use crate::state::{with_context, with_context_mut};
 /// or an error if no frame has been rendered yet.
 pub fn current_view_state() -> Result<ViewState> {
     with_context(|ctx| {
-        ctx.view_state_snapshot
-            .clone()
+        ctx.view_state_snapshot()
+            .cloned()
             .ok_or(PolyscopeError::NoActiveView)
     })
 }
@@ -101,7 +59,7 @@ pub fn current_view_state() -> Result<ViewState> {
 pub fn apply_view_state(state: &ViewState, transition: ViewTransition) -> Result<()> {
     ViewState::validate(state)?;
     with_context_mut(|ctx| {
-        ctx.pending_view_apply = Some((state.clone(), transition));
+        ctx.set_pending_view_apply(state.clone(), transition);
     });
     Ok(())
 }
@@ -140,12 +98,12 @@ fn fallback_view_state() -> ViewState {
             background_color: [1.0, 1.0, 1.0],
             ground_plane: GroundPlaneState {
                 enabled: true,
-                mode: "tile_reflection".to_string(),
+                mode: GroundPlaneMode::TileReflection,
                 height: 0.0,
             },
             transparency: TransparencyState {
                 enabled: true,
-                mode: "simple".to_string(),
+                mode: TransparencyMode::Simple,
                 render_passes: 8,
             },
             ssao: SsaoConfig::default(),
@@ -207,7 +165,7 @@ struct PartialViewState {
     render: Option<PartialRenderState>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 struct PartialCameraState {
     position: Option<[f32; 3]>,
     target: Option<[f32; 3]>,
@@ -222,7 +180,7 @@ struct PartialCameraState {
     front_direction: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 struct PartialRenderState {
     background_color: Option<[f32; 3]>,
     ground_plane: Option<PartialGroundPlaneState>,
@@ -231,17 +189,17 @@ struct PartialRenderState {
     ssaa_factor: Option<u32>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 struct PartialGroundPlaneState {
     enabled: Option<bool>,
-    mode: Option<String>,
+    mode: Option<GroundPlaneMode>,
     height: Option<f32>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 struct PartialTransparencyState {
     enabled: Option<bool>,
-    mode: Option<String>,
+    mode: Option<TransparencyMode>,
     render_passes: Option<u32>,
 }
 
@@ -266,19 +224,7 @@ impl ViewState {
     }
 
     fn merge(partial: PartialViewState, current: &ViewState) -> ViewState {
-        let cam_p = partial.camera.unwrap_or(PartialCameraState {
-            position: None,
-            target: None,
-            up: None,
-            fov: None,
-            near: None,
-            far: None,
-            projection_mode: None,
-            ortho_scale: None,
-            navigation_style: None,
-            up_direction: None,
-            front_direction: None,
-        });
+        let cam_p = partial.camera.unwrap_or_default();
         let camera = CameraStateOwned {
             position: cam_p.position.unwrap_or(current.camera.position),
             target: cam_p.target.unwrap_or(current.camera.target),
@@ -301,23 +247,9 @@ impl ViewState {
                 .unwrap_or_else(|| current.camera.front_direction.clone()),
         };
 
-        let render_p = partial.render.unwrap_or(PartialRenderState {
-            background_color: None,
-            ground_plane: None,
-            transparency: None,
-            ssao: None,
-            ssaa_factor: None,
-        });
-        let gp_p = render_p.ground_plane.unwrap_or(PartialGroundPlaneState {
-            enabled: None,
-            mode: None,
-            height: None,
-        });
-        let tp_p = render_p.transparency.unwrap_or(PartialTransparencyState {
-            enabled: None,
-            mode: None,
-            render_passes: None,
-        });
+        let render_p = partial.render.unwrap_or_default();
+        let gp_p = render_p.ground_plane.unwrap_or_default();
+        let tp_p = render_p.transparency.unwrap_or_default();
 
         let render = RenderState {
             background_color: render_p
@@ -325,16 +257,12 @@ impl ViewState {
                 .unwrap_or(current.render.background_color),
             ground_plane: GroundPlaneState {
                 enabled: gp_p.enabled.unwrap_or(current.render.ground_plane.enabled),
-                mode: gp_p
-                    .mode
-                    .unwrap_or_else(|| current.render.ground_plane.mode.clone()),
+                mode: gp_p.mode.unwrap_or(current.render.ground_plane.mode),
                 height: gp_p.height.unwrap_or(current.render.ground_plane.height),
             },
             transparency: TransparencyState {
                 enabled: tp_p.enabled.unwrap_or(current.render.transparency.enabled),
-                mode: tp_p
-                    .mode
-                    .unwrap_or_else(|| current.render.transparency.mode.clone()),
+                mode: tp_p.mode.unwrap_or(current.render.transparency.mode),
                 render_passes: tp_p
                     .render_passes
                     .unwrap_or(current.render.transparency.render_passes),
@@ -362,8 +290,6 @@ impl ViewState {
             "none",
         ];
         const KNOWN_AXIS: &[&str] = &["pos_x", "neg_x", "pos_y", "neg_y", "pos_z", "neg_z"];
-        const KNOWN_GP: &[&str] = &["none", "tile", "shadow_only", "tile_reflection"];
-        const KNOWN_TR: &[&str] = &["simple", "pretty", "none"];
         const KNOWN_SSAA: &[u32] = &[1, 2, 4, 8];
 
         let invalid = |reason: &str| Err(PolyscopeError::InvalidViewState(reason.to_string()));
@@ -416,18 +342,6 @@ impl ViewState {
         if !s.render.background_color.iter().all(|x| x.is_finite()) {
             return invalid("render.background_color has non-finite values");
         }
-        if !KNOWN_GP.contains(&s.render.ground_plane.mode.as_str()) {
-            return invalid(&format!(
-                "unknown ground_plane.mode: {}",
-                s.render.ground_plane.mode
-            ));
-        }
-        if !KNOWN_TR.contains(&s.render.transparency.mode.as_str()) {
-            return invalid(&format!(
-                "unknown transparency.mode: {}",
-                s.render.transparency.mode
-            ));
-        }
         if s.render.transparency.render_passes == 0 {
             return invalid("render.transparency.render_passes must be ≥ 1");
         }
@@ -452,25 +366,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ground_plane_mode_names() {
-        assert_eq!(
-            ground_plane_mode_name(GroundPlaneMode::TileReflection),
-            "tile_reflection"
-        );
-        assert_eq!(
-            parse_ground_plane_mode("tile_reflection"),
-            Some(GroundPlaneMode::TileReflection)
-        );
-        assert_eq!(parse_ground_plane_mode("xyz"), None);
+    fn test_ground_plane_mode_serializes_snake_case() {
+        // Direct enum serde — replaces removed name/parse helper pair.
+        let v = serde_json::to_value(GroundPlaneMode::TileReflection).unwrap();
+        assert_eq!(v, "tile_reflection");
+        let parsed: GroundPlaneMode = serde_json::from_str("\"tile_reflection\"").unwrap();
+        assert_eq!(parsed, GroundPlaneMode::TileReflection);
     }
 
     #[test]
-    fn test_transparency_mode_names() {
-        assert_eq!(transparency_mode_name(TransparencyMode::Pretty), "pretty");
-        assert_eq!(
-            parse_transparency_mode("simple"),
-            Some(TransparencyMode::Simple)
-        );
+    fn test_transparency_mode_serializes_snake_case() {
+        let v = serde_json::to_value(TransparencyMode::Pretty).unwrap();
+        assert_eq!(v, "pretty");
+        let parsed: TransparencyMode = serde_json::from_str("\"simple\"").unwrap();
+        assert_eq!(parsed, TransparencyMode::Simple);
     }
 
     fn dummy_view_state() -> ViewState {
@@ -493,12 +402,12 @@ mod tests {
                 background_color: [1.0, 1.0, 1.0],
                 ground_plane: GroundPlaneState {
                     enabled: true,
-                    mode: "tile_reflection".to_string(),
+                    mode: GroundPlaneMode::TileReflection,
                     height: 0.0,
                 },
                 transparency: TransparencyState {
                     enabled: true,
-                    mode: "simple".to_string(),
+                    mode: TransparencyMode::Simple,
                     render_passes: 8,
                 },
                 ssao: SsaoConfig::default(),
@@ -607,17 +516,12 @@ mod tests {
 
     fn clear_view_buffers() {
         ensure_initialized();
-        with_context_mut(|ctx| {
-            ctx.view_state_snapshot = None;
-            ctx.pending_view_apply = None;
-        });
+        with_context_mut(crate::state::Context::clear_view_buffers);
     }
 
     fn install_snapshot(s: ViewState) {
         ensure_initialized();
-        with_context_mut(|ctx| {
-            ctx.view_state_snapshot = Some(s);
-        });
+        with_context_mut(|ctx| ctx.set_view_state_snapshot(s));
     }
 
     #[test]
@@ -644,10 +548,7 @@ mod tests {
         let json = save_view_to_json().unwrap();
         load_view_from_json(&json, ViewTransition::Instant).unwrap();
         with_context(|ctx| {
-            let (state, transition) = ctx
-                .pending_view_apply
-                .as_ref()
-                .expect("pending should be set");
+            let (state, transition) = ctx.pending_view_apply().expect("pending should be set");
             assert_eq!(*transition, ViewTransition::Instant);
             assert!((state.camera.fov - 0.7854).abs() < 1e-5);
         });
@@ -660,12 +561,12 @@ mod tests {
             background_color: [0.1, 0.2, 0.3],
             ground_plane: GroundPlaneState {
                 enabled: true,
-                mode: "tile_reflection".to_string(),
+                mode: GroundPlaneMode::TileReflection,
                 height: 1.5,
             },
             transparency: TransparencyState {
                 enabled: true,
-                mode: "simple".to_string(),
+                mode: TransparencyMode::Simple,
                 render_passes: 6,
             },
             ssao: SsaoConfig::default(),

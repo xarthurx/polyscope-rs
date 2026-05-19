@@ -1422,8 +1422,11 @@ impl App {
             self.capture_screenshot(filename);
         }
 
-        // Publish a fresh snapshot for save_view_to_json callers.
-        let snapshot = self.current_view_state();
-        polyscope_core::state::with_context_mut(|ctx| ctx.set_view_state_snapshot(snapshot));
+        // Publish a fresh snapshot for save_view_to_json callers, in one
+        // write-lock acquisition (gather + write inside the same closure).
+        polyscope_core::state::with_context_mut(|ctx| {
+            let snapshot = self.view_state_from_options(&ctx.options);
+            ctx.set_view_state_snapshot(snapshot);
+        });
     }
 }
