@@ -74,11 +74,9 @@ pub struct Context {
 
     /// Latest view-state snapshot, published by the App once per frame.
     /// `None` until the first frame is rendered.
-    #[allow(dead_code)] // wired in Tasks 6 and 8 of the view-save-restore plan
     pub(crate) view_state_snapshot: Option<crate::view_state::ViewState>,
 
     /// Pending view state queued by a caller, consumed by the App on the next frame.
-    #[allow(dead_code)] // wired in Tasks 6 and 8 of the view-save-restore plan
     pub(crate) pending_view_apply: Option<(
         crate::view_state::ViewState,
         crate::view_state::ViewTransition,

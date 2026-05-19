@@ -44,6 +44,11 @@ pub use ssao::SsaoConfig;
 pub use state::{Context, MaterialLoadRequest, with_context, with_context_mut};
 pub use structure::{HasQuantities, Structure};
 pub use tone_mapping::ToneMappingConfig;
+pub use view_state::{
+    CameraStateOwned, GroundPlaneState, RenderState, TransparencyState, ViewState, ViewTransition,
+    apply_view_state, current_view_state, load_view_from_file, load_view_from_json,
+    save_view_to_file, save_view_to_json,
+};
 
 // Re-export glam types for convenience
 pub use glam::{Mat4, Vec2, Vec3, Vec4};

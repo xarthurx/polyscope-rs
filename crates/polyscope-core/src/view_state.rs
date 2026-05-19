@@ -85,6 +85,93 @@ pub fn parse_transparency_mode(s: &str) -> Option<TransparencyMode> {
 }
 
 use crate::error::{PolyscopeError, Result};
+use crate::state::{with_context, with_context_mut};
+
+/// Returns the latest view-state snapshot from the running App,
+/// or an error if no frame has been rendered yet.
+pub fn current_view_state() -> Result<ViewState> {
+    with_context(|ctx| {
+        ctx.view_state_snapshot
+            .clone()
+            .ok_or(PolyscopeError::NoActiveView)
+    })
+}
+
+/// Queues a view-state application for the next frame.
+pub fn apply_view_state(state: &ViewState, transition: ViewTransition) -> Result<()> {
+    ViewState::validate(state)?;
+    with_context_mut(|ctx| {
+        ctx.pending_view_apply = Some((state.clone(), transition));
+    });
+    Ok(())
+}
+
+/// Serialize the current view state to a JSON string.
+pub fn save_view_to_json() -> Result<String> {
+    let state = current_view_state()?;
+    Ok(serde_json::to_string_pretty(&state)?)
+}
+
+/// Save the current view state to a file.
+pub fn save_view_to_file(path: impl AsRef<std::path::Path>) -> Result<()> {
+    let json = save_view_to_json()?;
+    std::fs::write(path, json)?;
+    Ok(())
+}
+
+/// Built-in default view state used when no snapshot is available yet.
+fn fallback_view_state() -> ViewState {
+    ViewState {
+        version: ViewState::CURRENT_VERSION,
+        camera: CameraStateOwned {
+            position: [0.0, 0.0, 3.0],
+            target: [0.0, 0.0, 0.0],
+            up: [0.0, 1.0, 0.0],
+            fov: std::f32::consts::FRAC_PI_4,
+            near: 0.01,
+            far: 1000.0,
+            projection_mode: "perspective".to_string(),
+            ortho_scale: 1.0,
+            navigation_style: "turntable".to_string(),
+            up_direction: "pos_y".to_string(),
+            front_direction: "neg_z".to_string(),
+        },
+        render: RenderState {
+            background_color: [1.0, 1.0, 1.0],
+            ground_plane: GroundPlaneState {
+                enabled: true,
+                mode: "tile_reflection".to_string(),
+                height: 0.0,
+            },
+            transparency: TransparencyState {
+                enabled: true,
+                mode: "simple".to_string(),
+                render_passes: 8,
+            },
+            ssao: SsaoConfig::default(),
+            ssaa_factor: 1,
+        },
+    }
+}
+
+/// Parse a JSON view-state and queue it for application.
+///
+/// Missing fields preserve the current snapshot's values. If no snapshot is
+/// available, missing fields fall back to a built-in default.
+pub fn load_view_from_json(json: &str, transition: ViewTransition) -> Result<()> {
+    let current = current_view_state().unwrap_or_else(|_| fallback_view_state());
+    let merged = ViewState::from_json_partial_then_validate(json, &current)?;
+    apply_view_state(&merged, transition)
+}
+
+/// Load and queue a view state from a file path.
+pub fn load_view_from_file(
+    path: impl AsRef<std::path::Path>,
+    transition: ViewTransition,
+) -> Result<()> {
+    let json = std::fs::read_to_string(path)?;
+    load_view_from_json(&json, transition)
+}
 
 /// Plain DTO mirroring `polyscope_render::CameraState` but living in core
 /// (avoids a render → core dependency for the wrapper).
@@ -511,6 +598,60 @@ mod tests {
         let mut s = dummy_view_state();
         s.camera.projection_mode = "definitely_not_a_mode".to_string();
         assert!(ViewState::validate(&s).is_err());
+    }
+
+    fn ensure_initialized() {
+        // Tests share the global OnceLock-backed context. Initialize it once.
+        let _ = crate::state::init_context();
+    }
+
+    fn clear_view_buffers() {
+        ensure_initialized();
+        with_context_mut(|ctx| {
+            ctx.view_state_snapshot = None;
+            ctx.pending_view_apply = None;
+        });
+    }
+
+    fn install_snapshot(s: ViewState) {
+        ensure_initialized();
+        with_context_mut(|ctx| {
+            ctx.view_state_snapshot = Some(s);
+        });
+    }
+
+    #[test]
+    fn test_current_view_state_returns_error_when_no_snapshot() {
+        clear_view_buffers();
+        let err = current_view_state().unwrap_err();
+        assert!(matches!(err, crate::error::PolyscopeError::NoActiveView));
+    }
+
+    #[test]
+    fn test_save_view_to_json_roundtrip_via_buffers() {
+        install_snapshot(dummy_view_state());
+        let json = save_view_to_json().unwrap();
+        assert!(json.contains("\"version\""));
+        // Reparse via partial (the public surface) — confirms the JSON is well-formed.
+        let _: ViewState =
+            ViewState::from_json_partial_then_validate(&json, &dummy_view_state()).unwrap();
+        clear_view_buffers();
+    }
+
+    #[test]
+    fn test_load_view_from_json_queues_pending() {
+        install_snapshot(dummy_view_state());
+        let json = save_view_to_json().unwrap();
+        load_view_from_json(&json, ViewTransition::Instant).unwrap();
+        with_context(|ctx| {
+            let (state, transition) = ctx
+                .pending_view_apply
+                .as_ref()
+                .expect("pending should be set");
+            assert_eq!(*transition, ViewTransition::Instant);
+            assert!((state.camera.fov - 0.7854).abs() < 1e-5);
+        });
+        clear_view_buffers();
     }
 
     #[test]
