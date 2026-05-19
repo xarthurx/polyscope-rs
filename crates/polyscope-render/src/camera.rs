@@ -912,6 +912,42 @@ impl CameraState {
     }
 }
 
+impl From<&CameraState> for polyscope_core::view_state::CameraStateOwned {
+    fn from(s: &CameraState) -> Self {
+        polyscope_core::view_state::CameraStateOwned {
+            position: s.position,
+            target: s.target,
+            up: s.up,
+            fov: s.fov,
+            near: s.near,
+            far: s.far,
+            projection_mode: s.projection_mode.clone(),
+            ortho_scale: s.ortho_scale,
+            navigation_style: s.navigation_style.clone(),
+            up_direction: s.up_direction.clone(),
+            front_direction: s.front_direction.clone(),
+        }
+    }
+}
+
+impl From<&polyscope_core::view_state::CameraStateOwned> for CameraState {
+    fn from(s: &polyscope_core::view_state::CameraStateOwned) -> Self {
+        CameraState {
+            position: s.position,
+            target: s.target,
+            up: s.up,
+            fov: s.fov,
+            near: s.near,
+            far: s.far,
+            projection_mode: s.projection_mode.clone(),
+            ortho_scale: s.ortho_scale,
+            navigation_style: s.navigation_style.clone(),
+            up_direction: s.up_direction.clone(),
+            front_direction: s.front_direction.clone(),
+        }
+    }
+}
+
 fn navigation_style_name(s: NavigationStyle) -> &'static str {
     match s {
         NavigationStyle::Turntable => "turntable",
