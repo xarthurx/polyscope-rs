@@ -64,6 +64,36 @@ pub fn add_slice_plane_with_pose(
     SlicePlaneHandle { name }
 }
 
+/// Adds a slice plane with an auto-generated name like "Scene Slice Plane 0".
+///
+/// Mirrors C++ Polyscope's `addSlicePlane()` (no-args overload). Returns a
+/// handle to the newly created plane. The chosen index is the smallest
+/// non-negative integer N for which "Scene Slice Plane N" is not already in
+/// use, so removing a middle plane and re-adding will reclaim that index.
+///
+/// Search and creation happen under a single `with_context_mut` lock — without
+/// that, two concurrent callers could pick the same name and one would receive
+/// a handle to the other's plane (since core's `add_slice_plane` is an upsert).
+pub fn add_slice_plane_auto() -> SlicePlaneHandle {
+    let name = with_context_mut(|ctx| {
+        let mut i = 0usize;
+        let candidate = loop {
+            let c = format!("Scene Slice Plane {i}");
+            if !ctx.has_slice_plane(&c) {
+                break c;
+            }
+            i += 1;
+        };
+        let length_scale = ctx.length_scale;
+        let center = (ctx.bounding_box.0 + ctx.bounding_box.1) * 0.5;
+        let plane = ctx.add_slice_plane(&candidate);
+        plane.set_plane_size(length_scale * 0.25);
+        plane.set_origin(center);
+        candidate
+    });
+    SlicePlaneHandle { name }
+}
+
 /// Gets an existing slice plane by name.
 #[must_use]
 pub fn get_slice_plane(name: &str) -> Option<SlicePlaneHandle> {
@@ -114,6 +144,14 @@ impl SlicePlaneHandle {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Removes this slice plane from the scene.
+    ///
+    /// Consumes the handle since the underlying plane is gone afterwards.
+    /// Mirrors C++ Polyscope's `SlicePlane::remove()`.
+    pub fn remove(self) {
+        remove_slice_plane(&self.name);
     }
 
     /// Sets the pose (origin and normal) of the slice plane.

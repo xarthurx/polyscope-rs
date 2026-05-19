@@ -104,6 +104,37 @@ fn ray_cylinder_intersect(
 
     // Quadratic coefficients for intersection with infinite cylinder
     let a = dot(ray_dir_perp, ray_dir_perp);
+
+    // Parallel-ray case: ray parallel (or nearly) to cylinder axis. Quadratic
+    // degenerates (a≈0); intersect against the two end-cap disks instead.
+    // Triggered by ortho viewing straight down a tube — without this, all
+    // fragments produce NaN and the tube disappears or shows garbage pixels.
+    if (a < 1e-8) {
+        // Ray must be inside the infinite cylinder to hit either cap.
+        if (dot(delta_perp, delta_perp) > cyl_radius * cyl_radius) {
+            return false;
+        }
+        let ray_dot_cyl = dot(ray_dir, cyl_dir);
+        if (abs(ray_dot_cyl) < 1e-8) {
+            return false;
+        }
+        let t_start = dot(cyl_start - ray_origin, cyl_dir) / ray_dot_cyl;
+        let t_end = dot(cyl_end - ray_origin, cyl_dir) / ray_dot_cyl;
+        var t_cap = min(t_start, t_end);
+        if (t_cap < 0.001) {
+            t_cap = max(t_start, t_end);
+            if (t_cap < 0.001) {
+                return false;
+            }
+        }
+        // Outward cap normal: cyl_start cap faces -cyl_dir, cyl_end cap faces +cyl_dir.
+        let cap_normal = select(cyl_dir, -cyl_dir, t_start < t_end);
+        *t_hit = t_cap;
+        *hit_point = ray_origin + t_cap * ray_dir;
+        *hit_normal = cap_normal;
+        return true;
+    }
+
     let b = 2.0 * dot(ray_dir_perp, delta_perp);
     let c = dot(delta_perp, delta_perp) - cyl_radius * cyl_radius;
 
@@ -159,9 +190,20 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let tip = edge_vertices[in.edge_id * 2u + 1u].xyz;
     let radius = uniforms.radius;
 
-    // Setup ray from camera through this fragment
-    let ray_origin = camera.camera_pos.xyz;
-    let ray_dir = normalize(in.world_position - ray_origin);
+    // Setup ray. Perspective: from camera through fragment. Orthographic: parallel
+    // along world-space view forward, pushed back behind the cylinder so the
+    // intersection routine's t > 0 check always sees the front face of the cylinder
+    // regardless of which face of the impostor bounding box this fragment came from.
+    var ray_origin: vec3<f32>;
+    var ray_dir: vec3<f32>;
+    if (camera.camera_pos.w > 0.5) {
+        ray_dir = -vec3<f32>(camera.view[0].z, camera.view[1].z, camera.view[2].z);
+        let cyl_extent = length(tip - tail) + 2.0 * radius;
+        ray_origin = in.world_position - cyl_extent * ray_dir;
+    } else {
+        ray_origin = camera.camera_pos.xyz;
+        ray_dir = normalize(in.world_position - ray_origin);
+    }
 
     // Ray-cylinder intersection
     var t_hit: f32;
