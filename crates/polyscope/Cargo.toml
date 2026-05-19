@@ -27,6 +27,8 @@ egui.workspace = true
 egui-wgpu.workspace = true
 egui-winit.workspace = true
 chrono = "0.4.43"
+serde_json = { workspace = true }
+rfd = "0.15"
 
 [dev-dependencies]
 proptest.workspace = true
@@ -87,6 +89,10 @@ path = "../../examples/polygon_mesh_demo.rs"
 [[example]]
 name = "generate_screenshots"
 path = "../../examples/generate_screenshots.rs"
+
+[[example]]
+name = "view_state_demo"
+path = "../../examples/view_state_demo.rs"
 
 [lints]
 workspace = true

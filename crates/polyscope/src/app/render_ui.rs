@@ -55,6 +55,8 @@ impl App {
         let mut scene_extents_changed = false;
         let mut screenshot_requested = false;
         let mut reset_view_requested = false;
+        let mut view_save_requested = false;
+        let mut view_load_requested = false;
         let mut ssaa_changed = false;
         let mut fly_to_camera: Option<polyscope_structures::CameraParameters> = None;
 
@@ -68,6 +70,8 @@ impl App {
                 scene_extents_changed = false;
                 screenshot_requested = false;
                 reset_view_requested = false;
+                view_save_requested = false;
+                view_load_requested = false;
                 ssaa_changed = false;
                 fly_to_camera = None;
             }
@@ -80,6 +84,12 @@ impl App {
                     }
                     polyscope_ui::ViewAction::ResetView => {
                         reset_view_requested = true;
+                    }
+                    polyscope_ui::ViewAction::RequestSaveView => {
+                        view_save_requested = true;
+                    }
+                    polyscope_ui::ViewAction::RequestLoadView => {
+                        view_load_requested = true;
                     }
                     polyscope_ui::ViewAction::None => {}
                 }
@@ -622,6 +632,42 @@ impl App {
             // Clear discard reasons before the next pass
             egui_output.platform_output.request_discard_reasons.clear();
         } // end multi-pass egui loop
+
+        // Handle Save/Load View dialogs OUTSIDE the multi-pass egui loop —
+        // egui may rerun the builder multiple times per frame, and we don't
+        // want the native dialog opening repeatedly.
+        if view_save_requested {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("Polyscope View", &["json"])
+                .set_file_name("view.json")
+                .save_file()
+            {
+                if let Err(e) = polyscope_core::view_state::save_view_to_file(&path) {
+                    rfd::MessageDialog::new()
+                        .set_level(rfd::MessageLevel::Error)
+                        .set_title("Save View failed")
+                        .set_description(e.to_string())
+                        .show();
+                }
+            }
+        }
+        if view_load_requested {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("Polyscope View", &["json"])
+                .pick_file()
+            {
+                if let Err(e) = polyscope_core::view_state::load_view_from_file(
+                    &path,
+                    polyscope_core::view_state::ViewTransition::FlyTo,
+                ) {
+                    rfd::MessageDialog::new()
+                        .set_level(rfd::MessageLevel::Error)
+                        .set_title("Load View failed")
+                        .set_description(e.to_string())
+                        .show();
+                }
+            }
+        }
 
         // Handle platform output (clipboard, cursor, etc.) once after all passes
         egui.handle_platform_output(window, &egui_output.platform_output);

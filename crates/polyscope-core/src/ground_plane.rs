@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Ground plane rendering mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum GroundPlaneMode {
     /// No ground plane.
     None,

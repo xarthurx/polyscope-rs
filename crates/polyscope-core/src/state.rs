@@ -71,6 +71,16 @@ pub struct Context {
 
     /// Deferred material load requests (processed by App each frame).
     pub material_load_queue: Vec<MaterialLoadRequest>,
+
+    /// Latest view-state snapshot, published by the App once per frame.
+    /// `None` until the first frame is rendered.
+    view_state_snapshot: Option<crate::view_state::ViewState>,
+
+    /// Pending view state queued by a caller, consumed by the App on the next frame.
+    pending_view_apply: Option<(
+        crate::view_state::ViewState,
+        crate::view_state::ViewTransition,
+    )>,
 }
 
 impl Default for Context {
@@ -89,11 +99,76 @@ impl Default for Context {
             floating_quantities: Vec::new(),
             file_drop_callback: None,
             material_load_queue: Vec::new(),
+            view_state_snapshot: None,
+            pending_view_apply: None,
         }
     }
 }
 
+#[cfg(test)]
+mod state_view_tests {
+    use super::*;
+
+    #[test]
+    fn test_context_starts_with_no_view_buffers() {
+        let ctx = Context::default();
+        assert!(ctx.view_state_snapshot().is_none());
+        // `pending_view_apply` is fully private; we can't observe its
+        // initial state externally, but `view_state_snapshot()` covers
+        // the readable buffer.
+    }
+}
+
 impl Context {
+    /// Take the queued pending view-state, if any. Used by the App at frame start.
+    pub fn take_pending_view_apply(
+        &mut self,
+    ) -> Option<(
+        crate::view_state::ViewState,
+        crate::view_state::ViewTransition,
+    )> {
+        self.pending_view_apply.take()
+    }
+
+    /// Queue a view-state to be applied on the next frame. Used by `apply_view_state`.
+    pub(crate) fn set_pending_view_apply(
+        &mut self,
+        state: crate::view_state::ViewState,
+        transition: crate::view_state::ViewTransition,
+    ) {
+        self.pending_view_apply = Some((state, transition));
+    }
+
+    /// Publish a fresh view-state snapshot. Used by the App at frame end.
+    pub fn set_view_state_snapshot(&mut self, snapshot: crate::view_state::ViewState) {
+        self.view_state_snapshot = Some(snapshot);
+    }
+
+    /// Read the latest view-state snapshot. Used by `current_view_state`.
+    #[must_use]
+    pub(crate) fn view_state_snapshot(&self) -> Option<&crate::view_state::ViewState> {
+        self.view_state_snapshot.as_ref()
+    }
+
+    /// Read the currently-queued view-state, if any. Used by tests.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn pending_view_apply(
+        &self,
+    ) -> Option<&(
+        crate::view_state::ViewState,
+        crate::view_state::ViewTransition,
+    )> {
+        self.pending_view_apply.as_ref()
+    }
+
+    /// Clear both view buffers. Used by tests.
+    #[cfg(test)]
+    pub(crate) fn clear_view_buffers(&mut self) {
+        self.view_state_snapshot = None;
+        self.pending_view_apply = None;
+    }
+
     /// Computes the center of the bounding box.
     #[must_use]
     pub fn center(&self) -> Vec3 {

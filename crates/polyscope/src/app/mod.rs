@@ -7,6 +7,7 @@ mod render_capture;
 mod render_init;
 mod render_scene;
 mod render_ui;
+mod view_state;
 
 use std::collections::HashSet;
 pub(super) use std::sync::Arc;

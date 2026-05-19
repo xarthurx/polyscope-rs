@@ -307,6 +307,11 @@ pub enum ViewAction {
     ResetView,
     /// Screenshot requested.
     Screenshot,
+    /// User clicked "Save View…". App opens a save dialog after the egui
+    /// frame is done and calls `save_view_to_file(path)`.
+    RequestSaveView,
+    /// User clicked "Load View…". Same flow as `RequestSaveView`.
+    RequestLoadView,
 }
 
 /// Actions from the material loading UI.
@@ -635,6 +640,23 @@ pub fn build_controls_section(ui: &mut Ui, background_color: &mut [f32; 3]) -> V
                     .clicked()
                 {
                     action = ViewAction::Screenshot;
+                }
+            });
+
+            ui.columns(2, |cols| {
+                let w = cols[0].available_width();
+                let h = cols[0].spacing().interact_size.y;
+                if cols[0]
+                    .add_sized([w, h], egui::Button::new("Save View…"))
+                    .clicked()
+                {
+                    action = ViewAction::RequestSaveView;
+                }
+                if cols[1]
+                    .add_sized([w, h], egui::Button::new("Load View…"))
+                    .clicked()
+                {
+                    action = ViewAction::RequestLoadView;
                 }
             });
 

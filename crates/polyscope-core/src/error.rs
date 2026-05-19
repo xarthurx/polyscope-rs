@@ -52,6 +52,34 @@ pub enum PolyscopeError {
     /// JSON serialization error.
     #[error("JSON error: {0}")]
     JsonError(#[from] serde_json::Error),
+
+    /// View save/restore validation or version error.
+    #[error("invalid view state: {0}")]
+    InvalidViewState(String),
+
+    /// Save called before any view frame has been rendered.
+    #[error("no view available yet (render at least one frame before saving)")]
+    NoActiveView,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_invalid_view_state_displays_reason() {
+        let e = PolyscopeError::InvalidViewState("bad fov".to_string());
+        let msg = format!("{e}");
+        assert!(msg.contains("bad fov"), "got: {msg}");
+        assert!(msg.contains("view"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_no_active_view_displays_static_message() {
+        let e = PolyscopeError::NoActiveView;
+        let msg = format!("{e}");
+        assert!(msg.contains("no view"), "got: {msg}");
+    }
 }
 
 /// A specialized Result type for polyscope-rs operations.

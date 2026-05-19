@@ -20,6 +20,8 @@ image.workspace = true
 log.workspace = true
 thiserror.workspace = true
 bytemuck.workspace = true
+serde = { workspace = true }
+serde_json = { workspace = true }
 rand = "0.8"
 half = "2"
 

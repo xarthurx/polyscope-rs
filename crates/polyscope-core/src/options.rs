@@ -84,6 +84,7 @@ pub enum GroundPlaneMode {
 
 /// Mode for transparency rendering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
 pub enum TransparencyMode {
     /// Simple transparency (order-dependent, default).
     #[default]
