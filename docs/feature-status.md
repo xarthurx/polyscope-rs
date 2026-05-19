@@ -9,7 +9,7 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 | Point Cloud | Full | Full | Sphere impostors via instanced rendering |
 | Surface Mesh | Full | Full | Triangles + arbitrary polygons, full quantity support |
 | Curve Network | Full | Full | Lines + tubes via compute shaders |
-| Volume Mesh | Full | Full | Tet/hex, interior face detection, slice capping |
+| Volume Mesh | Full | Full | Tet/hex/prism/pyramid, interior face detection, slice capping |
 | Volume Grid | Full | Full | Node/cell scalars, gridcube + isosurface (marching cubes) |
 | Camera View | Full | Full | Frustum visualization |
 | Floating Quantities | Full | Full | Scalar/color images, depth/color/raw render images |
@@ -80,6 +80,7 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 - [x] VolumeGrid isosurface indexing fix for non-uniform dimensions — corrects silent X/Z transpose; adds regression tests (upstream commit e91a709)
 - [x] Curve network tube ortho-projection ray casting — parallel rays in ortho mode via new `is_orthographic` camera flag (upstream commit 51953c2)
 - [x] Slice plane API improvements — `add_slice_plane_auto()` (auto-named) and `SlicePlaneHandle::remove(self)` (upstream commit 24ec7e3)
+- [x] Volume Mesh prism + pyramid cell support (upstream PR #353, commit dcbaedb)
 
 ---
 

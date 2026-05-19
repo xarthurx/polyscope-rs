@@ -41,6 +41,7 @@
 //! mesh.add_vertex_scalar_quantity("temperature", vec![0.0, 0.5, 1.0, 0.25]);
 //! ```
 
+mod cell_data;
 mod color_quantity;
 mod scalar_quantity;
 pub mod slice_geometry;
@@ -48,7 +49,7 @@ mod vector_quantity;
 
 pub use color_quantity::*;
 pub use scalar_quantity::*;
-pub use slice_geometry::{CellSliceResult, slice_hex, slice_tet};
+pub use slice_geometry::{CellSliceResult, slice_hex, slice_prism, slice_pyramid, slice_tet};
 pub use vector_quantity::*;
 
 // Re-export SliceMeshData from this module
@@ -64,16 +65,21 @@ use polyscope_render::{
 /// Cell type for volume meshes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VolumeCellType {
-    /// Tetrahedron (4 vertices)
+    /// Tetrahedron (4 vertices, 4 triangular faces)
     Tet,
-    /// Hexahedron (8 vertices)
+    /// Hexahedron (8 vertices, 6 quadrilateral faces)
     Hex,
+    /// Triangular prism / wedge (6 vertices, 2 tri + 3 quad faces)
+    Prism,
+    /// Square pyramid (5 vertices, 1 quad + 4 tri faces)
+    Pyramid,
 }
 
-/// A volume mesh structure (tetrahedral or hexahedral).
+/// A volume mesh structure with mixed cell types (tet / hex / prism / pyramid).
 ///
-/// Cells are stored as arrays of 8 vertex indices. For tetrahedra,
-/// only the first 4 indices are used (indices 4-7 are set to `u32::MAX`).
+/// Cells are stored as arrays of 8 vertex indices. Unused trailing slots are
+/// set to `u32::MAX`: tets use 4 slots, pyramids 5, prisms 6, hexes all 8.
+/// The cell type is recovered from the sentinel pattern via [`Self::cell_type`].
 pub struct VolumeMesh {
     name: String,
 
@@ -174,6 +180,41 @@ impl VolumeMesh {
         Self::new(name, vertices, hexes)
     }
 
+    /// Creates a triangular-prism (wedge) mesh.
+    ///
+    /// Each prism has 6 vertices: slots 0..2 form the bottom triangle and
+    /// slots 3..5 form the top triangle (slot `i+3` should be the vertex
+    /// above slot `i`). Cells are stored as 8-index arrays with the last two
+    /// slots set to `u32::MAX` for sentinel detection.
+    pub fn new_prism_mesh(
+        name: impl Into<String>,
+        vertices: Vec<Vec3>,
+        prisms: Vec<[u32; 6]>,
+    ) -> Self {
+        let cells: Vec<[u32; 8]> = prisms
+            .into_iter()
+            .map(|p| [p[0], p[1], p[2], p[3], p[4], p[5], u32::MAX, u32::MAX])
+            .collect();
+        Self::new(name, vertices, cells)
+    }
+
+    /// Creates a square-pyramid mesh.
+    ///
+    /// Each pyramid has 5 vertices: slots 0..3 form the base quad (in CCW
+    /// order viewed from outside the cell) and slot 4 is the apex. Cells are
+    /// stored as 8-index arrays with the last three slots set to `u32::MAX`.
+    pub fn new_pyramid_mesh(
+        name: impl Into<String>,
+        vertices: Vec<Vec3>,
+        pyramids: Vec<[u32; 5]>,
+    ) -> Self {
+        let cells: Vec<[u32; 8]> = pyramids
+            .into_iter()
+            .map(|p| [p[0], p[1], p[2], p[3], p[4], u32::MAX, u32::MAX, u32::MAX])
+            .collect();
+        Self::new(name, vertices, cells)
+    }
+
     /// Returns the number of vertices.
     #[must_use]
     pub fn num_vertices(&self) -> usize {
@@ -187,13 +228,13 @@ impl VolumeMesh {
     }
 
     /// Returns the cell type of the given cell.
+    ///
+    /// Sentinels are placed at the end of the 8-slot array, so the type is
+    /// determined by which of slots 4/5/6 holds `u32::MAX` (matches upstream
+    /// C++ Polyscope's sentinel-count classification).
     #[must_use]
     pub fn cell_type(&self, cell_idx: usize) -> VolumeCellType {
-        if self.cells[cell_idx][4] == u32::MAX {
-            VolumeCellType::Tet
-        } else {
-            VolumeCellType::Hex
-        }
+        cell_data::cell_type_of(&self.cells[cell_idx])
     }
 
     /// Returns the vertices.
@@ -257,82 +298,51 @@ impl VolumeMesh {
     }
 
     /// Decomposes all cells into tetrahedra.
-    /// Tets pass through unchanged, hexes are decomposed into 5 tets.
+    ///
+    /// Decomposition counts per cell type:
+    /// - Tet → 1 tet (passthrough)
+    /// - Hex → 5 tets (fixed diagonal pattern)
+    /// - Prism → 3 tets (consistent diagonal split)
+    /// - Pyramid → 2 tets (consistent diagonal split)
     #[must_use]
     pub fn decompose_to_tets(&self) -> Vec<[u32; 4]> {
-        let mut tets = Vec::new();
-
+        let mut tets = Vec::with_capacity(self.cells.len() * 2);
         for cell in &self.cells {
-            if cell[4] == u32::MAX {
-                // Already a tet
-                tets.push([cell[0], cell[1], cell[2], cell[3]]);
-            } else {
-                // Hex - decompose using diagonal pattern (5 tets)
-                for tet_local in &HEX_TO_TET_PATTERN {
-                    let tet = [
-                        cell[tet_local[0]],
-                        cell[tet_local[1]],
-                        cell[tet_local[2]],
-                        cell[tet_local[3]],
-                    ];
-                    tets.push(tet);
-                }
-            }
+            cell_data::for_each_tet(cell, cell_data::cell_type_of(cell), |t| tets.push(t));
         }
-
         tets
     }
 
-    /// Returns the number of tetrahedra (including decomposed hexes).
+    /// Returns the number of tetrahedra (including decomposed cells).
     #[must_use]
     pub fn num_tets(&self) -> usize {
-        self.decompose_to_tets().len()
+        self.cells
+            .iter()
+            .map(|c| cell_data::num_tets_in_cell(cell_data::cell_type_of(c)))
+            .sum()
     }
 
     /// Computes face counts for interior/exterior detection.
     fn compute_face_counts(&self) -> HashMap<[u32; 4], usize> {
         let mut face_counts: HashMap<[u32; 4], usize> = HashMap::new();
-
-        for cell in &self.cells {
-            if cell[4] == u32::MAX {
-                // Tetrahedron
-                for [a, b, c] in TET_FACE_STENCIL {
-                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
-                    *face_counts.entry(key).or_insert(0) += 1;
-                }
-            } else {
-                // Hexahedron - each quad face uses same 4 vertices
-                for quad in HEX_FACE_STENCIL {
-                    // Get the 4 unique vertices of this quad face
-                    let v0 = cell[quad[0][0]];
-                    let v1 = cell[quad[0][1]];
-                    let v2 = cell[quad[0][2]];
-                    let v3 = cell[quad[1][2]]; // The fourth vertex
-                    let key = canonical_face_key(v0, v1, v2, Some(v3));
-                    *face_counts.entry(key).or_insert(0) += 1;
-                }
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
+            let ct = self.cell_type(cell_idx);
+            for face in cell_data::face_data_for(ct) {
+                let key = cell_data::canonical_face_key(cell, face.polygon);
+                *face_counts.entry(key).or_insert(0) += 1;
             }
         }
-
         face_counts
     }
 
-    /// Computes the centroid of a cell.
-    fn cell_centroid(&self, cell: &[u32; 8]) -> Vec3 {
-        if cell[4] == u32::MAX {
-            // Tetrahedron: average of 4 vertices
-            let sum = self.vertices[cell[0] as usize]
-                + self.vertices[cell[1] as usize]
-                + self.vertices[cell[2] as usize]
-                + self.vertices[cell[3] as usize];
-            sum / 4.0
-        } else {
-            // Hexahedron: average of 8 vertices
-            let sum = (0..8)
-                .map(|i| self.vertices[cell[i] as usize])
-                .fold(Vec3::ZERO, |a, b| a + b);
-            sum / 8.0
+    /// Computes the centroid of a cell as the mean of its real (non-sentinel) vertices.
+    pub(crate) fn cell_centroid(&self, cell: &[u32; 8]) -> Vec3 {
+        let n = cell_data::num_real_verts(cell_data::cell_type_of(cell));
+        let mut sum = Vec3::ZERO;
+        for &v in &cell[..n] {
+            sum += self.vertices[v as usize];
         }
+        sum / n as f32
     }
 
     /// Tests if a cell should be visible based on slice planes.
@@ -353,38 +363,22 @@ impl VolumeMesh {
         true
     }
 
-    /// Computes face counts for interior/exterior detection, only for visible cells.
+    /// Same as `compute_face_counts` but skips cells culled by slice planes.
     fn compute_face_counts_with_culling(
         &self,
         planes: &[(Vec3, Vec3)],
     ) -> HashMap<[u32; 4], usize> {
         let mut face_counts: HashMap<[u32; 4], usize> = HashMap::new();
-
-        for cell in &self.cells {
-            // Skip cells culled by slice planes
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
             if !self.is_cell_visible(cell, planes) {
                 continue;
             }
-
-            if cell[4] == u32::MAX {
-                // Tetrahedron
-                for [a, b, c] in TET_FACE_STENCIL {
-                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
-                    *face_counts.entry(key).or_insert(0) += 1;
-                }
-            } else {
-                // Hexahedron
-                for quad in HEX_FACE_STENCIL {
-                    let v0 = cell[quad[0][0]];
-                    let v1 = cell[quad[0][1]];
-                    let v2 = cell[quad[0][2]];
-                    let v3 = cell[quad[1][2]];
-                    let key = canonical_face_key(v0, v1, v2, Some(v3));
-                    *face_counts.entry(key).or_insert(0) += 1;
-                }
+            let ct = self.cell_type(cell_idx);
+            for face in cell_data::face_data_for(ct) {
+                let key = cell_data::canonical_face_key(cell, face.polygon);
+                *face_counts.entry(key).or_insert(0) += 1;
             }
         }
-
         face_counts
     }
 
@@ -394,38 +388,19 @@ impl VolumeMesh {
         let mut positions = Vec::new();
         let mut faces = Vec::new();
 
-        for cell in &self.cells {
-            if cell[4] == u32::MAX {
-                // Tetrahedron
-                for [a, b, c] in TET_FACE_STENCIL {
-                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
-                    if face_counts[&key] == 1 {
-                        // Exterior face
-                        let base_idx = positions.len() as u32;
-                        positions.push(self.vertices[cell[a] as usize]);
-                        positions.push(self.vertices[cell[b] as usize]);
-                        positions.push(self.vertices[cell[c] as usize]);
-                        faces.push([base_idx, base_idx + 1, base_idx + 2]);
-                    }
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
+            let ct = self.cell_type(cell_idx);
+            for face in cell_data::face_data_for(ct) {
+                let key = cell_data::canonical_face_key(cell, face.polygon);
+                if face_counts[&key] != 1 {
+                    continue;
                 }
-            } else {
-                // Hexahedron
-                for quad in HEX_FACE_STENCIL {
-                    let v0 = cell[quad[0][0]];
-                    let v1 = cell[quad[0][1]];
-                    let v2 = cell[quad[0][2]];
-                    let v3 = cell[quad[1][2]];
-                    let key = canonical_face_key(v0, v1, v2, Some(v3));
-                    if face_counts[&key] == 1 {
-                        // Exterior face - emit both triangles
-                        for [a, b, c] in quad {
-                            let base_idx = positions.len() as u32;
-                            positions.push(self.vertices[cell[a] as usize]);
-                            positions.push(self.vertices[cell[b] as usize]);
-                            positions.push(self.vertices[cell[c] as usize]);
-                            faces.push([base_idx, base_idx + 1, base_idx + 2]);
-                        }
-                    }
+                for &[a, b, c] in face.triangulation {
+                    let base_idx = positions.len() as u32;
+                    positions.push(self.vertices[cell[a] as usize]);
+                    positions.push(self.vertices[cell[b] as usize]);
+                    positions.push(self.vertices[cell[c] as usize]);
+                    faces.push([base_idx, base_idx + 1, base_idx + 2]);
                 }
             }
         }
@@ -434,52 +409,30 @@ impl VolumeMesh {
     }
 
     /// Generates triangulated exterior faces with cell culling based on slice planes.
-    /// Only cells whose centroid is on the positive side of all planes are rendered.
     fn generate_render_geometry_with_culling(
         &self,
         planes: &[(Vec3, Vec3)],
     ) -> (Vec<Vec3>, Vec<[u32; 3]>) {
-        // Compute face counts only for visible cells
         let face_counts = self.compute_face_counts_with_culling(planes);
         let mut positions = Vec::new();
         let mut faces = Vec::new();
 
-        for cell in &self.cells {
-            // Skip cells culled by slice planes
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
             if !self.is_cell_visible(cell, planes) {
                 continue;
             }
-
-            if cell[4] == u32::MAX {
-                // Tetrahedron
-                for [a, b, c] in TET_FACE_STENCIL {
-                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
-                    // Render face if it's exterior among visible cells
-                    if face_counts.get(&key) == Some(&1) {
-                        let base_idx = positions.len() as u32;
-                        positions.push(self.vertices[cell[a] as usize]);
-                        positions.push(self.vertices[cell[b] as usize]);
-                        positions.push(self.vertices[cell[c] as usize]);
-                        faces.push([base_idx, base_idx + 1, base_idx + 2]);
-                    }
+            let ct = self.cell_type(cell_idx);
+            for face in cell_data::face_data_for(ct) {
+                let key = cell_data::canonical_face_key(cell, face.polygon);
+                if face_counts.get(&key) != Some(&1) {
+                    continue;
                 }
-            } else {
-                // Hexahedron
-                for quad in HEX_FACE_STENCIL {
-                    let v0 = cell[quad[0][0]];
-                    let v1 = cell[quad[0][1]];
-                    let v2 = cell[quad[0][2]];
-                    let v3 = cell[quad[1][2]];
-                    let key = canonical_face_key(v0, v1, v2, Some(v3));
-                    if face_counts.get(&key) == Some(&1) {
-                        for [a, b, c] in quad {
-                            let base_idx = positions.len() as u32;
-                            positions.push(self.vertices[cell[a] as usize]);
-                            positions.push(self.vertices[cell[b] as usize]);
-                            positions.push(self.vertices[cell[c] as usize]);
-                            faces.push([base_idx, base_idx + 1, base_idx + 2]);
-                        }
-                    }
+                for &[a, b, c] in face.triangulation {
+                    let base_idx = positions.len() as u32;
+                    positions.push(self.vertices[cell[a] as usize]);
+                    positions.push(self.vertices[cell[b] as usize]);
+                    positions.push(self.vertices[cell[c] as usize]);
+                    faces.push([base_idx, base_idx + 1, base_idx + 2]);
                 }
             }
         }
@@ -498,47 +451,24 @@ impl VolumeMesh {
 
         // First pass: generate geometry and track indices
         for (cell_idx, cell) in self.cells.iter().enumerate() {
-            if cell[4] == u32::MAX {
-                // Tetrahedron
-                for [a, b, c] in TET_FACE_STENCIL {
-                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
-                    if face_counts[&key] == 1 {
-                        let base_idx = positions.len() as u32;
-                        positions.push(self.vertices[cell[a] as usize]);
-                        positions.push(self.vertices[cell[b] as usize]);
-                        positions.push(self.vertices[cell[c] as usize]);
-                        vertex_indices.push(cell[a] as usize);
-                        vertex_indices.push(cell[b] as usize);
-                        vertex_indices.push(cell[c] as usize);
-                        cell_indices.push(cell_idx);
-                        cell_indices.push(cell_idx);
-                        cell_indices.push(cell_idx);
-                        faces.push([base_idx, base_idx + 1, base_idx + 2]);
-                    }
+            let ct = self.cell_type(cell_idx);
+            for face in cell_data::face_data_for(ct) {
+                let key = cell_data::canonical_face_key(cell, face.polygon);
+                if face_counts[&key] != 1 {
+                    continue;
                 }
-            } else {
-                // Hexahedron
-                for quad in HEX_FACE_STENCIL {
-                    let v0 = cell[quad[0][0]];
-                    let v1 = cell[quad[0][1]];
-                    let v2 = cell[quad[0][2]];
-                    let v3 = cell[quad[1][2]];
-                    let key = canonical_face_key(v0, v1, v2, Some(v3));
-                    if face_counts[&key] == 1 {
-                        for [a, b, c] in quad {
-                            let base_idx = positions.len() as u32;
-                            positions.push(self.vertices[cell[a] as usize]);
-                            positions.push(self.vertices[cell[b] as usize]);
-                            positions.push(self.vertices[cell[c] as usize]);
-                            vertex_indices.push(cell[a] as usize);
-                            vertex_indices.push(cell[b] as usize);
-                            vertex_indices.push(cell[c] as usize);
-                            cell_indices.push(cell_idx);
-                            cell_indices.push(cell_idx);
-                            cell_indices.push(cell_idx);
-                            faces.push([base_idx, base_idx + 1, base_idx + 2]);
-                        }
-                    }
+                for &[a, b, c] in face.triangulation {
+                    let base_idx = positions.len() as u32;
+                    positions.push(self.vertices[cell[a] as usize]);
+                    positions.push(self.vertices[cell[b] as usize]);
+                    positions.push(self.vertices[cell[c] as usize]);
+                    vertex_indices.push(cell[a] as usize);
+                    vertex_indices.push(cell[b] as usize);
+                    vertex_indices.push(cell[c] as usize);
+                    cell_indices.push(cell_idx);
+                    cell_indices.push(cell_idx);
+                    cell_indices.push(cell_idx);
+                    faces.push([base_idx, base_idx + 1, base_idx + 2]);
                 }
             }
         }
@@ -763,33 +693,18 @@ impl VolumeMesh {
     fn generate_cell_index_per_triangle(&self) -> Vec<u32> {
         let face_counts = self.compute_face_counts();
         let mut cell_indices = Vec::new();
-
         for (cell_idx, cell) in self.cells.iter().enumerate() {
-            if cell[4] == u32::MAX {
-                // Tetrahedron
-                for [a, b, c] in TET_FACE_STENCIL {
-                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
-                    if face_counts[&key] == 1 {
-                        cell_indices.push(cell_idx as u32);
-                    }
+            let ct = self.cell_type(cell_idx);
+            for face in cell_data::face_data_for(ct) {
+                let key = cell_data::canonical_face_key(cell, face.polygon);
+                if face_counts.get(&key) != Some(&1) {
+                    continue;
                 }
-            } else {
-                // Hexahedron
-                for quad in HEX_FACE_STENCIL {
-                    let v0 = cell[quad[0][0]];
-                    let v1 = cell[quad[0][1]];
-                    let v2 = cell[quad[0][2]];
-                    let v3 = cell[quad[1][2]];
-                    let key = canonical_face_key(v0, v1, v2, Some(v3));
-                    if face_counts[&key] == 1 {
-                        // 2 triangles per quad face
-                        cell_indices.push(cell_idx as u32);
-                        cell_indices.push(cell_idx as u32);
-                    }
+                for _tri in face.triangulation {
+                    cell_indices.push(cell_idx as u32);
                 }
             }
         }
-
         cell_indices
     }
 
@@ -797,34 +712,21 @@ impl VolumeMesh {
     fn generate_cell_index_per_triangle_with_culling(&self, planes: &[(Vec3, Vec3)]) -> Vec<u32> {
         let face_counts = self.compute_face_counts_with_culling(planes);
         let mut cell_indices = Vec::new();
-
         for (cell_idx, cell) in self.cells.iter().enumerate() {
             if !self.is_cell_visible(cell, planes) {
                 continue;
             }
-
-            if cell[4] == u32::MAX {
-                for [a, b, c] in TET_FACE_STENCIL {
-                    let key = canonical_face_key(cell[a], cell[b], cell[c], None);
-                    if face_counts.get(&key) == Some(&1) {
-                        cell_indices.push(cell_idx as u32);
-                    }
+            let ct = self.cell_type(cell_idx);
+            for face in cell_data::face_data_for(ct) {
+                let key = cell_data::canonical_face_key(cell, face.polygon);
+                if face_counts.get(&key) != Some(&1) {
+                    continue;
                 }
-            } else {
-                for quad in HEX_FACE_STENCIL {
-                    let v0 = cell[quad[0][0]];
-                    let v1 = cell[quad[0][1]];
-                    let v2 = cell[quad[0][2]];
-                    let v3 = cell[quad[1][2]];
-                    let key = canonical_face_key(v0, v1, v2, Some(v3));
-                    if face_counts.get(&key) == Some(&1) {
-                        cell_indices.push(cell_idx as u32);
-                        cell_indices.push(cell_idx as u32);
-                    }
+                for _tri in face.triangulation {
+                    cell_indices.push(cell_idx as u32);
                 }
             }
         }
-
         cell_indices
     }
 
@@ -1028,15 +930,19 @@ impl VolumeMesh {
 
     /// Builds the egui UI for this volume mesh.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
-        // Info
-        let num_tets = self.cells.iter().filter(|c| c[4] == u32::MAX).count();
-        let num_hexes = self.num_cells() - num_tets;
+        // Info — count each cell type
+        let mut counts = [0usize; 4]; // Tet, Hex, Prism, Pyramid
+        for cell in &self.cells {
+            counts[cell_data::cell_type_of(cell) as usize] += 1;
+        }
         ui.label(format!(
-            "{} verts, {} cells ({} tets, {} hexes)",
+            "{} verts, {} cells ({} tet, {} hex, {} prism, {} pyramid)",
             self.num_vertices(),
             self.num_cells(),
-            num_tets,
-            num_hexes
+            counts[VolumeCellType::Tet as usize],
+            counts[VolumeCellType::Hex as usize],
+            counts[VolumeCellType::Prism as usize],
+            counts[VolumeCellType::Pyramid as usize],
         ));
 
         // Color
@@ -1198,6 +1104,16 @@ impl VolumeMesh {
                     let hex_verts: [Vec3; 8] =
                         std::array::from_fn(|i| self.vertices[cell[i] as usize]);
                     slice_hex(hex_verts, plane_origin, plane_normal)
+                }
+                VolumeCellType::Prism => {
+                    let prism_verts: [Vec3; 6] =
+                        std::array::from_fn(|i| self.vertices[cell[i] as usize]);
+                    slice_prism(prism_verts, plane_origin, plane_normal)
+                }
+                VolumeCellType::Pyramid => {
+                    let pyr_verts: [Vec3; 5] =
+                        std::array::from_fn(|i| self.vertices[cell[i] as usize]);
+                    slice_pyramid(pyr_verts, plane_origin, plane_normal)
                 }
             };
 
@@ -1407,27 +1323,6 @@ impl HasQuantities for VolumeMesh {
 
 use std::collections::HashMap;
 
-/// Generates a canonical (sorted) face key for hashing.
-/// For triangular faces, the fourth element is `u32::MAX`.
-fn canonical_face_key(v0: u32, v1: u32, v2: u32, v3: Option<u32>) -> [u32; 4] {
-    let mut key = [v0, v1, v2, v3.unwrap_or(u32::MAX)];
-    key.sort_unstable();
-    key
-}
-
-/// Face stencil for tetrahedra: 4 triangular faces
-const TET_FACE_STENCIL: [[usize; 3]; 4] = [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]];
-
-/// Face stencil for hexahedra: 6 quad faces (each as 2 triangles sharing diagonal)
-const HEX_FACE_STENCIL: [[[usize; 3]; 2]; 6] = [
-    [[2, 1, 0], [2, 0, 3]], // Bottom
-    [[4, 0, 1], [4, 1, 5]], // Front
-    [[5, 1, 2], [5, 2, 6]], // Right
-    [[7, 3, 0], [7, 0, 4]], // Left
-    [[6, 2, 3], [6, 3, 7]], // Back
-    [[7, 4, 5], [7, 5, 6]], // Top
-];
-
 /// Render geometry data with optional quantity values.
 pub struct VolumeMeshRenderGeometry {
     pub positions: Vec<Vec3>,
@@ -1439,18 +1334,239 @@ pub struct VolumeMeshRenderGeometry {
     pub vertex_colors: Option<Vec<Vec3>>,
 }
 
-/// Diagonal decomposition patterns (5 tets).
-const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
-    [0, 1, 2, 5],
-    [0, 2, 7, 5],
-    [0, 2, 3, 7],
-    [0, 5, 7, 4],
-    [2, 7, 5, 6],
-];
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_new_prism_mesh_constructor() {
+        let verts = vec![
+            Vec3::ZERO,
+            Vec3::X,
+            Vec3::Y,
+            Vec3::Z,
+            Vec3::X + Vec3::Z,
+            Vec3::Y + Vec3::Z,
+        ];
+        let prisms = vec![[0u32, 1, 2, 3, 4, 5]];
+        let mesh = VolumeMesh::new_prism_mesh("p", verts, prisms);
+        assert_eq!(mesh.num_cells(), 1);
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Prism);
+    }
+
+    #[test]
+    fn test_new_pyramid_mesh_constructor() {
+        let verts = vec![
+            Vec3::ZERO,
+            Vec3::X,
+            Vec3::X + Vec3::Y,
+            Vec3::Y,
+            Vec3::splat(0.5) + Vec3::Z,
+        ];
+        let pyramids = vec![[0u32, 1, 2, 3, 4]];
+        let mesh = VolumeMesh::new_pyramid_mesh("py", verts, pyramids);
+        assert_eq!(mesh.num_cells(), 1);
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Pyramid);
+    }
+
+    #[test]
+    fn test_single_prism_all_exterior() {
+        let verts = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(0.5, 1.0, 1.0),
+        ];
+        let mesh = VolumeMesh::new("p", verts, vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]]);
+        let (_, faces) = mesh.generate_render_geometry();
+        assert_eq!(
+            faces.len(),
+            8,
+            "single prism should have 8 triangles (2 tri + 3*2 quad)"
+        );
+    }
+
+    #[test]
+    fn test_single_pyramid_all_exterior() {
+        let verts = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let mesh = VolumeMesh::new(
+            "py",
+            verts,
+            vec![[0, 1, 2, 3, 4, u32::MAX, u32::MAX, u32::MAX]],
+        );
+        let (_, faces) = mesh.generate_render_geometry();
+        assert_eq!(
+            faces.len(),
+            6,
+            "single pyramid should have 6 triangles (2 base + 4 sides)"
+        );
+    }
+
+    #[test]
+    fn test_mixed_cell_mesh_renders_all() {
+        let verts = vec![
+            // Tet
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+            // Prism (translated +5 in x)
+            Vec3::new(5.0, 0.0, 0.0),
+            Vec3::new(6.0, 0.0, 0.0),
+            Vec3::new(5.5, 1.0, 0.0),
+            Vec3::new(5.0, 0.0, 1.0),
+            Vec3::new(6.0, 0.0, 1.0),
+            Vec3::new(5.5, 1.0, 1.0),
+            // Pyramid (translated +10 in x)
+            Vec3::new(10.0, 0.0, 0.0),
+            Vec3::new(11.0, 0.0, 0.0),
+            Vec3::new(11.0, 1.0, 0.0),
+            Vec3::new(10.0, 1.0, 0.0),
+            Vec3::new(10.5, 0.5, 1.0),
+        ];
+        let cells = vec![
+            [0, 1, 2, 3, u32::MAX, u32::MAX, u32::MAX, u32::MAX],
+            [4, 5, 6, 7, 8, 9, u32::MAX, u32::MAX],
+            [10, 11, 12, 13, 14, u32::MAX, u32::MAX, u32::MAX],
+        ];
+        let mesh = VolumeMesh::new("m", verts, cells);
+        let (_, faces) = mesh.generate_render_geometry();
+        assert_eq!(
+            faces.len(),
+            4 + 8 + 6,
+            "mixed mesh should sum per-cell triangle counts"
+        );
+    }
+
+    #[test]
+    fn test_decompose_prism_to_tets() {
+        let verts = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(0.5, 1.0, 1.0),
+        ];
+        let mesh = VolumeMesh::new(
+            "prism_only",
+            verts,
+            vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]],
+        );
+        let tets = mesh.decompose_to_tets();
+        assert_eq!(tets.len(), 3, "prism should decompose to 3 tets");
+        for tet in &tets {
+            for &v in tet {
+                assert!(v < 6, "tet vertex index {v} out of range for prism");
+            }
+        }
+    }
+
+    #[test]
+    fn test_decompose_pyramid_to_tets() {
+        let verts = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let mesh = VolumeMesh::new(
+            "pyr_only",
+            verts,
+            vec![[0, 1, 2, 3, 4, u32::MAX, u32::MAX, u32::MAX]],
+        );
+        let tets = mesh.decompose_to_tets();
+        assert_eq!(tets.len(), 2, "pyramid should decompose to 2 tets");
+        for tet in &tets {
+            for &v in tet {
+                assert!(v < 5, "tet vertex index {v} out of range for pyramid");
+            }
+        }
+    }
+
+    #[test]
+    fn test_cell_centroid_prism() {
+        let verts = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 0.0),
+            Vec3::new(1.0, 2.0, 0.0),
+            Vec3::new(0.0, 0.0, 4.0),
+            Vec3::new(2.0, 0.0, 4.0),
+            Vec3::new(1.0, 2.0, 4.0),
+        ];
+        let mesh = VolumeMesh::new(
+            "p",
+            verts.clone(),
+            vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]],
+        );
+        let expected: Vec3 = verts.iter().copied().sum::<Vec3>() / 6.0;
+        let centroid = mesh.cell_centroid(&mesh.cells()[0]);
+        assert!((centroid - expected).length() < 1e-5);
+    }
+
+    #[test]
+    fn test_cell_type_detection_tet() {
+        let mesh = VolumeMesh::new(
+            "t",
+            vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z],
+            vec![[0, 1, 2, 3, u32::MAX, u32::MAX, u32::MAX, u32::MAX]],
+        );
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Tet);
+    }
+
+    #[test]
+    fn test_cell_type_detection_hex() {
+        let verts = (0..8).map(|i| Vec3::splat(i as f32)).collect();
+        let mesh = VolumeMesh::new("h", verts, vec![[0, 1, 2, 3, 4, 5, 6, 7]]);
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Hex);
+    }
+
+    #[test]
+    fn test_cell_type_detection_prism() {
+        let verts = (0..6).map(|i| Vec3::splat(i as f32)).collect();
+        let mesh = VolumeMesh::new("p", verts, vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]]);
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Prism);
+    }
+
+    #[test]
+    fn test_cell_type_detection_pyramid() {
+        let verts = (0..5).map(|i| Vec3::splat(i as f32)).collect();
+        let mesh = VolumeMesh::new(
+            "py",
+            verts,
+            vec![[0, 1, 2, 3, 4, u32::MAX, u32::MAX, u32::MAX]],
+        );
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Pyramid);
+    }
+
+    #[test]
+    fn test_cell_type_enum_has_prism_and_pyramid() {
+        // Compile-time check: pattern match must be exhaustive over all 4 variants.
+        let types = [
+            VolumeCellType::Tet,
+            VolumeCellType::Hex,
+            VolumeCellType::Prism,
+            VolumeCellType::Pyramid,
+        ];
+        for t in types {
+            let label = match t {
+                VolumeCellType::Tet => "tet",
+                VolumeCellType::Hex => "hex",
+                VolumeCellType::Prism => "prism",
+                VolumeCellType::Pyramid => "pyramid",
+            };
+            assert!(!label.is_empty());
+        }
+    }
 
     #[test]
     fn test_interior_face_detection() {

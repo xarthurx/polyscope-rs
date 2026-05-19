@@ -88,35 +88,22 @@ pub fn slice_tet(
     }
 }
 
-/// Slice a hexahedron by decomposing into 5 tetrahedra.
+/// Slice a polyhedral cell by decomposing it into tetrahedra, slicing each,
+/// and merging the resulting polygons.
 ///
-/// Hexahedra are sliced by treating them as 5 tetrahedra (using the standard
-/// symmetric decomposition), then merging the resulting polygons.
-///
-/// # Arguments
-/// * `vertices` - The 8 vertices of the hexahedron in standard ordering
-/// * `plane_origin` - A point on the plane
-/// * `plane_normal` - The plane normal (points toward kept geometry)
-///
-/// # Returns
-/// A `CellSliceResult` containing 0, 3-6 vertices depending on the intersection.
-#[must_use]
-pub fn slice_hex(vertices: [Vec3; 8], plane_origin: Vec3, plane_normal: Vec3) -> CellSliceResult {
-    // Standard decomposition of a hex into 5 tets
-    // This decomposition is symmetric and works for any hex orientation
-    let tet_indices = [
-        [0, 1, 3, 4],
-        [1, 2, 3, 6],
-        [1, 4, 5, 6],
-        [3, 4, 6, 7],
-        [1, 3, 4, 6], // Central tet connecting all others
-    ];
-
+/// Used by `slice_hex`, `slice_prism`, and `slice_pyramid`. The tet table's
+/// local indices (0..3) are remapped back to cell-local indices via the table.
+fn slice_via_tet_decomposition(
+    vertices: &[Vec3],
+    tet_indices: &[[usize; 4]],
+    plane_origin: Vec3,
+    plane_normal: Vec3,
+) -> CellSliceResult {
     let mut all_vertices = Vec::new();
     let mut all_interp = Vec::new();
 
-    for tet in &tet_indices {
-        let result = slice_tet(
+    for tet in tet_indices {
+        let r = slice_tet(
             vertices[tet[0]],
             vertices[tet[1]],
             vertices[tet[2]],
@@ -124,20 +111,17 @@ pub fn slice_hex(vertices: [Vec3; 8], plane_origin: Vec3, plane_normal: Vec3) ->
             plane_origin,
             plane_normal,
         );
-
-        // Remap interpolation indices from local tet indices to hex indices
-        for (local_a, local_b, t) in result.interpolation {
-            let hex_a = tet[local_a as usize] as u32;
-            let hex_b = tet[local_b as usize] as u32;
-            all_interp.push((hex_a, hex_b, t));
+        for (local_a, local_b, t) in r.interpolation {
+            all_interp.push((
+                tet[local_a as usize] as u32,
+                tet[local_b as usize] as u32,
+                t,
+            ));
         }
-        all_vertices.extend(result.vertices);
+        all_vertices.extend(r.vertices);
     }
 
-    // Merge and deduplicate vertices that are close together
     merge_slice_vertices(&mut all_vertices, &mut all_interp);
-
-    // Order vertices to form valid polygon
     if all_vertices.len() >= 3 {
         order_polygon_vertices(&mut all_vertices, &mut all_interp, plane_normal);
     }
@@ -146,6 +130,45 @@ pub fn slice_hex(vertices: [Vec3; 8], plane_origin: Vec3, plane_normal: Vec3) ->
         vertices: all_vertices,
         interpolation: all_interp,
     }
+}
+
+/// Slice a hexahedron by decomposing into 5 tetrahedra.
+///
+/// # Returns
+/// A `CellSliceResult` containing 0, 3-6 vertices depending on the intersection.
+#[must_use]
+pub fn slice_hex(vertices: [Vec3; 8], plane_origin: Vec3, plane_normal: Vec3) -> CellSliceResult {
+    // Symmetric 5-tet decomposition that works for any hex orientation.
+    const TETS: [[usize; 4]; 5] = [
+        [0, 1, 3, 4],
+        [1, 2, 3, 6],
+        [1, 4, 5, 6],
+        [3, 4, 6, 7],
+        [1, 3, 4, 6], // Central tet connecting all others
+    ];
+    slice_via_tet_decomposition(&vertices, &TETS, plane_origin, plane_normal)
+}
+
+/// Slice a triangular prism by decomposing into 3 tetrahedra.
+///
+/// Slots 0..2 form the bottom triangle, 3..5 the top.
+#[must_use]
+pub fn slice_prism(vertices: [Vec3; 6], plane_origin: Vec3, plane_normal: Vec3) -> CellSliceResult {
+    const TETS: [[usize; 4]; 3] = [[0, 5, 4, 3], [0, 4, 5, 2], [0, 4, 2, 1]];
+    slice_via_tet_decomposition(&vertices, &TETS, plane_origin, plane_normal)
+}
+
+/// Slice a square pyramid by decomposing into 2 tetrahedra.
+///
+/// Slots 0..3 form the base quad, slot 4 is the apex.
+#[must_use]
+pub fn slice_pyramid(
+    vertices: [Vec3; 5],
+    plane_origin: Vec3,
+    plane_normal: Vec3,
+) -> CellSliceResult {
+    const TETS: [[usize; 4]; 2] = [[0, 2, 4, 1], [0, 4, 2, 3]];
+    slice_via_tet_decomposition(&vertices, &TETS, plane_origin, plane_normal)
 }
 
 /// Orders polygon vertices in counter-clockwise order around the centroid.
@@ -374,6 +397,72 @@ mod tests {
                 .any(|v| (*v - *corner).length() < 0.1);
             assert!(has_near, "Expected vertex near corner {:?}", corner);
         }
+    }
+
+    #[test]
+    fn test_slice_prism_through_middle() {
+        let verts = [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(0.5, 1.0, 1.0),
+        ];
+        let result = slice_prism(verts, Vec3::new(0.0, 0.0, 0.5), Vec3::Z);
+        assert!(result.has_intersection());
+        assert!(
+            result.vertices.len() >= 3,
+            "expected at least 3 verts, got {}",
+            result.vertices.len()
+        );
+        for v in &result.vertices {
+            assert!((v.z - 0.5).abs() < 1e-4, "vertex z={} should be 0.5", v.z);
+        }
+    }
+
+    #[test]
+    fn test_slice_prism_no_intersection() {
+        let verts = [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(0.5, 1.0, 1.0),
+        ];
+        let result = slice_prism(verts, Vec3::new(0.0, 0.0, 2.0), Vec3::Z);
+        assert!(!result.has_intersection());
+    }
+
+    #[test]
+    fn test_slice_pyramid_through_middle() {
+        let verts = [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let result = slice_pyramid(verts, Vec3::new(0.0, 0.0, 0.5), Vec3::Z);
+        assert!(result.has_intersection());
+        assert!(result.vertices.len() >= 3);
+        for v in &result.vertices {
+            assert!((v.z - 0.5).abs() < 1e-4);
+        }
+    }
+
+    #[test]
+    fn test_slice_pyramid_no_intersection() {
+        let verts = [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.5, 0.5, 1.0),
+        ];
+        let result = slice_pyramid(verts, Vec3::new(0.0, 0.0, -1.0), Vec3::Z);
+        assert!(!result.has_intersection());
     }
 
     #[test]
