@@ -53,6 +53,10 @@ name = "volume_mesh_demo"
 path = "../../examples/volume_mesh_demo.rs"
 
 [[example]]
+name = "volume_mesh_mixed_cells_demo"
+path = "../../examples/volume_mesh_mixed_cells_demo.rs"
+
+[[example]]
 name = "slice_plane_demo"
 path = "../../examples/slice_plane_demo.rs"
 
