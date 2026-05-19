@@ -249,7 +249,9 @@ impl VolumeMesh {
             2 => VolumeCellType::Prism,
             3 => VolumeCellType::Pyramid,
             4 => VolumeCellType::Tet,
-            n => panic!("VolumeMesh cell {cell_idx}: invalid sentinel count {n} (expected 0/2/3/4)"),
+            n => {
+                panic!("VolumeMesh cell {cell_idx}: invalid sentinel count {n} (expected 0/2/3/4)")
+            }
         }
     }
 
@@ -1392,13 +1394,13 @@ mod tests {
             Vec3::new(1.0, 0.0, 1.0),
             Vec3::new(0.5, 1.0, 1.0),
         ];
-        let mesh = VolumeMesh::new(
-            "p",
-            verts,
-            vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]],
-        );
+        let mesh = VolumeMesh::new("p", verts, vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]]);
         let (_, faces) = mesh.generate_render_geometry();
-        assert_eq!(faces.len(), 8, "single prism should have 8 triangles (2 tri + 3*2 quad)");
+        assert_eq!(
+            faces.len(),
+            8,
+            "single prism should have 8 triangles (2 tri + 3*2 quad)"
+        );
     }
 
     #[test]
@@ -1416,7 +1418,11 @@ mod tests {
             vec![[0, 1, 2, 3, 4, u32::MAX, u32::MAX, u32::MAX]],
         );
         let (_, faces) = mesh.generate_render_geometry();
-        assert_eq!(faces.len(), 6, "single pyramid should have 6 triangles (2 base + 4 sides)");
+        assert_eq!(
+            faces.len(),
+            6,
+            "single pyramid should have 6 triangles (2 base + 4 sides)"
+        );
     }
 
     #[test]
@@ -1448,7 +1454,11 @@ mod tests {
         ];
         let mesh = VolumeMesh::new("m", verts, cells);
         let (_, faces) = mesh.generate_render_geometry();
-        assert_eq!(faces.len(), 4 + 8 + 6, "mixed mesh should sum per-cell triangle counts");
+        assert_eq!(
+            faces.len(),
+            4 + 8 + 6,
+            "mixed mesh should sum per-cell triangle counts"
+        );
     }
 
     #[test]
@@ -1538,11 +1548,7 @@ mod tests {
     #[test]
     fn test_cell_type_detection_prism() {
         let verts = (0..6).map(|i| Vec3::splat(i as f32)).collect();
-        let mesh = VolumeMesh::new(
-            "p",
-            verts,
-            vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]],
-        );
+        let mesh = VolumeMesh::new("p", verts, vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]]);
         assert_eq!(mesh.cell_type(0), VolumeCellType::Prism);
     }
 

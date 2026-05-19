@@ -6,8 +6,8 @@
 
 use glam::Vec3;
 use polyscope_rs::{
-    Result, init, register_hex_mesh, register_prism_mesh, register_pyramid_mesh,
-    register_tet_mesh, show,
+    Result, init, register_hex_mesh, register_prism_mesh, register_pyramid_mesh, register_tet_mesh,
+    show,
 };
 
 fn main() -> Result<()> {

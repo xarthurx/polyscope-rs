@@ -155,18 +155,10 @@ pub fn slice_hex(vertices: [Vec3; 8], plane_origin: Vec3, plane_normal: Vec3) ->
 /// * `plane_origin` - A point on the plane
 /// * `plane_normal` - The plane normal (points toward kept geometry)
 #[must_use]
-pub fn slice_prism(
-    vertices: [Vec3; 6],
-    plane_origin: Vec3,
-    plane_normal: Vec3,
-) -> CellSliceResult {
+pub fn slice_prism(vertices: [Vec3; 6], plane_origin: Vec3, plane_normal: Vec3) -> CellSliceResult {
     // Symmetric 3-tet decomposition. Cross-cell consistency is not required for
     // isolated slicing — the choice doesn't affect correctness.
-    let tet_indices = [
-        [0usize, 5, 4, 3],
-        [0, 4, 5, 2],
-        [0, 4, 2, 1],
-    ];
+    let tet_indices = [[0usize, 5, 4, 3], [0, 4, 5, 2], [0, 4, 2, 1]];
 
     let mut all_vertices = Vec::new();
     let mut all_interp = Vec::new();
@@ -211,10 +203,7 @@ pub fn slice_pyramid(
     plane_origin: Vec3,
     plane_normal: Vec3,
 ) -> CellSliceResult {
-    let tet_indices = [
-        [0usize, 2, 4, 1],
-        [0, 4, 2, 3],
-    ];
+    let tet_indices = [[0usize, 2, 4, 1], [0, 4, 2, 3]];
 
     let mut all_vertices = Vec::new();
     let mut all_interp = Vec::new();

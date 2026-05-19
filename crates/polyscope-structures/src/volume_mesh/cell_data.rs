@@ -28,43 +28,103 @@ pub struct FaceData {
 
 // ===== Tet =====
 const TET_FACES: &[FaceData] = &[
-    FaceData { polygon: &[0, 2, 1], triangulation: &[[0, 2, 1]] },
-    FaceData { polygon: &[0, 1, 3], triangulation: &[[0, 1, 3]] },
-    FaceData { polygon: &[0, 3, 2], triangulation: &[[0, 3, 2]] },
-    FaceData { polygon: &[1, 2, 3], triangulation: &[[1, 2, 3]] },
+    FaceData {
+        polygon: &[0, 2, 1],
+        triangulation: &[[0, 2, 1]],
+    },
+    FaceData {
+        polygon: &[0, 1, 3],
+        triangulation: &[[0, 1, 3]],
+    },
+    FaceData {
+        polygon: &[0, 3, 2],
+        triangulation: &[[0, 3, 2]],
+    },
+    FaceData {
+        polygon: &[1, 2, 3],
+        triangulation: &[[1, 2, 3]],
+    },
 ];
 
 // ===== Hex =====
 // Numbered like in the VTK file-formats diagram, with slots 6 and 7 swapped
 // to match upstream (see polyscope/src/volume_mesh.cpp:43).
 const HEX_FACES: &[FaceData] = &[
-    FaceData { polygon: &[2, 1, 0, 3], triangulation: &[[2, 1, 0], [2, 0, 3]] }, // Bottom
-    FaceData { polygon: &[4, 0, 1, 5], triangulation: &[[4, 0, 1], [4, 1, 5]] }, // Front
-    FaceData { polygon: &[5, 1, 2, 6], triangulation: &[[5, 1, 2], [5, 2, 6]] }, // Right
-    FaceData { polygon: &[7, 3, 0, 4], triangulation: &[[7, 3, 0], [7, 0, 4]] }, // Left
-    FaceData { polygon: &[6, 2, 3, 7], triangulation: &[[6, 2, 3], [6, 3, 7]] }, // Back
-    FaceData { polygon: &[7, 4, 5, 6], triangulation: &[[7, 4, 5], [7, 5, 6]] }, // Top
+    FaceData {
+        polygon: &[2, 1, 0, 3],
+        triangulation: &[[2, 1, 0], [2, 0, 3]],
+    }, // Bottom
+    FaceData {
+        polygon: &[4, 0, 1, 5],
+        triangulation: &[[4, 0, 1], [4, 1, 5]],
+    }, // Front
+    FaceData {
+        polygon: &[5, 1, 2, 6],
+        triangulation: &[[5, 1, 2], [5, 2, 6]],
+    }, // Right
+    FaceData {
+        polygon: &[7, 3, 0, 4],
+        triangulation: &[[7, 3, 0], [7, 0, 4]],
+    }, // Left
+    FaceData {
+        polygon: &[6, 2, 3, 7],
+        triangulation: &[[6, 2, 3], [6, 3, 7]],
+    }, // Back
+    FaceData {
+        polygon: &[7, 4, 5, 6],
+        triangulation: &[[7, 4, 5], [7, 5, 6]],
+    }, // Top
 ];
 
 // ===== Prism (wedge) =====
 // Slots 0,1,2 = bottom triangle; 3,4,5 = top triangle (slots 3,4,5 align with 0,1,2).
 const PRISM_FACES: &[FaceData] = &[
-    FaceData { polygon: &[0, 2, 1],    triangulation: &[[0, 2, 1]] },            // Bottom tri
-    FaceData { polygon: &[0, 3, 5, 2], triangulation: &[[0, 5, 2], [0, 3, 5]] }, // Side quad 1
-    FaceData { polygon: &[2, 5, 4, 1], triangulation: &[[2, 4, 5], [2, 1, 4]] }, // Side quad 2
-    FaceData { polygon: &[0, 1, 4, 3], triangulation: &[[3, 0, 4], [0, 1, 4]] }, // Side quad 3
-    FaceData { polygon: &[3, 4, 5],    triangulation: &[[3, 4, 5]] },            // Top tri
+    FaceData {
+        polygon: &[0, 2, 1],
+        triangulation: &[[0, 2, 1]],
+    }, // Bottom tri
+    FaceData {
+        polygon: &[0, 3, 5, 2],
+        triangulation: &[[0, 5, 2], [0, 3, 5]],
+    }, // Side quad 1
+    FaceData {
+        polygon: &[2, 5, 4, 1],
+        triangulation: &[[2, 4, 5], [2, 1, 4]],
+    }, // Side quad 2
+    FaceData {
+        polygon: &[0, 1, 4, 3],
+        triangulation: &[[3, 0, 4], [0, 1, 4]],
+    }, // Side quad 3
+    FaceData {
+        polygon: &[3, 4, 5],
+        triangulation: &[[3, 4, 5]],
+    }, // Top tri
 ];
 
 // ===== Pyramid =====
 // Slots 0..3 = base quad (CCW from outside, looking from -apex toward base);
 // Slot 4 = apex.
 const PYRAMID_FACES: &[FaceData] = &[
-    FaceData { polygon: &[0, 1, 2, 3], triangulation: &[[0, 3, 2], [0, 2, 1]] }, // Base quad
-    FaceData { polygon: &[0, 1, 4],    triangulation: &[[0, 1, 4]] },            // Side 1
-    FaceData { polygon: &[1, 2, 4],    triangulation: &[[1, 2, 4]] },            // Side 2
-    FaceData { polygon: &[2, 3, 4],    triangulation: &[[2, 3, 4]] },            // Side 3
-    FaceData { polygon: &[3, 0, 4],    triangulation: &[[3, 0, 4]] },            // Side 4
+    FaceData {
+        polygon: &[0, 1, 2, 3],
+        triangulation: &[[0, 3, 2], [0, 2, 1]],
+    }, // Base quad
+    FaceData {
+        polygon: &[0, 1, 4],
+        triangulation: &[[0, 1, 4]],
+    }, // Side 1
+    FaceData {
+        polygon: &[1, 2, 4],
+        triangulation: &[[1, 2, 4]],
+    }, // Side 2
+    FaceData {
+        polygon: &[2, 3, 4],
+        triangulation: &[[2, 3, 4]],
+    }, // Side 3
+    FaceData {
+        polygon: &[3, 0, 4],
+        triangulation: &[[3, 0, 4]],
+    }, // Side 4
 ];
 
 /// Returns the face data table for a given cell type.
@@ -171,15 +231,9 @@ pub fn decompose_pyramid(cell: &[u32; 8]) -> [[u32; 4]; 2] {
     let p: [u32; 5] = [cell[0], cell[1], cell[2], cell[3], cell[4]];
 
     if p[0].min(p[2]) < p[1].min(p[3]) {
-        [
-            [p[0], p[2], p[4], p[1]],
-            [p[0], p[4], p[2], p[3]],
-        ]
+        [[p[0], p[2], p[4], p[1]], [p[0], p[4], p[2], p[3]]]
     } else {
-        [
-            [p[1], p[3], p[4], p[2]],
-            [p[1], p[4], p[3], p[0]],
-        ]
+        [[p[1], p[3], p[4], p[2]], [p[1], p[4], p[3], p[0]]]
     }
 }
 
