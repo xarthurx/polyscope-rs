@@ -1038,6 +1038,37 @@ mod tests {
     }
 
     #[test]
+    fn test_camera_state_flyto_starts_flight() {
+        let cam = make_camera_state_input();
+        let state = CameraState::from_camera(&cam);
+        let mut fresh = Camera::new(1.5);
+        fresh.position = Vec3::new(-1.0, -1.0, -1.0);
+        fresh.target = Vec3::ZERO;
+        fresh.up = Vec3::Y;
+
+        state.apply(&mut fresh, ViewTransition::FlyTo);
+        assert!(fresh.flight.is_some(), "FlyTo should start a camera flight");
+        // Non-pose fields apply immediately
+        assert_eq!(fresh.projection_mode, cam.projection_mode);
+        assert!((fresh.ortho_scale - cam.ortho_scale).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_camera_state_unknown_enum_falls_back_in_apply() {
+        let mut bad = CameraState::from_camera(&make_camera_state_input());
+        bad.projection_mode = "definitely_not_a_mode".to_string();
+        bad.navigation_style = "also_not_real".to_string();
+
+        let mut target = Camera::new(1.5);
+        let original_proj = target.projection_mode;
+        let original_nav = target.navigation_style;
+        bad.apply(&mut target, ViewTransition::Instant);
+
+        assert_eq!(target.projection_mode, original_proj);
+        assert_eq!(target.navigation_style, original_nav);
+    }
+
+    #[test]
     fn test_projection_mode_perspective() {
         let camera = Camera::new(1.0);
         let proj = camera.projection_matrix();
