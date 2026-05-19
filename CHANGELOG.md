@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   produced by external pipelines must place sentinels in the correct trailing
   slots; tet meshes built with `new_tet_mesh` continue to work unchanged.
 
+### Fixed
+- Prism side quad 2 triangle winding now produces outward-facing normals
+  (was inward in upstream `stencilPrism`).
+
 ## [0.5.10] - 2026-05-04
 
 ### Fixed
