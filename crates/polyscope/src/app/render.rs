@@ -14,6 +14,14 @@ use polyscope_structures::volume_grid::{
 impl App {
     /// Renders a single frame.
     pub(super) fn render(&mut self) {
+        // Drain any queued view-state application before touching the camera.
+        let pending = polyscope_core::state::with_context_mut(
+            polyscope_core::Context::take_pending_view_apply,
+        );
+        if let Some((state, transition)) = pending {
+            self.apply_view_state(&state, transition);
+        }
+
         let (Some(engine), Some(_egui), Some(_window)) =
             (&mut self.engine, &mut self.egui, &self.window)
         else {
@@ -1413,5 +1421,9 @@ impl App {
             });
             self.capture_screenshot(filename);
         }
+
+        // Publish a fresh snapshot for save_view_to_json callers.
+        let snapshot = self.current_view_state();
+        polyscope_core::state::with_context_mut(|ctx| ctx.set_view_state_snapshot(snapshot));
     }
 }

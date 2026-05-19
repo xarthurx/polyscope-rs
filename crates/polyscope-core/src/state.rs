@@ -118,6 +118,21 @@ mod state_view_tests {
 }
 
 impl Context {
+    /// Take the queued pending view-state, if any. Used by the App at frame start.
+    pub fn take_pending_view_apply(
+        &mut self,
+    ) -> Option<(
+        crate::view_state::ViewState,
+        crate::view_state::ViewTransition,
+    )> {
+        self.pending_view_apply.take()
+    }
+
+    /// Publish a fresh view-state snapshot. Used by the App at frame end.
+    pub fn set_view_state_snapshot(&mut self, snapshot: crate::view_state::ViewState) {
+        self.view_state_snapshot = Some(snapshot);
+    }
+
     /// Computes the center of the bounding box.
     #[must_use]
     pub fn center(&self) -> Vec3 {
