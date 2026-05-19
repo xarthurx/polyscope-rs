@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- View save/restore: serialize the camera + render-look state (background,
+  ground plane, transparency, SSAO, SSAA) to a JSON file and load it back.
+  New API: `save_view_to_file`, `load_view_from_file`, `save_view_to_json`,
+  `load_view_from_json`, `current_view_state`, `apply_view_state`, plus the
+  `ViewTransition` enum (`Instant` / `FlyTo`). Two UI buttons in the View
+  Controls section open native file dialogs (via `rfd`). JSON format is
+  Rust-native (not byte-compatible with C++ Polyscope view files) and
+  versioned. Headless rendering honors a loaded view and skips auto-fit, so
+  scripts can do `load_view_from_file(...)?; render_to_file(...)?` for
+  reproducible figures. New example `view_state_demo`.
 - Volume Mesh now supports prism (wedge) and pyramid cell types in addition to
   tetrahedra and hexahedra. New constructors: `register_prism_mesh`,
   `register_pyramid_mesh`, `VolumeMesh::new_prism_mesh`,

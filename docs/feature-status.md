@@ -81,6 +81,7 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 - [x] Curve network tube ortho-projection ray casting — parallel rays in ortho mode via new `is_orthographic` camera flag (upstream commit 51953c2)
 - [x] Slice plane API improvements — `add_slice_plane_auto()` (auto-named) and `SlicePlaneHandle::remove(self)` (upstream commit 24ec7e3)
 - [x] Volume Mesh prism + pyramid cell support (upstream PR #353, commit dcbaedb)
+- [x] View save/restore JSON — serialize/deserialize camera + render-look state to/from JSON file, with UI buttons and headless reproducibility (upstream commit 7570a40, fix #389; Rust-native format, not byte-compatible with C++)
 
 ---
 
@@ -93,7 +94,6 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 ## Planned Work
 
 ### Upstream Ports (Medium-Term)
-- [ ] View save/restore JSON — serialize/deserialize camera state (upstream 7570a40, d034498)
 - [ ] Configurable right panel width — user-settable UI panel width (upstream 18f99ed)
 - [ ] Double-click/selection improvements — better logic around clicks (upstream 022deea)
 - [ ] Onscreen colorbar — floating colorbar widget on viewport (upstream 994acb0)
