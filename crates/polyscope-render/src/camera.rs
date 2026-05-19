@@ -826,9 +826,216 @@ impl Default for Camera {
     }
 }
 
+// ===== View-state DTO + helpers =====
+
+use serde::{Deserialize, Serialize};
+
+/// Serializable snapshot of a `Camera` covering everything needed to
+/// reproduce its rendered view.
+///
+/// Enum-string fields are DTO-local — the public enums on `Camera`
+/// (`NavigationStyle`, `ProjectionMode`, `AxisDirection`) keep their
+/// existing serialization.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CameraState {
+    pub position: [f32; 3],
+    pub target: [f32; 3],
+    pub up: [f32; 3],
+    pub fov: f32,
+    pub near: f32,
+    pub far: f32,
+    pub projection_mode: String,
+    pub ortho_scale: f32,
+    pub navigation_style: String,
+    pub up_direction: String,
+    pub front_direction: String,
+}
+
+impl CameraState {
+    /// Snapshot the current camera into a `CameraState`.
+    #[must_use]
+    pub fn from_camera(c: &Camera) -> Self {
+        Self {
+            position: c.position.into(),
+            target: c.target.into(),
+            up: c.up.into(),
+            fov: c.fov,
+            near: c.near,
+            far: c.far,
+            projection_mode: projection_mode_name(c.projection_mode).to_owned(),
+            ortho_scale: c.ortho_scale,
+            navigation_style: navigation_style_name(c.navigation_style).to_owned(),
+            up_direction: axis_direction_name(c.up_direction).to_owned(),
+            front_direction: axis_direction_name(c.front_direction).to_owned(),
+        }
+    }
+
+    /// Apply this state to `camera`. For `Instant`, all fields snap. For
+    /// `FlyTo`, position/target/up/fov animate via the existing camera flight
+    /// (~0.4 s); other fields snap.
+    pub fn apply(
+        &self,
+        camera: &mut Camera,
+        transition: polyscope_core::view_state::ViewTransition,
+    ) {
+        use polyscope_core::view_state::ViewTransition;
+
+        let new_pos = Vec3::from(self.position);
+        let new_target = Vec3::from(self.target);
+        let new_up = Vec3::from(self.up);
+
+        camera.near = self.near;
+        camera.far = self.far;
+        camera.projection_mode =
+            parse_projection_mode(&self.projection_mode).unwrap_or(camera.projection_mode);
+        camera.ortho_scale = self.ortho_scale;
+        camera.navigation_style =
+            parse_navigation_style(&self.navigation_style).unwrap_or(camera.navigation_style);
+        camera.up_direction =
+            parse_axis_direction(&self.up_direction).unwrap_or(camera.up_direction);
+        camera.front_direction =
+            parse_axis_direction(&self.front_direction).unwrap_or(camera.front_direction);
+
+        match transition {
+            ViewTransition::Instant => {
+                camera.position = new_pos;
+                camera.target = new_target;
+                camera.up = new_up;
+                camera.fov = self.fov;
+                camera.flight = None;
+            }
+            ViewTransition::FlyTo => {
+                let target_view = Mat4::look_at_rh(new_pos, new_target, new_up);
+                camera.start_flight_to(target_view, self.fov, 0.4);
+            }
+        }
+    }
+}
+
+fn navigation_style_name(s: NavigationStyle) -> &'static str {
+    match s {
+        NavigationStyle::Turntable => "turntable",
+        NavigationStyle::Free => "free",
+        NavigationStyle::Planar => "planar",
+        NavigationStyle::Arcball => "arcball",
+        NavigationStyle::FirstPerson => "first_person",
+        NavigationStyle::None => "none",
+    }
+}
+
+fn parse_navigation_style(s: &str) -> Option<NavigationStyle> {
+    Some(match s {
+        "turntable" => NavigationStyle::Turntable,
+        "free" => NavigationStyle::Free,
+        "planar" => NavigationStyle::Planar,
+        "arcball" => NavigationStyle::Arcball,
+        "first_person" => NavigationStyle::FirstPerson,
+        "none" => NavigationStyle::None,
+        _ => return None,
+    })
+}
+
+fn projection_mode_name(p: ProjectionMode) -> &'static str {
+    match p {
+        ProjectionMode::Perspective => "perspective",
+        ProjectionMode::Orthographic => "orthographic",
+    }
+}
+
+fn parse_projection_mode(s: &str) -> Option<ProjectionMode> {
+    Some(match s {
+        "perspective" => ProjectionMode::Perspective,
+        "orthographic" => ProjectionMode::Orthographic,
+        _ => return None,
+    })
+}
+
+fn axis_direction_name(a: AxisDirection) -> &'static str {
+    match a {
+        AxisDirection::PosX => "pos_x",
+        AxisDirection::NegX => "neg_x",
+        AxisDirection::PosY => "pos_y",
+        AxisDirection::NegY => "neg_y",
+        AxisDirection::PosZ => "pos_z",
+        AxisDirection::NegZ => "neg_z",
+    }
+}
+
+fn parse_axis_direction(s: &str) -> Option<AxisDirection> {
+    Some(match s {
+        "pos_x" => AxisDirection::PosX,
+        "neg_x" => AxisDirection::NegX,
+        "pos_y" => AxisDirection::PosY,
+        "neg_y" => AxisDirection::NegY,
+        "pos_z" => AxisDirection::PosZ,
+        "neg_z" => AxisDirection::NegZ,
+        _ => return None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use polyscope_core::view_state::ViewTransition;
+
+    fn make_camera_state_input() -> Camera {
+        let mut c = Camera::new(1.5);
+        c.position = Vec3::new(2.0, 3.0, 4.0);
+        c.target = Vec3::new(0.5, 0.0, 0.0);
+        c.up = Vec3::new(0.0, 1.0, 0.0);
+        c.fov = 0.8;
+        c.near = 0.1;
+        c.far = 500.0;
+        c.projection_mode = ProjectionMode::Orthographic;
+        c.ortho_scale = 2.5;
+        c.navigation_style = NavigationStyle::Arcball;
+        c.up_direction = AxisDirection::NegY;
+        c.front_direction = AxisDirection::PosZ;
+        c
+    }
+
+    #[test]
+    fn test_camera_state_serializes_snake_case_enums() {
+        let s = CameraState::from_camera(&make_camera_state_input());
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(v["projection_mode"], "orthographic");
+        assert_eq!(v["navigation_style"], "arcball");
+        assert_eq!(v["up_direction"], "neg_y");
+        assert_eq!(v["front_direction"], "pos_z");
+    }
+
+    #[test]
+    fn test_camera_state_roundtrip() {
+        let cam = make_camera_state_input();
+        let state = CameraState::from_camera(&cam);
+        let json = serde_json::to_string(&state).unwrap();
+        let parsed: CameraState = serde_json::from_str(&json).unwrap();
+
+        let mut fresh = Camera::new(1.5);
+        parsed.apply(&mut fresh, ViewTransition::Instant);
+
+        let eps = 1e-5;
+        assert!((fresh.position - cam.position).length() < eps);
+        assert!((fresh.target - cam.target).length() < eps);
+        assert!((fresh.up - cam.up).length() < eps);
+        assert!((fresh.fov - cam.fov).abs() < eps);
+        assert!((fresh.near - cam.near).abs() < eps);
+        assert!((fresh.far - cam.far).abs() < eps);
+        assert_eq!(fresh.projection_mode, cam.projection_mode);
+        assert!((fresh.ortho_scale - cam.ortho_scale).abs() < eps);
+        assert_eq!(fresh.navigation_style, cam.navigation_style);
+        assert_eq!(fresh.up_direction, cam.up_direction);
+        assert_eq!(fresh.front_direction, cam.front_direction);
+    }
+
+    #[test]
+    fn test_camera_state_instant_does_not_start_flight() {
+        let cam = make_camera_state_input();
+        let state = CameraState::from_camera(&cam);
+        let mut fresh = Camera::new(1.5);
+        state.apply(&mut fresh, ViewTransition::Instant);
+        assert!(fresh.flight.is_none());
+    }
 
     #[test]
     fn test_projection_mode_perspective() {
