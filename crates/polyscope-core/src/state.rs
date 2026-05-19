@@ -71,6 +71,18 @@ pub struct Context {
 
     /// Deferred material load requests (processed by App each frame).
     pub material_load_queue: Vec<MaterialLoadRequest>,
+
+    /// Latest view-state snapshot, published by the App once per frame.
+    /// `None` until the first frame is rendered.
+    #[allow(dead_code)] // wired in Tasks 6 and 8 of the view-save-restore plan
+    pub(crate) view_state_snapshot: Option<crate::view_state::ViewState>,
+
+    /// Pending view state queued by a caller, consumed by the App on the next frame.
+    #[allow(dead_code)] // wired in Tasks 6 and 8 of the view-save-restore plan
+    pub(crate) pending_view_apply: Option<(
+        crate::view_state::ViewState,
+        crate::view_state::ViewTransition,
+    )>,
 }
 
 impl Default for Context {
@@ -89,7 +101,21 @@ impl Default for Context {
             floating_quantities: Vec::new(),
             file_drop_callback: None,
             material_load_queue: Vec::new(),
+            view_state_snapshot: None,
+            pending_view_apply: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod state_view_tests {
+    use super::*;
+
+    #[test]
+    fn test_context_starts_with_no_view_buffers() {
+        let ctx = Context::default();
+        assert!(ctx.view_state_snapshot.is_none());
+        assert!(ctx.pending_view_apply.is_none());
     }
 }
 
