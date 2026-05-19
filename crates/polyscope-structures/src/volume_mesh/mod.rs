@@ -192,12 +192,29 @@ impl VolumeMesh {
     }
 
     /// Returns the cell type of the given cell.
+    ///
+    /// Cell type is determined by the number of sentinel (`u32::MAX`) indices
+    /// in the 8-slot cell array (matches upstream C++ Polyscope):
+    /// - 0 sentinels → `Hex` (8 verts)
+    /// - 2 sentinels → `Prism` (6 verts)
+    /// - 3 sentinels → `Pyramid` (5 verts)
+    /// - 4 sentinels → `Tet` (4 verts)
+    ///
+    /// # Panics
+    /// Panics if `cell_idx` is out of range or the sentinel count is invalid
+    /// (1, 5, 6, 7, or 8 sentinels).
     #[must_use]
     pub fn cell_type(&self, cell_idx: usize) -> VolumeCellType {
-        if self.cells[cell_idx][4] == u32::MAX {
-            VolumeCellType::Tet
-        } else {
-            VolumeCellType::Hex
+        let sentinels = self.cells[cell_idx]
+            .iter()
+            .filter(|&&v| v == u32::MAX)
+            .count();
+        match sentinels {
+            0 => VolumeCellType::Hex,
+            2 => VolumeCellType::Prism,
+            3 => VolumeCellType::Pyramid,
+            4 => VolumeCellType::Tet,
+            n => panic!("VolumeMesh cell {cell_idx}: invalid sentinel count {n} (expected 0/2/3/4)"),
         }
     }
 
@@ -1458,6 +1475,45 @@ const HEX_TO_TET_PATTERN: [[usize; 4]; 5] = [
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_cell_type_detection_tet() {
+        let mesh = VolumeMesh::new(
+            "t",
+            vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z],
+            vec![[0, 1, 2, 3, u32::MAX, u32::MAX, u32::MAX, u32::MAX]],
+        );
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Tet);
+    }
+
+    #[test]
+    fn test_cell_type_detection_hex() {
+        let verts = (0..8).map(|i| Vec3::splat(i as f32)).collect();
+        let mesh = VolumeMesh::new("h", verts, vec![[0, 1, 2, 3, 4, 5, 6, 7]]);
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Hex);
+    }
+
+    #[test]
+    fn test_cell_type_detection_prism() {
+        let verts = (0..6).map(|i| Vec3::splat(i as f32)).collect();
+        let mesh = VolumeMesh::new(
+            "p",
+            verts,
+            vec![[0, 1, 2, 3, 4, 5, u32::MAX, u32::MAX]],
+        );
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Prism);
+    }
+
+    #[test]
+    fn test_cell_type_detection_pyramid() {
+        let verts = (0..5).map(|i| Vec3::splat(i as f32)).collect();
+        let mesh = VolumeMesh::new(
+            "py",
+            verts,
+            vec![[0, 1, 2, 3, 4, u32::MAX, u32::MAX, u32::MAX]],
+        );
+        assert_eq!(mesh.cell_type(0), VolumeCellType::Pyramid);
+    }
 
     #[test]
     fn test_cell_type_enum_has_prism_and_pyramid() {
