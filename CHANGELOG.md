@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Volume Mesh now supports prism (wedge) and pyramid cell types in addition to
+  tetrahedra and hexahedra. New constructors: `register_prism_mesh`,
+  `register_pyramid_mesh`, `VolumeMesh::new_prism_mesh`,
+  `VolumeMesh::new_pyramid_mesh`. Mixed-cell meshes are supported by using the
+  8-slot cell array with sentinel `u32::MAX` indices in unused slots
+  (matches upstream Polyscope PR #353).
+- `slice_prism` and `slice_pyramid` helpers in
+  `polyscope_structures::volume_mesh::slice_geometry`.
+- Example `volume_mesh_mixed_cells_demo` showing all four cell types.
+
+### Changed
+- `VolumeMesh::cell_type` now classifies cells by sentinel count (0/2/3/4 →
+  Hex/Prism/Pyramid/Tet) instead of by `cell[4] == u32::MAX`. Mixed meshes
+  produced by external pipelines must place sentinels in the correct trailing
+  slots; tet meshes built with `new_tet_mesh` continue to work unchanged.
+
 ## [0.5.9] - 2026-03-02
 
 ### Changed

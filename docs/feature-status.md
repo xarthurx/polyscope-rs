@@ -9,7 +9,7 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 | Point Cloud | Full | Full | Sphere impostors via instanced rendering |
 | Surface Mesh | Full | Full | Triangles + arbitrary polygons, full quantity support |
 | Curve Network | Full | Full | Lines + tubes via compute shaders |
-| Volume Mesh | Full | Full | Tet/hex, interior face detection, slice capping |
+| Volume Mesh | Full | Full | Tet/hex/prism/pyramid, interior face detection, slice capping |
 | Volume Grid | Full | Full | Node/cell scalars, gridcube + isosurface (marching cubes) |
 | Camera View | Full | Full | Frustum visualization |
 | Floating Quantities | Full | Full | Scalar/color images, depth/color/raw render images |
@@ -77,6 +77,7 @@ Feature parity tracking between polyscope-rs and C++ Polyscope 2.x.
 - [x] Degenerate bounding box tolerance (upstream commit 3198ab5)
 - [x] `remove_everything()` / `remove_all_groups()` scene reset (upstream commit f34f403)
 - [x] Improved camera flight interpolation via inverse view matrix (upstream commit 067f760)
+- [x] Volume Mesh prism + pyramid cell support (upstream PR #353, commit dcbaedb)
 
 ---
 
