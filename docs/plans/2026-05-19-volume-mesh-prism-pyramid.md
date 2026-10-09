@@ -1,7 +1,5 @@
 # Volume Mesh Prism & Pyramid Cell Support Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Add prism (6-vertex wedge) and pyramid (5-vertex) cell support to `VolumeMesh`, achieving feature parity with upstream C++ Polyscope PR #353.
 
 **Architecture:** Extract cell-shape data (stencils, polygon faces, decomposition patterns) into a new `cell_data.rs` submodule under `polyscope-structures/src/volume_mesh/`. Switch `VolumeMesh::cell_type()` from the current sentinel-slot-4 check to a sentinel-count classifier (0=Hex, 2=Prism, 3=Pyramid, 4=Tet — matches upstream). Refactor each per-cell iteration site (`compute_face_counts`, `generate_render_geometry`, `generate_render_geometry_with_culling`, `generate_render_geometry_with_quantities`, `generate_cell_index_per_triangle`, `decompose_to_tets`, `cell_centroid`) to dispatch through a unified `face_data_for(cell_type)` table instead of branching on tet-vs-hex. Add `slice_prism` / `slice_pyramid` to `slice_geometry.rs` using tet-decomposition (same strategy as existing `slice_hex`). Expose `new_prism_mesh` / `new_pyramid_mesh` on `VolumeMesh` and matching `register_*` functions on the public crate.

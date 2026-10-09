@@ -1,7 +1,5 @@
 # View Save / Restore Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Implement the design from `docs/plans/2026-05-19-view-save-restore-design.md` — JSON-based save/restore of camera pose + render-look state, with both a programmatic API and UI buttons.
 
 **Architecture:** The state to save is distributed across `RenderEngine::camera`, `App` fields (`background_color`, `ground_plane`), `AppearanceSettings` (transparency), and `Context::options` (SSAO). To present a clean free-function API despite this distribution, two new fields are added to `Context`: `view_state_snapshot` (App-published, frame-by-frame) and `pending_view_apply` (queued by callers, App-consumed). The App drains pending at frame start and publishes snapshot at frame end. Headless rendering drains the pending queue once during `render_to_image()` and skips auto-fit when a view was applied. UI emits *intent* (`RequestSaveView`/`RequestLoadView`) from the egui builder; the actual `rfd` file dialog opens in the app loop *after* the egui frame, avoiding multi-pass reruns.
