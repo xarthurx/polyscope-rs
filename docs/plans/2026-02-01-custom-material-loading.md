@@ -1,7 +1,5 @@
 # Custom Material Loading Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add runtime loading of user-provided matcap textures from disk, with both programmatic API and UI panel.
 
 **Architecture:** New `decode_matcap_image_from_file()` function in `materials.rs` loads images via `image::open()`, then feeds into the existing `upload_matcap_texture()` pipeline. `RenderEngine` gets `load_blendable_material()` and `load_static_material()` methods. Public API in `polyscope` crate wraps these. UI material selector becomes dynamic from registry; new "Materials" collapsing section added to left panel.

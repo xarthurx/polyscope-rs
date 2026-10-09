@@ -1,7 +1,5 @@
 # Phase 3: Point Cloud Rendering Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Render point clouds as sphere impostors with scalar, color, and vector quantities.
 
 **Architecture:** Use instanced rendering to draw billboard quads (one per point), with fragment shader ray-casting for sphere impostors. Quantities modify per-point colors via storage buffers. Colormaps use 1D textures for scalar-to-color mapping.

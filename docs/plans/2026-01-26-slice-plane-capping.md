@@ -1,7 +1,5 @@
 # Slice Plane Capping Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Implement slice planes that cut through geometry and optionally show cross-section "capping" for volume meshes.
 
 **Architecture:** Three-phase approach: (1) Basic fragment-level slicing via shader discard, (2) Slice plane visualization, (3) Volume mesh cross-section capping using geometry generation. The existing `SlicePlane` data structure in `polyscope-core` provides the foundation.

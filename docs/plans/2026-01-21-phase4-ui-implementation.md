@@ -1,7 +1,5 @@
 # Phase 4: UI Integration Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add egui-based UI with structure tree, quantity controls, and element picking.
 
 **Architecture:** Integrate egui into the wgpu render loop using egui-winit for input and egui-wgpu for rendering. UI panels overlay the 3D viewport. Pick buffer uses a separate render pass with color-encoded element IDs.

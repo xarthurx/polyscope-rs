@@ -1,7 +1,5 @@
 # Gizmo Rendering Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add visual 3D transformation gizmo rendering using the transform-gizmo-egui crate, enabling interactive translation/rotation/scaling of selected structures.
 
 **Architecture:** Upgrade egui from 0.31 to 0.33, add transform-gizmo-egui dependency, integrate gizmo rendering into the existing egui frame, and connect gizmo interactions to the structure transform system. The gizmo will render when a structure is selected and gizmo is visible.

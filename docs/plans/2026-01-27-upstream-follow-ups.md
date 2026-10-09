@@ -1,7 +1,5 @@
 # Upstream C++ Polyscope Follow-ups Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Port relevant bug fixes and UX improvements from recent C++ Polyscope commits to polyscope-rs.
 
 **Architecture:** Three independent features touching the App struct's event handling (double-click, drag-and-drop) and the camera module (turntable drift fix). Each task is self-contained with no cross-dependencies.

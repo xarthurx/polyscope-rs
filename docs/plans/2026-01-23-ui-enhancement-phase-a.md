@@ -1,7 +1,5 @@
 # UI Enhancement Phase A: Core View Controls Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add comprehensive camera and view controls to polyscope-rs UI matching the original C++ Polyscope functionality.
 
 **Architecture:** Add camera configuration types (navigation style, projection mode, directions) to the render crate, then create UI panels in polyscope-ui that expose these settings. The UI panels connect to both Camera (render) and Context (core) for scene extents.

@@ -1,7 +1,5 @@
 # Ground Reflections Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Enable planar ground reflections showing mirrored geometry on the ground plane.
 
 **Architecture:** Use stencil buffer to mask the ground plane region, then render reflected geometry only within that region. Existing shaders (`reflected_mesh.wgsl`, `ground_stencil.wgsl`) and infrastructure (`ReflectionPass`, `reflection_matrix()`) are already in place - this plan wires them together in the render loop.

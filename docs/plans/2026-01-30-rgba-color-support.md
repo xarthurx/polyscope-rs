@@ -1,7 +1,5 @@
 # RGBA Color Support Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add RGBA color support throughout polyscope-rs, replacing Vec3 color storage with Vec4 and propagating alpha to GPU buffers and UI.
 
 **Architecture:** Change all internal color storage from `Vec3` to `Vec4` (with alpha channel). Keep existing `Vec3` public API methods working by extending them with `alpha=1.0` default, and add new `_rgba` setter variants. GPU uniforms already use `[f32; 4]` so the main work is CPU-side storage and buffer creation.

@@ -1,7 +1,5 @@
 # render.rs Split + Dedup Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Split the 3,459-line `render.rs` into 5 focused modules, deduplicating 3x scene drawing code and 2x GPU init code.
 
 **Architecture:** Extract shared functions for GPU initialization, buffer updates, and scene draw commands into dedicated modules. The main `render.rs` becomes a slim orchestrator. Screenshot and headless paths call shared helpers instead of duplicating draw logic. All modules use `impl App` or free functions taking `&RenderEngine`.

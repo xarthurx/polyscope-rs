@@ -1,7 +1,5 @@
 # Proper Code Cleanup Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Fix ~221 clippy warnings properly without using broad crate-level allows
 
 **Architecture:** Use targeted fixes and allows only where semantically appropriate. Type casts in graphics code are intentional and get targeted allows. Auto-fixable lints get fixed. Documentation lints handled pragmatically.

@@ -1,7 +1,5 @@
 # Ground Plane Reflections Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add TileReflection ground plane mode that renders reflected scene geometry on the ground plane with configurable reflection intensity, matching original C++ Polyscope functionality.
 
 **Architecture:** Implement planar reflections using stencil buffer. First render ground plane to stencil, then render scene geometry mirrored about the ground plane (only where stencil is set), finally render normal ground plane with reflection blended. Uses a reflection matrix to flip scene about ground plane.

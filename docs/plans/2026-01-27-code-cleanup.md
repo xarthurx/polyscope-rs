@@ -1,7 +1,5 @@
 # Code Cleanup and Simplification Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Systematically clean up the codebase - fix all compiler warnings, address clippy lints, remove dead code, and improve code quality.
 
 **Architecture:** Work through warnings by category, starting with the most impactful (dead code, unused), then moving to style and documentation issues. Each phase can be committed independently.

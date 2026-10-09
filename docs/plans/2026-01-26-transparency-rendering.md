@@ -1,7 +1,5 @@
 # Transparency Rendering Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Implement order-independent transparency rendering using Weighted Blended OIT, with per-structure transparency control.
 
 **Architecture:** Two-pass approach using Weighted Blended Order-Independent Transparency (WBOIT). First pass accumulates weighted color and alpha into separate textures. Second pass composites the result. This provides correct visual appearance regardless of render order with a single geometry pass.

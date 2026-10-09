@@ -1,7 +1,5 @@
 # Slice Planes UI Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add UI panel for managing slice planes, allowing users to add, remove, and configure slice planes through the GUI.
 
 **Architecture:** Create UI data structures and panel builders in polyscope-ui that interact with the existing SlicePlane backend in polyscope-core. The UI displays a list of slice planes with per-plane controls for origin, normal, color, transparency, and visibility options.

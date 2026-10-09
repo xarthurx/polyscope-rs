@@ -1,7 +1,5 @@
 # Tone Mapping Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add tone mapping post-processing with exposure, gamma, and white level controls to match original C++ Polyscope rendering quality.
 
 **Architecture:** Render scene to an HDR intermediate texture, then apply a fullscreen tone mapping pass that converts to LDR with configurable exposure, gamma correction, and white level. UI controls in the Appearance section.

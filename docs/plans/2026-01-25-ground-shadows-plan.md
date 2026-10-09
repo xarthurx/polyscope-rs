@@ -1,7 +1,5 @@
 # Ground Shadows Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Render scene objects to a shadow map from the light's perspective, enabling the ground plane to display real shadows under meshes.
 
 **Architecture:** Add a shadow render pass before the main render pass that renders SurfaceMesh objects to a depth-only shadow map texture. The existing ground plane shader already samples this texture with PCF - we just need to populate it with actual depth data.

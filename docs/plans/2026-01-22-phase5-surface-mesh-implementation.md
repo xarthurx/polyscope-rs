@@ -1,7 +1,5 @@
 # Phase 5: SurfaceMesh Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Implement full SurfaceMesh support with polygon storage, multiple shading modes, wireframe, and all quantity types matching C++ Polyscope.
 
 **Architecture:** SurfaceMesh stores variable-length polygon faces and computes triangulation for rendering. Uses instanced rendering for vectors, barycentric coordinates for wireframe, and per-element color encoding for picking. Quantities follow the same pattern as PointCloud.

@@ -1,7 +1,5 @@
 # Shadow Mode Ground Plane Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add ShadowOnly ground plane mode that renders shadows cast by scene objects onto the ground plane, matching original C++ Polyscope functionality.
 
 **Architecture:** Implement shadow mapping with a directional light. Render scene from light's perspective to depth texture (shadow map), then sample this map during ground plane rendering to determine shadow regions. Includes shadow blur for soft shadows.

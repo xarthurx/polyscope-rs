@@ -1,7 +1,5 @@
 # Ground Plane Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add ground plane rendering with tile mode to polyscope-rs
 
 **Architecture:** Ground plane is rendered as a fullscreen quad with vertices at infinity, using a shader that computes the intersection with an infinite horizontal plane and applies a checker pattern.

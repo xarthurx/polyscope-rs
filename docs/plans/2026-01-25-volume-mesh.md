@@ -1,7 +1,5 @@
 # Volume Mesh Complete Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Complete the volume mesh implementation with proper interior/exterior face detection, quantities (scalar, color, vector), and slice plane integration.
 
 **Architecture:** The volume mesh renders exterior faces only (faces not shared between cells). Interior faces are detected by hashing sorted face vertices and counting occurrences. Quantities follow the existing VolumeGridScalarQuantity pattern, with separate types for vertex and cell quantities.

@@ -1,7 +1,5 @@
 # SSAO (Screen Space Ambient Occlusion) Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add screen-space ambient occlusion to improve depth perception and visual quality by darkening areas where geometry is close together.
 
 **Architecture:** Multi-pass approach: (1) Render view-space normals to G-buffer during geometry pass, (2) SSAO compute pass samples depth buffer in hemisphere, (3) Blur pass smooths result, (4) Apply SSAO factor during tone mapping. Uses existing post-processing pattern from ToneMapPass.

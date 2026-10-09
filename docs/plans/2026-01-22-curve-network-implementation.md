@@ -1,7 +1,5 @@
 # CurveNetwork Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Implement CurveNetwork structure for visualizing nodes connected by edges with line/tube rendering and quantities.
 
 **Architecture:** CurveNetwork stores nodes and edges (as separate tail/tip index arrays). Rendering supports both line mode (simple lines) and tube mode (cylinder geometry). Quantities attach to nodes or edges. Pattern follows existing PointCloud and SurfaceMesh implementations.

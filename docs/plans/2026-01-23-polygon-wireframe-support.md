@@ -1,7 +1,5 @@
 # Polygon Wireframe Support Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add `edge_is_real` buffer support so wireframe rendering only shows original polygon edges, not internal triangulation edges.
 
 **Architecture:** Add a new GPU buffer `edge_is_real` that stores per-triangle-vertex flags indicating which edges are real polygon edges vs internal fan-triangulation edges. The shader uses this to selectively draw only real edges.

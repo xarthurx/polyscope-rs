@@ -1,7 +1,5 @@
 # Curve Network Tube Rendering Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Render curve network edges as 3D cylinder impostors with proper depth and lighting, using compute shaders for geometry generation and ray-cylinder intersection in fragment shaders.
 
 **Architecture:** A compute shader generates bounding box geometry (36 vertices per edge) that fully contains each cylinder. The fragment shader performs ray-cylinder intersection to find the exact hit point, computes the surface normal, writes correct depth, and applies lighting. This matches the approach used by the original C++ Polyscope.

@@ -1,7 +1,5 @@
 # Phase 2: Windowed Rendering Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Implement the windowed event loop and basic rendering so that `polyscope::show()` opens a window and renders a colored background.
 
 **Architecture:** Create a winit event loop that creates a window, initializes the wgpu render engine, and runs a frame loop that clears the screen. The RenderEngine will be stored in the global Context. Camera controls (orbit/pan/zoom) will respond to mouse input.

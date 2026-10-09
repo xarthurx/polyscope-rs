@@ -1,7 +1,5 @@
 # engine.rs Refactor: Split into Focused Modules
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Split the 4,387-line `engine.rs` into 6 focused modules to improve AI coding ergonomics and maintainability.
 
 **Architecture:** Convert `engine.rs` (single file) to `engine/` (module directory). The `RenderEngine` struct stays in `mod.rs`. Method implementations are split across sibling files using separate `impl RenderEngine` blocks. All fields use `pub(crate)` visibility so sibling modules within the crate can access them.

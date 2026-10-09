@@ -1,7 +1,5 @@
 # Tier 3 — Advanced Quantity Types Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Implement the four remaining advanced quantity types — parameterization, intrinsic vectors, one-forms, and floating quantities — to bring polyscope-rs close to full feature parity with C++ Polyscope 2.x.
 
 **Architecture:** Each feature follows the established quantity pattern: define struct → implement Quantity trait → add UI builder → add registration on parent structure → add shader (if needed) → add tests. Parameterization and intrinsic vectors are surface-mesh-only. One-forms are surface-mesh edge-based. Floating quantities are a new screen-space concept not tied to structures.

@@ -1,7 +1,5 @@
 # GPU Picking Design
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Replace screen-space approximation picking with pixel-perfect GPU picking that identifies exact elements (point #42, face #127, etc.)
 
 **Architecture:** Render all structures to an offscreen pick buffer with encoded color IDs, then read back the pixel at click position and decode to identify structure + element.
