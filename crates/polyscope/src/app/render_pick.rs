@@ -383,3 +383,28 @@ pub(super) fn render_pick_pass(engine: &RenderEngine) {
 
     engine.queue.submit(std::iter::once(encoder.finish()));
 }
+
+#[cfg(test)]
+impl super::App {
+    /// Runs the passes of a window frame without the surface and the UI:
+    /// frame preparation, pick pass and scene passes. It works with a
+    /// headless engine.
+    pub(crate) fn render_pick_frame(&mut self) {
+        self.prepare_frame(true);
+        if let Some(engine) = &self.engine {
+            render_pick_pass(engine);
+        }
+        let options = crate::with_context(|ctx| ctx.options.clone());
+        self.configure_frame(&options);
+        if let Some(engine) = &mut self.engine {
+            let mut encoder =
+                engine
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("test frame encoder"),
+                    });
+            super::render_frame::encode_scene(engine, &mut encoder, &options, false);
+            engine.queue.submit(std::iter::once(encoder.finish()));
+        }
+    }
+}

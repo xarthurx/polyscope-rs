@@ -416,6 +416,10 @@ pub fn update_gpu_buffers(engine: &RenderEngine, update_pick_uniforms: bool) {
                 && let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>()
             {
                 cn.update_gpu_buffers(&engine.queue, &engine.color_maps);
+                if update_pick_uniforms {
+                    // The line and tube pick radii follow the current radius.
+                    cn.update_pick_uniforms(&engine.queue);
+                }
 
                 // Update node and edge vector quantity uniforms
                 let model = structure.transform();

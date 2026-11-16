@@ -1510,4 +1510,55 @@ mod tests {
         let second = second_engine.frame();
         assert_eq!(first, second, "the new engine must draw the same frame");
     }
+
+    #[test]
+    fn test_curve_pick_radius_follows_the_radius() {
+        let _guard = setup();
+        register_curve_network(
+            "pick_radius_cn",
+            vec![Vec3::new(-1.0, 0.0, 0.0), Vec3::new(1.0, 0.0, 0.0)],
+            vec![[0, 1]],
+        );
+        with_curve_network("pick_radius_cn", |cn| {
+            cn.set_render_mode(1);
+            cn.set_radius(0.01, false);
+        });
+        let Some(mut renderer) = LiveRenderer::new() else {
+            eprintln!("Skipping curve pick radius test: no GPU adapter available");
+            return;
+        };
+        let app = &mut renderer.app;
+        let engine = app.engine.as_mut().expect("engine");
+        let (width, height) = (engine.width, engine.height);
+        engine.init_pick_buffers(width, height);
+
+        // The first frames create the pick resources with the small radius.
+        app.render_pick_frame();
+        app.render_pick_frame();
+        // A point 0.15 away from the tube axis, in the image plane.
+        let pixel_of = |engine: &RenderEngine, p: Vec3| {
+            let clip = engine.camera.view_projection_matrix() * p.extend(1.0);
+            let ndc = clip.truncate() / clip.w;
+            let x = f32::midpoint(ndc.x, 1.0) * engine.width as f32;
+            let y = f32::midpoint(-ndc.y, 1.0) * engine.height as f32;
+            (x as u32, y as u32)
+        };
+        let engine = app.engine.as_ref().expect("engine");
+        let up = engine.camera.up_direction.to_vec3();
+        let (x, y) = pixel_of(engine, up * 0.15);
+        let hit = |app: &app::App| {
+            let engine = app.engine.as_ref().expect("engine");
+            engine.pick_at(x, y).is_some_and(|index| index > 0)
+        };
+        assert!(!hit(app), "the thin tube must not cover the test pixel");
+
+        // The pick pass of a frame uses the tube geometry of the frame before.
+        // So two frames after the change, the pick must use the new radius.
+        with_curve_network("pick_radius_cn", |cn| {
+            cn.set_radius(0.3, false);
+        });
+        app.render_pick_frame();
+        app.render_pick_frame();
+        assert!(hit(app), "the pick pass must use the new tube radius");
+    }
 }
