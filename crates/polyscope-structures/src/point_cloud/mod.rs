@@ -453,6 +453,8 @@ impl Structure for PointCloud {
     }
 
     fn refresh(&mut self) {
+        // The GPU buffers hold the old points, so rebuild them on the next frame.
+        self.clear_gpu_resources();
         for quantity in &mut self.quantities {
             quantity.refresh();
         }
