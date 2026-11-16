@@ -673,7 +673,8 @@ impl Camera {
         // Set ortho_scale to fit the model in view
         // Use the larger of height or width/aspect_ratio to ensure model fits
         let half_height = extents.y.max(extents.x / self.aspect_ratio) * 0.6;
-        self.ortho_scale = half_height.max(0.1);
+        // The floor applies when the box is flat in the view plane. It scales with the box.
+        self.ortho_scale = half_height.max(size * 0.05).max(f32::MIN_POSITIVE);
     }
 
     /// Sets the navigation style.
@@ -699,9 +700,9 @@ impl Camera {
         self.move_speed = speed.max(0.01);
     }
 
-    /// Sets the orthographic scale.
+    /// Sets the orthographic scale. The scale stays positive; no other limit applies.
     pub fn set_ortho_scale(&mut self, scale: f32) {
-        self.ortho_scale = scale.max(0.01);
+        self.ortho_scale = scale.max(f32::MIN_POSITIVE);
     }
 
     /// Sets the field of view in radians.
@@ -710,13 +711,18 @@ impl Camera {
     }
 
     /// Sets the near clipping plane.
+    ///
+    /// The near plane stays positive. No other limit applies, so the value is
+    /// valid at any scene scale.
     pub fn set_near(&mut self, near: f32) {
-        self.near = near.max(0.001);
+        self.near = near.max(f32::MIN_POSITIVE);
     }
 
     /// Sets the far clipping plane.
+    ///
+    /// The far plane stays beyond the near plane. No other limit applies.
     pub fn set_far(&mut self, far: f32) {
-        self.far = far.max(self.near + 0.1);
+        self.far = far.max(self.near.next_up());
     }
 
     // ========================================================================
@@ -1215,6 +1221,34 @@ mod tests {
             assert!(camera.view_matrix().is_finite());
             assert!(camera.forward().dot(Vec3::NEG_Z) > 0.999);
         }
+    }
+
+    /// The clip-plane and ortho-scale setters keep the fitted values of a small
+    /// or large scene. They only keep near > 0, far > near and scale > 0.
+    #[test]
+    fn test_clip_setters_keep_values_at_any_scale() {
+        for half in [0.005_f32, 5.0e4] {
+            let mut camera = Camera::new(1.0);
+            camera.look_at_box(Vec3::splat(-half), Vec3::splat(half));
+            let (near, far, ortho_scale) = (camera.near, camera.far, camera.ortho_scale);
+            // The fitted ortho scale follows the box (0.6 of its height).
+            assert!((ortho_scale - 1.2 * half).abs() < 1e-4 * half);
+            camera.set_near(near);
+            camera.set_far(far);
+            camera.set_ortho_scale(ortho_scale);
+            assert_eq!(camera.near.to_bits(), near.to_bits());
+            assert_eq!(camera.far.to_bits(), far.to_bits());
+            assert_eq!(camera.ortho_scale.to_bits(), ortho_scale.to_bits());
+        }
+
+        let mut camera = Camera::new(1.0);
+        camera.set_near(0.0);
+        assert!(camera.near > 0.0);
+        camera.set_near(1e-6);
+        camera.set_far(1e-7);
+        assert!(camera.far > camera.near);
+        camera.set_ortho_scale(-1.0);
+        assert!(camera.ortho_scale > 0.0);
     }
 
     /// The scroll-zoom step is relative, so it has the same effect at any scale.
