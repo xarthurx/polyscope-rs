@@ -1,5 +1,5 @@
 use super::RenderEngine;
-use crate::ground_plane::GroundPlaneRenderData;
+use crate::ground_plane::{GroundPlaneFrame, GroundPlaneRenderData};
 use crate::slice_plane_render::SlicePlaneRenderData;
 
 const DEFAULT_MATERIAL: &str = "clay";
@@ -26,12 +26,14 @@ impl RenderEngine {
     /// * `view` - The render target view
     /// * `enabled` - Whether the ground plane is enabled
     /// * `scene_center` - Center of the scene bounding box
-    /// * `scene_min_y` - Minimum Y coordinate of scene bounding box
+    /// * `scene_bounds` - Scene bounding box (min, max)
     /// * `length_scale` - Scene length scale
-    /// * `height_override` - Optional manual height (None = auto below scene)
+    /// * `height_override` - Optional manual height on the up axis (None = auto below scene)
     /// * `shadow_darkness` - Shadow darkness (0.0 = no shadow, 1.0 = full black)
     /// * `shadow_mode` - Shadow mode: 0=none, `1=shadow_only`, `2=tile_with_shadow`
     /// * `reflection_intensity` - Reflection intensity (0.0 = opaque, affects transparency)
+    ///
+    /// The plane orientation follows the camera up direction.
     #[allow(clippy::too_many_arguments)]
     pub fn render_ground_plane(
         &mut self,
@@ -39,7 +41,7 @@ impl RenderEngine {
         surface_view: &wgpu::TextureView,
         enabled: bool,
         scene_center: [f32; 3],
-        scene_min_y: f32,
+        scene_bounds: (glam::Vec3, glam::Vec3),
         length_scale: f32,
         height_override: Option<f32>,
         shadow_darkness: f32,
@@ -70,17 +72,17 @@ impl RenderEngine {
             ));
         }
 
-        // Get camera height
-        let camera_height = self.camera.position.y;
+        let frame = GroundPlaneFrame::new(self.camera.up_direction);
+        let ground_height = frame.ground_height(scene_bounds, length_scale, height_override);
 
         if let Some(render_data) = &self.ground_plane_render_data {
             render_data.update(
                 &self.queue,
                 scene_center,
-                scene_min_y,
+                frame,
+                ground_height,
                 length_scale,
-                camera_height,
-                height_override,
+                self.camera.position,
                 shadow_darkness,
                 shadow_mode,
                 is_orthographic,
@@ -285,6 +287,7 @@ impl RenderEngine {
     ///
     /// This should be called before rendering reflected geometry.
     /// The stencil buffer will have value 1 where the ground plane is visible.
+    /// `ground_height` is the coordinate of the plane on the up axis.
     #[allow(clippy::too_many_arguments)]
     pub fn render_stencil_pass(
         &mut self,
@@ -319,16 +322,15 @@ impl RenderEngine {
         // Check if camera is in orthographic mode
         let is_orthographic =
             self.camera.projection_mode == crate::camera::ProjectionMode::Orthographic;
-        let camera_height = self.camera.position.y;
 
         // Update ground uniforms for stencil pass
         render_data.update(
             &self.queue,
             scene_center,
-            scene_center[1] - length_scale * 0.5, // scene_min_y estimate
+            GroundPlaneFrame::new(self.camera.up_direction),
+            ground_height,
             length_scale,
-            camera_height,
-            Some(ground_height),
+            self.camera.position,
             0.0, // shadow_darkness (unused in stencil)
             0,   // shadow_mode (unused in stencil)
             is_orthographic,
@@ -379,6 +381,8 @@ impl RenderEngine {
     }
 
     /// Updates reflection uniforms.
+    ///
+    /// `ground_height` is the coordinate of the plane on the up axis of the camera.
     pub fn update_reflection(
         &self,
         reflection_matrix: glam::Mat4,
@@ -386,7 +390,13 @@ impl RenderEngine {
         ground_height: f32,
     ) {
         if let Some(reflection) = &self.reflection_pass {
-            reflection.update_uniforms(&self.queue, reflection_matrix, intensity, ground_height);
+            reflection.update_uniforms(
+                &self.queue,
+                reflection_matrix,
+                intensity,
+                ground_height,
+                GroundPlaneFrame::new(self.camera.up_direction),
+            );
         }
     }
 

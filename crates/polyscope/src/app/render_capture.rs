@@ -62,11 +62,11 @@ impl App {
         }
 
         // Render ground plane for screenshot
-        let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
+        let (scene_center, scene_bounds, length_scale) = crate::with_context(|ctx| {
             let center = ctx.center();
             (
                 [center.x, center.y, center.z],
-                ctx.bounding_box.0.y,
+                ctx.bounding_box,
                 ctx.length_scale,
             )
         });
@@ -91,7 +91,7 @@ impl App {
             &screenshot_view,
             self.ground_plane.mode != GroundPlaneMode::None,
             scene_center,
-            scene_min_y,
+            scene_bounds,
             length_scale,
             height_override,
             self.ground_plane.shadow_darkness,
@@ -263,11 +263,11 @@ impl App {
         }
 
         // Render ground plane
-        let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
+        let (scene_center, scene_bounds, length_scale) = crate::with_context(|ctx| {
             let center = ctx.center();
             (
                 [center.x, center.y, center.z],
-                ctx.bounding_box.0.y,
+                ctx.bounding_box,
                 ctx.length_scale,
             )
         });
@@ -286,7 +286,7 @@ impl App {
             &screenshot_view,
             self.ground_plane.mode != GroundPlaneMode::None,
             scene_center,
-            scene_min_y,
+            scene_bounds,
             length_scale,
             height_override,
             self.ground_plane.shadow_darkness,

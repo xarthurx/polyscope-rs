@@ -1,6 +1,6 @@
 use super::{
     App, CurveNetwork, GroundPlaneMode, PointCloud, ScreenDescriptor, Structure, SurfaceMesh, Vec3,
-    VolumeGrid, VolumeMesh, reflection, render_scene,
+    VolumeGrid, VolumeMesh, render_scene,
 };
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::HasQuantities;
@@ -686,6 +686,8 @@ impl App {
             // TileReflection also uses tile mode with shadows
             GroundPlaneMode::Tile | GroundPlaneMode::TileReflection => 2u32,
         };
+        // The ground plane, its shadows and its reflection follow the up direction
+        let ground_frame = polyscope_render::GroundPlaneFrame::new(engine.camera.up_direction);
 
         // Compute pass for curve network tubes
         {
@@ -721,7 +723,7 @@ impl App {
             // Compute light matrix from scene bounds
             let (scene_center, scene_radius) =
                 crate::with_context(|ctx| (ctx.center(), ctx.length_scale * 5.0));
-            let light_dir = glam::Vec3::new(0.5, -1.0, 0.3).normalize();
+            let light_dir = ground_frame.light_direction();
             let light_matrix = polyscope_render::ShadowMapPass::compute_light_matrix(
                 scene_center,
                 scene_radius,
@@ -778,25 +780,22 @@ impl App {
         // - Simple mode: meshes with no depth write get overwritten by later ground plane
         // - Pretty mode: mesh depth prepass blocks ground from rendering, making peeled
         //   transparent meshes appear gray (no ground behind them to show through)
-        let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
+        let (scene_center, scene_bounds, length_scale) = crate::with_context(|ctx| {
             let center = ctx.center();
             (
                 [center.x, center.y, center.z],
-                ctx.bounding_box.0.y,
+                ctx.bounding_box,
                 ctx.length_scale,
             )
         });
 
         if self.ground_plane.mode == GroundPlaneMode::TileReflection {
-            // Compute ground height
-            let ground_height = if self.ground_plane.height_is_relative {
-                scene_min_y - length_scale * 0.001
-            } else {
-                self.ground_plane.height
-            };
+            // Compute ground height (a coordinate on the up axis)
+            let ground_height =
+                ground_frame.ground_height(scene_bounds, length_scale, gp_height_override);
 
             // Update reflection uniforms
-            let reflection_matrix = reflection::ground_reflection_matrix(ground_height);
+            let reflection_matrix = ground_frame.reflection_matrix(ground_height);
             engine.update_reflection(
                 reflection_matrix,
                 self.ground_plane.reflection_intensity,
@@ -818,7 +817,7 @@ impl App {
                 &view,
                 true, // enabled
                 scene_center,
-                scene_min_y,
+                scene_bounds,
                 length_scale,
                 gp_height_override,
                 self.ground_plane.shadow_darkness,
@@ -926,7 +925,7 @@ impl App {
                 &view,
                 gp_enabled,
                 scene_center,
-                scene_min_y,
+                scene_bounds,
                 length_scale,
                 gp_height_override,
                 self.ground_plane.shadow_darkness,
