@@ -225,7 +225,7 @@ impl CameraParameters {
     /// Gets the projection matrix.
     #[must_use]
     pub fn projection_matrix(&self, near: f32, far: f32) -> Mat4 {
-        Mat4::perspective_rh(
+        glam::camera::rh::proj::directx::perspective(
             self.intrinsics.fov_vertical_degrees.to_radians(),
             self.intrinsics.aspect_ratio,
             near,

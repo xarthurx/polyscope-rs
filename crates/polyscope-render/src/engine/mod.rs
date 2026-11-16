@@ -269,9 +269,9 @@ pub struct RenderEngine {
 impl RenderEngine {
     /// Creates a new windowed render engine.
     pub async fn new_windowed(window: Arc<winit::window::Window>) -> RenderResult<Self> {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
-            ..wgpu::InstanceDescriptor::default()
+            ..wgpu::InstanceDescriptor::new_with_display_handle(Box::new(window.clone()))
         });
 
         let surface = instance.create_surface(window.clone())?;
@@ -281,6 +281,7 @@ impl RenderEngine {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .map_err(|_| RenderError::AdapterCreationFailed)?;
@@ -317,6 +318,7 @@ impl RenderEngine {
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
+            color_space: wgpu::SurfaceColorSpace::Auto,
         };
         surface.configure(&device, &surface_config);
 
@@ -435,8 +437,8 @@ impl RenderEngine {
         let ground_plane_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Ground Plane Pipeline Layout"),
-                bind_group_layouts: &[&ground_plane_bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&ground_plane_bind_group_layout)],
+                immediate_size: 0,
             });
 
         // Ground plane render pipeline (with alpha blending)
@@ -466,13 +468,13 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::LessEqual,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 
@@ -608,9 +610,9 @@ impl RenderEngine {
 
     /// Creates a new headless render engine.
     pub async fn new_headless(width: u32, height: u32) -> RenderResult<Self> {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
-            ..wgpu::InstanceDescriptor::default()
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
         });
 
         let adapter = instance
@@ -618,6 +620,7 @@ impl RenderEngine {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: None,
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .map_err(|_| RenderError::AdapterCreationFailed)?;
@@ -642,6 +645,7 @@ impl RenderEngine {
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
+            color_space: wgpu::SurfaceColorSpace::Auto,
         };
 
         let (depth_texture, depth_view, depth_only_view) =
@@ -759,8 +763,8 @@ impl RenderEngine {
         let ground_plane_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Ground Plane Pipeline Layout"),
-                bind_group_layouts: &[&ground_plane_bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&ground_plane_bind_group_layout)],
+                immediate_size: 0,
             });
 
         // Ground plane render pipeline (with alpha blending)
@@ -790,13 +794,13 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::LessEqual,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 

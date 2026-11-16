@@ -80,7 +80,7 @@ impl ApplicationHandler for App {
         let egui_using_pointer = self
             .egui
             .as_ref()
-            .is_some_and(|e| e.context.is_using_pointer());
+            .is_some_and(|e| e.context.egui_is_using_pointer());
 
         // Check if mouse is in the left UI panel area.
         // Uses the dynamic panel width (updated each frame from actual egui panel rect)
@@ -104,40 +104,39 @@ impl ApplicationHandler for App {
                 let now = std::time::Instant::now();
                 if let Some(last) = self.last_frame_time {
                     let dt = now.duration_since(last).as_secs_f32();
-                    if let Some(engine) = &mut self.engine {
-                        if engine.camera.navigation_style
+                    if let Some(engine) = &mut self.engine
+                        && engine.camera.navigation_style
                             == polyscope_render::NavigationStyle::FirstPerson
-                            && !self.keys_down.is_empty()
-                        {
-                            let mut delta = Vec3::ZERO;
-                            if self.keys_down.contains(&KeyCode::KeyA) {
-                                delta.x -= 1.0; // strafe left
-                            }
-                            if self.keys_down.contains(&KeyCode::KeyD) {
-                                delta.x += 1.0; // strafe right
-                            }
-                            if self.keys_down.contains(&KeyCode::KeyQ) {
-                                delta.y += 1.0; // rise
-                            }
-                            if self.keys_down.contains(&KeyCode::KeyE) {
-                                delta.y -= 1.0; // descend
-                            }
-                            if self.keys_down.contains(&KeyCode::KeyW) {
-                                delta.z += 1.0; // forward
-                            }
-                            if self.keys_down.contains(&KeyCode::KeyS) {
-                                delta.z -= 1.0; // backward
-                            }
-                            if delta.length_squared() > 0.0 {
-                                engine.camera.cancel_flight();
-                                let length_scale = engine
-                                    .camera
-                                    .position
-                                    .distance(engine.camera.target)
-                                    .max(1.0);
-                                let speed = length_scale * dt * engine.camera.move_speed;
-                                engine.camera.move_first_person(delta.normalize() * speed);
-                            }
+                        && !self.keys_down.is_empty()
+                    {
+                        let mut delta = Vec3::ZERO;
+                        if self.keys_down.contains(&KeyCode::KeyA) {
+                            delta.x -= 1.0; // strafe left
+                        }
+                        if self.keys_down.contains(&KeyCode::KeyD) {
+                            delta.x += 1.0; // strafe right
+                        }
+                        if self.keys_down.contains(&KeyCode::KeyQ) {
+                            delta.y += 1.0; // rise
+                        }
+                        if self.keys_down.contains(&KeyCode::KeyE) {
+                            delta.y -= 1.0; // descend
+                        }
+                        if self.keys_down.contains(&KeyCode::KeyW) {
+                            delta.z += 1.0; // forward
+                        }
+                        if self.keys_down.contains(&KeyCode::KeyS) {
+                            delta.z -= 1.0; // backward
+                        }
+                        if delta.length_squared() > 0.0 {
+                            engine.camera.cancel_flight();
+                            let length_scale = engine
+                                .camera
+                                .position
+                                .distance(engine.camera.target)
+                                .max(1.0);
+                            let speed = length_scale * dt * engine.camera.move_speed;
+                            engine.camera.move_first_person(delta.normalize() * speed);
                         }
                     }
                 }

@@ -183,8 +183,8 @@ impl ShadowMapPass {
             Vec3::Y
         };
 
-        let view = Mat4::look_at_rh(light_pos, scene_center, up);
-        let proj = Mat4::orthographic_rh(
+        let view = glam::camera::rh::view::look_at_mat4(light_pos, scene_center, up);
+        let proj = glam::camera::rh::proj::directx::orthographic(
             -scene_radius,
             scene_radius,
             -scene_radius,

@@ -162,8 +162,8 @@ impl PlanarShadowPass {
         let depth_to_mask_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Depth to Mask Pipeline Layout"),
-                bind_group_layouts: &[&depth_to_mask_bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&depth_to_mask_bind_group_layout)],
+                immediate_size: 0,
             });
 
         let depth_to_mask_pipeline =
@@ -192,7 +192,7 @@ impl PlanarShadowPass {
                 },
                 depth_stencil: None,
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 
@@ -241,8 +241,8 @@ impl PlanarShadowPass {
 
         let blur_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Planar Shadow Blur Pipeline Layout"),
-            bind_group_layouts: &[&blur_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&blur_bind_group_layout)],
+            immediate_size: 0,
         });
 
         let blur_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -270,7 +270,7 @@ impl PlanarShadowPass {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 

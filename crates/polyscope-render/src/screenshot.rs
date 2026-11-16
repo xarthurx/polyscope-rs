@@ -35,7 +35,7 @@ pub fn save_image(
 
     // Convert BGRA to RGBA (wgpu surface format is Bgra8UnormSrgb)
     let mut rgba_data = data.to_vec();
-    for chunk in rgba_data.chunks_exact_mut(4) {
+    for chunk in rgba_data.as_chunks_mut::<4>().0 {
         chunk.swap(0, 2); // Swap B and R
     }
 
@@ -73,7 +73,7 @@ pub fn save_image(
 pub fn save_to_buffer(data: &[u8], width: u32, height: u32) -> Result<Vec<u8>, ScreenshotError> {
     // Convert BGRA to RGBA
     let mut rgba_data = data.to_vec();
-    for chunk in rgba_data.chunks_exact_mut(4) {
+    for chunk in rgba_data.as_chunks_mut::<4>().0 {
         chunk.swap(0, 2); // Swap B and R
     }
 

@@ -111,11 +111,11 @@ impl RenderEngine {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("gridcube pipeline layout"),
                 bind_group_layouts: &[
-                    &bind_group_layout,
-                    &self.slice_plane_bind_group_layout,
-                    &self.matcap_bind_group_layout,
+                    Some(&bind_group_layout),
+                    Some(&self.slice_plane_bind_group_layout),
+                    Some(&self.matcap_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         let pipeline = self
@@ -159,13 +159,13 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 

@@ -516,16 +516,16 @@ where
 /// Note: Due to `OnceLock` semantics, the context cannot be re-initialized
 /// after shutdown in the same process.
 pub fn shutdown_context() {
-    if let Some(lock) = CONTEXT.get() {
-        if let Ok(mut ctx) = lock.write() {
-            ctx.initialized = false;
-            ctx.registry.clear();
-            ctx.groups.clear();
-            ctx.slice_planes.clear();
-            ctx.selected_structure = None;
-            ctx.selected_slice_plane = None;
-            ctx.floating_quantities.clear();
-            ctx.material_load_queue.clear();
-        }
+    if let Some(lock) = CONTEXT.get()
+        && let Ok(mut ctx) = lock.write()
+    {
+        ctx.initialized = false;
+        ctx.registry.clear();
+        ctx.groups.clear();
+        ctx.slice_planes.clear();
+        ctx.selected_structure = None;
+        ctx.selected_slice_plane = None;
+        ctx.floating_quantities.clear();
+        ctx.material_load_queue.clear();
     }
 }

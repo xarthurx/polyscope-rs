@@ -306,10 +306,11 @@ impl CurveNetwork {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
-                if let Some(sq) = q.as_any().downcast_ref::<CurveNodeScalarQuantity>() {
-                    return Some(sq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Scalar
+                && let Some(sq) = q.as_any().downcast_ref::<CurveNodeScalarQuantity>()
+            {
+                return Some(sq);
             }
         }
         None
@@ -321,10 +322,11 @@ impl CurveNetwork {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
-                if let Some(sq) = q.as_any().downcast_ref::<CurveEdgeScalarQuantity>() {
-                    return Some(sq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Scalar
+                && let Some(sq) = q.as_any().downcast_ref::<CurveEdgeScalarQuantity>()
+            {
+                return Some(sq);
             }
         }
         None
@@ -336,10 +338,11 @@ impl CurveNetwork {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Color {
-                if let Some(cq) = q.as_any().downcast_ref::<CurveNodeColorQuantity>() {
-                    return Some(cq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Color
+                && let Some(cq) = q.as_any().downcast_ref::<CurveNodeColorQuantity>()
+            {
+                return Some(cq);
             }
         }
         None
@@ -351,10 +354,11 @@ impl CurveNetwork {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Color {
-                if let Some(cq) = q.as_any().downcast_ref::<CurveEdgeColorQuantity>() {
-                    return Some(cq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Color
+                && let Some(cq) = q.as_any().downcast_ref::<CurveEdgeColorQuantity>()
+            {
+                return Some(cq);
             }
         }
         None
@@ -662,21 +666,21 @@ impl CurveNetwork {
         // Apply node color quantities
         if let Some(color_q) = self.active_node_color_quantity() {
             color_q.apply_to_render_data(queue, render_data);
-        } else if let Some(scalar_q) = self.active_node_scalar_quantity() {
-            if let Some(colormap) = color_maps.get(scalar_q.colormap_name()) {
-                let colors = scalar_q.compute_colors(colormap);
-                render_data.update_node_colors(queue, &colors);
-            }
+        } else if let Some(scalar_q) = self.active_node_scalar_quantity()
+            && let Some(colormap) = color_maps.get(scalar_q.colormap_name())
+        {
+            let colors = scalar_q.compute_colors(colormap);
+            render_data.update_node_colors(queue, &colors);
         }
 
         // Apply edge color quantities
         if let Some(color_q) = self.active_edge_color_quantity() {
             color_q.apply_to_render_data(queue, render_data);
-        } else if let Some(scalar_q) = self.active_edge_scalar_quantity() {
-            if let Some(colormap) = color_maps.get(scalar_q.colormap_name()) {
-                let colors = scalar_q.compute_colors(colormap);
-                render_data.update_edge_colors(queue, &colors);
-            }
+        } else if let Some(scalar_q) = self.active_edge_scalar_quantity()
+            && let Some(colormap) = color_maps.get(scalar_q.colormap_name())
+        {
+            let colors = scalar_q.compute_colors(colormap);
+            render_data.update_edge_colors(queue, &colors);
         }
     }
 

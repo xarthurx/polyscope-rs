@@ -66,7 +66,7 @@ impl VolumeGridNodeScalarQuantity {
         bound_max: Vec3,
     ) -> Self {
         let (data_min, data_max) = Self::compute_range(&values);
-        let isosurface_level = (data_min + data_max) * 0.5;
+        let isosurface_level = f32::midpoint(data_min, data_max);
         Self {
             name: name.into(),
             structure_name: structure_name.into(),
@@ -250,7 +250,7 @@ impl VolumeGridNodeScalarQuantity {
                 }
             }
 
-            for tri in mesh.indices.chunks_exact_mut(3) {
+            for tri in mesh.indices.as_chunks_mut::<3>().0 {
                 tri.swap(1, 2);
             }
 

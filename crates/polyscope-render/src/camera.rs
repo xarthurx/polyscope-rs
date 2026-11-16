@@ -286,16 +286,19 @@ impl Camera {
     /// Returns the view matrix.
     #[must_use]
     pub fn view_matrix(&self) -> Mat4 {
-        Mat4::look_at_rh(self.position, self.target, self.up)
+        glam::camera::rh::view::look_at_mat4(self.position, self.target, self.up)
     }
 
     /// Returns the projection matrix.
     #[must_use]
     pub fn projection_matrix(&self) -> Mat4 {
         match self.projection_mode {
-            ProjectionMode::Perspective => {
-                Mat4::perspective_rh(self.fov, self.aspect_ratio, self.near, self.far)
-            }
+            ProjectionMode::Perspective => glam::camera::rh::proj::directx::perspective(
+                self.fov,
+                self.aspect_ratio,
+                self.near,
+                self.far,
+            ),
             ProjectionMode::Orthographic => {
                 let half_height = self.ortho_scale;
                 let half_width = half_height * self.aspect_ratio;
@@ -307,7 +310,7 @@ impl Camera {
                 // Near plane should be negative relative to target to see objects
                 // between camera and target. We use a large range to avoid clipping.
                 let ortho_depth = (dist + self.far).max(self.ortho_scale * 100.0);
-                Mat4::orthographic_rh(
+                glam::camera::rh::proj::directx::orthographic(
                     -half_width,
                     half_width,
                     -half_height,
@@ -421,7 +424,7 @@ impl Camera {
 
         // Reconstruct view with lookAt (matches C++ line 204: lookAt(pos, center, upVec))
         // This ensures the up vector and view matrix are always consistent.
-        let final_view = Mat4::look_at_rh(self.position, self.target, up_vec);
+        let final_view = glam::camera::rh::view::look_at_mat4(self.position, self.target, up_vec);
         if final_view.is_finite() {
             // Extract up from the reconstructed view matrix
             let fr = glam::Mat3::from_cols(
@@ -905,7 +908,7 @@ impl CameraState {
                 camera.flight = None;
             }
             ViewTransition::FlyTo => {
-                let target_view = Mat4::look_at_rh(new_pos, new_target, new_up);
+                let target_view = glam::camera::rh::view::look_at_mat4(new_pos, new_target, new_up);
                 camera.start_flight_to(target_view, self.fov, 0.4);
             }
         }
@@ -1196,7 +1199,7 @@ mod tests {
             ),
         ];
         for &(eye, target, up) in cases {
-            let view = Mat4::look_at_rh(eye, target, up);
+            let view = glam::camera::rh::view::look_at_mat4(eye, target, up);
             let extracted = shader_forward_from_view(view);
             let expected = (target - eye).normalize();
             assert!(

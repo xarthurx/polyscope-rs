@@ -1,6 +1,6 @@
 //! UI panel builders.
 
-use egui::{CollapsingHeader, Context, DragValue, SidePanel, Slider, Ui};
+use egui::{CollapsingHeader, Context, DragValue, Panel, Slider, Ui};
 
 /// Camera settings exposed in UI.
 #[derive(Debug, Clone)]
@@ -598,10 +598,20 @@ pub fn build_groups_section(ui: &mut Ui, groups: &mut Vec<GroupSettings>) -> Gro
 /// Builds the main left panel.
 /// Returns the actual panel width in logical pixels (for dynamic pointer checks).
 pub fn build_left_panel(ctx: &Context, build_contents: impl FnOnce(&mut Ui)) -> f32 {
-    let resp = SidePanel::left("polyscope_main_panel")
-        .default_width(305.0)
+    // egui no longer shows panels on a `Context`. Host the panel in a top-level
+    // background `Ui`, as `SidePanel::show(ctx)` did before.
+    let mut root_ui = Ui::new(
+        ctx.clone(),
+        egui::Id::new("polyscope_main_panel"),
+        egui::UiBuilder::new().layer_id(egui::LayerId::background()),
+    );
+    root_ui
+        .response()
+        .widget_info(|| egui::WidgetInfo::new(egui::WidgetType::Panel));
+    let resp = Panel::left("polyscope_main_panel")
+        .default_size(305.0)
         .resizable(true)
-        .show(ctx, |ui| {
+        .show(&mut root_ui, |ui| {
             ui.heading("polyscope-rs");
             ui.separator();
             egui::ScrollArea::vertical()

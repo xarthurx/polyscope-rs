@@ -115,10 +115,10 @@ impl PointCloudHandle {
     /// * `values` - One scalar value per point
     pub fn add_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
         with_context_mut(|ctx| {
-            if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name) {
-                if let Some(pc) = (pc as &mut dyn std::any::Any).downcast_mut::<PointCloud>() {
-                    pc.add_scalar_quantity(name, values);
-                }
+            if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name)
+                && let Some(pc) = (pc as &mut dyn std::any::Any).downcast_mut::<PointCloud>()
+            {
+                pc.add_scalar_quantity(name, values);
             }
         });
         self
@@ -136,10 +136,10 @@ impl PointCloudHandle {
     /// * `vectors` - One 3D vector per point
     pub fn add_vector_quantity(&self, name: &str, vectors: Vec<Vec3>) -> &Self {
         with_context_mut(|ctx| {
-            if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name) {
-                if let Some(pc) = (pc as &mut dyn std::any::Any).downcast_mut::<PointCloud>() {
-                    pc.add_vector_quantity(name, vectors);
-                }
+            if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name)
+                && let Some(pc) = (pc as &mut dyn std::any::Any).downcast_mut::<PointCloud>()
+            {
+                pc.add_vector_quantity(name, vectors);
             }
         });
         self
@@ -157,10 +157,10 @@ impl PointCloudHandle {
     /// * `colors` - One RGB color (Vec3) per point
     pub fn add_color_quantity(&self, name: &str, colors: Vec<Vec3>) -> &Self {
         with_context_mut(|ctx| {
-            if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name) {
-                if let Some(pc) = (pc as &mut dyn std::any::Any).downcast_mut::<PointCloud>() {
-                    pc.add_color_quantity(name, colors);
-                }
+            if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name)
+                && let Some(pc) = (pc as &mut dyn std::any::Any).downcast_mut::<PointCloud>()
+            {
+                pc.add_color_quantity(name, colors);
             }
         });
         self

@@ -92,15 +92,19 @@ impl EguiIntegration {
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
         screen_descriptor: &ScreenDescriptor,
-        output: egui::FullOutput,
+        mut output: egui::FullOutput,
     ) {
         let paint_jobs = self
             .context
             .tessellate(output.shapes, output.pixels_per_point);
 
-        for (id, image_delta) in &output.textures_delta.set {
-            self.renderer
-                .update_texture(device, queue, *id, image_delta);
+        // Drain the deltas: egui asserts in debug builds that a dropped
+        // `TexturesDelta` is empty.
+        for (id, image_deltas) in output.textures_delta.set.drain() {
+            for image_delta in image_deltas {
+                self.renderer
+                    .update_texture(device, queue, id, &image_delta);
+            }
         }
 
         self.renderer
@@ -129,8 +133,8 @@ impl EguiIntegration {
                 .render(&mut render_pass, &paint_jobs, screen_descriptor);
         }
 
-        for id in &output.textures_delta.free {
-            self.renderer.free_texture(id);
+        for id in output.textures_delta.free.drain() {
+            self.renderer.free_texture(&id);
         }
     }
 }

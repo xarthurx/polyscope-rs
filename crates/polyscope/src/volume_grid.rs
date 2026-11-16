@@ -150,13 +150,12 @@ impl VolumeGridHandle {
     /// Sets the visualization mode for a node scalar quantity.
     pub fn set_node_scalar_viz_mode(&self, quantity_name: &str, mode: VolumeGridVizMode) -> &Self {
         with_volume_grid(&self.name, |vg| {
-            if let Some(q) = vg.get_quantity_mut(quantity_name) {
-                if let Some(nsq) = q
+            if let Some(q) = vg.get_quantity_mut(quantity_name)
+                && let Some(nsq) = q
                     .as_any_mut()
                     .downcast_mut::<VolumeGridNodeScalarQuantity>()
-                {
-                    nsq.set_viz_mode(mode);
-                }
+            {
+                nsq.set_viz_mode(mode);
             }
         });
         self
@@ -165,13 +164,12 @@ impl VolumeGridHandle {
     /// Sets the isosurface level for a node scalar quantity.
     pub fn set_isosurface_level(&self, quantity_name: &str, level: f32) -> &Self {
         with_volume_grid(&self.name, |vg| {
-            if let Some(q) = vg.get_quantity_mut(quantity_name) {
-                if let Some(nsq) = q
+            if let Some(q) = vg.get_quantity_mut(quantity_name)
+                && let Some(nsq) = q
                     .as_any_mut()
                     .downcast_mut::<VolumeGridNodeScalarQuantity>()
-                {
-                    nsq.set_isosurface_level(level);
-                }
+            {
+                nsq.set_isosurface_level(level);
             }
         });
         self
@@ -180,13 +178,12 @@ impl VolumeGridHandle {
     /// Sets the isosurface color for a node scalar quantity.
     pub fn set_isosurface_color(&self, quantity_name: &str, color: Vec3) -> &Self {
         with_volume_grid(&self.name, |vg| {
-            if let Some(q) = vg.get_quantity_mut(quantity_name) {
-                if let Some(nsq) = q
+            if let Some(q) = vg.get_quantity_mut(quantity_name)
+                && let Some(nsq) = q
                     .as_any_mut()
                     .downcast_mut::<VolumeGridNodeScalarQuantity>()
-                {
-                    nsq.set_isosurface_color(color);
-                }
+            {
+                nsq.set_isosurface_color(color);
             }
         });
         self

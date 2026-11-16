@@ -197,19 +197,19 @@ pub fn deselect_slice_plane_gizmo() {
 /// Applies gizmo transform to the selected slice plane.
 pub fn apply_slice_plane_gizmo_transform(origin: [f32; 3], rotation_degrees: [f32; 3]) {
     with_context_mut(|ctx| {
-        if let Some(name) = ctx.selected_slice_plane.clone() {
-            if let Some(plane) = ctx.get_slice_plane_mut(&name) {
-                // Reconstruct transform from origin + rotation
-                let rotation = glam::Quat::from_euler(
-                    glam::EulerRot::XYZ,
-                    rotation_degrees[0].to_radians(),
-                    rotation_degrees[1].to_radians(),
-                    rotation_degrees[2].to_radians(),
-                );
-                let transform =
-                    glam::Mat4::from_rotation_translation(rotation, Vec3::from_array(origin));
-                plane.set_from_transform(transform);
-            }
+        if let Some(name) = ctx.selected_slice_plane.clone()
+            && let Some(plane) = ctx.get_slice_plane_mut(&name)
+        {
+            // Reconstruct transform from origin + rotation
+            let rotation = glam::Quat::from_euler(
+                glam::EulerRot::XYZ,
+                rotation_degrees[0].to_radians(),
+                rotation_degrees[1].to_radians(),
+                rotation_degrees[2].to_radians(),
+            );
+            let transform =
+                glam::Mat4::from_rotation_translation(rotation, Vec3::from_array(origin));
+            plane.set_from_transform(transform);
         }
     });
 }
@@ -356,10 +356,10 @@ pub fn apply_selection_transform(selection: &polyscope_ui::SelectionInfo) {
     let transform = Mat4::from_scale_rotation_translation(scale, rotation, translation);
 
     with_context_mut(|ctx| {
-        if let Some((type_name, name)) = ctx.selected_structure.clone() {
-            if let Some(structure) = ctx.registry.get_mut(&type_name, &name) {
-                structure.set_transform(transform);
-            }
+        if let Some((type_name, name)) = ctx.selected_structure.clone()
+            && let Some(structure) = ctx.registry.get_mut(&type_name, &name)
+        {
+            structure.set_transform(transform);
         }
     });
 }

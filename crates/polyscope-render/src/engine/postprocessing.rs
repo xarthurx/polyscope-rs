@@ -177,7 +177,9 @@ impl RenderEngine {
             .map_err(|_| crate::screenshot::ScreenshotError::BufferMapFailed)?;
 
         // Copy data, removing row padding
-        let data = buffer_slice.get_mapped_range();
+        let data = buffer_slice
+            .get_mapped_range()
+            .expect("buffer slice is mapped for reading");
         let mut result = Vec::with_capacity((self.width * self.height * 4) as usize);
         let row_bytes = (self.width * 4) as usize;
 
@@ -456,25 +458,21 @@ impl RenderEngine {
     ) {
         if let (Some(tone_map), Some(hdr_view)) = (&self.tone_map_pass, &self.hdr_view) {
             // If SSAA is enabled, first downsample HDR, then tone map
-            if self.ssaa_factor > 1 {
-                if let (Some(intermediate_view), Some(ssaa_pass)) =
+            if self.ssaa_factor > 1
+                && let (Some(intermediate_view), Some(ssaa_pass)) =
                     (&self.ssaa_intermediate_view, &self.ssaa_pass)
-                {
-                    // Step 1: Downsample HDR (SSAA res) -> intermediate HDR (screen res)
-                    ssaa_pass.render_to_target(&self.device, encoder, hdr_view, intermediate_view);
+            {
+                // Step 1: Downsample HDR (SSAA res) -> intermediate HDR (screen res)
+                ssaa_pass.render_to_target(&self.device, encoder, hdr_view, intermediate_view);
 
-                    // Step 2: Tone map intermediate HDR -> output LDR
-                    // Pass intermediate_view as the SSAO slot — SSAO is disabled via
-                    // ssao_enabled=0 uniform so the texture value is ignored, but the
-                    // bind group requires a valid Float texture of matching format.
-                    let bind_group = tone_map.create_bind_group(
-                        &self.device,
-                        intermediate_view,
-                        intermediate_view,
-                    );
-                    tone_map.render(encoder, output_view, &bind_group);
-                    return;
-                }
+                // Step 2: Tone map intermediate HDR -> output LDR
+                // Pass intermediate_view as the SSAO slot — SSAO is disabled via
+                // ssao_enabled=0 uniform so the texture value is ignored, but the
+                // bind group requires a valid Float texture of matching format.
+                let bind_group =
+                    tone_map.create_bind_group(&self.device, intermediate_view, intermediate_view);
+                tone_map.render(encoder, output_view, &bind_group);
+                return;
             }
 
             // No SSAA - tone map directly from HDR to output with SSAO

@@ -18,7 +18,6 @@ polyscope-ui.workspace = true
 glam.workspace = true
 wgpu.workspace = true
 egui.workspace = true
-ply-rs.workspace = true
 log.workspace = true
 thiserror.workspace = true
 bytemuck.workspace = true

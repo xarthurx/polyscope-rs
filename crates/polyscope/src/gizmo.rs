@@ -103,10 +103,10 @@ pub fn set_gizmo_snap_scale(snap: f32) {
 /// Does nothing if no structure is selected.
 pub fn set_selected_transform(transform: Mat4) {
     with_context_mut(|ctx| {
-        if let Some((type_name, name)) = ctx.selected_structure.clone() {
-            if let Some(structure) = ctx.registry.get_mut(&type_name, &name) {
-                structure.set_transform(transform);
-            }
+        if let Some((type_name, name)) = ctx.selected_structure.clone()
+            && let Some(structure) = ctx.registry.get_mut(&type_name, &name)
+        {
+            structure.set_transform(transform);
         }
     });
 }

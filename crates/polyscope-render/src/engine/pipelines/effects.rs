@@ -69,8 +69,8 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Shadow Pipeline Layout"),
-                bind_group_layouts: &[&bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&bind_group_layout)],
+                immediate_size: 0,
             });
 
         let pipeline = self
@@ -100,8 +100,8 @@ impl RenderEngine {
                 depth_stencil: Some(wgpu::DepthStencilState {
                     // Shadow pipeline uses Depth32Float to match shadow map texture
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState {
                         constant: 2, // Bias to prevent shadow acne
@@ -110,7 +110,7 @@ impl RenderEngine {
                     },
                 }),
                 multisample: wgpu::MultisampleState::default(), // No MSAA for shadow map
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 
@@ -144,8 +144,8 @@ impl RenderEngine {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Ground Stencil Pipeline Layout"),
-                bind_group_layouts: &[&self.ground_plane_bind_group_layout],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&self.ground_plane_bind_group_layout)],
+                immediate_size: 0,
             });
 
         self.ground_stencil_pipeline = Some(self.device.create_render_pipeline(
@@ -174,8 +174,8 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: false, // Don't write depth
-                    depth_compare: wgpu::CompareFunction::Always,
+                    depth_write_enabled: Some(false), // Don't write depth
+                    depth_compare: Some(wgpu::CompareFunction::Always),
                     stencil: wgpu::StencilState {
                         front: wgpu::StencilFaceState {
                             compare: wgpu::CompareFunction::Always,
@@ -195,7 +195,7 @@ impl RenderEngine {
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             },
         ));
@@ -309,12 +309,12 @@ impl RenderEngine {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Reflected Mesh Pipeline Layout"),
                 bind_group_layouts: &[
-                    &mesh_bind_group_layout,
-                    reflection_pass.bind_group_layout(),
-                    &self.matcap_bind_group_layout,
-                    &self.slice_plane_bind_group_layout,
+                    Some(&mesh_bind_group_layout),
+                    Some(reflection_pass.bind_group_layout()),
+                    Some(&self.matcap_bind_group_layout),
+                    Some(&self.slice_plane_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         self.reflected_mesh_pipeline = Some(self.device.create_render_pipeline(
@@ -355,8 +355,8 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: false, // Don't write depth for reflections
-                    depth_compare: wgpu::CompareFunction::Always, // Always pass depth test, stencil does the masking
+                    depth_write_enabled: Some(false), // Don't write depth for reflections
+                    depth_compare: Some(wgpu::CompareFunction::Always), // Always pass depth test, stencil does the masking
                     stencil: wgpu::StencilState {
                         front: wgpu::StencilFaceState {
                             compare: wgpu::CompareFunction::Equal, // Only render where stencil == ref
@@ -376,7 +376,7 @@ impl RenderEngine {
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             },
         ));
@@ -456,12 +456,12 @@ impl RenderEngine {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Reflected Point Cloud Pipeline Layout"),
                 bind_group_layouts: &[
-                    &point_bind_group_layout,
-                    reflection_pass.bind_group_layout(),
-                    &self.matcap_bind_group_layout,
-                    &self.slice_plane_bind_group_layout,
+                    Some(&point_bind_group_layout),
+                    Some(reflection_pass.bind_group_layout()),
+                    Some(&self.matcap_bind_group_layout),
+                    Some(&self.slice_plane_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         self.reflected_point_cloud_pipeline = Some(self.device.create_render_pipeline(
@@ -501,8 +501,8 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: false,
-                    depth_compare: wgpu::CompareFunction::Always,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::Always),
                     stencil: wgpu::StencilState {
                         front: wgpu::StencilFaceState {
                             compare: wgpu::CompareFunction::Equal,
@@ -522,7 +522,7 @@ impl RenderEngine {
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             },
         ));
@@ -602,12 +602,12 @@ impl RenderEngine {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Reflected Curve Network Pipeline Layout"),
                 bind_group_layouts: &[
-                    &curve_bind_group_layout,
-                    reflection_pass.bind_group_layout(),
-                    &self.matcap_bind_group_layout,
-                    &self.slice_plane_bind_group_layout,
+                    Some(&curve_bind_group_layout),
+                    Some(reflection_pass.bind_group_layout()),
+                    Some(&self.matcap_bind_group_layout),
+                    Some(&self.slice_plane_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         // Vertex buffer layout for tube bounding box
@@ -637,7 +637,7 @@ impl RenderEngine {
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: Some("vs_main"),
-                    buffers: &[vertex_buffer_layout],
+                    buffers: &[Some(vertex_buffer_layout)],
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                 },
                 fragment: Some(wgpu::FragmentState {
@@ -668,8 +668,8 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: false, // Don't write depth for reflections
-                    depth_compare: wgpu::CompareFunction::Always, // Always pass depth test, stencil does the masking
+                    depth_write_enabled: Some(false), // Don't write depth for reflections
+                    depth_compare: Some(wgpu::CompareFunction::Always), // Always pass depth test, stencil does the masking
                     stencil: wgpu::StencilState {
                         front: wgpu::StencilFaceState {
                             compare: wgpu::CompareFunction::Equal,
@@ -689,7 +689,7 @@ impl RenderEngine {
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             },
         ));

@@ -107,32 +107,32 @@ impl TransformGizmo {
         self.gizmo.update_config(config);
 
         // Interact with gizmo
-        if let Some((_result, new_transforms)) = self.gizmo.interact(ui, &[transform]) {
-            if let Some(new_transform) = new_transforms.first() {
-                // Convert back to Mat4
-                let translation = Vec3::new(
-                    new_transform.translation.x as f32,
-                    new_transform.translation.y as f32,
-                    new_transform.translation.z as f32,
-                );
-                let rotation = Quat::from_xyzw(
-                    new_transform.rotation.v.x as f32,
-                    new_transform.rotation.v.y as f32,
-                    new_transform.rotation.v.z as f32,
-                    new_transform.rotation.s as f32,
-                );
-                let scale = Vec3::new(
-                    new_transform.scale.x as f32,
-                    new_transform.scale.y as f32,
-                    new_transform.scale.z as f32,
-                );
+        if let Some((_result, new_transforms)) = self.gizmo.interact(ui, &[transform])
+            && let Some(new_transform) = new_transforms.first()
+        {
+            // Convert back to Mat4
+            let translation = Vec3::new(
+                new_transform.translation.x as f32,
+                new_transform.translation.y as f32,
+                new_transform.translation.z as f32,
+            );
+            let rotation = Quat::from_xyzw(
+                new_transform.rotation.v.x as f32,
+                new_transform.rotation.v.y as f32,
+                new_transform.rotation.v.z as f32,
+                new_transform.rotation.s as f32,
+            );
+            let scale = Vec3::new(
+                new_transform.scale.x as f32,
+                new_transform.scale.y as f32,
+                new_transform.scale.z as f32,
+            );
 
-                return Some(Mat4::from_scale_rotation_translation(
-                    scale,
-                    rotation,
-                    translation,
-                ));
-            }
+            return Some(Mat4::from_scale_rotation_translation(
+                scale,
+                rotation,
+                translation,
+            ));
         }
 
         None

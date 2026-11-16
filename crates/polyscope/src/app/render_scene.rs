@@ -21,19 +21,14 @@ pub(super) fn draw_point_clouds<'a>(
             if !ctx.is_structure_visible(structure) {
                 continue;
             }
-            if structure.type_name() == "PointCloud" {
-                if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
-                    if let Some(render_data) = pc.render_data() {
-                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                        render_pass.set_bind_group(
-                            2,
-                            engine.matcap_bind_group_for(pc.material()),
-                            &[],
-                        );
-                        // 6 vertices per quad, num_points instances
-                        render_pass.draw(0..6, 0..render_data.num_points);
-                    }
-                }
+            if structure.type_name() == "PointCloud"
+                && let Some(pc) = structure.as_any().downcast_ref::<PointCloud>()
+                && let Some(render_data) = pc.render_data()
+            {
+                render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                render_pass.set_bind_group(2, engine.matcap_bind_group_for(pc.material()), &[]);
+                // 6 vertices per quad, num_points instances
+                render_pass.draw(0..6, 0..render_data.num_points);
             }
         }
     });
@@ -56,54 +51,52 @@ pub(super) fn draw_vector_quantities<'a>(
                 continue;
             }
             render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
-            if structure.type_name() == "PointCloud" {
-                if let Some(pc) = structure.as_any().downcast_ref::<PointCloud>() {
-                    if let Some(vq) = pc.active_vector_quantity() {
-                        if let Some(render_data) = vq.render_data() {
-                            render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                            // shaft sides: 8×6=48 + cone sides: 8×3=24 + cone cap: 8×3=24 + shaft cap: 8×3=24 = 120 vertices per arrow
-                            render_pass.draw(0..120, 0..render_data.num_vectors);
-                        }
-                    }
-                }
+            if structure.type_name() == "PointCloud"
+                && let Some(pc) = structure.as_any().downcast_ref::<PointCloud>()
+                && let Some(vq) = pc.active_vector_quantity()
+                && let Some(render_data) = vq.render_data()
+            {
+                render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                // shaft sides: 8×6=48 + cone sides: 8×3=24 + cone cap: 8×3=24 + shaft cap: 8×3=24 = 120 vertices per arrow
+                render_pass.draw(0..120, 0..render_data.num_vectors);
             }
-            if structure.type_name() == "SurfaceMesh" {
-                if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                    // Draw vertex vector quantity (e.g. vertex normals)
-                    if let Some(vq) = mesh.active_vertex_vector_quantity() {
-                        if let Some(render_data) = vq.render_data() {
-                            render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                            render_pass.draw(0..120, 0..render_data.num_vectors);
-                        }
-                    }
-                    // Draw face vector quantity (e.g. face normals)
-                    if let Some(vq) = mesh.active_face_vector_quantity() {
-                        if let Some(render_data) = vq.render_data() {
-                            render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                            render_pass.draw(0..120, 0..render_data.num_vectors);
-                        }
-                    }
-                    // Draw vertex intrinsic vector quantity (e.g. tangent field)
-                    if let Some(iq) = mesh.active_vertex_intrinsic_vector_quantity() {
-                        if let Some(render_data) = iq.render_data() {
-                            render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                            render_pass.draw(0..120, 0..render_data.num_vectors);
-                        }
-                    }
-                    // Draw face intrinsic vector quantity
-                    if let Some(iq) = mesh.active_face_intrinsic_vector_quantity() {
-                        if let Some(render_data) = iq.render_data() {
-                            render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                            render_pass.draw(0..120, 0..render_data.num_vectors);
-                        }
-                    }
-                    // Draw one-form quantity (edge flow arrows)
-                    if let Some(oq) = mesh.active_one_form_quantity() {
-                        if let Some(render_data) = oq.render_data() {
-                            render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                            render_pass.draw(0..120, 0..render_data.num_vectors);
-                        }
-                    }
+            if structure.type_name() == "SurfaceMesh"
+                && let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>()
+            {
+                // Draw vertex vector quantity (e.g. vertex normals)
+                if let Some(vq) = mesh.active_vertex_vector_quantity()
+                    && let Some(render_data) = vq.render_data()
+                {
+                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                    render_pass.draw(0..120, 0..render_data.num_vectors);
+                }
+                // Draw face vector quantity (e.g. face normals)
+                if let Some(vq) = mesh.active_face_vector_quantity()
+                    && let Some(render_data) = vq.render_data()
+                {
+                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                    render_pass.draw(0..120, 0..render_data.num_vectors);
+                }
+                // Draw vertex intrinsic vector quantity (e.g. tangent field)
+                if let Some(iq) = mesh.active_vertex_intrinsic_vector_quantity()
+                    && let Some(render_data) = iq.render_data()
+                {
+                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                    render_pass.draw(0..120, 0..render_data.num_vectors);
+                }
+                // Draw face intrinsic vector quantity
+                if let Some(iq) = mesh.active_face_intrinsic_vector_quantity()
+                    && let Some(render_data) = iq.render_data()
+                {
+                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                    render_pass.draw(0..120, 0..render_data.num_vectors);
+                }
+                // Draw one-form quantity (edge flow arrows)
+                if let Some(oq) = mesh.active_one_form_quantity()
+                    && let Some(render_data) = oq.render_data()
+                {
+                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                    render_pass.draw(0..120, 0..render_data.num_vectors);
                 }
             }
         }
@@ -127,35 +120,33 @@ pub(super) fn draw_curve_networks_and_lines<'a>(
                 continue;
             }
             render_pass.set_bind_group(2, engine.matcap_bind_group_for(structure.material()), &[]);
-            if structure.type_name() == "CurveNetwork" {
-                if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
-                    // Only render in line mode (0)
-                    if cn.render_mode() == 0 {
-                        if let Some(render_data) = cn.render_data() {
-                            render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                            // 2 vertices per edge (LineList topology)
-                            render_pass.draw(0..render_data.num_edges * 2, 0..1);
-                        }
-                    }
+            if structure.type_name() == "CurveNetwork"
+                && let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>()
+            {
+                // Only render in line mode (0)
+                if cn.render_mode() == 0
+                    && let Some(render_data) = cn.render_data()
+                {
+                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                    // 2 vertices per edge (LineList topology)
+                    render_pass.draw(0..render_data.num_edges * 2, 0..1);
                 }
             }
-            if structure.type_name() == "CameraView" {
-                if let Some(cv) = structure.as_any().downcast_ref::<CameraView>() {
-                    if let Some(render_data) = cv.render_data() {
-                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                        // 2 vertices per edge (LineList topology)
-                        render_pass.draw(0..render_data.num_edges * 2, 0..1);
-                    }
-                }
+            if structure.type_name() == "CameraView"
+                && let Some(cv) = structure.as_any().downcast_ref::<CameraView>()
+                && let Some(render_data) = cv.render_data()
+            {
+                render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                // 2 vertices per edge (LineList topology)
+                render_pass.draw(0..render_data.num_edges * 2, 0..1);
             }
-            if structure.type_name() == "VolumeGrid" {
-                if let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>() {
-                    if let Some(render_data) = vg.render_data() {
-                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                        // 2 vertices per edge (LineList topology)
-                        render_pass.draw(0..render_data.num_edges * 2, 0..1);
-                    }
-                }
+            if structure.type_name() == "VolumeGrid"
+                && let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>()
+                && let Some(render_data) = vg.render_data()
+            {
+                render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                // 2 vertices per edge (LineList topology)
+                render_pass.draw(0..render_data.num_edges * 2, 0..1);
             }
         }
     });
@@ -177,27 +168,26 @@ pub(super) fn draw_curve_network_tubes<'a>(
             if !ctx.is_structure_visible(structure) {
                 continue;
             }
-            if structure.type_name() == "CurveNetwork" {
-                if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
-                    // Only render in tube mode (1)
-                    if cn.render_mode() == 1 {
-                        if let Some(render_data) = cn.render_data() {
-                            if let (Some(tube_bg), Some(gen_vb)) = (
-                                &render_data.tube_render_bind_group,
-                                &render_data.generated_vertex_buffer,
-                            ) {
-                                render_pass.set_bind_group(
-                                    2,
-                                    engine.matcap_bind_group_for(structure.material()),
-                                    &[],
-                                );
-                                render_pass.set_bind_group(0, tube_bg, &[]);
-                                render_pass.set_vertex_buffer(0, gen_vb.slice(..));
-                                // 36 vertices per edge (12 triangles for bounding box)
-                                render_pass.draw(0..render_data.num_edges * 36, 0..1);
-                            }
-                        }
-                    }
+            if structure.type_name() == "CurveNetwork"
+                && let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>()
+            {
+                // Only render in tube mode (1)
+                if cn.render_mode() == 1
+                    && let Some(render_data) = cn.render_data()
+                    && let (Some(tube_bg), Some(gen_vb)) = (
+                        &render_data.tube_render_bind_group,
+                        &render_data.generated_vertex_buffer,
+                    )
+                {
+                    render_pass.set_bind_group(
+                        2,
+                        engine.matcap_bind_group_for(structure.material()),
+                        &[],
+                    );
+                    render_pass.set_bind_group(0, tube_bg, &[]);
+                    render_pass.set_vertex_buffer(0, gen_vb.slice(..));
+                    // 36 vertices per edge (12 triangles for bounding box)
+                    render_pass.draw(0..render_data.num_edges * 36, 0..1);
                 }
             }
         }
@@ -220,23 +210,22 @@ pub(super) fn draw_curve_network_nodes<'a>(
             if !ctx.is_structure_visible(structure) {
                 continue;
             }
-            if structure.type_name() == "CurveNetwork" {
-                if let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>() {
-                    // Only render node spheres in tube mode (1)
-                    if cn.render_mode() == 1 {
-                        if let Some(render_data) = cn.render_data() {
-                            if let Some(node_bg) = &render_data.node_render_bind_group {
-                                render_pass.set_bind_group(
-                                    2,
-                                    engine.matcap_bind_group_for(structure.material()),
-                                    &[],
-                                );
-                                render_pass.set_bind_group(0, node_bg, &[]);
-                                // 6 vertices per quad, num_nodes instances
-                                render_pass.draw(0..6, 0..render_data.num_nodes);
-                            }
-                        }
-                    }
+            if structure.type_name() == "CurveNetwork"
+                && let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>()
+            {
+                // Only render node spheres in tube mode (1)
+                if cn.render_mode() == 1
+                    && let Some(render_data) = cn.render_data()
+                    && let Some(node_bg) = &render_data.node_render_bind_group
+                {
+                    render_pass.set_bind_group(
+                        2,
+                        engine.matcap_bind_group_for(structure.material()),
+                        &[],
+                    );
+                    render_pass.set_bind_group(0, node_bg, &[]);
+                    // 6 vertices per quad, num_nodes instances
+                    render_pass.draw(0..6, 0..render_data.num_nodes);
                 }
             }
         }
@@ -259,42 +248,41 @@ pub(super) fn draw_meshes_simple<'a>(
             if !ctx.is_structure_visible(structure) {
                 continue;
             }
-            if structure.type_name() == "SurfaceMesh" {
-                if let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() {
-                    if let Some(render_data) = mesh.render_data() {
-                        render_pass.set_bind_group(
-                            2,
-                            engine.matcap_bind_group_for(structure.material()),
-                            &[],
-                        );
-                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                        render_pass.set_index_buffer(
-                            render_data.index_buffer.slice(..),
-                            wgpu::IndexFormat::Uint32,
-                        );
-                        render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
-                    }
-                }
+            if structure.type_name() == "SurfaceMesh"
+                && let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>()
+                && let Some(render_data) = mesh.render_data()
+            {
+                render_pass.set_bind_group(
+                    2,
+                    engine.matcap_bind_group_for(structure.material()),
+                    &[],
+                );
+                render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                render_pass.set_index_buffer(
+                    render_data.index_buffer.slice(..),
+                    wgpu::IndexFormat::Uint32,
+                );
+                render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
             }
-            if structure.type_name() == "VolumeMesh" {
-                if let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() {
-                    // Render exterior faces (includes cell culling when slice plane is active)
-                    if let Some(render_data) = vm.render_data() {
-                        render_pass.set_bind_group(
-                            2,
-                            engine.matcap_bind_group_for(structure.material()),
-                            &[],
-                        );
-                        render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                        render_pass.set_index_buffer(
-                            render_data.index_buffer.slice(..),
-                            wgpu::IndexFormat::Uint32,
-                        );
-                        render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
-                    }
-                    // Note: No slice cap geometry needed - we use cell culling
-                    // which shows whole cells instead of cross-section caps
+            if structure.type_name() == "VolumeMesh"
+                && let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>()
+            {
+                // Render exterior faces (includes cell culling when slice plane is active)
+                if let Some(render_data) = vm.render_data() {
+                    render_pass.set_bind_group(
+                        2,
+                        engine.matcap_bind_group_for(structure.material()),
+                        &[],
+                    );
+                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                    render_pass.set_index_buffer(
+                        render_data.index_buffer.slice(..),
+                        wgpu::IndexFormat::Uint32,
+                    );
+                    render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
                 }
+                // Note: No slice cap geometry needed - we use cell culling
+                // which shows whole cells instead of cross-section caps
             }
         }
     });
@@ -329,13 +317,11 @@ pub(super) fn draw_volume_grid_isosurfaces<'a>(
                     if let Some(nsq) = quantity
                         .as_any()
                         .downcast_ref::<VolumeGridNodeScalarQuantity>()
+                        && nsq.viz_mode() == VolumeGridVizMode::Isosurface
+                        && let Some(rd) = nsq.isosurface_render_data()
                     {
-                        if nsq.viz_mode() == VolumeGridVizMode::Isosurface {
-                            if let Some(rd) = nsq.isosurface_render_data() {
-                                render_pass.set_bind_group(0, &rd.bind_group, &[]);
-                                render_pass.draw(0..rd.num_vertices, 0..1);
-                            }
-                        }
+                        render_pass.set_bind_group(0, &rd.bind_group, &[]);
+                        render_pass.draw(0..rd.num_vertices, 0..1);
                     }
                 }
             }
@@ -372,23 +358,20 @@ pub(super) fn draw_volume_grid_gridcubes<'a>(
                     if let Some(nsq) = quantity
                         .as_any()
                         .downcast_ref::<VolumeGridNodeScalarQuantity>()
+                        && nsq.viz_mode() == VolumeGridVizMode::Gridcube
+                        && let Some(rd) = nsq.gridcube_render_data()
                     {
-                        if nsq.viz_mode() == VolumeGridVizMode::Gridcube {
-                            if let Some(rd) = nsq.gridcube_render_data() {
-                                render_pass.set_bind_group(0, &rd.bind_group, &[]);
-                                // 36 vertices per cube instance
-                                render_pass.draw(0..rd.num_instances * 36, 0..1);
-                            }
-                        }
+                        render_pass.set_bind_group(0, &rd.bind_group, &[]);
+                        // 36 vertices per cube instance
+                        render_pass.draw(0..rd.num_instances * 36, 0..1);
                     }
                     if let Some(csq) = quantity
                         .as_any()
                         .downcast_ref::<VolumeGridCellScalarQuantity>()
+                        && let Some(rd) = csq.gridcube_render_data()
                     {
-                        if let Some(rd) = csq.gridcube_render_data() {
-                            render_pass.set_bind_group(0, &rd.bind_group, &[]);
-                            render_pass.draw(0..rd.num_instances * 36, 0..1);
-                        }
+                        render_pass.set_bind_group(0, &rd.bind_group, &[]);
+                        render_pass.draw(0..rd.num_instances * 36, 0..1);
                     }
                 }
             }

@@ -539,12 +539,12 @@ impl DepthPeelPass {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("mesh peel pipeline layout"),
             bind_group_layouts: &[
-                mesh_bind_group_layout,        // Group 0
-                slice_plane_bind_group_layout, // Group 1
-                matcap_bind_group_layout,      // Group 2
-                peel_bind_group_layout,        // Group 3
+                Some(mesh_bind_group_layout),        // Group 0
+                Some(slice_plane_bind_group_layout), // Group 1
+                Some(matcap_bind_group_layout),      // Group 2
+                Some(peel_bind_group_layout),        // Group 3
             ],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -586,13 +586,13 @@ impl DepthPeelPass {
             },
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth24PlusStencil8,
-                depth_write_enabled: true, // Write depth for this layer
-                depth_compare: wgpu::CompareFunction::Less,
+                depth_write_enabled: Some(true), // Write depth for this layer
+                depth_compare: Some(wgpu::CompareFunction::Less),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         })
     }
@@ -611,8 +611,8 @@ impl DepthPeelPass {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("composite peel pipeline layout"),
-            bind_group_layouts: &[bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(bind_group_layout)],
+            immediate_size: 0,
         });
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -640,7 +640,7 @@ impl DepthPeelPass {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         })
     }
@@ -659,8 +659,8 @@ impl DepthPeelPass {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("depth update pipeline layout"),
-            bind_group_layouts: &[bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(bind_group_layout)],
+            immediate_size: 0,
         });
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -702,7 +702,7 @@ impl DepthPeelPass {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         })
     }

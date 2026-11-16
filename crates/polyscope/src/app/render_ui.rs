@@ -254,42 +254,40 @@ impl App {
                         // Build structure-specific UI
                         crate::with_context_mut(|ctx| {
                             if let Some(s) = ctx.registry.get_mut(type_name, name) {
-                                if type_name == "PointCloud" {
-                                    if let Some(pc) = s.as_any_mut().downcast_mut::<PointCloud>() {
-                                        pc.build_egui_ui(ui, &available_materials);
+                                if type_name == "PointCloud"
+                                    && let Some(pc) = s.as_any_mut().downcast_mut::<PointCloud>()
+                                {
+                                    pc.build_egui_ui(ui, &available_materials);
+                                }
+                                if type_name == "SurfaceMesh"
+                                    && let Some(mesh) = s.as_any_mut().downcast_mut::<SurfaceMesh>()
+                                {
+                                    mesh.build_egui_ui(ui, &available_materials);
+                                }
+                                if type_name == "CurveNetwork"
+                                    && let Some(cn) = s.as_any_mut().downcast_mut::<CurveNetwork>()
+                                {
+                                    cn.build_egui_ui(ui, &available_materials);
+                                }
+                                if type_name == "CameraView"
+                                    && let Some(cv) = s.as_any_mut().downcast_mut::<CameraView>()
+                                {
+                                    cv.build_egui_ui(ui);
+                                    // Check if user requested "fly to" this camera
+                                    if cv.take_fly_to_request() {
+                                        let params = *cv.params();
+                                        fly_to_camera = Some(params);
                                     }
                                 }
-                                if type_name == "SurfaceMesh" {
-                                    if let Some(mesh) = s.as_any_mut().downcast_mut::<SurfaceMesh>()
-                                    {
-                                        mesh.build_egui_ui(ui, &available_materials);
-                                    }
+                                if type_name == "VolumeGrid"
+                                    && let Some(vg) = s.as_any_mut().downcast_mut::<VolumeGrid>()
+                                {
+                                    vg.build_egui_ui(ui, &colormap_name_refs);
                                 }
-                                if type_name == "CurveNetwork" {
-                                    if let Some(cn) = s.as_any_mut().downcast_mut::<CurveNetwork>()
-                                    {
-                                        cn.build_egui_ui(ui, &available_materials);
-                                    }
-                                }
-                                if type_name == "CameraView" {
-                                    if let Some(cv) = s.as_any_mut().downcast_mut::<CameraView>() {
-                                        cv.build_egui_ui(ui);
-                                        // Check if user requested "fly to" this camera
-                                        if cv.take_fly_to_request() {
-                                            let params = *cv.params();
-                                            fly_to_camera = Some(params);
-                                        }
-                                    }
-                                }
-                                if type_name == "VolumeGrid" {
-                                    if let Some(vg) = s.as_any_mut().downcast_mut::<VolumeGrid>() {
-                                        vg.build_egui_ui(ui, &colormap_name_refs);
-                                    }
-                                }
-                                if type_name == "VolumeMesh" {
-                                    if let Some(vm) = s.as_any_mut().downcast_mut::<VolumeMesh>() {
-                                        vm.build_egui_ui(ui);
-                                    }
+                                if type_name == "VolumeMesh"
+                                    && let Some(vm) = s.as_any_mut().downcast_mut::<VolumeMesh>()
+                                {
+                                    vm.build_egui_ui(ui);
                                 }
                             }
                         });
@@ -300,13 +298,13 @@ impl App {
             self.left_panel_width = f64::from(panel_width) + 5.0;
 
             // Show selection panel if we have a selection
-            if let Some(ref selection) = self.selection {
-                if selection.hit {
-                    polyscope_ui::build_selection_panel(&egui.context, selection, |ui| {
-                        // Structure-specific pick UI (placeholder for now)
-                        ui.label("Quantity values would appear here");
-                    });
-                }
+            if let Some(ref selection) = self.selection
+                && selection.hit
+            {
+                polyscope_ui::build_selection_panel(&egui.context, selection, |ui| {
+                    // Structure-specific pick UI (placeholder for now)
+                    ui.label("Quantity values would appear here");
+                });
             }
 
             // Common gizmo setup - check if pointer is over UI panel
@@ -424,42 +422,41 @@ impl App {
 
                             // Immediately update GPU buffers so structure renders at new position this frame
                             crate::with_context(|ctx| {
-                                if let Some((type_name, name)) = ctx.selected_structure() {
-                                    if let Some(structure) = ctx.registry.get(type_name, name) {
-                                        if type_name == "PointCloud" {
-                                            if let Some(pc) =
-                                                structure.as_any().downcast_ref::<PointCloud>()
-                                            {
-                                                pc.update_gpu_buffers(
-                                                    &engine.queue,
-                                                    &engine.color_maps,
-                                                );
-                                            }
-                                        } else if type_name == "SurfaceMesh" {
-                                            if let Some(mesh) =
-                                                structure.as_any().downcast_ref::<SurfaceMesh>()
-                                            {
-                                                mesh.update_gpu_buffers(
-                                                    &engine.queue,
-                                                    &engine.color_maps,
-                                                );
-                                            }
-                                        } else if type_name == "CurveNetwork" {
-                                            if let Some(cn) =
-                                                structure.as_any().downcast_ref::<CurveNetwork>()
-                                            {
-                                                cn.update_gpu_buffers(
-                                                    &engine.queue,
-                                                    &engine.color_maps,
-                                                );
-                                            }
-                                        } else if type_name == "VolumeMesh" {
-                                            if let Some(vm) =
-                                                structure.as_any().downcast_ref::<VolumeMesh>()
-                                            {
-                                                vm.update_gpu_buffers(&engine.queue);
-                                            }
+                                if let Some((type_name, name)) = ctx.selected_structure()
+                                    && let Some(structure) = ctx.registry.get(type_name, name)
+                                {
+                                    if type_name == "PointCloud" {
+                                        if let Some(pc) =
+                                            structure.as_any().downcast_ref::<PointCloud>()
+                                        {
+                                            pc.update_gpu_buffers(
+                                                &engine.queue,
+                                                &engine.color_maps,
+                                            );
                                         }
+                                    } else if type_name == "SurfaceMesh" {
+                                        if let Some(mesh) =
+                                            structure.as_any().downcast_ref::<SurfaceMesh>()
+                                        {
+                                            mesh.update_gpu_buffers(
+                                                &engine.queue,
+                                                &engine.color_maps,
+                                            );
+                                        }
+                                    } else if type_name == "CurveNetwork" {
+                                        if let Some(cn) =
+                                            structure.as_any().downcast_ref::<CurveNetwork>()
+                                        {
+                                            cn.update_gpu_buffers(
+                                                &engine.queue,
+                                                &engine.color_maps,
+                                            );
+                                        }
+                                    } else if type_name == "VolumeMesh"
+                                        && let Some(vm) =
+                                            structure.as_any().downcast_ref::<VolumeMesh>()
+                                    {
+                                        vm.update_gpu_buffers(&engine.queue);
                                     }
                                 }
                             });
@@ -617,7 +614,7 @@ impl App {
                     1.0
                 };
                 let target_point = position + look_dir * dist;
-                let target_view = glam::Mat4::look_at_rh(position, target_point, up);
+                let target_view = glam::camera::rh::view::look_at_mat4(position, target_point, up);
                 let target_fov = params.fov_vertical_degrees().to_radians();
                 engine.camera.start_flight_to(target_view, target_fov, 0.4);
             }
@@ -636,37 +633,33 @@ impl App {
         // Handle Save/Load View dialogs OUTSIDE the multi-pass egui loop —
         // egui may rerun the builder multiple times per frame, and we don't
         // want the native dialog opening repeatedly.
-        if view_save_requested {
-            if let Some(path) = rfd::FileDialog::new()
+        if view_save_requested
+            && let Some(path) = rfd::FileDialog::new()
                 .add_filter("Polyscope View", &["json"])
                 .set_file_name("view.json")
                 .save_file()
-            {
-                if let Err(e) = polyscope_core::view_state::save_view_to_file(&path) {
-                    rfd::MessageDialog::new()
-                        .set_level(rfd::MessageLevel::Error)
-                        .set_title("Save View failed")
-                        .set_description(e.to_string())
-                        .show();
-                }
-            }
+            && let Err(e) = polyscope_core::view_state::save_view_to_file(&path)
+        {
+            rfd::MessageDialog::new()
+                .set_level(rfd::MessageLevel::Error)
+                .set_title("Save View failed")
+                .set_description(e.to_string())
+                .show();
         }
-        if view_load_requested {
-            if let Some(path) = rfd::FileDialog::new()
+        if view_load_requested
+            && let Some(path) = rfd::FileDialog::new()
                 .add_filter("Polyscope View", &["json"])
                 .pick_file()
-            {
-                if let Err(e) = polyscope_core::view_state::load_view_from_file(
-                    &path,
-                    polyscope_core::view_state::ViewTransition::FlyTo,
-                ) {
-                    rfd::MessageDialog::new()
-                        .set_level(rfd::MessageLevel::Error)
-                        .set_title("Load View failed")
-                        .set_description(e.to_string())
-                        .show();
-                }
-            }
+            && let Err(e) = polyscope_core::view_state::load_view_from_file(
+                &path,
+                polyscope_core::view_state::ViewTransition::FlyTo,
+            )
+        {
+            rfd::MessageDialog::new()
+                .set_level(rfd::MessageLevel::Error)
+                .set_title("Load View failed")
+                .set_description(e.to_string())
+                .show();
         }
 
         // Handle platform output (clipboard, cursor, etc.) once after all passes

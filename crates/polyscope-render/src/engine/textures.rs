@@ -141,15 +141,24 @@ impl RenderEngine {
 
     /// Creates the SSAO noise texture.
     pub(crate) fn create_ssao_noise_texture(&mut self) {
-        use rand::Rng;
+        // Xorshift32 with a fixed seed. The noise is the same on each run, so
+        // renders are reproducible (upstream Polyscope commit 8740ddc also
+        // seeds its generator deterministically).
+        let mut state: u32 = 0x9E37_79B9;
+        let mut next_unit = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            // Use the top 24 bits: an f32 holds them exactly.
+            (state >> 8) as f32 / (1u32 << 24) as f32
+        };
 
-        // Generate 4x4 random rotation vectors
-        let mut rng = rand::thread_rng();
+        // Generate 4x4 pseudo-random rotation vectors
         let mut noise_data = Vec::with_capacity(4 * 4 * 4); // 4x4 pixels, RGBA8
 
         for _ in 0..16 {
-            // Random rotation vector in tangent plane (z=0)
-            let angle: f32 = rng.gen_range(0.0..std::f32::consts::TAU);
+            // Pseudo-random rotation vector in tangent plane (z=0)
+            let angle: f32 = next_unit() * std::f32::consts::TAU;
             let x = angle.cos();
             let y = angle.sin();
             // Store in [0,1] range

@@ -204,8 +204,8 @@ pub fn create_slice_plane_pipeline(
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Slice Plane Pipeline Layout"),
-        bind_group_layouts: &[bind_group_layout],
-        push_constant_ranges: &[],
+        bind_group_layouts: &[Some(bind_group_layout)],
+        immediate_size: 0,
     });
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -249,8 +249,8 @@ pub fn create_slice_plane_pipeline(
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: depth_format,
-            depth_write_enabled: true, // Write depth so scene geometry can occlude the plane
-            depth_compare: wgpu::CompareFunction::LessEqual, // Respect depth so nearer planes win
+            depth_write_enabled: Some(true), // Write depth so scene geometry can occlude the plane
+            depth_compare: Some(wgpu::CompareFunction::LessEqual), // Respect depth so nearer planes win
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
@@ -259,7 +259,7 @@ pub fn create_slice_plane_pipeline(
             mask: !0,
             alpha_to_coverage_enabled: false,
         },
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     })
 }

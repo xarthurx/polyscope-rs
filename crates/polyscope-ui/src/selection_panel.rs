@@ -1,6 +1,6 @@
 //! Selection/pick results panel.
 
-use egui::{Context, SidePanel, Ui};
+use egui::{Context, Panel, Ui};
 use polyscope_render::{PickElementType, PickResult};
 
 /// Builds the selection panel on the right side.
@@ -10,9 +10,19 @@ pub fn build_selection_panel(
     selection: &PickResult,
     build_structure_pick_ui: impl FnOnce(&mut Ui),
 ) {
-    SidePanel::right("selection_panel")
-        .default_width(300.0)
-        .show(ctx, |ui| {
+    // egui no longer shows panels on a `Context`. Host the panel in a top-level
+    // background `Ui`, as `SidePanel::show(ctx)` did before.
+    let mut root_ui = Ui::new(
+        ctx.clone(),
+        egui::Id::new("selection_panel"),
+        egui::UiBuilder::new().layer_id(egui::LayerId::background()),
+    );
+    root_ui
+        .response()
+        .widget_info(|| egui::WidgetInfo::new(egui::WidgetType::Panel));
+    Panel::right("selection_panel")
+        .default_size(300.0)
+        .show(&mut root_ui, |ui| {
             ui.heading("Selection");
             ui.separator();
 

@@ -57,17 +57,17 @@ impl RenderEngine {
         let view = self.hdr_view.as_ref().unwrap_or(surface_view);
 
         // Initialize render data if needed
-        if self.ground_plane_render_data.is_none() {
-            if let Some(ref shadow_pass) = self.shadow_map_pass {
-                self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
-                    &self.device,
-                    &self.ground_plane_bind_group_layout,
-                    &self.camera_buffer,
-                    shadow_pass.light_buffer(),
-                    shadow_pass.depth_view(),
-                    shadow_pass.comparison_sampler(),
-                ));
-            }
+        if self.ground_plane_render_data.is_none()
+            && let Some(ref shadow_pass) = self.shadow_map_pass
+        {
+            self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
+                &self.device,
+                &self.ground_plane_bind_group_layout,
+                &self.camera_buffer,
+                shadow_pass.light_buffer(),
+                shadow_pass.depth_view(),
+                shadow_pass.comparison_sampler(),
+            ));
         }
 
         // Get camera height
@@ -299,17 +299,17 @@ impl RenderEngine {
         };
 
         // Initialize render data if needed
-        if self.ground_plane_render_data.is_none() {
-            if let Some(ref shadow_pass) = self.shadow_map_pass {
-                self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
-                    &self.device,
-                    &self.ground_plane_bind_group_layout,
-                    &self.camera_buffer,
-                    shadow_pass.light_buffer(),
-                    shadow_pass.depth_view(),
-                    shadow_pass.comparison_sampler(),
-                ));
-            }
+        if self.ground_plane_render_data.is_none()
+            && let Some(ref shadow_pass) = self.shadow_map_pass
+        {
+            self.ground_plane_render_data = Some(GroundPlaneRenderData::new(
+                &self.device,
+                &self.ground_plane_bind_group_layout,
+                &self.camera_buffer,
+                shadow_pass.light_buffer(),
+                shadow_pass.depth_view(),
+                shadow_pass.comparison_sampler(),
+            ));
         }
 
         let Some(render_data) = &self.ground_plane_render_data else {

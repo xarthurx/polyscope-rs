@@ -870,10 +870,8 @@ impl VolumeMesh {
                 && (n - plane_normal).length_squared() < 1e-10
         });
 
-        if cache_valid {
-            if let Some(ref data) = self.slice_render_data {
-                return !data.is_empty();
-            }
+        if cache_valid && let Some(ref data) = self.slice_render_data {
+            return !data.is_empty();
         }
 
         // Generate new slice geometry
@@ -1052,10 +1050,10 @@ impl VolumeMesh {
     /// Returns the active vertex color quantity, if any.
     fn active_vertex_color_quantity(&self) -> Option<&VolumeMeshVertexColorQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() {
-                if let Some(vcq) = q.as_any().downcast_ref::<VolumeMeshVertexColorQuantity>() {
-                    return Some(vcq);
-                }
+            if q.is_enabled()
+                && let Some(vcq) = q.as_any().downcast_ref::<VolumeMeshVertexColorQuantity>()
+            {
+                return Some(vcq);
             }
         }
         None

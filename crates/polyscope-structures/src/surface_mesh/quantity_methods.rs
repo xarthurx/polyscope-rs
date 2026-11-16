@@ -226,10 +226,11 @@ impl SurfaceMesh {
     #[must_use]
     pub fn active_vertex_scalar_quantity(&self) -> Option<&MeshVertexScalarQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
-                if let Some(sq) = q.as_any().downcast_ref::<MeshVertexScalarQuantity>() {
-                    return Some(sq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Scalar
+                && let Some(sq) = q.as_any().downcast_ref::<MeshVertexScalarQuantity>()
+            {
+                return Some(sq);
             }
         }
         None
@@ -239,10 +240,11 @@ impl SurfaceMesh {
     #[must_use]
     pub fn active_face_scalar_quantity(&self) -> Option<&MeshFaceScalarQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
-                if let Some(sq) = q.as_any().downcast_ref::<MeshFaceScalarQuantity>() {
-                    return Some(sq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Scalar
+                && let Some(sq) = q.as_any().downcast_ref::<MeshFaceScalarQuantity>()
+            {
+                return Some(sq);
             }
         }
         None
@@ -252,10 +254,11 @@ impl SurfaceMesh {
     #[must_use]
     pub fn active_vertex_color_quantity(&self) -> Option<&MeshVertexColorQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Color {
-                if let Some(cq) = q.as_any().downcast_ref::<MeshVertexColorQuantity>() {
-                    return Some(cq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Color
+                && let Some(cq) = q.as_any().downcast_ref::<MeshVertexColorQuantity>()
+            {
+                return Some(cq);
             }
         }
         None
@@ -265,10 +268,11 @@ impl SurfaceMesh {
     #[must_use]
     pub fn active_face_color_quantity(&self) -> Option<&MeshFaceColorQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Color {
-                if let Some(cq) = q.as_any().downcast_ref::<MeshFaceColorQuantity>() {
-                    return Some(cq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Color
+                && let Some(cq) = q.as_any().downcast_ref::<MeshFaceColorQuantity>()
+            {
+                return Some(cq);
             }
         }
         None
@@ -278,10 +282,11 @@ impl SurfaceMesh {
     #[must_use]
     pub fn active_vertex_vector_quantity(&self) -> Option<&MeshVertexVectorQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any().downcast_ref::<MeshVertexVectorQuantity>() {
-                    return Some(vq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(vq) = q.as_any().downcast_ref::<MeshVertexVectorQuantity>()
+            {
+                return Some(vq);
             }
         }
         None
@@ -290,10 +295,11 @@ impl SurfaceMesh {
     /// Returns the currently active vertex vector quantity (mutable), if any.
     pub fn active_vertex_vector_quantity_mut(&mut self) -> Option<&mut MeshVertexVectorQuantity> {
         for q in &mut self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any_mut().downcast_mut::<MeshVertexVectorQuantity>() {
-                    return Some(vq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(vq) = q.as_any_mut().downcast_mut::<MeshVertexVectorQuantity>()
+            {
+                return Some(vq);
             }
         }
         None
@@ -303,10 +309,11 @@ impl SurfaceMesh {
     #[must_use]
     pub fn active_face_vector_quantity(&self) -> Option<&MeshFaceVectorQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any().downcast_ref::<MeshFaceVectorQuantity>() {
-                    return Some(vq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(vq) = q.as_any().downcast_ref::<MeshFaceVectorQuantity>()
+            {
+                return Some(vq);
             }
         }
         None
@@ -315,10 +322,11 @@ impl SurfaceMesh {
     /// Returns the currently active face vector quantity (mutable), if any.
     pub fn active_face_vector_quantity_mut(&mut self) -> Option<&mut MeshFaceVectorQuantity> {
         for q in &mut self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any_mut().downcast_mut::<MeshFaceVectorQuantity>() {
-                    return Some(vq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(vq) = q.as_any_mut().downcast_mut::<MeshFaceVectorQuantity>()
+            {
+                return Some(vq);
             }
         }
         None
@@ -345,13 +353,13 @@ impl SurfaceMesh {
         &self,
     ) -> Option<&MeshVertexParameterizationQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Parameterization {
-                if let Some(pq) = q
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Parameterization
+                && let Some(pq) = q
                     .as_any()
                     .downcast_ref::<MeshVertexParameterizationQuantity>()
-                {
-                    return Some(pq);
-                }
+            {
+                return Some(pq);
             }
         }
         None
@@ -363,13 +371,13 @@ impl SurfaceMesh {
         &self,
     ) -> Option<&MeshCornerParameterizationQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Parameterization {
-                if let Some(pq) = q
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Parameterization
+                && let Some(pq) = q
                     .as_any()
                     .downcast_ref::<MeshCornerParameterizationQuantity>()
-                {
-                    return Some(pq);
-                }
+            {
+                return Some(pq);
             }
         }
         None
@@ -381,13 +389,13 @@ impl SurfaceMesh {
         &self,
     ) -> Option<&MeshVertexIntrinsicVectorQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(iq) = q
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(iq) = q
                     .as_any()
                     .downcast_ref::<MeshVertexIntrinsicVectorQuantity>()
-                {
-                    return Some(iq);
-                }
+            {
+                return Some(iq);
             }
         }
         None
@@ -398,13 +406,13 @@ impl SurfaceMesh {
         &mut self,
     ) -> Option<&mut MeshVertexIntrinsicVectorQuantity> {
         for q in &mut self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(iq) = q
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(iq) = q
                     .as_any_mut()
                     .downcast_mut::<MeshVertexIntrinsicVectorQuantity>()
-                {
-                    return Some(iq);
-                }
+            {
+                return Some(iq);
             }
         }
         None
@@ -416,10 +424,11 @@ impl SurfaceMesh {
         &self,
     ) -> Option<&MeshFaceIntrinsicVectorQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(iq) = q.as_any().downcast_ref::<MeshFaceIntrinsicVectorQuantity>() {
-                    return Some(iq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(iq) = q.as_any().downcast_ref::<MeshFaceIntrinsicVectorQuantity>()
+            {
+                return Some(iq);
             }
         }
         None
@@ -430,13 +439,13 @@ impl SurfaceMesh {
         &mut self,
     ) -> Option<&mut MeshFaceIntrinsicVectorQuantity> {
         for q in &mut self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(iq) = q
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(iq) = q
                     .as_any_mut()
                     .downcast_mut::<MeshFaceIntrinsicVectorQuantity>()
-                {
-                    return Some(iq);
-                }
+            {
+                return Some(iq);
             }
         }
         None
@@ -446,10 +455,11 @@ impl SurfaceMesh {
     #[must_use]
     pub fn active_one_form_quantity(&self) -> Option<&MeshOneFormQuantity> {
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(oq) = q.as_any().downcast_ref::<MeshOneFormQuantity>() {
-                    return Some(oq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(oq) = q.as_any().downcast_ref::<MeshOneFormQuantity>()
+            {
+                return Some(oq);
             }
         }
         None
@@ -458,10 +468,11 @@ impl SurfaceMesh {
     /// Returns the currently active one-form quantity (mutable), if any.
     pub fn active_one_form_quantity_mut(&mut self) -> Option<&mut MeshOneFormQuantity> {
         for q in &mut self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(oq) = q.as_any_mut().downcast_mut::<MeshOneFormQuantity>() {
-                    return Some(oq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(oq) = q.as_any_mut().downcast_mut::<MeshOneFormQuantity>()
+            {
+                return Some(oq);
             }
         }
         None

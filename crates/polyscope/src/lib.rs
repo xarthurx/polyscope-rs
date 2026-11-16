@@ -329,24 +329,35 @@ pub fn load_static_material(name: &str, filename: &str) {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::{Mutex, MutexGuard, PoisonError};
 
     // Counter for unique test names to avoid race conditions
     static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+    // All tests share one global context. Some tests clear it
+    // (`remove_everything`, `remove_all_structures`, `remove_all_groups`).
+    // This lock makes the tests run one at a time.
+    static CONTEXT_LOCK: Mutex<()> = Mutex::new(());
 
     fn unique_name(prefix: &str) -> String {
         let n = COUNTER.fetch_add(1, Ordering::SeqCst);
         format!("{prefix}_{n}")
     }
 
-    fn setup() {
-        // Initialize context (only once)
-        // Use ok() to handle race conditions in parallel tests
+    /// Initializes the context and returns the guard that serializes the tests.
+    ///
+    /// Keep the guard alive for the full test (`let _guard = setup();`).
+    fn setup() -> MutexGuard<'static, ()> {
+        // A failed test poisons the lock. The other tests must still run.
+        let guard = CONTEXT_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        // `init` fails after the first call. That is expected here.
         let _ = init();
+        guard
     }
 
     #[test]
     fn test_register_curve_network() {
-        setup();
+        let _guard = setup();
         let name = unique_name("test_cn");
         let nodes = vec![
             Vec3::new(0.0, 0.0, 0.0),
@@ -369,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_register_curve_network_line() {
-        setup();
+        let _guard = setup();
         let name = unique_name("line");
         let nodes = vec![
             Vec3::new(0.0, 0.0, 0.0),
@@ -386,7 +397,7 @@ mod tests {
 
     #[test]
     fn test_register_curve_network_loop() {
-        setup();
+        let _guard = setup();
         let name = unique_name("loop");
         let nodes = vec![
             Vec3::new(0.0, 0.0, 0.0),
@@ -402,7 +413,7 @@ mod tests {
 
     #[test]
     fn test_register_curve_network_segments() {
-        setup();
+        let _guard = setup();
         let name = unique_name("segs");
         let nodes = vec![
             Vec3::new(0.0, 0.0, 0.0),
@@ -419,7 +430,7 @@ mod tests {
 
     #[test]
     fn test_curve_network_handle_methods() {
-        setup();
+        let _guard = setup();
         let name = unique_name("handle_test");
         let nodes = vec![Vec3::ZERO, Vec3::X];
         let edges = vec![[0, 1]];
@@ -443,7 +454,7 @@ mod tests {
 
     #[test]
     fn test_with_curve_network() {
-        setup();
+        let _guard = setup();
         let name = unique_name("with_test");
         let nodes = vec![Vec3::ZERO, Vec3::X, Vec3::Y];
         let edges = vec![[0, 1], [1, 2]];
@@ -464,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_create_group() {
-        setup();
+        let _guard = setup();
         let name = unique_name("test_group");
         let handle = create_group(&name);
         assert_eq!(handle.name(), name);
@@ -473,7 +484,7 @@ mod tests {
 
     #[test]
     fn test_get_group() {
-        setup();
+        let _guard = setup();
         let name = unique_name("get_group");
         create_group(&name);
 
@@ -487,7 +498,7 @@ mod tests {
 
     #[test]
     fn test_group_enable_disable() {
-        setup();
+        let _guard = setup();
         let name = unique_name("enable_group");
         let handle = create_group(&name);
 
@@ -500,7 +511,7 @@ mod tests {
 
     #[test]
     fn test_group_add_structures() {
-        setup();
+        let _guard = setup();
         let group_name = unique_name("struct_group");
         let pc_name = unique_name("pc_in_group");
 
@@ -516,7 +527,7 @@ mod tests {
 
     #[test]
     fn test_group_hierarchy() {
-        setup();
+        let _guard = setup();
         let parent_name = unique_name("parent_group");
         let child_name = unique_name("child_group");
 
@@ -530,7 +541,7 @@ mod tests {
 
     #[test]
     fn test_remove_group() {
-        setup();
+        let _guard = setup();
         let name = unique_name("remove_group");
         create_group(&name);
 
@@ -541,7 +552,7 @@ mod tests {
 
     #[test]
     fn test_add_slice_plane() {
-        setup();
+        let _guard = setup();
         let name = unique_name("slice_plane");
         let handle = add_slice_plane(&name);
         assert_eq!(handle.name(), name);
@@ -550,7 +561,7 @@ mod tests {
 
     #[test]
     fn test_slice_plane_pose() {
-        setup();
+        let _guard = setup();
         let name = unique_name("slice_pose");
         let handle = add_slice_plane_with_pose(&name, Vec3::new(1.0, 2.0, 3.0), Vec3::X);
 
@@ -560,7 +571,7 @@ mod tests {
 
     #[test]
     fn test_slice_plane_setters() {
-        setup();
+        let _guard = setup();
         let name = unique_name("slice_setters");
         let handle = add_slice_plane(&name);
 
@@ -578,7 +589,7 @@ mod tests {
 
     #[test]
     fn test_slice_plane_enable_disable() {
-        setup();
+        let _guard = setup();
         let name = unique_name("slice_enable");
         let handle = add_slice_plane(&name);
 
@@ -591,7 +602,7 @@ mod tests {
 
     #[test]
     fn test_remove_slice_plane() {
-        setup();
+        let _guard = setup();
         let name = unique_name("slice_remove");
         add_slice_plane(&name);
 
@@ -602,7 +613,7 @@ mod tests {
 
     #[test]
     fn test_select_structure() {
-        setup();
+        let _guard = setup();
         let name = unique_name("select_pc");
         register_point_cloud(&name, vec![Vec3::ZERO]);
 
@@ -623,7 +634,7 @@ mod tests {
 
     #[test]
     fn test_slice_plane_gizmo_selection() {
-        setup();
+        let _guard = setup();
         let name = unique_name("slice_gizmo");
         add_slice_plane(&name);
 
@@ -645,7 +656,7 @@ mod tests {
 
     #[test]
     fn test_slice_plane_structure_mutual_exclusion() {
-        setup();
+        let _guard = setup();
         let pc_name = unique_name("mutual_pc");
         let plane_name = unique_name("mutual_plane");
 
@@ -671,7 +682,7 @@ mod tests {
 
     #[test]
     fn test_structure_transform() {
-        setup();
+        let _guard = setup();
         let name = unique_name("transform_pc");
         register_point_cloud(&name, vec![Vec3::ZERO, Vec3::X]);
 
@@ -690,7 +701,7 @@ mod tests {
 
     #[test]
     fn test_get_slice_plane_settings() {
-        setup();
+        let _guard = setup();
         let name = unique_name("ui_slice_plane");
 
         // Add a slice plane
@@ -709,7 +720,7 @@ mod tests {
 
     #[test]
     fn test_apply_slice_plane_settings() {
-        setup();
+        let _guard = setup();
         let name = unique_name("apply_slice_plane");
 
         // Add a slice plane
@@ -745,7 +756,7 @@ mod tests {
 
     #[test]
     fn test_handle_slice_plane_action_add() {
-        setup();
+        let _guard = setup();
         let name = unique_name("action_add_plane");
         let mut settings = Vec::new();
 
@@ -761,7 +772,7 @@ mod tests {
 
     #[test]
     fn test_handle_slice_plane_action_remove() {
-        setup();
+        let _guard = setup();
         let name = unique_name("action_remove_plane");
 
         // Add plane
@@ -777,7 +788,7 @@ mod tests {
 
     #[test]
     fn test_get_group_settings() {
-        setup();
+        let _guard = setup();
         let name = unique_name("ui_group");
         let pc_name = unique_name("pc_in_ui_group");
 
@@ -800,7 +811,7 @@ mod tests {
 
     #[test]
     fn test_apply_group_settings() {
-        setup();
+        let _guard = setup();
         let name = unique_name("apply_group");
 
         // Create group
@@ -826,7 +837,7 @@ mod tests {
 
     #[test]
     fn test_get_gizmo_settings() {
-        setup();
+        let _guard = setup();
 
         // Set known values
         set_gizmo_space(GizmoSpace::Local);
@@ -845,7 +856,7 @@ mod tests {
 
     #[test]
     fn test_apply_gizmo_settings() {
-        setup();
+        let _guard = setup();
 
         let settings = polyscope_ui::GizmoSettings {
             local_space: false, // World
@@ -863,7 +874,7 @@ mod tests {
 
     #[test]
     fn test_get_selection_info_with_selection() {
-        setup();
+        let _guard = setup();
         let name = unique_name("gizmo_select_pc");
 
         register_point_cloud(&name, vec![Vec3::ZERO]);
@@ -879,7 +890,7 @@ mod tests {
 
     #[test]
     fn test_apply_selection_transform() {
-        setup();
+        let _guard = setup();
         let name = unique_name("gizmo_transform_pc");
 
         register_point_cloud(&name, vec![Vec3::ZERO]);
@@ -906,7 +917,7 @@ mod tests {
 
     #[test]
     fn test_remove_all_groups() {
-        setup();
+        let _guard = setup();
         let g1 = unique_name("rag_group1");
         let g2 = unique_name("rag_group2");
         create_group(&g1);
@@ -923,7 +934,7 @@ mod tests {
 
     #[test]
     fn test_remove_everything() {
-        setup();
+        let _guard = setup();
         let pc_name = unique_name("re_pc");
         let group_name = unique_name("re_group");
         let sp_name = unique_name("re_slice");
@@ -941,7 +952,7 @@ mod tests {
 
     #[test]
     fn test_degenerate_bounding_box() {
-        setup();
+        let _guard = setup();
         // Clear all structures so only our degenerate point cloud contributes
         remove_all_structures();
         let name = unique_name("degen_bbox");

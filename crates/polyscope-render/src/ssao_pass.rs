@@ -142,8 +142,8 @@ impl SsaoPass {
         // SSAO pipeline
         let ssao_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("SSAO Pipeline Layout"),
-            bind_group_layouts: &[&ssao_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&ssao_bind_group_layout)],
+            immediate_size: 0,
         });
 
         let ssao_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -171,7 +171,7 @@ impl SsaoPass {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -226,8 +226,8 @@ impl SsaoPass {
         // Blur pipeline
         let blur_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("SSAO Blur Pipeline Layout"),
-            bind_group_layouts: &[&blur_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&blur_bind_group_layout)],
+            immediate_size: 0,
         });
 
         let blur_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -255,7 +255,7 @@ impl SsaoPass {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 

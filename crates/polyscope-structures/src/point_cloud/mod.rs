@@ -206,10 +206,11 @@ impl PointCloud {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Color {
-                if let Some(cq) = q.as_any().downcast_ref::<PointCloudColorQuantity>() {
-                    return Some(cq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Color
+                && let Some(cq) = q.as_any().downcast_ref::<PointCloudColorQuantity>()
+            {
+                return Some(cq);
             }
         }
         None
@@ -221,10 +222,11 @@ impl PointCloud {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Scalar {
-                if let Some(sq) = q.as_any().downcast_ref::<PointCloudScalarQuantity>() {
-                    return Some(sq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Scalar
+                && let Some(sq) = q.as_any().downcast_ref::<PointCloudScalarQuantity>()
+            {
+                return Some(sq);
             }
         }
         None
@@ -236,10 +238,11 @@ impl PointCloud {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any().downcast_ref::<PointCloudVectorQuantity>() {
-                    return Some(vq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(vq) = q.as_any().downcast_ref::<PointCloudVectorQuantity>()
+            {
+                return Some(vq);
             }
         }
         None
@@ -250,10 +253,11 @@ impl PointCloud {
         use polyscope_core::quantity::QuantityKind;
 
         for q in &mut self.quantities {
-            if q.is_enabled() && q.kind() == QuantityKind::Vector {
-                if let Some(vq) = q.as_any_mut().downcast_mut::<PointCloudVectorQuantity>() {
-                    return Some(vq);
-                }
+            if q.is_enabled()
+                && q.kind() == QuantityKind::Vector
+                && let Some(vq) = q.as_any_mut().downcast_mut::<PointCloudVectorQuantity>()
+            {
+                return Some(vq);
             }
         }
         None
@@ -323,12 +327,12 @@ impl PointCloud {
         if let Some(color_q) = self.active_color_quantity() {
             uniforms.use_per_point_color = 1;
             color_q.apply_to_render_data(queue, render_data);
-        } else if let Some(scalar_q) = self.active_scalar_quantity() {
-            if let Some(colormap) = color_maps.get(scalar_q.colormap_name()) {
-                uniforms.use_per_point_color = 1;
-                let colors = scalar_q.compute_colors(colormap);
-                render_data.update_colors(queue, &colors);
-            }
+        } else if let Some(scalar_q) = self.active_scalar_quantity()
+            && let Some(colormap) = color_maps.get(scalar_q.colormap_name())
+        {
+            uniforms.use_per_point_color = 1;
+            let colors = scalar_q.compute_colors(colormap);
+            render_data.update_colors(queue, &colors);
         }
 
         render_data.update_uniforms(queue, &uniforms);

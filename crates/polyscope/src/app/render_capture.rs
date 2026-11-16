@@ -212,51 +212,51 @@ impl App {
             let (w, h) = engine.dimensions();
             engine.create_normal_texture_with_size(w, h);
         }
-        if let Some(mesh_pipeline) = &engine.mesh_pipeline {
-            if let Some(normal_view) = engine.normal_view() {
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("headless mesh pass (MRT)"),
-                    color_attachments: &[
-                        Some(wgpu::RenderPassColorAttachment {
-                            view: &screenshot_view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            },
-                            depth_slice: None,
-                        }),
-                        Some(wgpu::RenderPassColorAttachment {
-                            view: normal_view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.5,
-                                    g: 0.5,
-                                    b: 1.0,
-                                    a: 0.0,
-                                }),
-                                store: wgpu::StoreOp::Store,
-                            },
-                            depth_slice: None,
-                        }),
-                    ],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: engine.screenshot_depth_view(),
-                        depth_ops: Some(wgpu::Operations {
+        if let Some(mesh_pipeline) = &engine.mesh_pipeline
+            && let Some(normal_view) = engine.normal_view()
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("headless mesh pass (MRT)"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &screenshot_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
                             load: wgpu::LoadOp::Load,
                             store: wgpu::StoreOp::Store,
-                        }),
-                        stencil_ops: None,
+                        },
+                        depth_slice: None,
                     }),
-                    ..Default::default()
-                });
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: normal_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.5,
+                                g: 0.5,
+                                b: 1.0,
+                                a: 0.0,
+                            }),
+                            store: wgpu::StoreOp::Store,
+                        },
+                        depth_slice: None,
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: engine.screenshot_depth_view(),
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
 
-                render_pass.set_pipeline(mesh_pipeline);
-                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
+            render_pass.set_pipeline(mesh_pipeline);
+            render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
-                render_scene::draw_meshes_simple(&mut render_pass, engine);
-            }
+            render_scene::draw_meshes_simple(&mut render_pass, engine);
         }
 
         // Render ground plane

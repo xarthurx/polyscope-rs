@@ -79,11 +79,11 @@ impl RenderEngine {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("point pipeline layout"),
                 bind_group_layouts: &[
-                    &bind_group_layout,
-                    &self.slice_plane_bind_group_layout,
-                    &self.matcap_bind_group_layout,
+                    Some(&bind_group_layout),
+                    Some(&self.slice_plane_bind_group_layout),
+                    Some(&self.matcap_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         let pipeline = self
@@ -118,13 +118,13 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 
@@ -206,11 +206,11 @@ impl RenderEngine {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("vector pipeline layout"),
                 bind_group_layouts: &[
-                    &bind_group_layout,
-                    &self.slice_plane_bind_group_layout,
-                    &self.matcap_bind_group_layout,
+                    Some(&bind_group_layout),
+                    Some(&self.slice_plane_bind_group_layout),
+                    Some(&self.matcap_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         let pipeline = self
@@ -245,13 +245,13 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 
@@ -380,11 +380,11 @@ impl RenderEngine {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("mesh pipeline layout"),
                 bind_group_layouts: &[
-                    &bind_group_layout,
-                    &self.slice_plane_bind_group_layout,
-                    &self.matcap_bind_group_layout,
+                    Some(&bind_group_layout),
+                    Some(&self.slice_plane_bind_group_layout),
+                    Some(&self.matcap_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         let pipeline = self
@@ -428,13 +428,13 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 
@@ -479,13 +479,13 @@ impl RenderEngine {
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: wgpu::TextureFormat::Depth24PlusStencil8,
-                        depth_write_enabled: true,
-                        depth_compare: wgpu::CompareFunction::Less,
+                        depth_write_enabled: Some(true),
+                        depth_compare: Some(wgpu::CompareFunction::Less),
                         stencil: wgpu::StencilState::default(),
                         bias: wgpu::DepthBiasState::default(),
                     }),
                     multisample: wgpu::MultisampleState::default(),
-                    multiview: None,
+                    multiview_mask: None,
                     cache: None,
                 });
 
@@ -561,11 +561,11 @@ impl RenderEngine {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("simple mesh pipeline layout"),
                 bind_group_layouts: &[
-                    &bind_group_layout,
-                    &self.slice_plane_bind_group_layout,
-                    &self.matcap_bind_group_layout,
+                    Some(&bind_group_layout),
+                    Some(&self.slice_plane_bind_group_layout),
+                    Some(&self.matcap_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         let pipeline = self
@@ -609,13 +609,13 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 
@@ -719,11 +719,11 @@ impl RenderEngine {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("curve network edge pipeline layout"),
                 bind_group_layouts: &[
-                    &bind_group_layout,
-                    &self.slice_plane_bind_group_layout,
-                    &self.matcap_bind_group_layout,
+                    Some(&bind_group_layout),
+                    Some(&self.slice_plane_bind_group_layout),
+                    Some(&self.matcap_bind_group_layout),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         let pipeline = self
@@ -758,13 +758,13 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 
@@ -840,8 +840,8 @@ impl RenderEngine {
             self.device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Curve Network Tube Compute Pipeline Layout"),
-                    bind_group_layouts: &[&compute_bind_group_layout],
-                    push_constant_ranges: &[],
+                    bind_group_layouts: &[Some(&compute_bind_group_layout)],
+                    immediate_size: 0,
                 });
 
         let compute_pipeline =
@@ -922,11 +922,11 @@ impl RenderEngine {
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Curve Network Tube Render Pipeline Layout"),
                     bind_group_layouts: &[
-                        &render_bind_group_layout,
-                        &self.slice_plane_bind_group_layout,
-                        &self.matcap_bind_group_layout,
+                        Some(&render_bind_group_layout),
+                        Some(&self.slice_plane_bind_group_layout),
+                        Some(&self.matcap_bind_group_layout),
                     ],
-                    push_constant_ranges: &[],
+                    immediate_size: 0,
                 });
 
         let render_pipeline = self
@@ -939,7 +939,7 @@ impl RenderEngine {
                     entry_point: Some("vs_main"),
                     buffers: &[
                         // Generated vertex buffer layout
-                        wgpu::VertexBufferLayout {
+                        Some(wgpu::VertexBufferLayout {
                             array_stride: 32, // vec4<f32> position + vec4<u32> edge_id_and_vertex_id
                             step_mode: wgpu::VertexStepMode::Vertex,
                             attributes: &[
@@ -954,7 +954,7 @@ impl RenderEngine {
                                     shader_location: 1,
                                 },
                             ],
-                        },
+                        }),
                     ],
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                 },
@@ -979,13 +979,13 @@ impl RenderEngine {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth24PlusStencil8,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
 
