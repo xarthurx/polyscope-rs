@@ -91,6 +91,7 @@ impl ApplicationHandler for App {
                     self.left_mouse_down = true;
                     self.last_click_pos = Some(self.mouse_pos);
                     self.drag_distance = 0.0;
+                    self.press_in_ui_panel = self.mouse_pos.0 <= self.left_panel_width;
                 }
                 (MouseButton::Left, ElementState::Released) => {
                     self.left_mouse_down = false;
@@ -98,6 +99,7 @@ impl ApplicationHandler for App {
                 (MouseButton::Right, ElementState::Pressed) => {
                     self.right_mouse_down = true;
                     self.drag_distance = 0.0;
+                    self.press_in_ui_panel = self.mouse_pos.0 <= self.left_panel_width;
                 }
                 (MouseButton::Right, ElementState::Released) => {
                     self.right_mouse_down = false;
@@ -204,13 +206,21 @@ impl ApplicationHandler for App {
 
                     let nav = engine.camera.navigation_style;
 
+                    // A drag that starts over the left UI panel does not move the
+                    // camera. This also applies to widgets that do not sense drags.
+                    let camera_drag = !self.press_in_ui_panel;
                     // Left drag rotation: blocked when gizmo is active
-                    let is_rotate = self.left_mouse_down && !self.shift_down && !egui_using_pointer;
+                    let is_rotate = self.left_mouse_down
+                        && !self.shift_down
+                        && !egui_using_pointer
+                        && camera_drag;
                     // Left+Shift pan: blocked when gizmo is active
-                    let is_left_pan =
-                        self.left_mouse_down && self.shift_down && !egui_using_pointer;
-                    // Right drag pan: always works regardless of selection/gizmo
-                    let is_right_pan = self.right_mouse_down;
+                    let is_left_pan = self.left_mouse_down
+                        && self.shift_down
+                        && !egui_using_pointer
+                        && camera_drag;
+                    // Right drag pan: works regardless of selection/gizmo
+                    let is_right_pan = self.right_mouse_down && camera_drag;
 
                     if is_rotate || is_left_pan || is_right_pan {
                         engine.camera.cancel_flight();

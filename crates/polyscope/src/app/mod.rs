@@ -48,6 +48,8 @@ pub struct App {
     pub(super) shift_down: bool,
     // Drag tracking - accumulated distance since mouse press
     pub(super) drag_distance: f64,
+    // True if the last mouse press was over the left UI panel
+    pub(super) press_in_ui_panel: bool,
     // Selection state
     pub(super) selection: Option<PickResult>,
     pub(super) last_click_pos: Option<(f64, f64)>,
@@ -104,6 +106,7 @@ impl App {
             right_mouse_down: false,
             shift_down: false,
             drag_distance: 0.0,
+            press_in_ui_panel: false,
             selection: None,
             last_click_pos: None,
             last_left_click_time: None,
