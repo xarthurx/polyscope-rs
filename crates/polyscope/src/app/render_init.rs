@@ -7,6 +7,20 @@ use polyscope_structures::{
     CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh,
 };
 
+/// Drops the GPU resources of all structures and their quantities.
+///
+/// GPU resources belong to the wgpu device that created them. Call this
+/// function when a render engine with a new device starts or after a
+/// temporary engine finishes. The next frame then builds the resources again
+/// with the current device.
+pub(crate) fn clear_structure_gpu_resources() {
+    crate::with_context_mut(|ctx| {
+        for structure in ctx.registry.iter_mut() {
+            structure.clear_gpu_resources();
+        }
+    });
+}
+
 /// Auto-fit camera to scene on first render with structures.
 /// Returns the new `camera_fitted` value.
 pub fn auto_fit_camera(engine: &mut RenderEngine, camera_fitted: bool) -> bool {

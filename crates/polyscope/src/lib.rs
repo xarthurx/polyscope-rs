@@ -1436,4 +1436,78 @@ mod tests {
         assert!((length_scale - expected).abs() < 1e-9);
         assert!((length_scale - 3.0_f32.sqrt() * 1e-3).abs() < 1e-6);
     }
+
+    /// Registers structures that hold GPU resources in structures and quantities.
+    fn register_gpu_scene() {
+        let square = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        ];
+        register_point_cloud("gpu_pc", square.clone());
+        with_point_cloud("gpu_pc", |pc| {
+            pc.add_vector_quantity("vecs", vec![Vec3::new(0.2, 0.1, 0.0); 4]);
+            enable_quantity(pc, "vecs");
+        });
+        register_surface_mesh("gpu_mesh", square.clone(), vec![vec![0u32, 1, 2, 3]]);
+        register_curve_network_loop("gpu_cn", square);
+        with_curve_network("gpu_cn", |cn| {
+            cn.set_render_mode(1);
+            cn.set_radius(0.05, false);
+        });
+        let grid = register_volume_grid(
+            "gpu_grid",
+            glam::UVec3::splat(3),
+            Vec3::new(0.0, 0.0, -1.0),
+            Vec3::new(1.0, 1.0, 0.0),
+        );
+        grid.add_node_scalar_quantity("s", (0..27u8).map(|i| f32::from(i) / 26.0).collect());
+        with_volume_grid("gpu_grid", |vg| enable_quantity(vg, "s"));
+    }
+
+    /// Returns whether any registered structure holds GPU render data.
+    fn any_structure_has_render_data() -> bool {
+        let pc = with_point_cloud_ref("gpu_pc", |pc| pc.render_data().is_some());
+        let mesh = with_surface_mesh_ref("gpu_mesh", |m| m.render_data().is_some());
+        let cn = with_curve_network_ref("gpu_cn", |cn| cn.render_data().is_some());
+        let grid = with_volume_grid_ref("gpu_grid", |vg| vg.render_data().is_some());
+        [pc, mesh, cn, grid].into_iter().any(|r| r == Some(true))
+    }
+
+    #[test]
+    fn test_headless_render_drops_its_gpu_resources() {
+        let _guard = setup();
+        register_gpu_scene();
+        let Ok(first) = render_to_image(96, 72) else {
+            eprintln!("Skipping headless GPU hygiene test: no GPU adapter available");
+            return;
+        };
+        assert!(
+            !any_structure_has_render_data(),
+            "a headless render must not leave GPU resources of its device"
+        );
+        let second = render_to_image(96, 72).expect("second headless render");
+        assert_eq!(first, second, "a second headless render must match");
+    }
+
+    #[test]
+    fn test_new_engine_rebuilds_gpu_resources() {
+        let _guard = setup();
+        register_gpu_scene();
+        let Some(mut first_engine) = LiveRenderer::new() else {
+            eprintln!("Skipping engine switch test: no GPU adapter available");
+            return;
+        };
+        let first = first_engine.frame();
+        assert!(any_structure_has_render_data());
+        drop(first_engine);
+
+        // A new engine has a new device. The window clears the GPU resources
+        // when it creates its engine; this test does the same.
+        app::clear_structure_gpu_resources();
+        let mut second_engine = LiveRenderer::new().expect("second engine");
+        let second = second_engine.frame();
+        assert_eq!(first, second, "the new engine must draw the same frame");
+    }
 }

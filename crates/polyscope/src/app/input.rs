@@ -69,6 +69,11 @@ impl ApplicationHandler for App {
             .block_on()
             .expect("failed to create render engine");
 
+        // The structures can hold GPU resources of an earlier device (a
+        // headless render or an earlier window). The first frame builds them
+        // again with the device of this engine.
+        super::render_init::clear_structure_gpu_resources();
+
         // Initialize GPU picking system
         engine.init_pick_buffers(engine.width, engine.height);
 

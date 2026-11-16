@@ -599,6 +599,8 @@ impl Quantity for VolumeGridNodeScalarQuantity {
     fn clear_gpu_resources(&mut self) {
         self.gridcube_render_data = None;
         self.isosurface_render_data = None;
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -933,6 +935,8 @@ impl Quantity for VolumeGridCellScalarQuantity {
 
     fn clear_gpu_resources(&mut self) {
         self.gridcube_render_data = None;
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

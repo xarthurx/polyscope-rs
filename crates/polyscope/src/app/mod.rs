@@ -12,6 +12,7 @@ mod view_state;
 
 #[cfg(test)]
 pub(crate) use picking::{ClickHit, ReleaseAction, release_action};
+pub(crate) use render_init::clear_structure_gpu_resources;
 
 use std::collections::HashSet;
 pub(super) use std::sync::Arc;

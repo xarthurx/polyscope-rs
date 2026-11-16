@@ -87,15 +87,10 @@ pub fn render_to_image_with_options(
         })?;
     app.engine = Some(engine);
 
-    // Clear stale GPU resources from all structures so they get re-initialized
-    // with the new wgpu device. This is necessary because each headless render
-    // call creates a fresh device, but structures in the global registry may
-    // retain buffers from a previous device.
-    with_context_mut(|ctx| {
-        for structure in ctx.registry.iter_mut() {
-            structure.clear_gpu_resources();
-        }
-    });
+    // Each headless render creates a new wgpu device. The structures can hold
+    // GPU resources of an earlier device (an earlier window session), so drop
+    // them. The frame builds them again with the new device.
+    crate::app::clear_structure_gpu_resources();
 
     // Drain any queued view-state. `apply_view_state` sets
     // `camera_fitted = true`, which makes the per-frame `auto_fit_camera`
@@ -115,5 +110,13 @@ pub fn render_to_image_with_options(
         ctx.set_view_state_snapshot(snapshot);
     });
 
-    app.capture_to_buffer()
+    let pixels = app.capture_to_buffer();
+
+    // The headless device ends with this call. Drop its GPU resources from
+    // the structures, so that a later window or headless render cannot use
+    // them with another device.
+    drop(app);
+    crate::app::clear_structure_gpu_resources();
+
+    pixels
 }
