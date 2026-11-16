@@ -1029,6 +1029,35 @@ mod tests {
         assert!(with_context(|ctx| ctx.selected_structure().is_none()));
     }
 
+    /// The pick waits for the Dear `ImGui` double-click time (0.30 s) plus a
+    /// 50 ms margin, as C++ Polyscope does.
+    #[test]
+    fn test_click_pick_delay_matches_imgui_double_click_time() {
+        use crate::app::{App, ClickHit};
+        use std::time::{Duration, Instant};
+
+        let _guard = setup();
+        deselect_structure();
+        let name = unique_name("click_delay_pc");
+        register_point_cloud(&name, vec![Vec3::ZERO]);
+        let mut app = App::new();
+
+        let before = Instant::now();
+        app.queue_click_pick(
+            Some(ClickHit::Structure {
+                type_name: "PointCloud".to_string(),
+                name: name.clone(),
+                element_index: 0,
+            }),
+            glam::Vec2::ZERO,
+        );
+        app.update_pending_pick(before + Duration::from_millis(340));
+        assert!(app.selection.is_none(), "no selection before 0.35 s");
+        app.update_pending_pick(Instant::now() + Duration::from_millis(360));
+        assert!(app.selection.is_some(), "selection after 0.35 s");
+        remove_structure(&name);
+    }
+
     #[test]
     fn test_single_point_scene_has_nonzero_length_scale() {
         let _guard = setup();

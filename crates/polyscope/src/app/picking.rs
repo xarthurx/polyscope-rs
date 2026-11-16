@@ -2,8 +2,13 @@ use std::time::{Duration, Instant};
 
 use super::{App, CurveNetwork, PickResult, PointCloud, SurfaceMesh, Vec3, VolumeMesh};
 
-/// Longest time between the two clicks of a double-click.
-pub(super) const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(500);
+/// Longest time between the two clicks of a double-click. C++ Polyscope uses
+/// the Dear `ImGui` default `io.MouseDoubleClickTime` of 0.30 s.
+pub(super) const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(300);
+
+/// Longest distance in pixels between the two clicks of a double-click
+/// (Dear `ImGui` default `io.MouseDoubleClickMaxDist`).
+pub(super) const DOUBLE_CLICK_DIST: f64 = 6.0;
 
 /// Time that a single-click pick waits before it changes the selection.
 /// C++ uses the double-click time plus a 50 ms margin.

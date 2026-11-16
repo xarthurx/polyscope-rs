@@ -1,4 +1,4 @@
-use super::picking::{ClickHit, DOUBLE_CLICK_TIME};
+use super::picking::{ClickHit, DOUBLE_CLICK_DIST, DOUBLE_CLICK_TIME};
 use super::{
     ActiveEventLoop, App, ApplicationHandler, Arc, EguiIntegration, ElementState, FutureExt,
     KeyCode, LogicalSize, MouseButton, RenderEngine, Vec3, Window, WindowEvent, WindowId,
@@ -274,8 +274,6 @@ impl ApplicationHandler for App {
                     }
 
                     // Double-click detection
-                    const DOUBLE_CLICK_DIST: f64 = 10.0;
-
                     let is_double_click = if let (Some(prev_time), Some(prev_pos)) =
                         (self.last_left_click_time, self.last_left_click_screen_pos)
                     {
