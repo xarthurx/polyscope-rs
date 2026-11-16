@@ -605,22 +605,48 @@ impl Camera {
 
     /// Zooms the camera (moves toward/away from target for perspective,
     /// adjusts `ortho_scale` for orthographic).
+    ///
+    /// In perspective mode, `delta` is a world-space distance. The camera never
+    /// reaches the target: the distance keeps a floor of 1e-5 of its current value,
+    /// as in C++ Polyscope `processZoom`. No floor depends on the scene size.
     pub fn zoom(&mut self, delta: f32) {
         match self.projection_mode {
             ProjectionMode::Perspective => {
                 let direction = self.forward();
                 let distance = (self.position - self.target).length();
-                let new_distance = (distance - delta).max(0.1);
-                self.position = self.target - direction * new_distance;
+                // The second term keeps the distance above the f32 resolution at the target.
+                let min_distance =
+                    (distance * 1e-5).max(16.0 * f32::EPSILON * self.target.abs().max_element());
+                // A zoom in never moves the camera away from the target.
+                let new_distance = (distance - delta).max(min_distance.min(distance));
+                let new_position = self.target - direction * new_distance;
+                // Below this length, the view direction is not accurate in f32.
+                if (self.target - new_position).length_squared() >= f32::MIN_POSITIVE {
+                    self.position = new_position;
+                }
             }
             ProjectionMode::Orthographic => {
                 // For orthographic, adjust the scale (smaller = zoom in, larger = zoom out)
-                // delta > 0 means zoom in (scroll up), so decrease scale
-                // Use a proportional factor based on current scale for consistent feel
-                let zoom_factor = 1.0 - delta * 0.4;
-                self.ortho_scale = (self.ortho_scale * zoom_factor).clamp(0.01, 1000.0);
+                // delta > 0 means zoom in (scroll up), so decrease scale.
+                // The factor is relative, so the zoom works at any scene scale.
+                let zoom_factor = (1.0 - delta * 0.4).max(0.1);
+                self.ortho_scale = (self.ortho_scale * zoom_factor).max(f32::MIN_POSITIVE);
             }
         }
+    }
+
+    /// Zooms the camera by `scroll` mouse-wheel steps. Positive values zoom in.
+    ///
+    /// In perspective mode, the step is relative to the camera-to-target distance,
+    /// as in the C++ Polyscope default (`ViewRelativeMode::CenterRelative`).
+    /// Thus one step has the same visual effect at any scene scale.
+    pub fn zoom_scroll(&mut self, scroll: f32) {
+        let delta = match self.projection_mode {
+            // C++ uses processZoom(0.5 * scroll) and a step of 0.15 * distance * amount.
+            ProjectionMode::Perspective => 0.075 * scroll * self.position.distance(self.target),
+            ProjectionMode::Orthographic => 0.2 * scroll,
+        };
+        self.zoom(delta);
     }
 
     /// Resets the camera to look at the given bounding box.
@@ -1150,6 +1176,67 @@ mod tests {
             new_distance < initial_distance,
             "Perspective zoom in should decrease distance"
         );
+    }
+
+    /// A scene of size 0.01 gives a fitted camera about 0.013 from the target.
+    /// One scroll step in must move the camera closer, not out to an absolute floor.
+    #[test]
+    fn test_zoom_in_small_scene_moves_closer() {
+        let mut camera = Camera::new(1.0);
+        camera.look_at_box(Vec3::splat(-0.005), Vec3::splat(0.005));
+        let fitted = camera.position.distance(camera.target);
+        assert!(fitted < 0.1, "fitted distance {fitted} must be small");
+
+        let mut direct = camera.clone();
+        direct.zoom(0.1 * fitted);
+        let after_direct = direct.position.distance(direct.target);
+        assert!(
+            (after_direct - 0.9 * fitted).abs() < fitted * 1e-4,
+            "zoom must not apply an absolute floor: {fitted} -> {after_direct}"
+        );
+
+        camera.zoom_scroll(1.0);
+        let after = camera.position.distance(camera.target);
+        assert!(
+            after < fitted,
+            "scroll-in must decrease the distance: {fitted} -> {after}"
+        );
+        // The step is relative to the distance (C++ CenterRelative: 0.075 per step).
+        assert!((after - fitted * 0.925).abs() < fitted * 1e-4);
+
+        // Many steps in never reach or cross the target, also far from the origin.
+        for offset in [Vec3::ZERO, Vec3::new(1000.0, -50.0, 3.0)] {
+            camera.look_at_box(offset - 0.005, offset + 0.005);
+            for _ in 0..1000 {
+                camera.zoom_scroll(5.0);
+            }
+            let close = camera.position.distance(camera.target);
+            assert!(close > 0.0 && close < fitted, "offset {offset}: {close}");
+            assert!(camera.view_matrix().is_finite());
+            assert!(camera.forward().dot(Vec3::NEG_Z) > 0.999);
+        }
+    }
+
+    /// The scroll-zoom step is relative, so it has the same effect at any scale.
+    #[test]
+    fn test_zoom_scroll_is_scale_invariant() {
+        for scale in [1e-3_f32, 1.0, 1e3] {
+            let mut camera = Camera::new(1.0);
+            camera.look_at_box(Vec3::splat(-scale), Vec3::splat(scale));
+            let before = camera.position.distance(camera.target);
+            camera.zoom_scroll(-2.0);
+            let ratio = camera.position.distance(camera.target) / before;
+            assert!((ratio - 1.15).abs() < 1e-4, "scale {scale}: ratio {ratio}");
+
+            camera.projection_mode = ProjectionMode::Orthographic;
+            camera.ortho_scale = scale;
+            camera.zoom_scroll(1.0);
+            let ratio = camera.ortho_scale / scale;
+            assert!(
+                (ratio - 0.92).abs() < 1e-4,
+                "scale {scale}: ortho ratio {ratio}"
+            );
+        }
     }
 
     #[test]
