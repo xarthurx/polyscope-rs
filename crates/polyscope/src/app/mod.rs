@@ -4,10 +4,13 @@ mod input;
 mod picking;
 mod render;
 mod render_capture;
+mod render_frame;
 mod render_init;
 mod render_peel;
+mod render_pick;
 mod render_scene;
 mod render_ui;
+mod render_volume_grid;
 mod view_state;
 
 #[cfg(test)]

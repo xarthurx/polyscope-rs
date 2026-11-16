@@ -9,8 +9,11 @@ pub struct ScreenshotOptions {
     /// Whether to use a transparent background.
     ///
     /// Pixels where only the background shows get alpha 0. Scene pixels keep
-    /// the alpha of the scene (for example of transparent meshes). PNG files
-    /// store the alpha; JPEG files have no alpha channel.
+    /// the alpha of the scene (for example of transparent meshes). The ground
+    /// plane is part of the scene: it stays in the image with the alpha of its
+    /// shader (opaque near the scene, fading out far away; in shadow-only mode
+    /// only the shadow has alpha), as in C++ Polyscope. PNG files store the
+    /// alpha; JPEG files have no alpha channel.
     pub transparent_background: bool,
 }
 

@@ -2,41 +2,27 @@ use super::RenderEngine;
 use crate::tone_mapping::ToneMapPass;
 
 impl RenderEngine {
-    /// Creates a screenshot texture for capturing frames.
+    /// Tone maps the scene of the engine HDR texture into the screenshot target.
     ///
-    /// Returns a texture view (HDR format) that can be used as a render target.
-    /// The pipelines render to HDR format, so we need an HDR texture for rendering,
-    /// then tone map to the final screenshot texture.
-    /// After rendering to this view, call `apply_screenshot_tone_mapping()` then
-    /// `capture_screenshot()` to get the pixel data.
-    ///
-    /// The HDR texture has the SSAA render resolution, so it matches the depth
-    /// and normal textures. The final texture has the output resolution.
-    pub fn create_screenshot_target(&mut self) -> wgpu::TextureView {
-        // Calculate buffer size with proper alignment
+    /// The screenshot target is a texture with the output resolution and the
+    /// surface format. The function uses the same tone mapping, SSAA
+    /// downsampling and SSAO as the window frame, so the screenshot shows
+    /// the scene as the window shows it. Encode the scene passes before this
+    /// call, submit the encoder, then call `capture_screenshot()`.
+    pub fn tone_map_to_screenshot_target(&mut self, encoder: &mut wgpu::CommandEncoder) {
+        self.create_screenshot_target();
+        let Some(texture) = &self.screenshot_texture else {
+            return;
+        };
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.render_tone_mapping(encoder, &view);
+    }
+
+    /// Creates the screenshot texture and the staging buffer for readback.
+    fn create_screenshot_target(&mut self) {
         let bytes_per_row = Self::aligned_bytes_per_row(self.width);
         let buffer_size = u64::from(bytes_per_row * self.height);
-        let (render_width, render_height) = self.render_dimensions();
 
-        // Create HDR texture for rendering (matches pipeline format)
-        let hdr_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("screenshot HDR texture"),
-            size: wgpu::Extent3d {
-                width: render_width,
-                height: render_height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float, // HDR format matching pipelines
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-
-        let hdr_view = hdr_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        // Create final capture texture (surface format for readback)
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("screenshot texture"),
             size: wgpu::Extent3d {
@@ -52,7 +38,6 @@ impl RenderEngine {
             view_formats: &[],
         });
 
-        // Create staging buffer for readback
         let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("screenshot buffer"),
             size: buffer_size,
@@ -60,78 +45,8 @@ impl RenderEngine {
             mapped_at_creation: false,
         });
 
-        self.screenshot_hdr_texture = Some(hdr_texture);
-        self.screenshot_hdr_view = Some(hdr_view);
         self.screenshot_texture = Some(texture);
         self.screenshot_buffer = Some(buffer);
-
-        // Return the HDR view for rendering
-        self.screenshot_hdr_view.as_ref().unwrap().clone()
-    }
-
-    /// Returns the screenshot texture view (for tone mapping output).
-    pub fn screenshot_texture_view(&self) -> Option<wgpu::TextureView> {
-        self.screenshot_texture
-            .as_ref()
-            .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
-    }
-
-    /// Applies tone mapping from the screenshot HDR texture to the final screenshot texture.
-    ///
-    /// When SSAA is on, the HDR texture is first downsampled to the output resolution.
-    pub fn apply_screenshot_tone_mapping(&mut self, encoder: &mut wgpu::CommandEncoder) {
-        let Some(hdr_view) = &self.screenshot_hdr_view else {
-            log::error!("Screenshot HDR view not initialized");
-            return;
-        };
-
-        let Some(screenshot_texture) = &self.screenshot_texture else {
-            log::error!("Screenshot texture not initialized");
-            return;
-        };
-
-        let screenshot_view =
-            screenshot_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        // SSAA: downsample to the output resolution, then tone map. SSAO is
-        // off in this case (see `render_tone_mapping`).
-        if self.ssaa_factor > 1
-            && let (Some(tone_map_pass), Some(intermediate_view), Some(ssaa_pass)) = (
-                &self.tone_map_pass,
-                &self.ssaa_intermediate_view,
-                &self.ssaa_pass,
-            )
-        {
-            ssaa_pass.render_to_target(&self.device, encoder, hdr_view, intermediate_view);
-            tone_map_pass.render_to_target(
-                &self.device,
-                encoder,
-                intermediate_view,
-                intermediate_view,
-                &screenshot_view,
-            );
-            return;
-        }
-
-        // Use the existing tone mapping pass
-        // For screenshots, we use the main SSAO output view if available
-        // (Note: SSAO effect depends on the main render resolution, not screenshot resolution)
-        if let Some(tone_map_pass) = &self.tone_map_pass {
-            // Use SSAO output or fall back to HDR view (which is ignored when ssao_enabled=false)
-            let ssao_view = self.ssao_output_view.as_ref().unwrap_or(hdr_view);
-            tone_map_pass.render_to_target(
-                &self.device,
-                encoder,
-                hdr_view,
-                ssao_view,
-                &screenshot_view,
-            );
-        }
-    }
-
-    /// Returns the screenshot depth view for rendering.
-    pub fn screenshot_depth_view(&self) -> &wgpu::TextureView {
-        &self.depth_view
     }
 
     /// Calculates bytes per row with proper alignment for wgpu buffer copies.
@@ -145,7 +60,7 @@ impl RenderEngine {
     /// Captures the screenshot after rendering to the screenshot target.
     ///
     /// This method copies the screenshot texture to a buffer and reads it back.
-    /// Call this after rendering to the view returned by `create_screenshot_target()`.
+    /// Call this after `tone_map_to_screenshot_target()`.
     ///
     /// Returns the raw pixel data in RGBA order (4 bytes per pixel, row by row
     /// from the top-left pixel). The capture texture has the surface format;
@@ -224,8 +139,6 @@ impl RenderEngine {
         // Clean up screenshot resources
         self.screenshot_texture = None;
         self.screenshot_buffer = None;
-        self.screenshot_hdr_texture = None;
-        self.screenshot_hdr_view = None;
 
         Ok(result)
     }

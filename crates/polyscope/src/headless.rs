@@ -3,6 +3,12 @@
 //! Provides functions to render the current scene to an image buffer or file
 //! without opening a window. Useful for integration tests, batch processing,
 //! and automated screenshot generation.
+//!
+//! A headless render uses the frame pipeline of the window: the same scene
+//! passes (ground plane, shadows, reflections, tubes, gridcubes, depth
+//! peeling, SSAO and so on) and the same tone mapping. For the same scene,
+//! options, camera and size, the image equals the window content without
+//! the UI.
 
 use crate::Result;
 use crate::ScreenshotOptions;
@@ -14,8 +20,8 @@ use polyscope_render::RenderEngine;
 /// Renders the current scene to a file.
 ///
 /// Creates a headless GPU context, renders one frame of the current scene
-/// (all registered structures and quantities), and saves the result as
-/// a PNG or JPEG image.
+/// (all registered structures and quantities, with the render look of the
+/// options), and saves the result as a PNG or JPEG image.
 ///
 /// The camera is automatically fitted to the scene bounding box.
 ///

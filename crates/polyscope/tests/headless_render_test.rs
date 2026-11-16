@@ -35,7 +35,12 @@ fn headless_render_tests() {
     // --- Test 1: Empty scene ---
     {
         remove_all_structures();
+        // Headless rendering draws the ground plane as the window does.
+        // Without it, an empty scene shows only the background.
+        let ground_plane_mode = with_context(|ctx| ctx.options.ground_plane.mode);
+        with_context_mut(|ctx| ctx.options.ground_plane.mode = GroundPlaneMode::None);
         let result = render_to_image(200, 150);
+        with_context_mut(|ctx| ctx.options.ground_plane.mode = ground_plane_mode);
         match result {
             Ok(pixels) => {
                 assert_eq!(pixels.len(), 200 * 150 * 4);

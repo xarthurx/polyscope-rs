@@ -20,6 +20,8 @@ pub struct ScreenshotRequest {
 /// The screenshot will be saved as `screenshot_NNNN.png` in the current directory,
 /// where NNNN is an auto-incrementing number.
 ///
+/// The screenshot shows the frame that the window shows, without the UI.
+///
 /// This function can be called while `show()` is running.
 /// The screenshot will be captured on the next frame.
 ///

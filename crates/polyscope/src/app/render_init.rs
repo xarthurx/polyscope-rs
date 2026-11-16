@@ -90,10 +90,10 @@ pub fn update_uniforms(engine: &mut RenderEngine) {
 /// - SurfaceMesh: init_gpu_resources + shadow resources + ALL vector/intrinsic/one-form quantity init
 /// - CurveNetwork: init_gpu_resources + tube resources + node resources + node/edge vector quantity init
 /// - CameraView: init_render_data
-/// - VolumeGrid: init_render_data (base wireframe only, NOT quantity init)
+/// - VolumeGrid: init_render_data (base wireframe; `render_volume_grid` builds the quantities)
 /// - VolumeMesh: init_render_data + slice plane culling + vertex/cell vector quantity init
 ///
-/// Windowed-only extras (pick resources, VolumeGrid quantity init) are kept in render() inline.
+/// The pick resources are window-only; `render_pick` builds them.
 pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
     crate::with_context_mut(|ctx| {
         // Collect slice plane data before the loop to avoid borrow conflicts
@@ -309,7 +309,6 @@ pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
                     &engine.queue,
                 );
             }
-            // Note: VolumeGrid quantity init (gridcube/isosurface) is windowed-only
 
             if structure.type_name() == "VolumeMesh"
                 && let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>()
@@ -358,8 +357,8 @@ pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
 }
 
 /// Update GPU buffers for all structures.
-/// This is nearly identical in both windowed and headless paths, except windowed also updates
-/// pick uniforms for PointCloud, SurfaceMesh, and VolumeMesh (which are skipped here).
+/// With `update_pick_uniforms` (the window), it also updates the pick uniforms
+/// of the structures; captures skip them.
 pub fn update_gpu_buffers(engine: &RenderEngine, update_pick_uniforms: bool) {
     crate::with_context(|ctx| {
         for structure in ctx.registry.iter() {
