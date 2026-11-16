@@ -70,6 +70,70 @@ fn check_curve_network_vectors() {
     );
 }
 
+/// Returns the eight corners of the unit cube in hex-cell order.
+fn unit_cube_vertices() -> Vec<Vec3> {
+    vec![
+        Vec3::new(0.0, 0.0, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+        Vec3::new(1.0, 1.0, 0.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        Vec3::new(0.0, 0.0, 1.0),
+        Vec3::new(1.0, 0.0, 1.0),
+        Vec3::new(1.0, 1.0, 1.0),
+        Vec3::new(0.0, 1.0, 1.0),
+    ]
+}
+
+/// Sets the enabled state of one quantity on a volume mesh.
+fn set_volume_quantity_enabled(structure: &str, quantity: &str, enabled: bool) {
+    with_volume_mesh(structure, |vm| {
+        vm.get_quantity_mut(quantity)
+            .expect("quantity not found")
+            .set_enabled(enabled);
+    });
+}
+
+/// Checks that vertex and cell vector quantities on a volume mesh are drawn.
+fn check_volume_mesh_vectors() {
+    remove_all_structures();
+    // Two hex cells side by side.
+    let mut vertices = unit_cube_vertices();
+    vertices.extend(unit_cube_vertices().iter().map(|v| *v + Vec3::X));
+    let vm = register_hex_mesh(
+        "vm_vectors",
+        vertices,
+        vec![[0, 1, 2, 3, 4, 5, 6, 7], [8, 9, 10, 11, 12, 13, 14, 15]],
+    );
+    vm.add_vertex_vector_quantity("vertex_vecs", vec![Vec3::new(0.3, 0.3, 0.0); 16]);
+    vm.add_cell_vector_quantity("cell_vecs", vec![Vec3::new(0.0, 0.0, 1.0); 2]);
+
+    let disabled = render();
+
+    set_volume_quantity_enabled("vm_vectors", "vertex_vecs", true);
+    let vertex_enabled = render();
+    assert!(
+        count_changed_pixels(&disabled, &vertex_enabled) > 0,
+        "an enabled volume mesh vertex vector quantity must change the image"
+    );
+    let vertex_rerender = render();
+    assert!(
+        count_changed_pixels(&disabled, &vertex_rerender) > 0,
+        "volume mesh vertex vectors must survive a headless re-render"
+    );
+
+    set_volume_quantity_enabled("vm_vectors", "vertex_vecs", false);
+    set_volume_quantity_enabled("vm_vectors", "cell_vecs", true);
+    let cell_enabled = render();
+    assert!(
+        count_changed_pixels(&disabled, &cell_enabled) > 0,
+        "an enabled volume mesh cell vector quantity must change the image"
+    );
+    assert!(
+        count_changed_pixels(&vertex_enabled, &cell_enabled) > 0,
+        "vertex and cell vectors start at different points"
+    );
+}
+
 #[test]
 fn structure_render_tests() {
     let _ = init();
@@ -82,6 +146,7 @@ fn structure_render_tests() {
     }
 
     check_curve_network_vectors();
+    check_volume_mesh_vectors();
 
     remove_all_structures();
 }

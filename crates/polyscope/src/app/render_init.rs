@@ -66,7 +66,7 @@ pub fn update_uniforms(engine: &mut RenderEngine) {
 /// - CurveNetwork: init_gpu_resources + tube resources + node resources + node/edge vector quantity init
 /// - CameraView: init_render_data
 /// - VolumeGrid: init_render_data (base wireframe only, NOT quantity init)
-/// - VolumeMesh: init_render_data + slice plane culling
+/// - VolumeMesh: init_render_data + slice plane culling + vertex/cell vector quantity init
 ///
 /// Windowed-only extras (pick resources, VolumeGrid quantity init) are kept in render() inline.
 pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
@@ -320,6 +320,13 @@ pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
                         engine.camera_buffer(),
                     );
                 }
+
+                // Initialize vertex and cell vector quantity render data if enabled
+                vm.init_vector_quantity_gpu_resources(
+                    &engine.device,
+                    engine.vector_bind_group_layout(),
+                    engine.camera_buffer(),
+                );
             }
         }
     });
@@ -409,6 +416,7 @@ pub fn update_gpu_buffers(engine: &RenderEngine, update_pick_uniforms: bool) {
                 if update_pick_uniforms {
                     vm.update_pick_uniforms(&engine.queue);
                 }
+                vm.update_vector_quantity_uniforms(&engine.queue);
             }
         }
     });

@@ -5,6 +5,9 @@ use polyscope_structures::curve_network::{CurveEdgeVectorQuantity, CurveNodeVect
 use polyscope_structures::volume_grid::{
     VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,
 };
+use polyscope_structures::volume_mesh::{
+    VolumeMeshCellVectorQuantity, VolumeMeshVertexVectorQuantity,
+};
 
 /// Draw point clouds to a wgpu render pass.
 pub(super) fn draw_point_clouds<'a>(
@@ -111,6 +114,21 @@ pub(super) fn draw_vector_quantities<'a>(
                     .active_edge_vector_quantity()
                     .and_then(CurveEdgeVectorQuantity::render_data);
                 for render_data in node_data.into_iter().chain(edge_data) {
+                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                    render_pass.draw(0..120, 0..render_data.num_vectors);
+                }
+            }
+            if structure.type_name() == "VolumeMesh"
+                && let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>()
+            {
+                // Vertex vectors start at the vertices, cell vectors at the cell centers.
+                let vertex_data = vm
+                    .active_vertex_vector_quantity()
+                    .and_then(VolumeMeshVertexVectorQuantity::render_data);
+                let cell_data = vm
+                    .active_cell_vector_quantity()
+                    .and_then(VolumeMeshCellVectorQuantity::render_data);
+                for render_data in vertex_data.into_iter().chain(cell_data) {
                     render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                     render_pass.draw(0..120, 0..render_data.num_vectors);
                 }
