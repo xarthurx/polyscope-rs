@@ -1,4 +1,6 @@
-use super::picking::{ClickHit, DOUBLE_CLICK_DIST, DOUBLE_CLICK_TIME};
+use super::picking::{
+    ClickHit, DOUBLE_CLICK_DIST, DOUBLE_CLICK_TIME, ReleaseAction, release_action,
+};
 use super::{
     ActiveEventLoop, App, ApplicationHandler, Arc, EguiIntegration, ElementState, FutureExt,
     KeyCode, LogicalSize, MouseButton, RenderEngine, Vec3, Window, WindowEvent, WindowId,
@@ -49,14 +51,14 @@ impl ApplicationHandler for App {
                 (MouseButton::Left, ElementState::Pressed) => {
                     self.left_mouse_down = true;
                     self.last_click_pos = Some(self.mouse_pos);
-                    self.drag_distance = 0.0;
+                    self.begin_mouse_press();
                 }
                 (MouseButton::Left, ElementState::Released) => {
                     self.left_mouse_down = false;
                 }
                 (MouseButton::Right, ElementState::Pressed) => {
                     self.right_mouse_down = true;
-                    self.drag_distance = 0.0;
+                    self.begin_mouse_press();
                 }
                 (MouseButton::Right, ElementState::Released) => {
                     self.right_mouse_down = false;
@@ -65,6 +67,7 @@ impl ApplicationHandler for App {
             },
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.shift_down = modifiers.state().shift_key();
+                self.modifiers = modifiers.state();
             }
             _ => {}
         }
@@ -155,9 +158,13 @@ impl ApplicationHandler for App {
                 let delta_y = position.y - self.mouse_pos.1;
                 self.mouse_pos = (position.x, position.y);
 
-                // Accumulate drag distance
+                // Accumulate drag distance (C++ Polyscope drag rules)
                 if self.left_mouse_down || self.right_mouse_down {
-                    self.drag_distance += delta_x.abs() + delta_y.abs();
+                    let window_size = self
+                        .window
+                        .as_ref()
+                        .map_or((1, 1), |w| (w.inner_size().width, w.inner_size().height));
+                    self.track_mouse_drag((delta_x, delta_y), window_size);
                 }
 
                 // Camera control:
@@ -241,12 +248,18 @@ impl ApplicationHandler for App {
                 // For 3D viewport clicks, we handle picking ourselves
                 // (even if egui "consumed" due to gizmo overlay)
 
-                // Threshold for distinguishing click from drag (in pixels)
-                const DRAG_THRESHOLD: f64 = 5.0;
+                // A release is a click only if it does not end a drag (C++ drag rules)
+                let is_click = self.release_is_click();
 
-                // A right-button release cancels a queued pick (C++ processInputEvents).
-                if let (MouseButton::Right, ElementState::Released) = (button, state) {
-                    self.cancel_pending_pick();
+                // A right-button release clears the selection or cancels a queued pick
+                if let (MouseButton::Right, ElementState::Released) = (button, state)
+                    && !mouse_in_ui_panel
+                {
+                    match release_action(MouseButton::Right, is_click, false, self.modifiers) {
+                        ReleaseAction::ClearSelection => self.clear_selection(),
+                        ReleaseAction::CancelPick => self.cancel_pending_pick(),
+                        _ => {}
+                    }
                 }
 
                 if let (MouseButton::Left, ElementState::Released) = (button, state) {
@@ -264,7 +277,7 @@ impl ApplicationHandler for App {
                     // Skip if egui is actively using pointer AND this was a drag (gizmo being dragged)
                     // But allow clicks through - egui_using_pointer can be true even for simple clicks
                     // when gizmo is visible, so we only skip if it was actually a drag operation
-                    if egui_using_pointer && self.drag_distance >= DRAG_THRESHOLD {
+                    if egui_using_pointer && !is_click {
                         log::debug!(
                             "[CLICK DEBUG] EARLY RETURN: egui was dragging (drag_distance={:.2})",
                             self.drag_distance
@@ -287,7 +300,7 @@ impl ApplicationHandler for App {
                     };
 
                     // Record this click for next double-click check
-                    if self.drag_distance < DRAG_THRESHOLD {
+                    if is_click {
                         self.last_left_click_time = Some(std::time::Instant::now());
                         self.last_left_click_screen_pos = Some(self.mouse_pos);
                     } else {
@@ -296,9 +309,14 @@ impl ApplicationHandler for App {
                         self.last_left_click_screen_pos = None;
                     }
 
-                    // Handle double-click: set view center to clicked 3D point
-                    if is_double_click && !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD
-                    {
+                    let action = if mouse_in_ui_panel {
+                        ReleaseAction::Nothing
+                    } else {
+                        release_action(MouseButton::Left, is_click, is_double_click, self.modifiers)
+                    };
+
+                    // Double-click or Ctrl+Shift click: set view center to clicked 3D point
+                    if action == ReleaseAction::SetViewCenter {
                         // Cancel the pick of the first click
                         self.cancel_pending_pick();
 
@@ -324,8 +342,8 @@ impl ApplicationHandler for App {
                         return;
                     }
 
-                    // Check if this was a click (not a drag) in the 3D viewport
-                    if !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD {
+                    // A click without modifier keys in the 3D viewport picks
+                    if action == ReleaseAction::QueuePick {
                         log::debug!("[CLICK DEBUG] Processing click in 3D viewport");
                         if let Some(engine) = &self.engine {
                             let click_screen =
@@ -474,10 +492,10 @@ impl ApplicationHandler for App {
                         }
                     } else {
                         log::debug!(
-                            "[CLICK DEBUG] SKIPPED: mouse_in_ui_panel={} or drag_distance={:.2} >= {}",
+                            "[CLICK DEBUG] SKIPPED: mouse_in_ui_panel={} drag_distance={:.4} modifiers={:?}",
                             mouse_in_ui_panel,
                             self.drag_distance,
-                            DRAG_THRESHOLD
+                            self.modifiers
                         );
                     }
                     self.last_click_pos = None;

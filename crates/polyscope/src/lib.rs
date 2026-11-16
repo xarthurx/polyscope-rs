@@ -1058,6 +1058,110 @@ mod tests {
         remove_structure(&name);
     }
 
+    /// Mouse releases act as in C++ `processInputEvents` (polyscope.cpp 540-590).
+    #[test]
+    fn test_release_actions_follow_upstream_click_logic() {
+        use crate::app::{ReleaseAction, release_action};
+        use winit::event::MouseButton::{Left, Right};
+        use winit::keyboard::ModifiersState as Mods;
+
+        let _guard = setup();
+        let ctrl = if cfg!(target_os = "macos") {
+            Mods::SUPER
+        } else {
+            Mods::CONTROL
+        };
+        let none = Mods::empty();
+
+        // Left button: a plain click picks, the end of a drag does nothing.
+        assert_eq!(
+            release_action(Left, true, false, none),
+            ReleaseAction::QueuePick
+        );
+        assert_eq!(
+            release_action(Left, false, false, none),
+            ReleaseAction::Nothing
+        );
+        // A held modifier key suppresses the pick.
+        for mods in [Mods::SHIFT, ctrl, Mods::ALT] {
+            assert_eq!(
+                release_action(Left, true, false, mods),
+                ReleaseAction::Nothing
+            );
+        }
+        // A double-click or a Ctrl+Shift click sets the view center.
+        let set_center = ReleaseAction::SetViewCenter;
+        assert_eq!(release_action(Left, true, true, none), set_center);
+        assert_eq!(release_action(Left, true, true, Mods::ALT), set_center);
+        assert_eq!(
+            release_action(Left, true, false, Mods::SHIFT | ctrl),
+            set_center
+        );
+        assert_eq!(
+            release_action(Left, false, true, none),
+            ReleaseAction::Nothing
+        );
+
+        // Right button: a click clears the selection, a drag cancels a queued pick.
+        assert_eq!(
+            release_action(Right, true, false, none),
+            ReleaseAction::ClearSelection
+        );
+        assert_eq!(
+            release_action(Right, false, false, none),
+            ReleaseAction::CancelPick
+        );
+        assert_eq!(
+            release_action(Right, true, false, Mods::SHIFT),
+            ReleaseAction::Nothing
+        );
+    }
+
+    /// The drag threshold follows C++ Polyscope: a drag starts 6 pixels from the
+    /// press position, and a release is a click while the drag adds less than
+    /// 1% of the window size.
+    #[test]
+    fn test_drag_threshold_follows_upstream() {
+        use crate::app::App;
+
+        let _guard = setup();
+        let mut app = App::new();
+        let size = (1000, 500);
+        let move_by = |app: &mut App, dx: f64| {
+            app.mouse_pos.0 += dx;
+            app.track_mouse_drag((dx, 0.0), size);
+        };
+
+        // Jitter below 6 pixels from the press position is a click.
+        app.mouse_pos = (100.0, 100.0);
+        app.begin_mouse_press();
+        for dx in [2.0, 2.0, -3.0, 4.0, -5.0] {
+            move_by(&mut app, dx);
+        }
+        assert!(app.release_is_click());
+
+        // A short drag past 6 pixels is still a click (7 / 1000 < 0.01).
+        app.begin_mouse_press();
+        move_by(&mut app, 7.0);
+        assert!(app.mouse_dragging);
+        assert!(app.release_is_click());
+
+        // A long drag is not a click, also when the cursor comes back.
+        move_by(&mut app, 20.0);
+        move_by(&mut app, -27.0);
+        assert!(!app.release_is_click());
+
+        // The next press starts a new click.
+        app.begin_mouse_press();
+        assert!(app.release_is_click());
+
+        // A right click clears the selection and a queued pick.
+        app.queue_click_pick(None, glam::Vec2::ZERO);
+        app.clear_selection();
+        assert!(app.pending_pick.is_none());
+        assert!(app.selection.is_none());
+    }
+
     #[test]
     fn test_single_point_scene_has_nonzero_length_scale() {
         let _guard = setup();
