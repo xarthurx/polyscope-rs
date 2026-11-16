@@ -114,12 +114,8 @@ impl PointCloudHandle {
     /// * `name` - Name for this quantity (shown in UI)
     /// * `values` - One scalar value per point
     pub fn add_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
-        with_context_mut(|ctx| {
-            if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name)
-                && let Some(pc) = (pc as &mut dyn std::any::Any).downcast_mut::<PointCloud>()
-            {
-                pc.add_scalar_quantity(name, values);
-            }
+        with_point_cloud(&self.name, |pc| {
+            pc.add_scalar_quantity(name, values);
         });
         self
     }
@@ -135,12 +131,8 @@ impl PointCloudHandle {
     /// * `name` - Name for this quantity (shown in UI)
     /// * `vectors` - One 3D vector per point
     pub fn add_vector_quantity(&self, name: &str, vectors: Vec<Vec3>) -> &Self {
-        with_context_mut(|ctx| {
-            if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name)
-                && let Some(pc) = (pc as &mut dyn std::any::Any).downcast_mut::<PointCloud>()
-            {
-                pc.add_vector_quantity(name, vectors);
-            }
+        with_point_cloud(&self.name, |pc| {
+            pc.add_vector_quantity(name, vectors);
         });
         self
     }
@@ -156,12 +148,8 @@ impl PointCloudHandle {
     /// * `name` - Name for this quantity (shown in UI)
     /// * `colors` - One RGB color (Vec3) per point
     pub fn add_color_quantity(&self, name: &str, colors: Vec<Vec3>) -> &Self {
-        with_context_mut(|ctx| {
-            if let Some(pc) = ctx.registry.get_mut("PointCloud", &self.name)
-                && let Some(pc) = (pc as &mut dyn std::any::Any).downcast_mut::<PointCloud>()
-            {
-                pc.add_color_quantity(name, colors);
-            }
+        with_point_cloud(&self.name, |pc| {
+            pc.add_color_quantity(name, colors);
         });
         self
     }

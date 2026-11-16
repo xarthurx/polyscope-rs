@@ -419,6 +419,18 @@ mod tests {
     }
 
     #[test]
+    fn test_point_cloud_handle_adds_quantities() {
+        let _guard = setup();
+        let name = unique_name("pc_quantities");
+        register_point_cloud(&name, vec![Vec3::ZERO, Vec3::X])
+            .add_scalar_quantity("scalar", vec![0.0, 1.0])
+            .add_vector_quantity("vector", vec![Vec3::X, Vec3::Y])
+            .add_color_quantity("color", vec![Vec3::ONE, Vec3::ZERO]);
+        let num_quantities = with_point_cloud_ref(&name, |pc| pc.num_quantities());
+        assert_eq!(num_quantities, Some(3));
+    }
+
+    #[test]
     fn test_register_curve_network_loop() {
         let _guard = setup();
         let name = unique_name("loop");
