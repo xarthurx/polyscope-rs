@@ -4,10 +4,6 @@
 //! One test function, because the global context can only be initialized
 //! once per process.
 
-use polyscope_core::view_state::{
-    RenderState, ViewTransition, apply_view_state, current_view_state,
-};
-use polyscope_core::{GroundPlaneConfig, GroundPlaneMode, SsaoConfig, TransparencyMode};
 use polyscope_rs::*;
 
 const W: u32 = 160;

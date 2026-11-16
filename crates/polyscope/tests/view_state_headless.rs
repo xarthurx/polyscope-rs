@@ -1,7 +1,9 @@
 //! Integration test for view-state reproducibility through headless rendering.
 
-use polyscope_core::view_state::{ViewTransition, apply_view_state, current_view_state};
-use polyscope_rs::{Vec3, init, register_point_cloud, render_to_image};
+use polyscope_rs::{
+    Vec3, ViewTransition, apply_view_state, current_view_state, init, register_point_cloud,
+    render_to_image,
+};
 
 #[test]
 fn test_load_view_then_headless_uses_loaded_view() {

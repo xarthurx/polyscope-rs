@@ -148,14 +148,21 @@ pub use polyscope_core::{
     Mat4, Vec2, Vec3, Vec4,
     error::{PolyscopeError, Result},
     gizmo::{GizmoAxis, GizmoConfig, GizmoMode, GizmoSpace, Transform},
+    ground_plane::{GroundPlaneConfig, GroundPlaneMode},
     group::Group,
-    options::Options,
+    options::{Options, TransparencyMode},
     pick::{PickResult, Pickable},
     quantity::{ParamCoordsType, ParamVizStyle, Quantity, QuantityKind},
     registry::Registry,
     slice_plane::{MAX_SLICE_PLANES, SlicePlane, SlicePlaneUniforms},
+    ssao::SsaoConfig,
     state::{Context, with_context, with_context_mut},
     structure::{HasQuantities, Structure},
+    view_state::{
+        CameraStateOwned, GroundPlaneState, RenderState, TransparencyState, ViewState,
+        ViewTransition, apply_view_state, current_view_state, load_view_from_file,
+        load_view_from_json, save_view_to_file, save_view_to_json,
+    },
 };
 
 // Re-export render types
