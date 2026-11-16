@@ -10,53 +10,63 @@ cargo build --release  # Release mode
 cargo test             # Run tests
 cargo check            # Check without building
 cargo fmt              # Format code
-cargo clippy           # Lint
+cargo clippy           # Lint (must give zero warnings)
 ```
 
-Rust edition 2024, MSRV 1.85.
+Rust edition 2024, minimum Rust version 1.96 (`rust-version` in the workspace `Cargo.toml`).
+
+The engine requests only the Vulkan, Metal, DirectX 12 and WebGPU backends of wgpu (`SUPPORTED_BACKENDS` in `polyscope-render/src/engine/mod.rs`). The OpenGL backend is not a target: some shaders sample depth textures in a way that it cannot compile. Without a supported backend, engine creation returns `RenderError::AdapterCreationFailed`. The GPU tests skip when no adapter is available.
 
 ## Workspace Structure
 
 ```
 crates/
-├── polyscope-core/       # Core traits, registry, state management
-├── polyscope-render/     # wgpu rendering backend
+├── polyscope-core/       # Core traits, registry, state management, options, view state
+├── polyscope-render/     # wgpu rendering backend, shaders, colormaps, materials
 ├── polyscope-ui/         # egui UI integration
 ├── polyscope-structures/ # Structure implementations
-└── polyscope/            # Main crate, re-exports all sub-crates
+└── polyscope/            # Main crate (package polyscope-rs); re-exports the public types of the sub-crates
 ```
+
+The main crate re-exports `Vec2`, `Vec3`, `Vec4` and `Mat4` from glam, but not the `glam` crate. Users who need other glam types add `glam = "0.34"` to their own `Cargo.toml`.
 
 ## Adding a New Structure
 
 1. Create module in `polyscope-structures/src/`
 2. Implement `Structure` trait (with `as_any`, `as_any_mut`, `bounding_box`, `length_scale`, `transform`, etc.)
 3. Implement `HasQuantities` if it supports quantities
-4. Add registration function in main `polyscope` crate
-5. Add GPU init/draw/pick code in `polyscope/src/app/render.rs`
+4. Add registration function and handle in the main `polyscope` crate (`polyscope/src/<structure>.rs`)
+5. Add GPU code in `polyscope/src/app/`:
+   - GPU initialization and buffer updates: `render_init.rs` (shared by the window and the headless path)
+   - Draw calls: `render_scene.rs`
+   - Pick resources and the pick pass: `render.rs`
+   - Screenshot and headless frame: `render_capture.rs`
 6. Add UI in `polyscope-ui/src/structure_ui.rs`
 7. Add tests
 
 ## Adding a New Quantity
 
-1. Implement `Quantity` trait (with `name`, `kind`, `is_enabled`, `set_enabled`, `as_any`, `as_any_mut`, `refresh`)
-2. Add marker trait if needed (`VertexQuantity`, `FaceQuantity`, etc.)
+1. Implement the `Quantity` trait: `as_any`, `as_any_mut`, `name`, `structure_name`, `kind`, `is_enabled`, `set_enabled`, `build_ui`, `refresh`, `data_size`. Override `clear_gpu_resources` if the quantity holds GPU data.
+2. Add marker trait if needed (`VertexQuantity`, `FaceQuantity`, `EdgeQuantity`, `CellQuantity`)
 3. Add GPU rendering fields: `render_data`, `init_gpu_resources()`, `update_uniforms()`, `render_data()`
 4. Add active accessor on parent structure (e.g., `active_vertex_vector_quantity()`)
-5. Add `auto_scale()` call in the structure's registration method
-6. Add init/update/draw code in `polyscope/src/app/render.rs`
-7. Add convenience method on parent structure (e.g., `mesh.add_vector_quantity(...)`)
+5. Call `auto_scale()` for vector-like quantities in the method of the structure that adds them
+6. Add init/update/draw code in `polyscope/src/app/` (see the file list above)
+7. Add the add method on the parent structure (e.g., `mesh.add_vertex_vector_quantity(...)`) and, if useful, on its handle
 8. Add UI controls in `polyscope-ui`
+
+A new quantity starts disabled, as in C++ Polyscope.
 
 ## Critical: Model Transform Propagation
 
-GPU data from structure geometry **must** be transformed by the model matrix. When adding new rendered quantities:
+GPU data from structure geometry **must** be transformed by the model matrix. When you add a rendered quantity:
 
 1. Include `model: mat4x4<f32>` in shader uniform struct
 2. Apply in vertex shader: positions (w=1), directions (w=0)
 3. Pass `structure.transform()` every frame via `update_uniforms()`
 4. Never assume GPU-baked positions are in world space — they are local/object space
 
-Failure to do this causes quantities to stay frozen when the user moves/rotates the structure via gizmos.
+If a quantity ignores the model matrix, it stays in place when the user moves or rotates the structure with the gizmo. The pick shaders need the model matrix too.
 
 ## Shader Development
 
@@ -68,13 +78,32 @@ All shaders are WGSL (WebGPU Shading Language). No geometry shader support in wg
 - **Group 1**: Slice planes / reflection uniforms
 - **Group 2**: Matcap textures (4-channel blend or single-texture)
 
-All scene shaders call `light_surface_matcap(view_normal, base_color)` via Group 2 for consistent lighting.
+The lit scene shaders define and call `light_surface_matcap(normal, color)`, with the matcap textures of Group 2, for consistent lighting. WGSL has no include mechanism, so each shader has its own copy of this function.
 
 ### Uniform Buffer Binding
 
 Always set explicit `min_binding_size` (via `NonZeroU64`) rather than `None`. This works around [wgpu Issue #7359](https://github.com/gfx-rs/wgpu/issues/7359) where late validation can cross-contaminate between pipelines.
 
 **WGSL alignment caveat**: `vec3<T>` aligns to 16 bytes, not 12. Padding fields must use scalar types (e.g., `_pad0: u32`) rather than `vec3<u32>` to match Rust `#[repr(C)]` struct sizes.
+
+## Colormap Data
+
+The built-in colormaps come from the C++ Polyscope tables. The data flow:
+
+1. `scripts/extract_colormaps.py` reads the `CM_*` tables in `src/render/color_maps.cpp` of the C++ source (`~/repo/polyscope`).
+2. The script writes one file per colormap to `crates/polyscope-render/data/colormaps/<name>.bin`. Each file holds RGB triples of little-endian `f32` values.
+3. `crates/polyscope-render/src/color_maps.rs` embeds the files with `include_bytes!` in `BUILTIN_COLOR_MAP_TABLES`, in the C++ order. `BUILTIN_COLOR_MAP_NAMES` holds the names.
+4. `ColorMapRegistry::new()` decodes the tables. The `RenderEngine` owns one registry (`engine.color_maps`).
+5. Each frame, the structures receive the registry in `update_gpu_buffers`. A scalar quantity computes one color per element on the CPU with `compute_colors`. Volume grid gridcubes upload the colormap as a 1D texture instead.
+
+The quantity panels offer `BUILTIN_COLOR_MAP_NAMES`. The volume grid panel offers the names of the registry.
+
+To add a built-in colormap:
+
+1. Add the C++ table name and the user name to `COLORMAPS` in `scripts/extract_colormaps.py`.
+2. Run `python3 scripts/extract_colormaps.py`.
+3. Add the entry to `BUILTIN_COLOR_MAP_TABLES` and change the array length.
+4. Run `cargo test -p polyscope-render`.
 
 ## UI Layout Convention
 
@@ -86,20 +115,24 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 - `with_context(|ctx| ...)` — Read access
 - `with_context_mut(|ctx| ...)` — Write access
 
+`Context::options` (`Options`) is the source of truth for the render look: background, ground plane, transparency, SSAA, SSAO and the frame rate limit. The UI panels read these values each frame and write their edits back. A saved view (`ViewState`) copies the render-look fields, but not `max_fps`.
+
 ## Render Pipeline Overview
 
-The render loop in `app/render.rs` follows this order:
+The windowed frame in `app/render.rs` follows this order:
 
-1. Shadow map pass
-2. Slice plane visualization
-3. Ground plane (with shadows/reflections)
-4. Depth prepass
-5. Main geometry pass (points, curves, vectors)
-6. Surface mesh pass
-7. Depth peel transparency (multi-pass)
-8. SSAO
-9. Tone mapping
-10. egui overlay
+1. Pick pass (GPU picking; a click reads one pixel of it)
+2. Compute pass for curve network tubes
+3. Shadow map pass (surface meshes)
+4. Slice plane visualization
+5. Ground plane (stencil, ground, reflected structures)
+6. Depth prepass of surface meshes (Pretty transparency only)
+7. Main geometry pass (points, curves, vectors, camera views)
+8. Surface mesh and volume mesh pass (HDR color + normal G-buffer), with volume grid isosurfaces and gridcubes
+9. Depth peel transparency (multi-pass, Pretty transparency only)
+10. SSAO (only with an SSAA factor of 1)
+11. Tone mapping (with the SSAA downsample)
+12. egui overlay
 
 ## API Patterns
 
@@ -129,6 +162,10 @@ with_point_cloud("my points", |pc| {
 - **Face format**: polyscope-rs accepts `UVec3` (triangles), `[u32; 3]`, or `Vec<Vec<u32>>` (polygons) via `IntoFaceList`
 - **Initialization**: `init()` returns `Result`, use `?` or `unwrap()`
 - **Thread safety**: Global state uses `RwLock`
+- **Camera**: no global camera functions; use `apply_view_state` or the UI
+- **Front direction**: the direction that the camera looks along (C++: the side where the camera sits)
+
+[Feature Status & Roadmap](feature-status.md) lists the C++ API that has no Rust equivalent yet.
 
 ## Reference
 
