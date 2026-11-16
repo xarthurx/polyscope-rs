@@ -166,6 +166,22 @@ impl AxisDirection {
         }
     }
 
+    /// Returns the up direction whose default front direction is this direction.
+    ///
+    /// This is the inverse of [`Self::default_front_direction`]
+    /// (C++ Polyscope `defaultOrthogonalUpDir`).
+    #[must_use]
+    pub fn default_up_direction(self) -> AxisDirection {
+        match self {
+            AxisDirection::NegZ => AxisDirection::PosY,
+            AxisDirection::PosZ => AxisDirection::NegY,
+            AxisDirection::PosX => AxisDirection::PosZ,
+            AxisDirection::NegX => AxisDirection::NegZ,
+            AxisDirection::PosY => AxisDirection::PosX,
+            AxisDirection::NegY => AxisDirection::NegX,
+        }
+    }
+
     /// Converts from a u32 index (used in UI) to `AxisDirection`.
     /// Order: 0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z
     #[must_use]
@@ -649,13 +665,32 @@ impl Camera {
         self.zoom(delta);
     }
 
-    /// Resets the camera to look at the given bounding box.
+    /// Returns the world up vector and the home look direction.
+    ///
+    /// The home look direction is the front direction. If the front direction lies
+    /// along the up axis, the default front direction for the up direction
+    /// replaces it, so the home view stays valid (C++ `computeHomeView`).
+    fn home_frame(&self) -> (Vec3, Vec3) {
+        let up = self.up_direction.to_vec3();
+        let mut front = self.front_direction.to_vec3();
+        if up.dot(front).abs() > 0.01 {
+            front = self.up_direction.default_front_direction().to_vec3();
+        }
+        (up, front)
+    }
+
+    /// Resets the camera to the home view of the given bounding box.
+    ///
+    /// The camera looks at the box center along the front direction, with the
+    /// up direction on top of the view.
     pub fn look_at_box(&mut self, min: Vec3, max: Vec3) {
         let center = (min + max) * 0.5;
         let size = (max - min).length();
         let extents = max - min;
+        let (up, front) = self.home_frame();
 
         self.target = center;
+        self.up = up;
 
         // Compute camera distance using FOV so the bounding sphere is fully visible.
         // self.fov is in radians already.
@@ -665,16 +700,37 @@ impl Camera {
         let radius = size * 0.5;
         // Add a small margin (1.1x) so objects don't touch the viewport edge
         let distance = (radius / half_fov.tan()) * 1.1;
-        self.position = center + Vec3::new(0.0, 0.0, distance);
+        self.position = center - front * distance;
 
         self.near = size * 0.001;
         self.far = size * 100.0;
 
         // Set ortho_scale to fit the model in view
         // Use the larger of height or width/aspect_ratio to ensure model fits
-        let half_height = extents.y.max(extents.x / self.aspect_ratio) * 0.6;
+        let right = front.cross(up);
+        let half_height = extents
+            .dot(up.abs())
+            .max(extents.dot(right.abs()) / self.aspect_ratio)
+            * 0.6;
         // The floor applies when the box is flat in the view plane. It scales with the box.
         self.ortho_scale = half_height.max(size * 0.05).max(f32::MIN_POSITIVE);
+    }
+
+    /// Returns whether the view matrix is valid (all entries finite).
+    #[must_use]
+    pub fn is_view_valid(&self) -> bool {
+        self.view_matrix().is_finite()
+    }
+
+    /// Resets the camera to the home view of the given box if the view is not
+    /// valid (C++ `ensureViewValid`). Returns `true` if a reset took place.
+    pub fn ensure_view_valid(&mut self, min: Vec3, max: Vec3) -> bool {
+        if self.is_view_valid() {
+            return false;
+        }
+        self.cancel_flight();
+        self.look_at_box(min, max);
+        true
     }
 
     /// Sets the navigation style.
@@ -687,12 +743,45 @@ impl Camera {
         self.projection_mode = mode;
     }
 
-    /// Sets the up direction and updates both the up vector and front direction.
-    /// The front direction is automatically derived using right-hand coordinate conventions.
+    /// Sets the up direction and updates the view (C++ `setUpDir`).
+    ///
+    /// The front direction changes to the default front direction for `direction`
+    /// (right-hand coordinate conventions). Except in Free and None navigation, the
+    /// camera then uses the new up vector. If the camera looks along the new up
+    /// axis, it moves around the target to look along the front direction.
+    /// Thus the view matrix stays valid.
     pub fn set_up_direction(&mut self, direction: AxisDirection) {
         self.up_direction = direction;
-        self.up = direction.to_vec3();
         self.front_direction = direction.default_front_direction();
+
+        match self.navigation_style {
+            // C++ keeps the view unchanged for these styles.
+            NavigationStyle::Free | NavigationStyle::None => {}
+            NavigationStyle::Turntable
+            | NavigationStyle::Planar
+            | NavigationStyle::Arcball
+            | NavigationStyle::FirstPerson => {
+                let up = direction.to_vec3();
+                // 0.99 is the pole limit of the turntable orbit.
+                if self.forward().dot(up).abs() > 0.99 {
+                    let distance = self.position.distance(self.target);
+                    self.position = self.target - self.front_direction.to_vec3() * distance;
+                }
+                self.up = up;
+            }
+        }
+    }
+
+    /// Sets the front direction (C++ `setFrontDir`).
+    ///
+    /// The front direction sets the look direction of the home view; the current
+    /// view does not change. If the front direction lies along the up axis, the
+    /// up direction changes to the default up direction for `direction`.
+    pub fn set_front_direction(&mut self, direction: AxisDirection) {
+        if direction.to_vec3().dot(self.up_direction.to_vec3()).abs() > 0.1 {
+            self.set_up_direction(direction.default_up_direction());
+        }
+        self.front_direction = direction;
     }
 
     /// Sets the movement speed.
@@ -1249,6 +1338,119 @@ mod tests {
         assert!(camera.far > camera.near);
         camera.set_ortho_scale(-1.0);
         assert!(camera.ortho_scale > 0.0);
+    }
+
+    const ALL_AXES: [AxisDirection; 6] = [
+        AxisDirection::PosX,
+        AxisDirection::NegX,
+        AxisDirection::PosY,
+        AxisDirection::NegY,
+        AxisDirection::PosZ,
+        AxisDirection::NegZ,
+    ];
+
+    /// Asserts a finite view that looks at `target` with `up` on top.
+    fn assert_looks_at(camera: &Camera, target: Vec3, up: Vec3, label: &str) {
+        assert!(camera.is_view_valid(), "{label}: view not finite");
+        let to_target = (target - camera.position).normalize();
+        assert!(
+            camera.forward().dot(to_target) > 0.9999,
+            "{label}: not at target"
+        );
+        assert!(camera.camera_up().dot(up) > 0.0, "{label}: up not on top");
+    }
+
+    /// Changing the up direction from any view must keep a valid view of the
+    /// target (C++ commit 1e5ff25). Free and None navigation keep the view.
+    #[test]
+    fn test_set_up_direction_keeps_view_valid() {
+        let styles = [
+            NavigationStyle::Turntable,
+            NavigationStyle::Planar,
+            NavigationStyle::Arcball,
+            NavigationStyle::FirstPerson,
+            NavigationStyle::Free,
+            NavigationStyle::None,
+        ];
+        let center = Vec3::new(1.0, 2.0, 3.0);
+        for style in styles {
+            for up in ALL_AXES {
+                let mut camera = Camera::new(1.5);
+                camera.look_at_box(center - 0.5, center + 0.5);
+                camera.navigation_style = style;
+                let view_before = camera.view_matrix();
+                camera.set_up_direction(up);
+                let label = format!("{style:?} up {}", up.name());
+                assert!(camera.is_view_valid(), "{label}: view not finite");
+                let up_vec = camera.up_direction.to_vec3();
+                assert!(up_vec.dot(camera.front_direction.to_vec3()).abs() < 1e-6);
+                if matches!(style, NavigationStyle::Free | NavigationStyle::None) {
+                    assert_eq!(camera.view_matrix(), view_before, "{label}");
+                } else {
+                    assert_looks_at(&camera, center, up.to_vec3(), &label);
+                }
+            }
+        }
+    }
+
+    /// The home view must honour every pair of up and front directions.
+    #[test]
+    fn test_home_view_honours_up_and_front() {
+        let center = Vec3::new(-2.0, 0.5, 4.0);
+        for up in ALL_AXES {
+            for front in ALL_AXES {
+                let label = format!("up {} front {}", up.name(), front.name());
+                let orthogonal = up.to_vec3().dot(front.to_vec3()) == 0.0;
+
+                // Fields set directly, as `CameraState::apply` does.
+                let mut camera = Camera::new(1.5);
+                camera.up_direction = up;
+                camera.front_direction = front;
+                camera.look_at_box(center - 1.0, center + 1.0);
+                assert_looks_at(&camera, center, up.to_vec3(), &label);
+                assert!(camera.forward().dot(up.to_vec3()).abs() < 1e-6, "{label}");
+                if orthogonal {
+                    assert!(camera.forward().dot(front.to_vec3()) > 0.9999, "{label}");
+                }
+
+                // Setters: the front direction wins over a parallel up direction.
+                let mut camera = Camera::new(1.5);
+                camera.set_up_direction(up);
+                camera.set_front_direction(front);
+                assert_eq!(camera.front_direction, front, "{label}");
+                if orthogonal {
+                    assert_eq!(camera.up_direction, up, "{label}");
+                }
+                camera.look_at_box(center - 1.0, center + 1.0);
+                let up_vec = camera.up_direction.to_vec3();
+                assert_looks_at(&camera, center, up_vec, &label);
+                assert!(camera.forward().dot(front.to_vec3()) > 0.9999, "{label}");
+            }
+        }
+    }
+
+    /// The default home view must not change: the camera sits on +Z.
+    #[test]
+    fn test_default_home_view_is_unchanged() {
+        let mut camera = Camera::new(1.5);
+        camera.look_at_box(Vec3::new(-1.0, 0.0, 2.0), Vec3::new(3.0, 1.0, 4.0));
+        assert_eq!(camera.position.x, 1.0);
+        assert_eq!(camera.position.y, 0.5);
+        assert!(camera.position.z > 3.0);
+        assert_eq!(camera.up, Vec3::Y);
+    }
+
+    /// A view that is not valid falls back to the home view (C++ `ensureViewValid`).
+    #[test]
+    fn test_invalid_view_falls_back_to_home_view() {
+        let mut camera = Camera::new(1.5);
+        camera.look_at_box(Vec3::ZERO, Vec3::ONE);
+        assert!(!camera.ensure_view_valid(Vec3::ZERO, Vec3::ONE));
+
+        camera.up = camera.forward();
+        assert!(!camera.is_view_valid());
+        assert!(camera.ensure_view_valid(Vec3::ZERO, Vec3::ONE));
+        assert_looks_at(&camera, Vec3::splat(0.5), Vec3::Y, "after fallback");
     }
 
     /// The scroll-zoom step is relative, so it has the same effect at any scale.

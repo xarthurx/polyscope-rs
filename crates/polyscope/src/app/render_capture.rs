@@ -136,6 +136,9 @@ impl App {
         // Auto-fit camera to scene
         self.camera_fitted = super::render_init::auto_fit_camera(engine, self.camera_fitted);
 
+        // Fall back to the home view if the view matrix is not valid
+        super::render_init::ensure_view_valid(engine);
+
         // Drain deferred material load queue
         super::render_init::drain_material_queue(engine);
 

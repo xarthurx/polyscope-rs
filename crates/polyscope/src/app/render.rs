@@ -39,6 +39,9 @@ impl App {
         // Update camera flight animation (before uniforms so interpolated position is used)
         engine.camera.update_flight();
 
+        // Fall back to the home view if the view matrix is not valid
+        super::render_init::ensure_view_valid(engine);
+
         // Drain deferred material load queue
         super::render_init::drain_material_queue(engine);
 
