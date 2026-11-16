@@ -94,6 +94,7 @@ impl ApplicationHandler for App {
                     self.left_mouse_down = true;
                     self.last_click_pos = Some(self.mouse_pos);
                     self.begin_mouse_press();
+                    self.press_in_ui_panel = self.cursor_over_ui_panel();
                 }
                 (MouseButton::Left, ElementState::Released) => {
                     self.left_mouse_down = false;
@@ -101,6 +102,7 @@ impl ApplicationHandler for App {
                 (MouseButton::Right, ElementState::Pressed) => {
                     self.right_mouse_down = true;
                     self.begin_mouse_press();
+                    self.press_in_ui_panel = self.cursor_over_ui_panel();
                 }
                 (MouseButton::Right, ElementState::Released) => {
                     self.right_mouse_down = false;
@@ -127,11 +129,11 @@ impl ApplicationHandler for App {
             .as_ref()
             .is_some_and(|e| e.context.egui_is_using_pointer());
 
-        // Check if mouse is in the left UI panel area.
-        // Uses the dynamic panel width (updated each frame from actual egui panel rect)
-        // instead of a hardcoded constant, so it stays accurate when the panel resizes
+        // Check if mouse is in a UI panel area.
+        // Uses the dynamic panel widths (updated each frame from actual egui panel rects)
+        // instead of a hardcoded constant, so it stays accurate when a panel resizes
         // (e.g., when groups are created/expanded or the user drags the panel edge).
-        let mouse_in_ui_panel = self.mouse_pos.0 <= self.left_panel_width;
+        let mouse_in_ui_panel = self.cursor_over_ui_panel();
 
         match event {
             WindowEvent::CloseRequested => {
@@ -211,13 +213,21 @@ impl ApplicationHandler for App {
 
                     let nav = engine.camera.navigation_style;
 
+                    // A drag that starts over the left UI panel does not move the
+                    // camera. This also applies to widgets that do not sense drags.
+                    let camera_drag = !self.press_in_ui_panel;
                     // Left drag rotation: blocked when gizmo is active
-                    let is_rotate = self.left_mouse_down && !self.shift_down && !egui_using_pointer;
+                    let is_rotate = self.left_mouse_down
+                        && !self.shift_down
+                        && !egui_using_pointer
+                        && camera_drag;
                     // Left+Shift pan: blocked when gizmo is active
-                    let is_left_pan =
-                        self.left_mouse_down && self.shift_down && !egui_using_pointer;
-                    // Right drag pan: always works regardless of selection/gizmo
-                    let is_right_pan = self.right_mouse_down;
+                    let is_left_pan = self.left_mouse_down
+                        && self.shift_down
+                        && !egui_using_pointer
+                        && camera_drag;
+                    // Right drag pan: works regardless of selection/gizmo
+                    let is_right_pan = self.right_mouse_down && camera_drag;
 
                     if is_rotate || is_left_pan || is_right_pan {
                         engine.camera.cancel_flight();

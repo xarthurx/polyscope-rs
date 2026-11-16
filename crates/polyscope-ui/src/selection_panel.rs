@@ -5,11 +5,13 @@ use polyscope_render::{PickElementType, PickResult};
 
 /// Builds the selection panel on the right side.
 /// Only shows if there is an active selection.
+///
+/// Returns the panel width in logical pixels (for pointer checks).
 pub fn build_selection_panel(
     ctx: &Context,
     selection: &PickResult,
     build_structure_pick_ui: impl FnOnce(&mut Ui),
-) {
+) -> f32 {
     // egui no longer shows panels on a `Context`. Host the panel in a top-level
     // background `Ui`, as `SidePanel::show(ctx)` did before.
     let mut root_ui = Ui::new(
@@ -20,7 +22,7 @@ pub fn build_selection_panel(
     root_ui
         .response()
         .widget_info(|| egui::WidgetInfo::new(egui::WidgetType::Panel));
-    Panel::right("selection_panel")
+    let resp = Panel::right("selection_panel")
         .default_size(300.0)
         .show(&mut root_ui, |ui| {
             ui.heading("Selection");
@@ -52,4 +54,5 @@ pub fn build_selection_panel(
             ui.separator();
             build_structure_pick_ui(ui);
         });
+    resp.response.rect.width()
 }

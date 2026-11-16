@@ -23,6 +23,20 @@ const DRAG_START_DIST: f64 = 6.0;
 /// (C++ `dragIgnoreThreshold`).
 const DRAG_IGNORE_THRESHOLD: f64 = 0.01;
 
+/// Returns true if a cursor at `cursor_x` is over a UI panel.
+///
+/// The left panel covers `0..=left_width`. The selection panel covers the last
+/// `right_width` of the window; it is hidden when `right_width` is 0. All
+/// values are in logical pixels.
+pub(crate) fn ui_panel_contains(
+    cursor_x: f64,
+    window_width: f64,
+    left_width: f64,
+    right_width: f64,
+) -> bool {
+    cursor_x <= left_width || (right_width > 0.0 && cursor_x >= window_width - right_width)
+}
+
 /// What a mouse-button release in the 3D view does (C++ `processInputEvents`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ReleaseAction {
@@ -97,6 +111,28 @@ pub(crate) struct PendingPick {
 
 impl App {
     /// Starts the drag tracking of a mouse-button press at the cursor.
+    /// Returns true if the cursor is over the left panel or the selection panel.
+    ///
+    /// The panel widths are in logical pixels. The cursor position and the
+    /// window width are in physical pixels.
+    pub(crate) fn cursor_over_ui_panel(&self) -> bool {
+        let scale = self
+            .egui
+            .as_ref()
+            .map_or(1.0, |egui| f64::from(egui.context.pixels_per_point()));
+        let cursor_x = self.mouse_pos.0 / scale;
+        let window_width = self
+            .engine
+            .as_ref()
+            .map_or(f64::INFINITY, |engine| f64::from(engine.width) / scale);
+        ui_panel_contains(
+            cursor_x,
+            window_width,
+            self.left_panel_width,
+            self.right_panel_width,
+        )
+    }
+
     pub(crate) fn begin_mouse_press(&mut self) {
         self.mouse_press_pos = Some(self.mouse_pos);
         self.mouse_dragging = false;

@@ -7,7 +7,7 @@ use egui::Ui;
 use glam::{DMat4, Mat4, Quat, Vec3};
 use polyscope_core::GizmoMode as PolyscopeGizmoMode;
 use transform_gizmo_egui::{
-    EnumSet, Gizmo, GizmoConfig, GizmoExt, GizmoMode, GizmoOrientation, GizmoVisuals,
+    EnumSet, Gizmo, GizmoConfig, GizmoInteraction, GizmoMode, GizmoOrientation, GizmoVisuals,
     config::TransformPivotPoint, math::Transform, mint,
 };
 
@@ -59,6 +59,8 @@ impl ModeConfig {
 /// Wrapper around transform-gizmo-egui for polyscope integration.
 pub struct TransformGizmo {
     gizmo: Gizmo,
+    /// True while the user drags a handle.
+    dragging: bool,
 }
 
 impl Default for TransformGizmo {
@@ -73,7 +75,19 @@ impl TransformGizmo {
     pub fn new() -> Self {
         Self {
             gizmo: Gizmo::default(),
+            dragging: false,
         }
+    }
+
+    /// Returns an egui area to show a gizmo over the 3D view.
+    ///
+    /// The area must be interactable: egui 0.36 leaves the widgets of a
+    /// non-interactable area out of the hit test. The area itself senses
+    /// only hover, so it takes no clicks.
+    pub fn overlay_area(id: egui::Id) -> egui::Area {
+        egui::Area::new(id)
+            .interactable(true)
+            .sense(egui::Sense::hover())
     }
 
     /// Draws the gizmo and handles interaction.
@@ -191,9 +205,7 @@ impl TransformGizmo {
         self.gizmo.update_config(config);
 
         // Interact with gizmo
-        if let Some((_result, new_transforms)) = self.gizmo.interact(ui, &[transform])
-            && let Some(new_transform) = new_transforms.first()
-        {
+        if let Some(new_transform) = self.update_and_draw(ui, transform, viewport) {
             // Convert back to Mat4
             let translation = Vec3::new(
                 new_transform.translation.x as f32,
@@ -220,6 +232,65 @@ impl TransformGizmo {
         }
 
         None
+    }
+
+    /// Updates the gizmo from the pointer, draws it, and returns the new transform
+    /// during a drag.
+    ///
+    /// This replaces `GizmoExt::interact`, which senses drags at the cursor
+    /// everywhere. Here the gizmo takes the pointer only over a handle or
+    /// during a drag. Thus a drag that starts elsewhere still moves the camera.
+    fn update_and_draw(
+        &mut self,
+        ui: &Ui,
+        target: Transform,
+        viewport: egui::Rect,
+    ) -> Option<Transform> {
+        let cursor = ui.input(|input| input.pointer.hover_pos());
+        let claims_pointer =
+            self.dragging || cursor.is_some_and(|pos| self.gizmo.pick_preview((pos.x, pos.y)));
+
+        // The widget tells egui that the gizmo uses the pointer, so that
+        // `egui_is_using_pointer` is true during the drag. If an egui widget
+        // is on top of the gizmo, `hovered` is false.
+        let hovered = match cursor {
+            Some(pos) if claims_pointer => ui
+                .interact(
+                    egui::Rect::from_center_size(pos, egui::Vec2::splat(1.0)),
+                    ui.id().with("gizmo_pointer"),
+                    egui::Sense::click_and_drag(),
+                )
+                .hovered(),
+            _ => false,
+        };
+
+        let interaction = GizmoInteraction {
+            cursor_pos: cursor.map_or((0.0, 0.0), |pos| (pos.x, pos.y)),
+            hovered,
+            drag_started: ui
+                .input(|input| input.pointer.button_pressed(egui::PointerButton::Primary)),
+            dragging: ui.input(|input| input.pointer.button_down(egui::PointerButton::Primary)),
+        };
+        let result = self.gizmo.update(interaction, &[target]);
+        self.dragging = result.is_some();
+
+        let draw_data = self.gizmo.draw();
+        egui::Painter::new(ui.ctx().clone(), ui.layer_id(), viewport).add(egui::Mesh {
+            indices: draw_data.indices,
+            vertices: draw_data
+                .vertices
+                .into_iter()
+                .zip(draw_data.colors)
+                .map(|(pos, [r, g, b, a])| egui::epaint::Vertex {
+                    pos: pos.into(),
+                    uv: egui::Pos2::default(),
+                    color: egui::Rgba::from_rgba_premultiplied(r, g, b, a).into(),
+                })
+                .collect(),
+            ..Default::default()
+        });
+
+        result.and_then(|(_, transforms)| transforms.first().copied())
     }
 
     /// Decomposes a Mat4 into translation, rotation (Euler degrees), and scale.
@@ -353,6 +424,150 @@ mod tests {
 
         settings.snap_rotate = 10.0;
         assert!(ModeConfig::new(&settings, false).snapping);
+    }
+
+    /// Runs the gizmo in headless egui frames, as the app shows it.
+    struct GizmoHarness {
+        ctx: egui::Context,
+        gizmo: TransformGizmo,
+        /// Transform of the target. Each result replaces it, as in the app.
+        target: Mat4,
+        frame: u32,
+    }
+
+    impl GizmoHarness {
+        const SCREEN: egui::Rect =
+            egui::Rect::from_min_max(egui::Pos2::ZERO, egui::Pos2 { x: 800.0, y: 600.0 });
+        const CENTER: egui::Pos2 = egui::Pos2 { x: 400.0, y: 300.0 };
+
+        /// Creates the harness and runs two frames, so that the overlay area
+        /// is past its sizing pass.
+        fn new() -> Self {
+            let mut harness = Self {
+                ctx: egui::Context::default(),
+                gizmo: TransformGizmo::new(),
+                target: Mat4::IDENTITY,
+                frame: 0,
+            };
+            harness.run(Vec::new());
+            harness.run(Vec::new());
+            harness
+        }
+
+        /// Runs one frame with the given events and returns the gizmo result.
+        fn run(&mut self, events: Vec<egui::Event>) -> Option<Mat4> {
+            self.frame += 1;
+            let input = egui::RawInput {
+                screen_rect: Some(Self::SCREEN),
+                time: Some(f64::from(self.frame) / 60.0),
+                events,
+                ..Default::default()
+            };
+            // The same matrix functions as `polyscope_render::Camera`.
+            let eye = Vec3::new(0.0, 0.0, 5.0);
+            let view = glam::camera::rh::view::look_at_mat4(eye, Vec3::ZERO, Vec3::Y);
+            let projection = glam::camera::rh::proj::directx::perspective(
+                45_f32.to_radians(),
+                800.0 / 600.0,
+                0.1,
+                100.0,
+            );
+            let settings = GizmoSettings::default();
+            let gizmo = &mut self.gizmo;
+            let mut result = None;
+            self.ctx
+                .run_ui(input, |ui| {
+                    TransformGizmo::overlay_area(egui::Id::new("test_gizmo_overlay"))
+                        .fixed_pos(egui::Pos2::ZERO)
+                        .show(ui.ctx(), |ui| {
+                            ui.set_clip_rect(Self::SCREEN);
+                            result = gizmo.interact(
+                                ui,
+                                view,
+                                projection,
+                                self.target,
+                                &settings,
+                                Self::SCREEN,
+                            );
+                        });
+                })
+                .drop_without_applying_deltas();
+            if let Some(transform) = result {
+                self.target = transform;
+            }
+            result
+        }
+
+        fn pointer_moved(&mut self, pos: egui::Pos2) -> Option<Mat4> {
+            self.run(vec![egui::Event::PointerMoved(pos)])
+        }
+
+        fn primary_button(&mut self, pos: egui::Pos2, pressed: bool) -> Option<Mat4> {
+            self.run(vec![egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            }])
+        }
+
+        /// Returns a point on the outermost handle to the right of the center.
+        fn handle_on_x_axis(&self) -> egui::Pos2 {
+            let x = (1..300)
+                .rev()
+                .map(|dx| Self::CENTER.x + dx as f32)
+                .find(|x| self.gizmo.gizmo.pick_preview((*x, Self::CENTER.y)))
+                .expect("no gizmo handle to the right of the center");
+            egui::pos2(x - 2.0, Self::CENTER.y)
+        }
+    }
+
+    #[test]
+    fn test_drag_on_handle_moves_target() {
+        let mut harness = GizmoHarness::new();
+        let start = harness.handle_on_x_axis();
+
+        // Hover first: the gizmo claims the pointer only over a handle.
+        assert!(harness.pointer_moved(start).is_none());
+        harness.primary_button(start, true);
+        for step in 1..=5 {
+            let pos = start + egui::vec2(10.0 * step as f32, 0.0);
+            assert!(
+                harness.pointer_moved(pos).is_some(),
+                "the drag on the handle must change the transform"
+            );
+            assert!(
+                harness.ctx.egui_is_using_pointer(),
+                "egui must report the drag, so that the camera does not orbit"
+            );
+        }
+        let end = start + egui::vec2(50.0, 0.0);
+        harness.primary_button(end, false);
+
+        let translation = harness.target.w_axis.truncate();
+        assert!(
+            translation.x > 0.2,
+            "translation {translation} must follow +X"
+        );
+        assert!(translation.y.abs() < 1e-3 && translation.z.abs() < 1e-3);
+        assert!(!harness.ctx.egui_is_using_pointer());
+    }
+
+    #[test]
+    fn test_drag_off_handle_leaves_pointer_to_camera() {
+        let mut harness = GizmoHarness::new();
+        let start = egui::pos2(100.0, 100.0);
+
+        assert!(harness.pointer_moved(start).is_none());
+        assert!(harness.primary_button(start, true).is_none());
+        for step in 1..=5 {
+            let pos = start + egui::vec2(10.0 * step as f32, 5.0 * step as f32);
+            assert!(harness.pointer_moved(pos).is_none());
+            assert!(
+                !harness.ctx.egui_is_using_pointer(),
+                "a drag away from the handles must stay free for the camera"
+            );
+        }
     }
 
     #[test]

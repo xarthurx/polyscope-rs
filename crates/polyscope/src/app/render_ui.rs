@@ -285,20 +285,27 @@ impl App {
             self.left_panel_width = f64::from(panel_width) + 5.0;
 
             // Show selection panel if we have a selection
+            self.right_panel_width = 0.0;
             if let Some(ref selection) = self.selection
                 && selection.hit
             {
-                polyscope_ui::build_selection_panel(&egui.context, selection, |ui| {
-                    // Structure-specific pick UI (placeholder for now)
-                    ui.label("Quantity values would appear here");
-                });
+                let panel_width =
+                    polyscope_ui::build_selection_panel(&egui.context, selection, |ui| {
+                        // Structure-specific pick UI (placeholder for now)
+                        ui.label("Quantity values would appear here");
+                    });
+                self.right_panel_width = f64::from(panel_width) + 5.0;
             }
 
-            // Common gizmo setup - check if pointer is over UI panel
+            // Common gizmo setup - check if pointer is over a UI panel
             let panel_w = self.left_panel_width as f32;
-            let pointer_over_ui = egui
-                .context
-                .input(|i| i.pointer.hover_pos().is_some_and(|pos| pos.x <= panel_w));
+            let right_panel_start = engine.width as f32 / egui.context.pixels_per_point()
+                - self.right_panel_width as f32;
+            let pointer_over_ui = egui.context.input(|i| {
+                i.pointer
+                    .hover_pos()
+                    .is_some_and(|pos| pos.x <= panel_w || pos.x >= right_panel_start)
+            });
 
             // Get camera matrices from engine - MUST match what's used for 3D rendering
             let view_matrix = engine.camera.view_matrix();
@@ -322,9 +329,8 @@ impl App {
 
                 // Use Area instead of CentralPanel to avoid consuming all mouse events
                 // The gizmo handles its own interaction detection
-                egui::Area::new(egui::Id::new("gizmo_overlay"))
+                polyscope_ui::TransformGizmo::overlay_area(egui::Id::new("gizmo_overlay"))
                     .fixed_pos(egui::Pos2::ZERO)
-                    .interactable(false) // Don't consume mouse events at the area level
                     .show(&egui.context, |ui| {
                         // Set the clip rect to full window
                         ui.set_clip_rect(full_window_viewport);
@@ -480,9 +486,9 @@ impl App {
                     glam::Vec3::ONE, // No scale for slice planes
                 );
 
-                egui::Area::new(egui::Id::new("slice_plane_gizmo_overlay"))
+                let area_id = egui::Id::new("slice_plane_gizmo_overlay");
+                polyscope_ui::TransformGizmo::overlay_area(area_id)
                     .fixed_pos(egui::Pos2::ZERO)
-                    .interactable(false)
                     .show(&egui.context, |ui| {
                         ui.set_clip_rect(full_window_viewport);
 

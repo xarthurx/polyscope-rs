@@ -11,7 +11,7 @@ mod render_ui;
 mod view_state;
 
 #[cfg(test)]
-pub(crate) use picking::{ClickHit, ReleaseAction, release_action};
+pub(crate) use picking::{ClickHit, ReleaseAction, release_action, ui_panel_contains};
 
 use std::collections::HashSet;
 pub(super) use std::sync::Arc;
@@ -55,6 +55,8 @@ pub struct App {
     pub(super) mouse_press_pos: Option<(f64, f64)>,
     pub(super) mouse_dragging: bool,
     pub(super) drag_distance: f64,
+    // True if the last mouse press was over the left UI panel
+    pub(super) press_in_ui_panel: bool,
     // Selection state
     pub(super) selection: Option<PickResult>,
     pub(super) last_click_pos: Option<(f64, f64)>,
@@ -79,6 +81,8 @@ pub struct App {
     pub(super) group_settings: Vec<polyscope_ui::GroupSettings>,
     // Dynamic left panel width (updated each frame from egui)
     pub(super) left_panel_width: f64,
+    // Width of the selection panel in logical pixels (0 while it is hidden)
+    pub(super) right_panel_width: f64,
     // Gizmo UI state
     pub(super) gizmo_settings: polyscope_ui::GizmoSettings,
     pub(super) selection_info: polyscope_ui::SelectionInfo,
@@ -116,6 +120,7 @@ impl App {
             mouse_press_pos: None,
             mouse_dragging: false,
             drag_distance: 0.0,
+            press_in_ui_panel: false,
             selection: None,
             last_click_pos: None,
             last_left_click_time: None,
@@ -130,6 +135,7 @@ impl App {
             new_slice_plane_name: String::new(),
             group_settings: crate::get_group_settings(),
             left_panel_width: 320.0, // Default, updated dynamically each frame
+            right_panel_width: 0.0,
             gizmo_settings: crate::get_gizmo_settings(),
             selection_info: polyscope_ui::SelectionInfo::default(),
             slice_plane_selection: polyscope_ui::SlicePlaneSelectionInfo::default(),

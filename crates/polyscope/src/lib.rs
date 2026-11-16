@@ -379,6 +379,22 @@ mod tests {
     }
 
     #[test]
+    fn test_ui_panel_hit_test_covers_both_panels() {
+        use crate::app::ui_panel_contains;
+
+        // Window of 1280 logical pixels, left panel 310, selection panel 305.
+        assert!(ui_panel_contains(100.0, 1280.0, 310.0, 305.0));
+        assert!(ui_panel_contains(310.0, 1280.0, 310.0, 305.0));
+        assert!(!ui_panel_contains(640.0, 1280.0, 310.0, 305.0));
+        assert!(ui_panel_contains(975.0, 1280.0, 310.0, 305.0));
+        assert!(ui_panel_contains(1279.0, 1280.0, 310.0, 305.0));
+
+        // A hidden selection panel covers nothing, also at the window edge.
+        assert!(!ui_panel_contains(1279.0, 1280.0, 310.0, 0.0));
+        assert!(!ui_panel_contains(1280.0, 1280.0, 310.0, 0.0));
+    }
+
+    #[test]
     fn test_removed_structure_does_not_stay_selected() {
         let _guard = setup();
         let kept = unique_name("selected_kept");
