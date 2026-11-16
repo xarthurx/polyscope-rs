@@ -143,6 +143,12 @@ ported yet.
 - A removed structure or slice plane stayed selected.
 - `init()` failed after `shutdown()`. It now starts again with an empty scene.
 - The gizmo ignored `set_gizmo_mode` and the snap settings.
+- A left drag in the 3D view did not orbit the camera while a structure was
+  selected, because the gizmo took the pointer everywhere.
+- A drag that started on the left panel moved the camera. A click inside the
+  selection panel went through to the scene and cleared the selection. The
+  pointer checks now use the display scale, so they are correct on HiDPI
+  displays.
 - Prism side quad 2 has the correct triangle winding; its normals pointed
   inward (the same defect is in upstream `stencilPrism`).
 
