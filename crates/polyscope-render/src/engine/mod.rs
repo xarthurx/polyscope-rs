@@ -162,10 +162,6 @@ pub struct RenderEngine {
     pub(crate) screenshot_texture: Option<wgpu::Texture>,
     /// Screenshot capture buffer (lazily initialized).
     pub(crate) screenshot_buffer: Option<wgpu::Buffer>,
-    /// Screenshot HDR texture for rendering (lazily initialized).
-    pub(crate) screenshot_hdr_texture: Option<wgpu::Texture>,
-    /// Screenshot HDR texture view.
-    pub(crate) screenshot_hdr_view: Option<wgpu::TextureView>,
     /// HDR intermediate texture for tone mapping.
     pub(crate) hdr_texture: Option<wgpu::Texture>,
     /// HDR texture view.
@@ -544,8 +540,6 @@ impl RenderEngine {
             slice_plane_render_data: Vec::new(),
             screenshot_texture: None,
             screenshot_buffer: None,
-            screenshot_hdr_texture: None,
-            screenshot_hdr_view: None,
             hdr_texture: None,
             hdr_view: None,
             normal_texture: None,
@@ -870,8 +864,6 @@ impl RenderEngine {
             slice_plane_render_data: Vec::new(),
             screenshot_texture: None,
             screenshot_buffer: None,
-            screenshot_hdr_texture: None,
-            screenshot_hdr_view: None,
             hdr_texture: None,
             hdr_view: None,
             normal_texture: None,

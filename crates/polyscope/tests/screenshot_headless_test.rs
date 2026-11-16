@@ -52,6 +52,16 @@ fn transparent_background_screenshot() {
         "the option must not change the scene color"
     );
 
+    // The ground plane is part of the scene and stays opaque near the scene,
+    // as in C++ Polyscope. Without it, the bottom row is background.
+    let bottom = (W / 2, H - 2);
+    assert_eq!(pixel(&transparent, bottom.0, bottom.1)[3], 255);
+    with_context_mut(|ctx| ctx.options.ground_plane.mode = GroundPlaneMode::None);
+    let no_ground =
+        render_to_image_with_options(W, H, &transparent_options).expect("render without ground");
+    assert_eq!(pixel(&no_ground, bottom.0, bottom.1)[3], 0);
+    with_context_mut(|ctx| ctx.options.ground_plane.mode = GroundPlaneMode::default());
+
     // A half-transparent mesh keeps its alpha over the transparent background
     quad.set_transparency(0.5);
     let half = render_to_image_with_options(W, H, &transparent_options).expect("half render");

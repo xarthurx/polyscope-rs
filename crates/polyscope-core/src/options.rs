@@ -18,7 +18,11 @@ pub struct Options {
 
     /// Ground plane configuration (mode, height, shadow and reflection).
     ///
-    /// Headless rendering and screenshots do not draw the ground plane yet.
+    /// The window, screenshots and headless rendering draw the ground plane in
+    /// the same way. A screenshot with a transparent background keeps the
+    /// ground plane, with the alpha of the ground plane shader (as C++
+    /// Polyscope does). Set the mode to `GroundPlaneMode::None` to get only
+    /// the structures.
     pub ground_plane: GroundPlaneConfig,
 
     /// Background color (linear RGB).

@@ -4,14 +4,18 @@ mod input;
 mod picking;
 mod render;
 mod render_capture;
+mod render_frame;
 mod render_init;
 mod render_peel;
+mod render_pick;
 mod render_scene;
 mod render_ui;
+mod render_volume_grid;
 mod view_state;
 
 #[cfg(test)]
 pub(crate) use picking::{ClickHit, ReleaseAction, release_action, ui_panel_contains};
+pub(crate) use render_init::clear_structure_gpu_resources;
 
 use std::collections::HashSet;
 pub(super) use std::sync::Arc;

@@ -1,17 +1,15 @@
-//! Depth-peeling transparency (`TransparencyMode::Pretty`) shared by the
-//! windowed frame and the screenshot/headless path.
+//! Depth-peeling transparency (`TransparencyMode::Pretty`) of the scene passes.
 
 use super::{SurfaceMesh, VolumeMesh};
 use polyscope_render::RenderEngine;
 
 /// Writes the depth and normals of surface meshes before the main pass, so
 /// that later geometry is depth-tested against them.
-pub(super) fn render_mesh_depth_prepass(
-    encoder: &mut wgpu::CommandEncoder,
-    engine: &RenderEngine,
-    color_view: &wgpu::TextureView,
-) {
-    let Some(depth_pipeline) = engine.mesh_depth_normal_pipeline.as_ref() else {
+pub(super) fn render_mesh_depth_prepass(encoder: &mut wgpu::CommandEncoder, engine: &RenderEngine) {
+    let (Some(depth_pipeline), Some(color_view)) = (
+        engine.mesh_depth_normal_pipeline.as_ref(),
+        engine.hdr_view(),
+    ) else {
         return;
     };
     let normal_view = engine
@@ -146,11 +144,10 @@ pub(super) fn draw_meshes_for_depth_peel<'a>(
 }
 
 /// Peels the surface meshes layer by layer and composites the result onto
-/// `target` (the engine HDR view when `None`).
+/// the engine HDR texture.
 pub(super) fn render_depth_peel(
     encoder: &mut wgpu::CommandEncoder,
     engine: &mut RenderEngine,
-    target: Option<&wgpu::TextureView>,
     num_passes: u32,
 ) {
     let has_surface_meshes = crate::with_context(|ctx| {
@@ -273,8 +270,6 @@ pub(super) fn render_depth_peel(
     }
 
     // Composite final peeled result onto the scene
-    let target = target
-        .or_else(|| engine.hdr_view())
-        .expect("HDR view should be available");
+    let target = engine.hdr_view().expect("HDR view should be available");
     peel.composite_final_to_scene(encoder, &engine.device, target);
 }

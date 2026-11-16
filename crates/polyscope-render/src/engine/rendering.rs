@@ -19,11 +19,10 @@ impl RenderEngine {
             .unwrap_or(&self.matcap_textures[DEFAULT_MATERIAL])
             .bind_group
     }
-    /// Renders the ground plane.
+    /// Renders the ground plane into the HDR scene texture.
     ///
     /// # Arguments
     /// * `encoder` - The command encoder
-    /// * `view` - The render target view
     /// * `enabled` - Whether the ground plane is enabled
     /// * `scene_center` - Center of the scene bounding box
     /// * `scene_bounds` - Scene bounding box (min, max)
@@ -38,7 +37,6 @@ impl RenderEngine {
     pub fn render_ground_plane(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
-        surface_view: &wgpu::TextureView,
         enabled: bool,
         scene_center: [f32; 3],
         scene_bounds: (glam::Vec3, glam::Vec3),
@@ -54,9 +52,6 @@ impl RenderEngine {
         if !enabled {
             return;
         }
-
-        // Always use HDR texture for ground plane rendering (pipelines use HDR format)
-        let view = self.hdr_view.as_ref().unwrap_or(surface_view);
 
         // Initialize render data if needed
         if self.ground_plane_render_data.is_none()
@@ -75,7 +70,7 @@ impl RenderEngine {
         let frame = GroundPlaneFrame::new(self.camera.up_direction);
         let ground_height = frame.ground_height(scene_bounds, length_scale, height_override);
 
-        if let Some(render_data) = &self.ground_plane_render_data {
+        if let (Some(render_data), Some(view)) = (&self.ground_plane_render_data, &self.hdr_view) {
             render_data.update(
                 &self.queue,
                 scene_center,
@@ -182,15 +177,16 @@ impl RenderEngine {
 
     /// Renders slice plane visualizations with clearing.
     ///
-    /// Clears the HDR texture and depth buffer first, then renders slice planes.
-    /// This should be called BEFORE rendering scene geometry so that geometry
-    /// can properly occlude the slice planes.
+    /// Clears the HDR texture to `clear_color` (linear RGBA) and the depth
+    /// buffer first, then renders slice planes. This should be called BEFORE
+    /// rendering scene geometry so that geometry can properly occlude the
+    /// slice planes.
     pub fn render_slice_planes_with_clear(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         planes: &[polyscope_core::slice_plane::SlicePlane],
         length_scale: f32,
-        clear_color: [f32; 3],
+        clear_color: [f32; 4],
     ) {
         // Use HDR texture if available
         let Some(view) = &self.hdr_view else {
@@ -222,7 +218,7 @@ impl RenderEngine {
                             r: f64::from(clear_color[0]),
                             g: f64::from(clear_color[1]),
                             b: f64::from(clear_color[2]),
-                            a: 1.0,
+                            a: f64::from(clear_color[3]),
                         }),
                         store: wgpu::StoreOp::Store,
                     },
@@ -287,12 +283,11 @@ impl RenderEngine {
     ///
     /// This should be called before rendering reflected geometry.
     /// The stencil buffer will have value 1 where the ground plane is visible.
-    /// `ground_height` is the coordinate of the plane on the up axis.
-    #[allow(clippy::too_many_arguments)]
+    /// `ground_height` is the coordinate of the plane on the up axis. The pass
+    /// uses the HDR scene texture as its color attachment and does not change it.
     pub fn render_stencil_pass(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
-        color_view: &wgpu::TextureView,
         ground_height: f32,
         scene_center: [f32; 3],
         length_scale: f32,
@@ -315,7 +310,8 @@ impl RenderEngine {
             ));
         }
 
-        let Some(render_data) = &self.ground_plane_render_data else {
+        let (Some(render_data), Some(view)) = (&self.ground_plane_render_data, &self.hdr_view)
+        else {
             return;
         };
 
@@ -336,8 +332,6 @@ impl RenderEngine {
             is_orthographic,
             0.0, // reflection_intensity (unused in stencil)
         );
-
-        let view = self.hdr_view.as_ref().unwrap_or(color_view);
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Stencil Pass"),

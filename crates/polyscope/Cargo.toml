@@ -33,6 +33,7 @@ rfd = "0.18"
 [dev-dependencies]
 proptest.workspace = true
 tobj.workspace = true
+image.workspace = true
 
 [[example]]
 name = "surface_mesh_demo"

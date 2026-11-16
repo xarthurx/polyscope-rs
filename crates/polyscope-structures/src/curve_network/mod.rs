@@ -666,13 +666,16 @@ impl CurveNetwork {
             return;
         };
 
-        // Apply object transform to positions before sending to GPU.
+        // The node spheres use the point pipeline, which applies the model
+        // matrix of the node uniforms. So the node buffer holds object-space
+        // positions. The edge shaders have no model matrix, so the edge
+        // vertices hold transformed positions.
+        render_data.update_node_positions(queue, &self.node_positions);
         let transformed_nodes: Vec<Vec3> = self
             .node_positions
             .iter()
             .map(|p| (self.transform * p.extend(1.0)).truncate())
             .collect();
-        render_data.update_node_positions(queue, &transformed_nodes);
         render_data.update_edge_vertices(
             queue,
             &transformed_nodes,

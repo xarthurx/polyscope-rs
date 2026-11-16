@@ -3,6 +3,12 @@
 //! Provides functions to render the current scene to an image buffer or file
 //! without opening a window. Useful for integration tests, batch processing,
 //! and automated screenshot generation.
+//!
+//! A headless render uses the frame pipeline of the window: the same scene
+//! passes (ground plane, shadows, reflections, tubes, gridcubes, depth
+//! peeling, SSAO and so on) and the same tone mapping. For the same scene,
+//! options, camera and size, the image equals the window content without
+//! the UI.
 
 use crate::Result;
 use crate::ScreenshotOptions;
@@ -14,8 +20,8 @@ use polyscope_render::RenderEngine;
 /// Renders the current scene to a file.
 ///
 /// Creates a headless GPU context, renders one frame of the current scene
-/// (all registered structures and quantities), and saves the result as
-/// a PNG or JPEG image.
+/// (all registered structures and quantities, with the render look of the
+/// options), and saves the result as a PNG or JPEG image.
 ///
 /// The camera is automatically fitted to the scene bounding box.
 ///
@@ -87,15 +93,10 @@ pub fn render_to_image_with_options(
         })?;
     app.engine = Some(engine);
 
-    // Clear stale GPU resources from all structures so they get re-initialized
-    // with the new wgpu device. This is necessary because each headless render
-    // call creates a fresh device, but structures in the global registry may
-    // retain buffers from a previous device.
-    with_context_mut(|ctx| {
-        for structure in ctx.registry.iter_mut() {
-            structure.clear_gpu_resources();
-        }
-    });
+    // Each headless render creates a new wgpu device. The structures can hold
+    // GPU resources of an earlier device (an earlier window session), so drop
+    // them. The frame builds them again with the new device.
+    crate::app::clear_structure_gpu_resources();
 
     // Drain any queued view-state. `apply_view_state` sets
     // `camera_fitted = true`, which makes the per-frame `auto_fit_camera`
@@ -115,5 +116,13 @@ pub fn render_to_image_with_options(
         ctx.set_view_state_snapshot(snapshot);
     });
 
-    app.capture_to_buffer()
+    let pixels = app.capture_to_buffer();
+
+    // The headless device ends with this call. Drop its GPU resources from
+    // the structures, so that a later window or headless render cannot use
+    // them with another device.
+    drop(app);
+    crate::app::clear_structure_gpu_resources();
+
+    pixels
 }
