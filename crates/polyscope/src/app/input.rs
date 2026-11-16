@@ -133,13 +133,9 @@ impl ApplicationHandler for App {
                         }
                         if delta.length_squared() > 0.0 {
                             engine.camera.cancel_flight();
-                            let length_scale = engine
-                                .camera
-                                .position
-                                .distance(engine.camera.target)
-                                .max(1.0);
-                            let speed = length_scale * dt * engine.camera.move_speed;
-                            engine.camera.move_first_person(delta.normalize() * speed);
+                            // The step is relative to the view, so it suits any scene scale
+                            let step = engine.camera.first_person_step(dt);
+                            engine.camera.move_first_person(delta.normalize() * step);
                         }
                     }
                 }
