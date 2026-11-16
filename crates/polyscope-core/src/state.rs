@@ -533,5 +533,6 @@ pub fn shutdown_context() {
         ctx.selected_slice_plane = None;
         ctx.floating_quantities.clear();
         ctx.material_load_queue.clear();
+        ctx.file_drop_callback = None;
     }
 }
