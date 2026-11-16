@@ -1,10 +1,51 @@
 use super::{
-    ActiveEventLoop, App, ApplicationHandler, Arc, EguiIntegration, ElementState, FutureExt,
-    KeyCode, LogicalSize, MouseButton, PickResult, RenderEngine, Vec3, Window, WindowEvent,
-    WindowId,
+    ActiveEventLoop, App, ApplicationHandler, Arc, ControlFlow, EguiIntegration, ElementState,
+    FutureExt, KeyCode, LogicalSize, MouseButton, PickResult, RenderEngine, Vec3, Window,
+    WindowEvent, WindowId,
 };
 
+impl App {
+    /// Requests the next redraw after a frame that started at `frame_start`.
+    ///
+    /// With `Options::max_fps` = 0 the next frame starts at once. Otherwise
+    /// the event loop waits until the next frame is due. It keeps handling
+    /// input events while it waits.
+    fn schedule_next_frame(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        frame_start: std::time::Instant,
+    ) {
+        let max_fps = crate::with_context(|ctx| ctx.options.max_fps);
+        if max_fps == 0 {
+            self.next_frame_time = None;
+            event_loop.set_control_flow(ControlFlow::Wait);
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
+            return;
+        }
+        let next = frame_start + std::time::Duration::from_secs_f64(1.0 / f64::from(max_fps));
+        self.next_frame_time = Some(next);
+        event_loop.set_control_flow(ControlFlow::WaitUntil(next));
+    }
+}
+
 impl ApplicationHandler for App {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let Some(next) = self.next_frame_time else {
+            return;
+        };
+        if std::time::Instant::now() >= next {
+            self.next_frame_time = None;
+            event_loop.set_control_flow(ControlFlow::Wait);
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
+        } else {
+            event_loop.set_control_flow(ControlFlow::WaitUntil(next));
+        }
+    }
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
             return;
@@ -143,9 +184,7 @@ impl ApplicationHandler for App {
                 self.last_frame_time = Some(now);
 
                 self.render();
-                if let Some(window) = &self.window {
-                    window.request_redraw();
-                }
+                self.schedule_next_frame(event_loop, now);
             }
             WindowEvent::CursorMoved { position, .. } => {
                 let delta_x = position.x - self.mouse_pos.0;

@@ -19,7 +19,7 @@ pub(super) use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
     event::{ElementState, MouseButton, WindowEvent},
-    event_loop::{ActiveEventLoop, EventLoop},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::KeyCode,
     window::{Window, WindowId},
 };
@@ -87,6 +87,8 @@ pub struct App {
     pub(super) keys_down: HashSet<KeyCode>,
     // Frame timing for first-person movement
     pub(super) last_frame_time: Option<std::time::Instant>,
+    // Time of the next redraw when `Options::max_fps` limits the frame rate
+    pub(super) next_frame_time: Option<std::time::Instant>,
 }
 
 impl App {
@@ -124,6 +126,7 @@ impl App {
             camera_fitted: false,
             keys_down: HashSet::new(),
             last_frame_time: None,
+            next_frame_time: None,
         }
     }
 
