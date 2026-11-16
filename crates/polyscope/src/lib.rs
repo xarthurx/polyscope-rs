@@ -213,6 +213,13 @@ pub fn remove_structure(name: &str) {
         ctx.registry.remove("VolumeMesh", name);
         ctx.registry.remove("VolumeGrid", name);
         ctx.registry.remove("CameraView", name);
+        // A removed structure does not stay selected.
+        let selection_is_gone = ctx
+            .selected_structure()
+            .is_some_and(|(type_name, selected)| !ctx.registry.contains(type_name, selected));
+        if selection_is_gone {
+            ctx.deselect_structure();
+        }
         ctx.update_extents();
     });
 }
@@ -221,6 +228,7 @@ pub fn remove_structure(name: &str) {
 pub fn remove_all_structures() {
     with_context_mut(|ctx| {
         ctx.registry.clear();
+        ctx.deselect_structure();
         ctx.update_extents();
     });
 }
@@ -359,7 +367,58 @@ mod tests {
         let guard = CONTEXT_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
         // `init` fails after the first call. That is expected here.
         let _ = init();
+        // Each test starts from a clean scene. An earlier test can leave
+        // structures, slice planes, a selection or changed options.
+        remove_everything();
+        with_context_mut(|ctx| {
+            ctx.options = Options::default();
+            ctx.gizmo_config = GizmoConfig::default();
+            ctx.take_pending_view_apply();
+        });
         guard
+    }
+
+    #[test]
+    fn test_removed_structure_does_not_stay_selected() {
+        let _guard = setup();
+        let kept = unique_name("selected_kept");
+        let removed = unique_name("selected_removed");
+        register_point_cloud(&kept, vec![Vec3::ZERO]);
+        register_point_cloud(&removed, vec![Vec3::X]);
+
+        // Removal of another structure keeps the selection.
+        select_structure("PointCloud", &kept);
+        remove_structure(&removed);
+        assert_eq!(
+            get_selected_structure(),
+            Some(("PointCloud".to_string(), kept.clone()))
+        );
+
+        // Removal of the selected structure clears the selection.
+        remove_structure(&kept);
+        assert!(!has_selection());
+
+        // Removal of all structures clears the selection.
+        register_point_cloud(&kept, vec![Vec3::ZERO]);
+        select_structure("PointCloud", &kept);
+        remove_all_structures();
+        assert!(!has_selection());
+    }
+
+    #[test]
+    fn test_removed_slice_plane_does_not_stay_selected() {
+        let _guard = setup();
+        let name = unique_name("selected_plane");
+
+        add_slice_plane(&name);
+        with_context_mut(|ctx| ctx.select_slice_plane(&name));
+        remove_slice_plane(&name);
+        assert!(with_context(|ctx| ctx.selected_slice_plane().is_none()));
+
+        add_slice_plane(&name);
+        with_context_mut(|ctx| ctx.select_slice_plane(&name));
+        remove_all_slice_planes();
+        assert!(with_context(|ctx| ctx.selected_slice_plane().is_none()));
     }
 
     #[test]

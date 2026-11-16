@@ -119,6 +119,7 @@ pub fn remove_slice_plane(name: &str) {
 pub fn remove_all_slice_planes() {
     with_context_mut(|ctx| {
         ctx.slice_planes.clear();
+        ctx.deselect_slice_plane();
     });
 }
 

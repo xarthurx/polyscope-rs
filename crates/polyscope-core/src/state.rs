@@ -339,7 +339,12 @@ impl Context {
     }
 
     /// Removes a slice plane by name.
+    ///
+    /// A removed slice plane does not stay selected.
     pub fn remove_slice_plane(&mut self, name: &str) -> Option<SlicePlane> {
+        if self.selected_slice_plane.as_deref() == Some(name) {
+            self.selected_slice_plane = None;
+        }
         self.slice_planes.remove(name)
     }
 
