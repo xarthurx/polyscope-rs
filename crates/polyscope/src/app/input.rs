@@ -300,7 +300,7 @@ impl ApplicationHandler for App {
                         if let Some(hit_point) = self.pick_world_position_at(click_screen)
                             && let Some(engine) = &mut self.engine
                         {
-                            engine.camera.target = hit_point;
+                            engine.camera.set_view_center(hit_point);
                             log::info!(
                                 "Double-click: set view center to ({:.3}, {:.3}, {:.3})",
                                 hit_point.x,

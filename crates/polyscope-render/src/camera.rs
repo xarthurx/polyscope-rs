@@ -978,6 +978,40 @@ impl Camera {
         }
     }
 
+    /// Sets a new view center and flies the view to it, as C++
+    /// `setViewCenterAndLookAt` does for each navigation style.
+    ///
+    /// - Planar: the camera moves parallel to the view plane until `center` is
+    ///   straight ahead. The view does not rotate.
+    /// - None: the view does not change.
+    /// - The other styles: the camera stays in place and turns to `center`,
+    ///   with the world up direction on top of the view.
+    pub fn set_view_center(&mut self, center: Vec3) {
+        const FLIGHT_SECS: f32 = 0.4;
+        match self.navigation_style {
+            NavigationStyle::None => {}
+            NavigationStyle::Planar => {
+                let look = self.forward();
+                let position = center - look * look.dot(center - self.position);
+                self.start_flight_to_pose(position, center, self.up, self.fov, FLIGHT_SECS);
+            }
+            NavigationStyle::Turntable
+            | NavigationStyle::Free
+            | NavigationStyle::Arcball
+            | NavigationStyle::FirstPerson => {
+                let world_up = self.up_direction.to_vec3();
+                let look = (center - self.position).normalize_or_zero();
+                // Keep the current up vector if the new view looks along the world up axis.
+                let up = if look.cross(world_up).length_squared() > 1e-6 {
+                    world_up
+                } else {
+                    self.up
+                };
+                self.start_flight_to_pose(self.position, center, up, self.fov, FLIGHT_SECS);
+            }
+        }
+    }
+
     /// Cancels any active camera flight animation.
     pub fn cancel_flight(&mut self) {
         self.flight = None;
@@ -1549,6 +1583,58 @@ mod tests {
         assert!(!camera.is_view_valid());
         assert!(camera.ensure_view_valid(Vec3::ZERO, Vec3::ONE));
         assert_looks_at(&camera, Vec3::splat(0.5), Vec3::Y, "after fallback");
+    }
+
+    /// A new view center changes the view as C++ `setViewCenterAndLookAt` does
+    /// for each navigation style (upstream commit 1b41445).
+    #[test]
+    fn test_set_view_center_per_navigation_style() {
+        let styles = [
+            NavigationStyle::Turntable,
+            NavigationStyle::Free,
+            NavigationStyle::Planar,
+            NavigationStyle::Arcball,
+            NavigationStyle::FirstPerson,
+            NavigationStyle::None,
+        ];
+        let new_center = Vec3::new(0.4, -0.3, 0.2);
+        for style in styles {
+            let mut camera = Camera::new(1.5);
+            camera.look_at_box(Vec3::splat(-1.0), Vec3::splat(1.0));
+            camera.navigation_style = style;
+            let before = camera.clone();
+
+            camera.set_view_center(new_center);
+            if camera.is_in_flight() {
+                age_flight(&mut camera, 1.0);
+                camera.update_flight();
+            }
+            assert!(camera.is_view_valid(), "{style:?}");
+
+            match style {
+                NavigationStyle::None => {
+                    assert_eq!(camera.position, before.position);
+                    assert_eq!(camera.target, before.target);
+                }
+                NavigationStyle::Planar => {
+                    // The view translates in its plane and does not rotate.
+                    assert_eq!(camera.target, new_center);
+                    assert!(
+                        camera.forward().dot(before.forward()) > 0.99999,
+                        "{style:?}"
+                    );
+                    let shift = camera.position - before.position;
+                    assert!(shift.dot(before.forward()).abs() < 1e-5, "{style:?}");
+                    assert!(camera.camera_up().dot(before.camera_up()) > 0.99999);
+                }
+                _ => {
+                    // The camera stays in place and turns to the new center.
+                    assert_eq!(camera.position, before.position, "{style:?}");
+                    assert_eq!(camera.target, new_center, "{style:?}");
+                    assert_eq!(camera.up, Vec3::Y, "{style:?}");
+                }
+            }
+        }
     }
 
     /// A screen position and its depth-buffer value give back the world point.
