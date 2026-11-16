@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-16
+
 ### Changed
 - The default background color is white, as in C++ Polyscope. It was dark
   gray (0.1, 0.1, 0.1). Set `Options::background_color` for another color.
-
 - The "Add" button of the Slice Planes panel adds a plane with an automatic
   name ("Scene Slice Plane N") when the name field is empty, as the
   "Add plane" button of C++ Polyscope does. Before, it did nothing.
