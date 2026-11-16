@@ -122,6 +122,14 @@ fn test_basics() {
         with_context(|ctx| ctx.file_drop_callback.is_none()),
         "shutdown must clear the file-drop callback"
     );
+
+    // Test 8: `init` starts again after a shutdown, with an empty scene
+    assert!(!is_initialized());
+    init().expect("init after shutdown failed");
+    assert!(is_initialized());
+    assert!(get_volume_mesh("test_vol").is_none());
+    assert!(init().is_err(), "a second init must fail");
+    shutdown();
 }
 
 /// This test requires a display and opens a window.

@@ -447,19 +447,31 @@ impl Context {
 
 /// Initializes the global context.
 ///
-/// This should be called once at the start of the program.
+/// Call this once at the start of the program. After [`shutdown_context`], a
+/// new call starts again with a default context.
+///
+/// # Errors
+///
+/// Returns [`PolyscopeError::AlreadyInitialized`] if the context is initialized.
 pub fn init_context() -> Result<()> {
-    let context = RwLock::new(Context::default());
-
-    CONTEXT
-        .set(context)
-        .map_err(|_| PolyscopeError::AlreadyInitialized)?;
-
-    with_context_mut(|ctx| {
+    if let Some(lock) = CONTEXT.get() {
+        // The context exists. Start again only after a shutdown.
+        let mut ctx = lock.write().expect("context lock poisoned");
+        if ctx.initialized {
+            return Err(PolyscopeError::AlreadyInitialized);
+        }
+        *ctx = Context::default();
         ctx.initialized = true;
-    });
+        return Ok(());
+    }
 
-    Ok(())
+    let context = Context {
+        initialized: true,
+        ..Context::default()
+    };
+    CONTEXT
+        .set(RwLock::new(context))
+        .map_err(|_| PolyscopeError::AlreadyInitialized)
 }
 
 /// Returns whether the context has been initialized.
@@ -524,8 +536,7 @@ where
 
 /// Shuts down the global context.
 ///
-/// Note: Due to `OnceLock` semantics, the context cannot be re-initialized
-/// after shutdown in the same process.
+/// The function clears the scene. [`init_context`] can start the context again.
 pub fn shutdown_context() {
     if let Some(lock) = CONTEXT.get()
         && let Ok(mut ctx) = lock.write()

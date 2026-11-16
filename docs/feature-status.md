@@ -462,4 +462,4 @@ The engine uses only the Vulkan, Metal, DirectX 12 and WebGPU backends of wgpu. 
 If no supported backend is available:
 
 - `render_to_image` and `render_to_file` return an error that contains the message "no graphics adapter found (Vulkan, Metal or DirectX 12 is necessary)".
-- `show()` stops with a panic: "failed to create render engine: AdapterCreationFailed".
+- `show()` stops with a panic that contains the same message.

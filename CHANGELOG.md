@@ -141,6 +141,7 @@ ported yet.
 - The point cloud pick ignored the model transform.
 - `shutdown()` did not clear the file-drop callback (upstream commit 8cbdf24).
 - A removed structure or slice plane stayed selected.
+- `init()` failed after `shutdown()`. It now starts again with an empty scene.
 - The gizmo ignored `set_gizmo_mode` and the snap settings.
 - Prism side quad 2 has the correct triangle winding; its normals pointed
   inward (the same defect is in upstream `stencilPrism`).

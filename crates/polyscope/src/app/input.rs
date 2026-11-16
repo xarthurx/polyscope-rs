@@ -67,7 +67,7 @@ impl ApplicationHandler for App {
         // Create render engine
         let mut engine = RenderEngine::new_windowed(window.clone())
             .block_on()
-            .expect("failed to create render engine");
+            .unwrap_or_else(|e| panic!("failed to create the render engine: {e}"));
 
         // Initialize GPU picking system
         engine.init_pick_buffers(engine.width, engine.height);
