@@ -1,6 +1,7 @@
 use super::{CameraView, CurveNetwork, PointCloud, Structure, SurfaceMesh, VolumeGrid, VolumeMesh};
 use polyscope_core::structure::HasQuantities;
 use polyscope_render::RenderEngine;
+use polyscope_structures::curve_network::{CurveEdgeVectorQuantity, CurveNodeVectorQuantity};
 use polyscope_structures::volume_grid::{
     VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,
 };
@@ -95,6 +96,21 @@ pub(super) fn draw_vector_quantities<'a>(
                 if let Some(oq) = mesh.active_one_form_quantity()
                     && let Some(render_data) = oq.render_data()
                 {
+                    render_pass.set_bind_group(0, &render_data.bind_group, &[]);
+                    render_pass.draw(0..120, 0..render_data.num_vectors);
+                }
+            }
+            if structure.type_name() == "CurveNetwork"
+                && let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>()
+            {
+                // Node vectors start at the nodes, edge vectors at the edge midpoints.
+                let node_data = cn
+                    .active_node_vector_quantity()
+                    .and_then(CurveNodeVectorQuantity::render_data);
+                let edge_data = cn
+                    .active_edge_vector_quantity()
+                    .and_then(CurveEdgeVectorQuantity::render_data);
+                for render_data in node_data.into_iter().chain(edge_data) {
                     render_pass.set_bind_group(0, &render_data.bind_group, &[]);
                     render_pass.draw(0..120, 0..render_data.num_vectors);
                 }
