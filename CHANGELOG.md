@@ -14,6 +14,10 @@ against C++ Polyscope found. It contains breaking changes.
 [Feature Status](docs/feature-status.md) lists the C++ features that are not
 ported yet.
 
+Rendered images look different from 0.5: the display gamma is applied once
+(colors are darker and more saturated, as in C++ Polyscope), and screenshots
+and headless renders show the same frame as the window.
+
 ### Breaking changes
 - Dependencies: wgpu 27 → 30, egui 0.33 → 0.36, glam 0.29 → 0.34,
   transform-gizmo-egui 0.8 → 0.11, pollster 0.4 → 1.0, rfd 0.15 → 0.18. The
@@ -33,8 +37,20 @@ ported yet.
   material names. The `build_egui_ui` methods of the volume mesh quantities
   return `bool`.
 - `TransformGizmo::interact` takes `&GizmoSettings`.
-- `RenderEngine::render_ground_plane` takes the scene bounds, not the minimum
-  Y coordinate.
+- `RenderEngine` screenshot API: `tone_map_to_screenshot_target` replaces
+  `create_screenshot_target`, `apply_screenshot_tone_mapping`,
+  `screenshot_texture_view` and `screenshot_depth_view`.
+  `render_ground_plane` takes the scene bounds, not the minimum Y coordinate.
+  `render_ground_plane` and `render_stencil_pass` always draw into the HDR
+  texture and take no target view. `render_slice_planes_with_clear` takes an
+  RGBA clear color.
+- `save_image` and `save_to_buffer` take RGBA pixels and do not swap channels.
+  `RenderEngine::capture_screenshot` returns RGBA for every capture format.
+- `ToneMapUniforms` has the new field `output_is_srgb`.
+- `CurveNetwork::update_gpu_buffers` and `CurveNetwork::update_pick_uniforms`
+  take the scene length scale.
+- The default cube size factor of a volume grid is 1 (full cell). It was 0,
+  with an internal floor of 0.5.
 - `VolumeMesh::cell_type` classifies cells by the number of sentinel indices
   (0/2/3/4 → Hex/Prism/Pyramid/Tet), not by `cell[4] == u32::MAX`. Mixed meshes
   from external pipelines must put the sentinels in the trailing slots. Tet
@@ -65,6 +81,12 @@ ported yet.
   run (upstream commit 8740ddc). The `rand` dependency is removed.
 - SSAO is off when the SSAA factor is above 1. The combination gave a wrong
   image before.
+- Screenshots and headless renders use the frame passes and the tone mapping
+  of the window. A windowed screenshot shows the frame on screen, without the
+  UI. A transparent-background screenshot keeps the ground plane with the alpha
+  of the ground plane shader, as C++ Polyscope does.
+- The gallery generator (`generate_screenshots`) enables its quantities and
+  draws tubes.
 - The unused dependencies `ply-rs` and `log` (in `polyscope-core`) are removed.
 
 ### Added
@@ -109,6 +131,20 @@ ported yet.
   and `SsaoConfig` are exported from `polyscope_rs`.
 
 ### Fixed
+- The display gamma was applied twice: the tone mapping shader applied it, and
+  the sRGB output texture encoded the result again. Colors were pale, and a
+  background of 0.1 showed as 163/255 instead of 94/255.
+- `render_to_file` wrote files with red and blue swapped.
+- Headless renders and screenshots did not show the ground plane, shadows,
+  reflections, curve network tubes, volume grid gridcubes or isosurfaces.
+- `show()` after a headless render, or a headless render after a window
+  session, stopped with a wgpu error about a buffer of another device.
+- Gridcubes were a quarter of their cell size, so a volume grid scalar showed
+  as scattered dots.
+- A relative curve network radius (`set_radius(r, true)`) drew as an absolute
+  value. It is now a fraction of the scene length scale.
+- In tube mode, the node spheres of a transformed curve network got the
+  transform twice. The curve network pick radius did not follow radius changes.
 - CI: a new clippy lint (`manual_midpoint`) and unit tests that used one
   global context at the same time made the CI of `main` fail. The tests now
   run one at a time and start from a clean scene.

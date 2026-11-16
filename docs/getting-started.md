@@ -818,9 +818,9 @@ let pixels = render_to_image_with_options(800, 600, &options)?;
 render_to_file_with_options("clear.png", 800, 600, &options)?;
 ```
 
-A headless render uses the same frame passes as the window: ground plane, shadows, reflections, curve network tubes, volume grid gridcubes and isosurfaces. <!-- verify: capture pipeline -->
+A headless render uses the same frame passes as the window: ground plane, shadows, reflections, curve network tubes, volume grid gridcubes and isosurfaces.
 
-`render_to_file` saves the same RGBA image that `render_to_image` returns, as PNG or JPEG. <!-- verify: capture pipeline -->
+`render_to_file` saves the same RGBA image that `render_to_image` returns, as PNG or JPEG.
 
 The pixel rows go from top to bottom. With `transparent_background`, background pixels get alpha 0. A JPEG file has no alpha channel.
 

@@ -72,7 +72,7 @@ A dash (—) means that C++ Polyscope also has no such quantity on the structure
 | Ground plane | Partial | Modes None, Tile, ShadowOnly and TileReflection. Follows the up direction. No height factor and no shadow blur setting. |
 | Ground shadows | Partial | Only surface meshes cast shadows. |
 | Ground reflections | Partial | Surface meshes, volume meshes, point clouds and curve networks show in the reflection. |
-| Tone mapping | Full | Exposure, white level and gamma in the Tone Mapping panel. |
+| Tone mapping | Full | Exposure, white level and gamma in the Tone Mapping panel. The displayed value is `pow(color, 1 / gamma)`, as in C++. |
 | SSAO | Rust only | Screen-space ambient occlusion. No effect when the SSAA factor is above 1. |
 | SSAA | Full | `Options::ssaa_factor`: 1, 2 or 4. |
 | Transparency | Partial | Simple and Pretty (depth peeling). Only surface meshes have a structure transparency. |
@@ -81,7 +81,7 @@ A dash (—) means that C++ Polyscope also has no such quantity on the structure
 | Slice planes | Partial | At most 4 planes act at a time. Volume meshes lose whole cells. No per-structure options. |
 | Groups | Partial | Hierarchical groups. A disabled group hides its structures and child groups. |
 | Screenshots | Partial | PNG and JPEG. Transparent background. No capture of the UI. |
-| Headless rendering | Full | `render_to_image`, `render_to_file` and their `_with_options` forms. The same frame passes as the window: ground plane, shadows, reflections, tubes, gridcubes and isosurfaces. <!-- verify: capture pipeline --> |
+| Headless rendering | Full | `render_to_image`, `render_to_file` and their `_with_options` forms. The same frame passes as the window: ground plane, shadows, reflections, tubes, gridcubes and isosurfaces. |
 | Frame rate limit | Full | `Options::max_fps` (default 60, 0 = unlimited) limits the window. |
 | Camera navigation | Full | Turntable, Free, Planar, Arcball, First Person and None. |
 | Projection | Full | Perspective and orthographic. |
@@ -320,6 +320,9 @@ One line per item. The C++ names are in backticks.
 
 These features exist in both libraries but behave differently.
 
+- **Curve network render mode.** A new curve network draws one-pixel lines. Call `set_render_mode(1)` for tubes. C++ always draws tubes.
+- **Gridcube size.** `set_cube_size_factor` sets a size: 1 is the full cell (the default) and 0 hides the cubes. In C++, `setCubeSizeFactor` sets a shrink amount: 0 is the full cell.
+- **Tone mapping curve.** The Reinhard curve acts on each color channel. C++ applies it to the luminance, so bright saturated colors differ a little.
 - **Front direction.** In polyscope-rs, the front direction is the direction that the camera looks along. In C++, it is the side where the camera sits.
 - **Home view.** The home view distance comes from the field of view and the bounding sphere. C++ uses 1.5 times the length scale and an offset along the up direction.
 - **`TransparencyMode::None`.** It renders like `Simple`. In C++, `None` turns transparency off.
