@@ -53,3 +53,26 @@ pub use point_cloud::PointCloud;
 pub use surface_mesh::SurfaceMesh;
 pub use volume_grid::VolumeGrid;
 pub use volume_mesh::{VolumeCellType, VolumeMesh};
+
+/// Returns the axis-aligned bounds of a box after a transform.
+///
+/// The function transforms the eight corners of the box and takes their bounds.
+pub(crate) fn transform_bounds(
+    min: glam::Vec3,
+    max: glam::Vec3,
+    transform: glam::Mat4,
+) -> (glam::Vec3, glam::Vec3) {
+    let mut world_min = glam::Vec3::splat(f32::MAX);
+    let mut world_max = glam::Vec3::splat(f32::MIN);
+    for i in 0..8 {
+        let corner = glam::Vec3::new(
+            if i & 1 == 0 { min.x } else { max.x },
+            if i & 2 == 0 { min.y } else { max.y },
+            if i & 4 == 0 { min.z } else { max.z },
+        );
+        let world = transform.transform_point3(corner);
+        world_min = world_min.min(world);
+        world_max = world_max.max(world);
+    }
+    (world_min, world_max)
+}

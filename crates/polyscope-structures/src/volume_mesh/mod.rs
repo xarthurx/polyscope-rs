@@ -1241,7 +1241,7 @@ impl Structure for VolumeMesh {
             max = max.max(v);
         }
 
-        Some((min, max))
+        Some(crate::transform_bounds(min, max, self.transform))
     }
 
     fn length_scale(&self) -> f32 {
@@ -1362,6 +1362,17 @@ pub struct VolumeMeshRenderGeometry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_bounding_box_follows_transform() {
+        let vertices = vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z];
+        let mut mesh = VolumeMesh::new_tet_mesh("tet", vertices, vec![[0, 1, 2, 3]]);
+        mesh.set_transform(Mat4::from_translation(Vec3::new(10.0, 0.0, 0.0)));
+
+        let (min, max) = mesh.bounding_box().unwrap();
+        assert!((min - Vec3::new(10.0, 0.0, 0.0)).length() < 1e-6);
+        assert!((max - Vec3::new(11.0, 1.0, 1.0)).length() < 1e-6);
+    }
 
     #[test]
     fn test_new_prism_mesh_constructor() {

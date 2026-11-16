@@ -167,9 +167,9 @@ pub use polyscope_core::{
 
 // Re-export render types
 pub use polyscope_render::{
-    AxisDirection, Camera, ColorMap, ColorMapRegistry, Material, MaterialRegistry, NavigationStyle,
-    PickElementType, ProjectionMode, RenderContext, RenderEngine, ScreenshotError,
-    ScreenshotOptions,
+    AxisDirection, BUILTIN_COLOR_MAP_NAMES, Camera, ColorMap, ColorMapRegistry, Material,
+    MaterialRegistry, NavigationStyle, PickElementType, ProjectionMode, RenderContext,
+    RenderEngine, ScreenshotError, ScreenshotOptions,
 };
 
 // Re-export UI types

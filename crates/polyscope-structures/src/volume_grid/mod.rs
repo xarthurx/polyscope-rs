@@ -407,11 +407,16 @@ impl Structure for VolumeGrid {
     }
 
     fn bounding_box(&self) -> Option<(Vec3, Vec3)> {
-        Some((self.bound_min, self.bound_max))
+        Some(crate::transform_bounds(
+            self.bound_min,
+            self.bound_max,
+            self.transform,
+        ))
     }
 
     fn length_scale(&self) -> f32 {
-        (self.bound_max - self.bound_min).length()
+        self.bounding_box()
+            .map_or(1.0, |(min, max)| (max - min).length())
     }
 
     fn transform(&self) -> Mat4 {
@@ -498,6 +503,16 @@ impl HasQuantities for VolumeGrid {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_bounding_box_follows_transform() {
+        let mut grid = VolumeGrid::new("test", UVec3::new(2, 2, 2), Vec3::ZERO, Vec3::ONE);
+        grid.set_transform(Mat4::from_translation(Vec3::new(10.0, 0.0, 0.0)));
+
+        let (min, max) = grid.bounding_box().unwrap();
+        assert!((min - Vec3::new(10.0, 0.0, 0.0)).length() < 1e-6);
+        assert!((max - Vec3::new(11.0, 1.0, 1.0)).length() < 1e-6);
+    }
 
     #[test]
     fn test_volume_grid_creation() {
