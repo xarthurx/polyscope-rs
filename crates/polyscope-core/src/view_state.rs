@@ -2,8 +2,8 @@
 //!
 //! See `docs/plans/2026-05-19-view-save-restore-design.md` for the design.
 
-use crate::ground_plane::GroundPlaneMode;
-use crate::options::TransparencyMode;
+use crate::ground_plane::{GroundPlaneConfig, GroundPlaneMode};
+use crate::options::{Options, TransparencyMode};
 use crate::ssao::SsaoConfig;
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +19,8 @@ pub enum ViewTransition {
 }
 
 /// Render-look state (background, ground plane, transparency, SSAO, SSAA).
+///
+/// It mirrors the render-look fields of [`Options`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RenderState {
     pub background_color: [f32; 3],
@@ -28,18 +30,62 @@ pub struct RenderState {
     pub ssaa_factor: u32,
 }
 
+/// Ground plane part of a [`RenderState`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GroundPlaneState {
-    pub enabled: bool,
     pub mode: GroundPlaneMode,
     pub height: f32,
+    pub height_is_relative: bool,
+    pub shadow_darkness: f32,
+    pub reflection_intensity: f32,
 }
 
+/// Transparency part of a [`RenderState`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TransparencyState {
-    pub enabled: bool,
     pub mode: TransparencyMode,
     pub render_passes: u32,
+}
+
+impl RenderState {
+    /// Copies the render-look fields of the options into a render state.
+    #[must_use]
+    pub fn from_options(options: &Options) -> Self {
+        let gp = &options.ground_plane;
+        Self {
+            background_color: options.background_color.to_array(),
+            ground_plane: GroundPlaneState {
+                mode: gp.mode,
+                height: gp.height,
+                height_is_relative: gp.height_is_relative,
+                shadow_darkness: gp.shadow_darkness,
+                reflection_intensity: gp.reflection_intensity,
+            },
+            transparency: TransparencyState {
+                mode: options.transparency_mode,
+                render_passes: options.transparency_render_passes,
+            },
+            ssao: options.ssao.clone(),
+            ssaa_factor: options.ssaa_factor,
+        }
+    }
+
+    /// Writes this render state into the render-look fields of the options.
+    pub fn apply_to_options(&self, options: &mut Options) {
+        let gp = &self.ground_plane;
+        options.background_color = glam::Vec3::from_array(self.background_color);
+        options.ground_plane = GroundPlaneConfig {
+            mode: gp.mode,
+            height: gp.height,
+            height_is_relative: gp.height_is_relative,
+            shadow_darkness: gp.shadow_darkness,
+            reflection_intensity: gp.reflection_intensity,
+        };
+        options.transparency_mode = self.transparency.mode;
+        options.transparency_render_passes = self.transparency.render_passes;
+        options.ssao = self.ssao.clone();
+        options.ssaa_factor = self.ssaa_factor;
+    }
 }
 
 use crate::error::{PolyscopeError, Result};
@@ -77,7 +123,8 @@ pub fn save_view_to_file(path: impl AsRef<std::path::Path>) -> Result<()> {
     Ok(())
 }
 
-/// Built-in default view state used when no snapshot is available yet.
+/// View state used when no snapshot is available yet: a default camera and
+/// the render look of the current options.
 fn fallback_view_state() -> ViewState {
     ViewState {
         version: ViewState::CURRENT_VERSION,
@@ -94,28 +141,15 @@ fn fallback_view_state() -> ViewState {
             up_direction: "pos_y".to_string(),
             front_direction: "neg_z".to_string(),
         },
-        render: RenderState {
-            background_color: [1.0, 1.0, 1.0],
-            ground_plane: GroundPlaneState {
-                enabled: true,
-                mode: GroundPlaneMode::TileReflection,
-                height: 0.0,
-            },
-            transparency: TransparencyState {
-                enabled: true,
-                mode: TransparencyMode::Simple,
-                render_passes: 8,
-            },
-            ssao: SsaoConfig::default(),
-            ssaa_factor: 1,
-        },
+        render: with_context(|ctx| RenderState::from_options(&ctx.options)),
     }
 }
 
 /// Parse a JSON view-state and queue it for application.
 ///
 /// Missing fields preserve the current snapshot's values. If no snapshot is
-/// available, missing fields fall back to a built-in default.
+/// available, missing camera fields fall back to a built-in default camera
+/// and missing render fields keep the current options.
 pub fn load_view_from_json(json: &str, transition: ViewTransition) -> Result<()> {
     let current = current_view_state().unwrap_or_else(|_| fallback_view_state());
     let merged = ViewState::from_json_partial_then_validate(json, &current)?;
@@ -191,14 +225,15 @@ struct PartialRenderState {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct PartialGroundPlaneState {
-    enabled: Option<bool>,
     mode: Option<GroundPlaneMode>,
     height: Option<f32>,
+    height_is_relative: Option<bool>,
+    shadow_darkness: Option<f32>,
+    reflection_intensity: Option<f32>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct PartialTransparencyState {
-    enabled: Option<bool>,
     mode: Option<TransparencyMode>,
     render_passes: Option<u32>,
 }
@@ -256,12 +291,19 @@ impl ViewState {
                 .background_color
                 .unwrap_or(current.render.background_color),
             ground_plane: GroundPlaneState {
-                enabled: gp_p.enabled.unwrap_or(current.render.ground_plane.enabled),
                 mode: gp_p.mode.unwrap_or(current.render.ground_plane.mode),
                 height: gp_p.height.unwrap_or(current.render.ground_plane.height),
+                height_is_relative: gp_p
+                    .height_is_relative
+                    .unwrap_or(current.render.ground_plane.height_is_relative),
+                shadow_darkness: gp_p
+                    .shadow_darkness
+                    .unwrap_or(current.render.ground_plane.shadow_darkness),
+                reflection_intensity: gp_p
+                    .reflection_intensity
+                    .unwrap_or(current.render.ground_plane.reflection_intensity),
             },
             transparency: TransparencyState {
-                enabled: tp_p.enabled.unwrap_or(current.render.transparency.enabled),
                 mode: tp_p.mode.unwrap_or(current.render.transparency.mode),
                 render_passes: tp_p
                     .render_passes
@@ -290,7 +332,7 @@ impl ViewState {
             "none",
         ];
         const KNOWN_AXIS: &[&str] = &["pos_x", "neg_x", "pos_y", "neg_y", "pos_z", "neg_z"];
-        const KNOWN_SSAA: &[u32] = &[1, 2, 4, 8];
+        const KNOWN_SSAA: &[u32] = &[1, 2, 4];
 
         let invalid = |reason: &str| Err(PolyscopeError::InvalidViewState(reason.to_string()));
 
@@ -348,6 +390,12 @@ impl ViewState {
         if !s.render.ground_plane.height.is_finite() {
             return invalid("render.ground_plane.height must be finite");
         }
+        if !(0.0..=1.0).contains(&s.render.ground_plane.shadow_darkness) {
+            return invalid("render.ground_plane.shadow_darkness must be in [0, 1]");
+        }
+        if !(0.0..=1.0).contains(&s.render.ground_plane.reflection_intensity) {
+            return invalid("render.ground_plane.reflection_intensity must be in [0, 1]");
+        }
         if !KNOWN_SSAA.contains(&s.render.ssaa_factor) {
             return invalid(&format!("render.ssaa_factor must be one of {KNOWN_SSAA:?}"));
         }
@@ -401,12 +449,13 @@ mod tests {
             render: RenderState {
                 background_color: [1.0, 1.0, 1.0],
                 ground_plane: GroundPlaneState {
-                    enabled: true,
                     mode: GroundPlaneMode::TileReflection,
                     height: 0.0,
+                    height_is_relative: true,
+                    shadow_darkness: 0.4,
+                    reflection_intensity: 0.25,
                 },
                 transparency: TransparencyState {
-                    enabled: true,
                     mode: TransparencyMode::Simple,
                     render_passes: 8,
                 },
@@ -560,13 +609,14 @@ mod tests {
         let r = RenderState {
             background_color: [0.1, 0.2, 0.3],
             ground_plane: GroundPlaneState {
-                enabled: true,
                 mode: GroundPlaneMode::TileReflection,
                 height: 1.5,
+                height_is_relative: false,
+                shadow_darkness: 0.6,
+                reflection_intensity: 0.5,
             },
             transparency: TransparencyState {
-                enabled: true,
-                mode: TransparencyMode::Simple,
+                mode: TransparencyMode::Pretty,
                 render_passes: 6,
             },
             ssao: SsaoConfig::default(),
@@ -575,5 +625,33 @@ mod tests {
         let s = serde_json::to_string(&r).unwrap();
         let back: RenderState = serde_json::from_str(&s).unwrap();
         assert_eq!(r, back);
+    }
+
+    #[test]
+    fn test_render_state_options_roundtrip() {
+        let options = Options {
+            background_color: glam::Vec3::new(0.2, 0.3, 0.4),
+            ground_plane: GroundPlaneConfig {
+                mode: GroundPlaneMode::ShadowOnly,
+                height: -1.0,
+                height_is_relative: false,
+                shadow_darkness: 0.7,
+                reflection_intensity: 0.1,
+            },
+            transparency_mode: TransparencyMode::Pretty,
+            transparency_render_passes: 4,
+            ssaa_factor: 2,
+            ssao: SsaoConfig {
+                enabled: true,
+                ..SsaoConfig::default()
+            },
+            ..Options::default()
+        };
+        let state = RenderState::from_options(&options);
+        let mut other = Options::default();
+        state.apply_to_options(&mut other);
+        assert_eq!(RenderState::from_options(&other), state);
+        assert_eq!(other.ground_plane, options.ground_plane);
+        assert_eq!(other.background_color, options.background_color);
     }
 }

@@ -3,6 +3,7 @@ use crate::{
     reset_selected_transform, with_context, with_context_mut,
 };
 use polyscope_core::gizmo::Transform;
+use polyscope_core::options::TransparencyMode;
 
 /// Syncs `CameraSettings` from UI to the actual Camera.
 pub fn apply_camera_settings(
@@ -55,6 +56,50 @@ pub fn set_auto_compute_extents(auto: bool) {
         if auto {
             ctx.recompute_extents();
         }
+    });
+}
+
+// ============================================================================
+// Appearance UI Sync Functions
+// ============================================================================
+
+/// Gets the appearance settings for the UI from the global options.
+pub(crate) fn get_appearance_settings() -> polyscope_ui::AppearanceSettings {
+    with_context(|ctx| {
+        let options = &ctx.options;
+        polyscope_ui::AppearanceSettings {
+            transparency_mode: match options.transparency_mode {
+                TransparencyMode::None => 0,
+                TransparencyMode::Simple => 1,
+                TransparencyMode::Pretty => 2,
+            },
+            ssaa_factor: options.ssaa_factor,
+            max_fps: options.max_fps,
+            ssao_enabled: options.ssao.enabled,
+            ssao_radius: options.ssao.radius,
+            ssao_intensity: options.ssao.intensity,
+            ssao_bias: options.ssao.bias,
+            ssao_sample_count: options.ssao.sample_count,
+        }
+    })
+}
+
+/// Writes the appearance settings of the UI to the global options.
+pub(crate) fn apply_appearance_settings(settings: &polyscope_ui::AppearanceSettings) {
+    with_context_mut(|ctx| {
+        let options = &mut ctx.options;
+        options.transparency_mode = match settings.transparency_mode {
+            0 => TransparencyMode::None,
+            1 => TransparencyMode::Simple,
+            _ => TransparencyMode::Pretty,
+        };
+        options.ssaa_factor = settings.ssaa_factor;
+        options.max_fps = settings.max_fps;
+        options.ssao.enabled = settings.ssao_enabled;
+        options.ssao.radius = settings.ssao_radius;
+        options.ssao.intensity = settings.ssao_intensity;
+        options.ssao.bias = settings.ssao_bias;
+        options.ssao.sample_count = settings.ssao_sample_count;
     });
 }
 

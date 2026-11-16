@@ -1,15 +1,12 @@
-//! `App`-side view-state gather/scatter: snapshot the App's render-look + camera
-//! into a `ViewState`, and apply a `ViewState` back across the distributed
-//! ownership.
+//! `App`-side view-state gather/scatter: snapshot the camera and the render
+//! look of the options into a `ViewState`, and apply a `ViewState` back.
 
-use polyscope_core::view_state::{
-    CameraStateOwned, GroundPlaneState, RenderState, TransparencyState, ViewState, ViewTransition,
-};
+use polyscope_core::view_state::{CameraStateOwned, RenderState, ViewState, ViewTransition};
 
 use super::App;
 
 impl App {
-    /// Build a `ViewState` using App-owned fields + a borrowed `Options`.
+    /// Build a `ViewState` from the engine camera + a borrowed `Options`.
     ///
     /// Lets per-frame publish gather + write inside a single context lock.
     /// Public consumers should use the free `current_view_state()` function
@@ -23,38 +20,17 @@ impl App {
             (&polyscope_render::CameraState::from_camera(&cam)).into()
         };
 
-        let render = RenderState {
-            background_color: [
-                self.background_color.x,
-                self.background_color.y,
-                self.background_color.z,
-            ],
-            ground_plane: GroundPlaneState {
-                enabled: !matches!(
-                    self.ground_plane.mode,
-                    polyscope_core::GroundPlaneMode::None
-                ),
-                mode: self.ground_plane.mode,
-                height: self.ground_plane.height,
-            },
-            transparency: TransparencyState {
-                enabled: options.transparency_enabled,
-                mode: options.transparency_mode,
-                render_passes: options.transparency_render_passes,
-            },
-            ssao: options.ssao.clone(),
-            ssaa_factor: options.ssaa_factor,
-        };
-
         ViewState {
             version: ViewState::CURRENT_VERSION,
             camera: camera_state,
-            render,
+            render: RenderState::from_options(options),
         }
     }
 
     /// Apply a view state to this App. For `Instant`, fields snap. For
     /// `FlyTo`, the camera animates; non-camera fields apply immediately.
+    ///
+    /// The render look goes into the global options, which the next frame reads.
     pub fn apply_view_state(&mut self, state: &ViewState, transition: ViewTransition) {
         // Only apply camera if an engine exists, and only then mark camera_fitted —
         // setting the flag without an engine would silently disable future auto-fit
@@ -65,21 +41,8 @@ impl App {
             self.camera_fitted = true;
         }
 
-        self.background_color = crate::Vec3::new(
-            state.render.background_color[0],
-            state.render.background_color[1],
-            state.render.background_color[2],
-        );
-
-        self.ground_plane.mode = state.render.ground_plane.mode;
-        self.ground_plane.height = state.render.ground_plane.height;
-
         polyscope_core::state::with_context_mut(|ctx| {
-            ctx.options.ssao = state.render.ssao.clone();
-            ctx.options.ssaa_factor = state.render.ssaa_factor;
-            ctx.options.transparency_enabled = state.render.transparency.enabled;
-            ctx.options.transparency_render_passes = state.render.transparency.render_passes;
-            ctx.options.transparency_mode = state.render.transparency.mode;
+            state.render.apply_to_options(&mut ctx.options);
         });
     }
 }

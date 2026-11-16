@@ -18,7 +18,7 @@ pub enum GroundPlaneMode {
 }
 
 /// Ground plane configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GroundPlaneConfig {
     /// Rendering mode.
     pub mode: GroundPlaneMode,
@@ -26,8 +26,6 @@ pub struct GroundPlaneConfig {
     pub height: f32,
     /// Whether height is relative to scene bounds (auto-placed below scene).
     pub height_is_relative: bool,
-    /// Shadow blur iterations (0-5).
-    pub shadow_blur_iters: u32,
     /// Shadow darkness (0.0 = no shadow, 1.0 = full black).
     pub shadow_darkness: f32,
     /// Reflection intensity (0.0 = none, 1.0 = full mirror).
@@ -40,7 +38,6 @@ impl Default for GroundPlaneConfig {
             mode: GroundPlaneMode::Tile,
             height: 0.0,
             height_is_relative: true,
-            shadow_blur_iters: 2,
             shadow_darkness: 0.4,
             reflection_intensity: 0.25,
         }

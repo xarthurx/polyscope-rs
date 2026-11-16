@@ -5,6 +5,7 @@ mod picking;
 mod render;
 mod render_capture;
 mod render_init;
+mod render_peel;
 mod render_scene;
 mod render_ui;
 mod view_state;
@@ -23,7 +24,7 @@ pub(super) use winit::{
     window::{Window, WindowId},
 };
 
-pub(super) use polyscope_core::{GroundPlaneConfig, GroundPlaneMode, Structure};
+pub(super) use polyscope_core::{GroundPlaneMode, Options, Structure};
 pub(super) use polyscope_render::{PickResult, RenderEngine, reflection};
 pub(super) use polyscope_structures::{
     CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh,
@@ -38,7 +39,6 @@ pub struct App {
     pub(super) engine: Option<RenderEngine>,
     pub(super) egui: Option<EguiIntegration>,
     pub(super) close_requested: bool,
-    pub(super) background_color: Vec3,
     // Mouse state for camera control
     // These track the PHYSICAL button state, updated on every press/release
     pub(super) mouse_pos: (f64, f64),
@@ -56,8 +56,6 @@ pub struct App {
     pub(super) last_left_click_screen_pos: Option<(f64, f64)>,
     // GPU picking - selected element index (from GPU pick)
     pub(super) selected_element_index: Option<u32>,
-    // Ground plane settings
-    pub(super) ground_plane: GroundPlaneConfig,
     // Screenshot state
     pub(super) screenshot_pending: Option<String>,
     pub(super) screenshot_counter: u32,
@@ -65,8 +63,6 @@ pub struct App {
     pub(super) camera_settings: polyscope_ui::CameraSettings,
     // Scene extents UI state
     pub(super) scene_extents: polyscope_ui::SceneExtents,
-    // Appearance settings UI state
-    pub(super) appearance_settings: polyscope_ui::AppearanceSettings,
     // Slice plane UI state
     pub(super) slice_plane_settings: Vec<polyscope_ui::SlicePlaneSettings>,
     pub(super) new_slice_plane_name: String,
@@ -101,7 +97,6 @@ impl App {
             engine: None,
             egui: None,
             close_requested: false,
-            background_color: Vec3::new(0.1, 0.1, 0.1),
             mouse_pos: (0.0, 0.0),
             left_mouse_down: false,
             right_mouse_down: false,
@@ -112,12 +107,10 @@ impl App {
             last_left_click_time: None,
             last_left_click_screen_pos: None,
             selected_element_index: None,
-            ground_plane: GroundPlaneConfig::default(),
             screenshot_pending: None,
             screenshot_counter: 0,
             camera_settings: polyscope_ui::CameraSettings::default(),
             scene_extents: polyscope_ui::SceneExtents::default(),
-            appearance_settings: polyscope_ui::AppearanceSettings::default(),
             slice_plane_settings: crate::get_slice_plane_settings(),
             new_slice_plane_name: String::new(),
             group_settings: crate::get_group_settings(),
@@ -146,6 +139,12 @@ impl Default for App {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Returns whether SSAO applies to the frame. SSAO is off with SSAA, because
+/// the tone mapping pass then reads the downsampled image and not the SSAO texture.
+pub(super) fn ssao_active(options: &Options, engine: &RenderEngine) -> bool {
+    options.ssao.enabled && engine.ssaa_factor() == 1
 }
 
 /// Runs the polyscope application.

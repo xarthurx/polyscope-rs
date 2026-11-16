@@ -25,25 +25,21 @@ impl App {
         let max_egui_passes: u32 = 2;
         let mut egui_output = egui::FullOutput::default();
 
-        // Build UI (declare mutable state before the loop so it persists across passes)
-        let mut bg_color = [
-            self.background_color.x,
-            self.background_color.y,
-            self.background_color.z,
-        ];
+        // Build UI (declare mutable state before the loop so it persists across passes).
+        // The global options hold the render look: the panels show them and
+        // write their edits back.
+        let options = polyscope_core::with_context(|ctx| ctx.options.clone());
+        let mut bg_color = options.background_color.to_array();
+        let mut appearance = crate::get_appearance_settings();
 
         // Extract ground plane settings for UI
-        let mut gp_mode = match self.ground_plane.mode {
+        let mut ground_plane = options.ground_plane.clone();
+        let mut gp_mode = match ground_plane.mode {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::Tile => 1u32,
             GroundPlaneMode::ShadowOnly => 2u32,
             GroundPlaneMode::TileReflection => 3u32,
         };
-        let mut gp_height = self.ground_plane.height;
-        let mut gp_height_is_relative = self.ground_plane.height_is_relative;
-        let mut gp_shadow_blur_iters = self.ground_plane.shadow_blur_iters;
-        let mut gp_shadow_darkness = self.ground_plane.shadow_darkness;
-        let mut gp_reflection_intensity = self.ground_plane.reflection_intensity;
 
         // Sync camera settings from engine
         self.camera_settings = crate::camera_to_settings(&engine.camera);
@@ -57,7 +53,7 @@ impl App {
         let mut reset_view_requested = false;
         let mut view_save_requested = false;
         let mut view_load_requested = false;
-        let mut ssaa_changed = false;
+        let mut ground_plane_changed = false;
         let mut fly_to_camera: Option<polyscope_structures::CameraParameters> = None;
 
         for egui_pass in 0..max_egui_passes {
@@ -72,7 +68,7 @@ impl App {
                 reset_view_requested = false;
                 view_save_requested = false;
                 view_load_requested = false;
-                ssaa_changed = false;
+                ground_plane_changed = false;
                 fly_to_camera = None;
             }
 
@@ -104,20 +100,9 @@ impl App {
                     scene_extents_changed = true;
                 }
 
-                // Appearance settings panel
-                if polyscope_ui::build_appearance_section(ui, &mut self.appearance_settings) {
-                    // Sync SSAO settings to global options
-                    polyscope_core::with_context_mut(|ctx| {
-                        ctx.options.ssao.enabled = self.appearance_settings.ssao_enabled;
-                        ctx.options.ssao.radius = self.appearance_settings.ssao_radius;
-                        ctx.options.ssao.intensity = self.appearance_settings.ssao_intensity;
-                        ctx.options.ssao.bias = self.appearance_settings.ssao_bias;
-                        ctx.options.ssao.sample_count = self.appearance_settings.ssao_sample_count;
-                        ctx.options.ssaa_factor = self.appearance_settings.ssaa_factor;
-                    });
-
-                    // Mark SSAA as changed (will apply outside closure)
-                    ssaa_changed = true;
+                // Appearance settings panel (the frame applies the options after the UI)
+                if polyscope_ui::build_appearance_section(ui, &mut appearance) {
+                    crate::apply_appearance_settings(&appearance);
                 }
 
                 // Tone mapping settings panel
@@ -200,14 +185,13 @@ impl App {
                     );
                 }
 
-                polyscope_ui::build_ground_plane_section(
+                ground_plane_changed |= polyscope_ui::build_ground_plane_section(
                     ui,
                     &mut gp_mode,
-                    &mut gp_height,
-                    &mut gp_height_is_relative,
-                    &mut gp_shadow_blur_iters,
-                    &mut gp_shadow_darkness,
-                    &mut gp_reflection_intensity,
+                    &mut ground_plane.height,
+                    &mut ground_plane.height_is_relative,
+                    &mut ground_plane.shadow_darkness,
+                    &mut ground_plane.reflection_intensity,
                 );
 
                 // Groups section (only shown if groups were created via API)
@@ -543,21 +527,25 @@ impl App {
                     });
             }
 
-            // Update background color if changed
-            self.background_color = Vec3::new(bg_color[0], bg_color[1], bg_color[2]);
-
-            // Update ground plane settings from UI
-            self.ground_plane.mode = match gp_mode {
-                0 => GroundPlaneMode::None,
-                1 => GroundPlaneMode::Tile,
-                2 => GroundPlaneMode::ShadowOnly,
-                _ => GroundPlaneMode::TileReflection,
-            };
-            self.ground_plane.height = gp_height;
-            self.ground_plane.height_is_relative = gp_height_is_relative;
-            self.ground_plane.shadow_blur_iters = gp_shadow_blur_iters;
-            self.ground_plane.shadow_darkness = gp_shadow_darkness;
-            self.ground_plane.reflection_intensity = gp_reflection_intensity;
+            // Write background color and ground plane edits to the options
+            let new_bg_color = Vec3::from_array(bg_color);
+            let bg_changed = new_bg_color != options.background_color;
+            if bg_changed || ground_plane_changed {
+                ground_plane.mode = match gp_mode {
+                    0 => GroundPlaneMode::None,
+                    1 => GroundPlaneMode::Tile,
+                    2 => GroundPlaneMode::ShadowOnly,
+                    _ => GroundPlaneMode::TileReflection,
+                };
+                polyscope_core::with_context_mut(|ctx| {
+                    if bg_changed {
+                        ctx.options.background_color = new_bg_color;
+                    }
+                    if ground_plane_changed {
+                        ctx.options.ground_plane = ground_plane.clone();
+                    }
+                });
+            }
 
             // Apply camera settings if changed
             if camera_changed {
@@ -577,11 +565,6 @@ impl App {
                         );
                     });
                 }
-            }
-
-            // Apply SSAA settings if changed
-            if ssaa_changed && engine.ssaa_factor() != self.appearance_settings.ssaa_factor {
-                engine.set_ssaa_factor(self.appearance_settings.ssaa_factor);
             }
 
             // Queue screenshot request from UI button (will be processed after render)

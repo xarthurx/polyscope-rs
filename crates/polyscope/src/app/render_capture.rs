@@ -1,10 +1,12 @@
 //! Screenshot capture and headless rendering.
 
-use super::{App, GroundPlaneMode, render_scene};
+use super::{App, GroundPlaneMode, Options, render_peel, render_scene};
 
 impl App {
     /// Captures a screenshot by re-rendering to a dedicated texture.
     pub(super) fn capture_screenshot(&mut self, filename: String) {
+        let options = crate::with_context(|ctx| ctx.options.clone());
+        let ground_plane = &options.ground_plane;
         let Some(engine) = &mut self.engine else {
             log::error!("Cannot capture screenshot: engine not initialized");
             return;
@@ -27,12 +29,7 @@ impl App {
                     view: &screenshot_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: f64::from(self.background_color.x),
-                            g: f64::from(self.background_color.y),
-                            b: f64::from(self.background_color.z),
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Clear(background_clear_color(&options)),
                         store: wgpu::StoreOp::Store,
                     },
                     depth_slice: None,
@@ -70,31 +67,31 @@ impl App {
                 ctx.length_scale,
             )
         });
-        let height_override = if self.ground_plane.height_is_relative {
+        let height_override = if ground_plane.height_is_relative {
             None
         } else {
-            Some(self.ground_plane.height)
+            Some(ground_plane.height)
         };
-        let screenshot_gp_shadow_mode = match self.ground_plane.mode {
+        let screenshot_gp_shadow_mode = match ground_plane.mode {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::ShadowOnly => 1u32,
             GroundPlaneMode::Tile | GroundPlaneMode::TileReflection => 2u32,
         };
         let screenshot_reflection_intensity =
-            if self.ground_plane.mode == GroundPlaneMode::TileReflection {
-                self.ground_plane.reflection_intensity
+            if ground_plane.mode == GroundPlaneMode::TileReflection {
+                ground_plane.reflection_intensity
             } else {
                 0.0
             };
         engine.render_ground_plane(
             &mut encoder,
             &screenshot_view,
-            self.ground_plane.mode != GroundPlaneMode::None,
+            ground_plane.mode != GroundPlaneMode::None,
             scene_center,
             scene_min_y,
             length_scale,
             height_override,
-            self.ground_plane.shadow_darkness,
+            ground_plane.shadow_darkness,
             screenshot_gp_shadow_mode,
             screenshot_reflection_intensity,
         );
@@ -129,9 +126,18 @@ impl App {
     /// and renders the scene to the screenshot target texture.
     /// Call `capture_to_buffer()` after this to retrieve pixel data.
     pub(crate) fn render_frame_headless(&mut self) {
+        let options = crate::with_context(|ctx| ctx.options.clone());
         let Some(engine) = &mut self.engine else {
             return;
         };
+
+        engine.set_ssaa_factor(options.ssaa_factor);
+
+        // Headless rendering keeps the default tone mapping values and sets
+        // only the SSAO flag.
+        let tone = polyscope_render::tone_mapping::ToneMapUniforms::default();
+        let ssao_enabled = super::ssao_active(&options, engine);
+        engine.update_tone_mapping(tone.exposure, tone.white_level, tone.gamma, ssao_enabled);
 
         // Auto-fit camera to scene
         self.camera_fitted = super::render_init::auto_fit_camera(engine, self.camera_fitted);
@@ -149,23 +155,63 @@ impl App {
         super::render_init::update_gpu_buffers(engine, false);
 
         // Now render to screenshot target (reuses existing capture_screenshot rendering)
-        self.capture_screenshot_headless();
+        self.capture_screenshot_headless(&options);
     }
 
     /// Renders the scene to the screenshot target texture without saving to file.
     /// The pixel data can be retrieved via `capture_to_buffer()`.
-    fn capture_screenshot_headless(&mut self) {
+    fn capture_screenshot_headless(&mut self, options: &Options) {
         let Some(engine) = &mut self.engine else {
             return;
         };
+        let ground_plane = &options.ground_plane;
+        let use_depth_peel = options.transparency_mode == polyscope_core::TransparencyMode::Pretty;
 
         let screenshot_view = engine.create_screenshot_target();
+
+        // The mesh pipeline expects 2 color attachments (HDR + normal G-buffer).
+        // Ensure the normal texture exists before any mesh pass.
+        if engine.mesh_pipeline.is_some() && engine.normal_view().is_none() {
+            let (w, h) = engine.render_dimensions();
+            engine.create_normal_texture_with_size(w, h);
+        }
 
         let mut encoder = engine
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("headless render encoder"),
             });
+
+        // Depth peeling writes the mesh depth before the other geometry, as
+        // the windowed frame does. The target must be clear before that.
+        let mut scene_color_load = wgpu::LoadOp::Clear(background_clear_color(options));
+        let mut scene_depth_load = wgpu::LoadOp::Clear(1.0);
+        if use_depth_peel {
+            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("headless clear pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &screenshot_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: scene_color_load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: engine.screenshot_depth_view(),
+                    depth_ops: Some(wgpu::Operations {
+                        load: scene_depth_load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+            render_peel::render_mesh_depth_prepass(&mut encoder, engine, &screenshot_view);
+            scene_color_load = wgpu::LoadOp::Load;
+            scene_depth_load = wgpu::LoadOp::Load;
+        }
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -174,12 +220,7 @@ impl App {
                     view: &screenshot_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: f64::from(self.background_color.x),
-                            g: f64::from(self.background_color.y),
-                            b: f64::from(self.background_color.z),
-                            a: 1.0,
-                        }),
+                        load: scene_color_load,
                         store: wgpu::StoreOp::Store,
                     },
                     depth_slice: None,
@@ -187,7 +228,7 @@ impl App {
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: engine.screenshot_depth_view(),
                     depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
+                        load: scene_depth_load,
                         store: wgpu::StoreOp::Store,
                     }),
                     stencil_ops: None,
@@ -207,11 +248,6 @@ impl App {
 
         // Surface mesh / volume mesh pass (MRT: HDR + normal G-buffer)
         // The mesh pipeline expects 2 color attachments, so we need a separate pass.
-        // Ensure normal texture exists before borrowing mesh_pipeline
-        if engine.mesh_pipeline.is_some() && engine.normal_view().is_none() {
-            let (w, h) = engine.dimensions();
-            engine.create_normal_texture_with_size(w, h);
-        }
         if let Some(mesh_pipeline) = &engine.mesh_pipeline
             && let Some(normal_view) = engine.normal_view()
         {
@@ -253,10 +289,23 @@ impl App {
                 ..Default::default()
             });
 
-            render_pass.set_pipeline(mesh_pipeline);
-            render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
+            if use_depth_peel {
+                render_peel::draw_meshes_for_depth_peel(&mut render_pass, engine);
+            } else {
+                render_pass.set_pipeline(mesh_pipeline);
+                render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
-            render_scene::draw_meshes_simple(&mut render_pass, engine);
+                render_scene::draw_meshes_simple(&mut render_pass, engine);
+            }
+        }
+
+        if use_depth_peel {
+            render_peel::render_depth_peel(
+                &mut encoder,
+                engine,
+                Some(&screenshot_view),
+                options.transparency_render_passes,
+            );
         }
 
         // Render ground plane
@@ -268,12 +317,12 @@ impl App {
                 ctx.length_scale,
             )
         });
-        let height_override = if self.ground_plane.height_is_relative {
+        let height_override = if ground_plane.height_is_relative {
             None
         } else {
-            Some(self.ground_plane.height)
+            Some(ground_plane.height)
         };
-        let gp_shadow_mode = match self.ground_plane.mode {
+        let gp_shadow_mode = match ground_plane.mode {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::ShadowOnly => 1u32,
             GroundPlaneMode::Tile | GroundPlaneMode::TileReflection => 2u32,
@@ -281,15 +330,19 @@ impl App {
         engine.render_ground_plane(
             &mut encoder,
             &screenshot_view,
-            self.ground_plane.mode != GroundPlaneMode::None,
+            ground_plane.mode != GroundPlaneMode::None,
             scene_center,
             scene_min_y,
             length_scale,
             height_override,
-            self.ground_plane.shadow_darkness,
+            ground_plane.shadow_darkness,
             gp_shadow_mode,
             0.0,
         );
+
+        if super::ssao_active(options, engine) {
+            engine.render_ssao(&mut encoder, &options.ssao);
+        }
 
         // Apply tone mapping
         engine.apply_screenshot_tone_mapping(&mut encoder);
@@ -308,5 +361,15 @@ impl App {
         engine.capture_screenshot().map_err(|e| {
             crate::PolyscopeError::RenderError(format!("Failed to capture screenshot: {e}"))
         })
+    }
+}
+
+/// Clear color of the screenshot target: the background color of the options.
+fn background_clear_color(options: &Options) -> wgpu::Color {
+    wgpu::Color {
+        r: f64::from(options.background_color.x),
+        g: f64::from(options.background_color.y),
+        b: f64::from(options.background_color.z),
+        a: 1.0,
     }
 }

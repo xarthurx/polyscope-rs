@@ -1424,7 +1424,6 @@ pub fn build_ground_plane_section(
     mode: &mut u32, // 0=None, 1=Tile, 2=ShadowOnly, 3=TileReflection
     height: &mut f32,
     height_is_relative: &mut bool,
-    shadow_blur_iters: &mut u32,
     shadow_darkness: &mut f32,
     reflection_intensity: &mut f32,
 ) -> bool {
@@ -1481,12 +1480,6 @@ pub fn build_ground_plane_section(
                 egui::Grid::new("shadow_grid")
                     .num_columns(2)
                     .show(ui, |ui| {
-                        ui.label("Blur iterations:");
-                        if ui.add(Slider::new(shadow_blur_iters, 0..=5)).changed() {
-                            changed = true;
-                        }
-                        ui.end_row();
-
                         ui.label("Darkness:");
                         if ui.add(Slider::new(shadow_darkness, 0.0..=1.0)).changed() {
                             changed = true;

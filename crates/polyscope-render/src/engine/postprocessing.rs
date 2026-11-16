@@ -9,17 +9,21 @@ impl RenderEngine {
     /// then tone map to the final screenshot texture.
     /// After rendering to this view, call `apply_screenshot_tone_mapping()` then
     /// `capture_screenshot()` to get the pixel data.
+    ///
+    /// The HDR texture has the SSAA render resolution, so it matches the depth
+    /// and normal textures. The final texture has the output resolution.
     pub fn create_screenshot_target(&mut self) -> wgpu::TextureView {
         // Calculate buffer size with proper alignment
         let bytes_per_row = Self::aligned_bytes_per_row(self.width);
         let buffer_size = u64::from(bytes_per_row * self.height);
+        let (render_width, render_height) = self.render_dimensions();
 
         // Create HDR texture for rendering (matches pipeline format)
         let hdr_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("screenshot HDR texture"),
             size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
+                width: render_width,
+                height: render_height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -73,6 +77,8 @@ impl RenderEngine {
     }
 
     /// Applies tone mapping from the screenshot HDR texture to the final screenshot texture.
+    ///
+    /// When SSAA is on, the HDR texture is first downsampled to the output resolution.
     pub fn apply_screenshot_tone_mapping(&mut self, encoder: &mut wgpu::CommandEncoder) {
         let Some(hdr_view) = &self.screenshot_hdr_view else {
             log::error!("Screenshot HDR view not initialized");
@@ -86,6 +92,26 @@ impl RenderEngine {
 
         let screenshot_view =
             screenshot_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // SSAA: downsample to the output resolution, then tone map. SSAO is
+        // off in this case (see `render_tone_mapping`).
+        if self.ssaa_factor > 1
+            && let (Some(tone_map_pass), Some(intermediate_view), Some(ssaa_pass)) = (
+                &self.tone_map_pass,
+                &self.ssaa_intermediate_view,
+                &self.ssaa_pass,
+            )
+        {
+            ssaa_pass.render_to_target(&self.device, encoder, hdr_view, intermediate_view);
+            tone_map_pass.render_to_target(
+                &self.device,
+                encoder,
+                intermediate_view,
+                intermediate_view,
+                &screenshot_view,
+            );
+            return;
+        }
 
         // Use the existing tone mapping pass
         // For screenshots, we use the main SSAO output view if available

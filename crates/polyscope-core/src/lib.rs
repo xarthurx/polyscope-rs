@@ -35,7 +35,7 @@ pub use gizmo::{GizmoAxis, GizmoConfig, GizmoMode, GizmoSpace, GizmoUniforms, Tr
 pub use ground_plane::{GroundPlaneConfig, GroundPlaneMode};
 pub use group::Group;
 pub use marching_cubes::{McmMesh, marching_cubes};
-pub use options::Options;
+pub use options::{Options, TransparencyMode};
 pub use pick::{PickResult, Pickable};
 pub use quantity::{Quantity, QuantityKind};
 pub use registry::Registry;

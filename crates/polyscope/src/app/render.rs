@@ -1,6 +1,6 @@
 use super::{
     App, CurveNetwork, GroundPlaneMode, PointCloud, ScreenDescriptor, Structure, SurfaceMesh, Vec3,
-    VolumeGrid, VolumeMesh, reflection, render_scene,
+    VolumeGrid, VolumeMesh, reflection, render_peel, render_scene,
 };
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::HasQuantities;
@@ -615,9 +615,15 @@ impl App {
         self.engine = Some(engine_temp);
         self.egui = Some(egui_temp);
 
+        // The options hold the render look. Read them after the UI, so that
+        // this frame already shows the UI edits.
+        let options = polyscope_core::with_context(|ctx| ctx.options.clone());
+
         let engine = self.engine.as_mut().unwrap();
         let egui = self.egui.as_mut().unwrap();
         let window = self.window.as_ref().unwrap();
+
+        engine.set_ssaa_factor(options.ssaa_factor);
 
         // Now borrow surface for rendering
         let surface = engine.surface.as_ref().expect("surface checked above");
@@ -655,8 +661,9 @@ impl App {
 
         // HDR texture is always available for scene rendering
         // Update tone mapping uniforms - use passthrough values if disabled
-        // Get SSAO settings from global options
-        let ssao_enabled = polyscope_core::with_context(|ctx| ctx.options.ssao.enabled);
+        // SSAO is off with SSAA, because the tone mapping pass then reads the
+        // downsampled image and not the SSAO texture.
+        let ssao_enabled = super::ssao_active(&options, engine);
         engine.update_tone_mapping(
             self.tone_mapping_settings.exposure,
             self.tone_mapping_settings.white_level,
@@ -664,20 +671,17 @@ impl App {
             ssao_enabled,
         );
 
-        // Store background color for use in render passes
-        let bg_r = f64::from(self.background_color.x);
-        let bg_g = f64::from(self.background_color.y);
-        let bg_b = f64::from(self.background_color.z);
+        let ground_plane = &options.ground_plane;
 
         // Store ground plane settings for later use
-        let gp_enabled = self.ground_plane.mode != GroundPlaneMode::None;
-        let gp_height_override = if self.ground_plane.height_is_relative {
+        let gp_enabled = ground_plane.mode != GroundPlaneMode::None;
+        let gp_height_override = if ground_plane.height_is_relative {
             None
         } else {
-            Some(self.ground_plane.height)
+            Some(ground_plane.height)
         };
         // Shadow mode: 0=none (disabled), 1=shadow_only, 2=tile_with_shadow
-        let gp_shadow_mode = match self.ground_plane.mode {
+        let gp_shadow_mode = match ground_plane.mode {
             GroundPlaneMode::None => 0u32,
             GroundPlaneMode::ShadowOnly => 1u32,
             // TileReflection also uses tile mode with shadows
@@ -765,10 +769,10 @@ impl App {
             &mut encoder,
             &slice_planes,
             length_scale_for_planes,
-            [bg_r as f32, bg_g as f32, bg_b as f32],
+            options.background_color.to_array(),
         );
 
-        let use_depth_peel = self.appearance_settings.transparency_mode == 2;
+        let use_depth_peel = options.transparency_mode == polyscope_core::TransparencyMode::Pretty;
 
         // Render ground plane BEFORE surface mesh passes so transparent objects
         // composite correctly over the ground. Without this, either:
@@ -784,19 +788,19 @@ impl App {
             )
         });
 
-        if self.ground_plane.mode == GroundPlaneMode::TileReflection {
+        if ground_plane.mode == GroundPlaneMode::TileReflection {
             // Compute ground height
-            let ground_height = if self.ground_plane.height_is_relative {
+            let ground_height = if ground_plane.height_is_relative {
                 scene_min_y - length_scale * 0.001
             } else {
-                self.ground_plane.height
+                ground_plane.height
             };
 
             // Update reflection uniforms
             let reflection_matrix = reflection::ground_reflection_matrix(ground_height);
             engine.update_reflection(
                 reflection_matrix,
-                self.ground_plane.reflection_intensity,
+                ground_plane.reflection_intensity,
                 ground_height,
             );
 
@@ -818,7 +822,7 @@ impl App {
                 scene_min_y,
                 length_scale,
                 gp_height_override,
-                self.ground_plane.shadow_darkness,
+                ground_plane.shadow_darkness,
                 gp_shadow_mode,
                 0.0, // No transparency - fully opaque ground
             );
@@ -926,78 +930,16 @@ impl App {
                 scene_min_y,
                 length_scale,
                 gp_height_override,
-                self.ground_plane.shadow_darkness,
+                ground_plane.shadow_darkness,
                 gp_shadow_mode,
                 0.0,
             );
         }
 
         // Surface mesh depth prepass for Pretty mode (opaque meshes only)
-        if use_depth_peel && let Some(depth_pipeline) = engine.mesh_depth_normal_pipeline.as_ref() {
+        if use_depth_peel {
             let hdr_view = engine.hdr_view().expect("HDR view should be available");
-            let normal_view = engine
-                .normal_view()
-                .expect("Normal view should be available");
-
-            let mut prepass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Surface Mesh Depth Prepass"),
-                color_attachments: &[
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: hdr_view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                        depth_slice: None,
-                    }),
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: normal_view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                        depth_slice: None,
-                    }),
-                ],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &engine.depth_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                ..Default::default()
-            });
-
-            prepass.set_pipeline(depth_pipeline);
-            prepass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
-
-            crate::with_context(|ctx| {
-                for structure in ctx.registry.iter() {
-                    if !ctx.is_structure_visible(structure) {
-                        continue;
-                    }
-                    if structure.type_name() == "SurfaceMesh"
-                        && let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>()
-                        && let Some(render_data) = mesh.render_data()
-                    {
-                        prepass.set_bind_group(
-                            2,
-                            engine.matcap_bind_group_for(structure.material()),
-                            &[],
-                        );
-                        prepass.set_bind_group(0, &render_data.bind_group, &[]);
-                        prepass.set_index_buffer(
-                            render_data.index_buffer.slice(..),
-                            wgpu::IndexFormat::Uint32,
-                        );
-                        prepass.draw_indexed(0..render_data.num_indices, 0, 0..1);
-                    }
-                }
-            });
+            render_peel::render_mesh_depth_prepass(&mut encoder, engine, hdr_view);
         }
 
         // Main render pass - always render scene to HDR texture
@@ -1051,8 +993,7 @@ impl App {
         } // End of main render pass scope
 
         // Surface mesh render pass with MRT (HDR color + normal G-buffer for SSAO)
-        if let Some(mesh_pipeline) = &engine.mesh_pipeline {
-            let mesh_depth_pipeline = engine.mesh_depth_normal_pipeline.as_ref();
+        if engine.mesh_pipeline.is_some() {
             let hdr_view = engine.hdr_view().expect("HDR view should be available");
             let normal_view = engine
                 .normal_view()
@@ -1102,68 +1043,9 @@ impl App {
             render_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
 
             if use_depth_peel {
-                if let Some(depth_pipeline) = mesh_depth_pipeline {
-                    render_pass.set_pipeline(depth_pipeline);
-                } else {
-                    render_pass.set_pipeline(mesh_pipeline);
-                }
-
-                // Surface meshes: depth/normal only (color handled by depth peeling)
-                // All surface meshes go through depth peeling for color, so we only
-                // write depth+normals here for SSAO regardless of transparency.
-                crate::with_context(|ctx| {
-                    for structure in ctx.registry.iter() {
-                        if !ctx.is_structure_visible(structure) {
-                            continue;
-                        }
-                        if structure.type_name() == "SurfaceMesh"
-                            && let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>()
-                            && let Some(render_data) = mesh.render_data()
-                        {
-                            render_pass.set_bind_group(
-                                2,
-                                engine.matcap_bind_group_for(structure.material()),
-                                &[],
-                            );
-                            render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                            render_pass.set_index_buffer(
-                                render_data.index_buffer.slice(..),
-                                wgpu::IndexFormat::Uint32,
-                            );
-                            render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
-                        }
-                    }
-                });
-
-                // Volume meshes: full color/normal pass (not peeled)
-                render_pass.set_pipeline(mesh_pipeline);
-                crate::with_context(|ctx| {
-                    for structure in ctx.registry.iter() {
-                        if !ctx.is_structure_visible(structure) {
-                            continue;
-                        }
-                        if structure.type_name() == "VolumeMesh"
-                            && let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>()
-                        {
-                            // Render exterior faces (includes cell culling when slice plane is active)
-                            if let Some(render_data) = vm.render_data() {
-                                render_pass.set_bind_group(
-                                    2,
-                                    engine.matcap_bind_group_for(structure.material()),
-                                    &[],
-                                );
-                                render_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                render_pass.set_index_buffer(
-                                    render_data.index_buffer.slice(..),
-                                    wgpu::IndexFormat::Uint32,
-                                );
-                                render_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
-                            }
-                            // Note: No slice cap geometry needed - we use cell culling
-                            // which shows whole cells instead of cross-section caps
-                        }
-                    }
-                });
+                // Surface meshes: depth/normal only (color handled by depth peeling).
+                // Volume meshes: full color/normal pass (not peeled).
+                render_peel::draw_meshes_for_depth_peel(&mut render_pass, engine);
             } else {
                 // Simple/None mode: render all surface meshes through the normal
                 // pipeline (alpha blending with depth write). The ground plane has
@@ -1188,156 +1070,17 @@ impl App {
         // Depth peeling transparency pass for surface meshes
         // All surface meshes go through depth peeling to handle overlapping geometry correctly
         if use_depth_peel {
-            // Check if there are any surface meshes to render
-            let has_surface_meshes = crate::with_context(|ctx| {
-                ctx.registry
-                    .iter()
-                    .any(|s| s.is_enabled() && s.type_name() == "SurfaceMesh")
-            });
-
-            if has_surface_meshes {
-                engine.ensure_depth_peel_pass();
-
-                let num_passes =
-                    polyscope_core::with_context(|ctx| ctx.options.transparency_render_passes);
-
-                // Clear final buffer to transparent black
-                {
-                    let peel = engine.depth_peel_pass().unwrap();
-                    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("Peel: clear final"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: peel.final_view(),
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                                store: wgpu::StoreOp::Store,
-                            },
-                            depth_slice: None,
-                        })],
-                        depth_stencil_attachment: None,
-                        ..Default::default()
-                    });
-                }
-
-                // Clear min-depth buffer to 0.0 (no depth peeled yet)
-                {
-                    let peel = engine.depth_peel_pass().unwrap();
-                    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("Peel: clear min-depth"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: peel.min_depth_view(),
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                                store: wgpu::StoreOp::Store,
-                            },
-                            depth_slice: None,
-                        })],
-                        depth_stencil_attachment: None,
-                        ..Default::default()
-                    });
-                }
-
-                for _i_pass in 0..num_passes {
-                    // Peel pass: render all surface meshes, discarding already-peeled fragments
-                    {
-                        let peel = engine.depth_peel_pass().unwrap();
-                        let mut peel_pass =
-                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                                label: Some("Peel: geometry pass"),
-                                color_attachments: &[
-                                    // Color output (premultiplied alpha)
-                                    Some(wgpu::RenderPassColorAttachment {
-                                        view: peel.peel_color_view(),
-                                        resolve_target: None,
-                                        ops: wgpu::Operations {
-                                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                                            store: wgpu::StoreOp::Store,
-                                        },
-                                        depth_slice: None,
-                                    }),
-                                    // Depth-as-color output
-                                    Some(wgpu::RenderPassColorAttachment {
-                                        view: peel.peel_depth_color_view(),
-                                        resolve_target: None,
-                                        ops: wgpu::Operations {
-                                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                                            store: wgpu::StoreOp::Store,
-                                        },
-                                        depth_slice: None,
-                                    }),
-                                ],
-                                depth_stencil_attachment: Some(
-                                    wgpu::RenderPassDepthStencilAttachment {
-                                        view: peel.peel_depth_view(),
-                                        depth_ops: Some(wgpu::Operations {
-                                            load: wgpu::LoadOp::Clear(1.0),
-                                            store: wgpu::StoreOp::Store,
-                                        }),
-                                        stencil_ops: None,
-                                    },
-                                ),
-                                ..Default::default()
-                            });
-
-                        peel_pass.set_pipeline(peel.peel_pipeline());
-                        peel_pass.set_bind_group(1, &engine.slice_plane_bind_group, &[]);
-                        peel_pass.set_bind_group(3, peel.peel_bind_group(), &[]);
-
-                        crate::with_context(|ctx| {
-                            for structure in ctx.registry.iter() {
-                                if !ctx.is_structure_visible(structure) {
-                                    continue;
-                                }
-                                if structure.type_name() == "SurfaceMesh"
-                                    && let Some(mesh) =
-                                        structure.as_any().downcast_ref::<SurfaceMesh>()
-                                    && let Some(render_data) = mesh.render_data()
-                                {
-                                    peel_pass.set_bind_group(
-                                        2,
-                                        engine.matcap_bind_group_for(structure.material()),
-                                        &[],
-                                    );
-                                    peel_pass.set_bind_group(0, &render_data.bind_group, &[]);
-                                    peel_pass.set_index_buffer(
-                                        render_data.index_buffer.slice(..),
-                                        wgpu::IndexFormat::Uint32,
-                                    );
-                                    peel_pass.draw_indexed(0..render_data.num_indices, 0, 0..1);
-                                }
-                            }
-                        });
-                    }
-
-                    // Composite this peel layer into the final buffer (alpha-under)
-                    {
-                        let peel = engine.depth_peel_pass().unwrap();
-                        peel.composite_layer(&mut encoder, &engine.device);
-                    }
-
-                    // Update min-depth from this peel's depth output (Max blend)
-                    {
-                        let peel = engine.depth_peel_pass().unwrap();
-                        peel.update_min_depth(&mut encoder, &engine.device);
-                    }
-                }
-
-                // Composite final peeled result onto the HDR scene
-                {
-                    let hdr_view = engine.hdr_view().expect("HDR view should be available");
-                    let peel = engine.depth_peel_pass().unwrap();
-                    peel.composite_final_to_scene(&mut encoder, &engine.device, hdr_view);
-                }
-            }
+            render_peel::render_depth_peel(
+                &mut encoder,
+                engine,
+                None,
+                options.transparency_render_passes,
+            );
         }
 
         // Render SSAO if enabled
         if ssao_enabled {
-            polyscope_core::with_context(|ctx| {
-                engine.render_ssao(&mut encoder, &ctx.options.ssao);
-            });
+            engine.render_ssao(&mut encoder, &options.ssao);
         }
 
         // Apply tone mapping from HDR to surface (always runs, uses passthrough if disabled)
