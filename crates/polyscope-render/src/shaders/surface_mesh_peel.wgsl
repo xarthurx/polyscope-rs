@@ -204,14 +204,15 @@ fn fs_main(
         let bary = in.barycentric;
         let edge_real = in.edge_real;
 
+        // edge_real.x/y/z flag the edges v0-v1, v1-v2 and v2-v0 (C++ Polyscope order).
         var d = 1.0;
-        if (edge_real.z > 0.5) {
+        if (edge_real.x > 0.5) {
             d = min(d, bary.z);
         }
-        if (edge_real.x > 0.5) {
+        if (edge_real.y > 0.5) {
             d = min(d, bary.x);
         }
-        if (edge_real.y > 0.5) {
+        if (edge_real.z > 0.5) {
             d = min(d, bary.y);
         }
 

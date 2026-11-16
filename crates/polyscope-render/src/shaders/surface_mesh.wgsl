@@ -202,18 +202,17 @@ fn fs_main(
         let bary = in.barycentric;
         let edge_real = in.edge_real;
 
-        // Compute distance to each edge, but only consider real edges
-        // Edge 0: opposite to vertex 0 (barycentric.x), between vertices 1-2
-        // Edge 1: opposite to vertex 1 (barycentric.y), between vertices 2-0
-        // Edge 2: opposite to vertex 2 (barycentric.z), between vertices 0-1
+        // Compute distance to each edge, but only consider real edges.
+        // edge_real follows C++ Polyscope: x = edge v0-v1, y = edge v1-v2, z = edge v2-v0.
+        // The distance to an edge is the barycentric coordinate of the opposite vertex.
         var d = 1.0; // start with max distance
-        if (edge_real.z > 0.5) { // edge from v0 to v1 (opposite to v2)
+        if (edge_real.x > 0.5) { // edge from v0 to v1 (opposite to v2)
             d = min(d, bary.z);
         }
-        if (edge_real.x > 0.5) { // edge from v1 to v2 (opposite to v0)
+        if (edge_real.y > 0.5) { // edge from v1 to v2 (opposite to v0)
             d = min(d, bary.x);
         }
-        if (edge_real.y > 0.5) { // edge from v2 to v0 (opposite to v1)
+        if (edge_real.z > 0.5) { // edge from v2 to v0 (opposite to v1)
             d = min(d, bary.y);
         }
 

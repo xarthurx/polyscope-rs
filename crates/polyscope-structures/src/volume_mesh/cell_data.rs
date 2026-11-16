@@ -14,6 +14,8 @@
 //! - Pyramid: 5 verts in 0..4, sentinels in 5..7. Base quad (0,1,2,3), apex (4).
 //!   5 faces: 1 quad (base) + 4 tris (sides) = 6 triangles.
 
+use glam::Vec3;
+
 use super::VolumeCellType;
 
 /// A face is described by (unique vertex slot list, triangulation).
@@ -126,6 +128,30 @@ const PYRAMID_FACES: &[FaceData] = &[
         triangulation: &[[3, 0, 4]],
     }, // Side 4
 ];
+
+/// Returns the real-edge flags of one triangle in the triangulation of a face.
+///
+/// Component `k` is 1.0 if the triangle edge from corner `k` to corner `(k + 1) % 3`
+/// is an edge of the face polygon. It is 0.0 if that edge is an internal diagonal
+/// of the triangulation. This matches `buildRealEdgeStencil` in upstream C++
+/// Polyscope (`src/volume_mesh.cpp`).
+#[must_use]
+pub fn triangle_real_edges(polygon: &[usize], tri: [usize; 3]) -> Vec3 {
+    let is_polygon_edge = |a: usize, b: usize| {
+        (0..polygon.len()).any(|p| {
+            let (u, v) = (polygon[p], polygon[(p + 1) % polygon.len()]);
+            (u, v) == (a, b) || (u, v) == (b, a)
+        })
+    };
+    let flag = |k: usize| {
+        if is_polygon_edge(tri[k], tri[(k + 1) % 3]) {
+            1.0
+        } else {
+            0.0
+        }
+    };
+    Vec3::new(flag(0), flag(1), flag(2))
+}
 
 /// Returns the face data table for a given cell type.
 #[must_use]
@@ -295,6 +321,49 @@ pub fn for_each_tet<F: FnMut([u32; 4])>(cell: &[u32; 8], cell_type: VolumeCellTy
         VolumeCellType::Pyramid => {
             for tet in decompose_pyramid(cell) {
                 f(tet);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_triangle_real_edges_order() {
+        // Hex bottom face [2, 1, 0, 3] splits along the diagonal 2-0.
+        // Component k flags the edge from corner k to corner k + 1.
+        assert_eq!(
+            triangle_real_edges(&[2, 1, 0, 3], [2, 1, 0]),
+            Vec3::new(1.0, 1.0, 0.0)
+        );
+        assert_eq!(
+            triangle_real_edges(&[2, 1, 0, 3], [2, 0, 3]),
+            Vec3::new(0.0, 1.0, 1.0)
+        );
+        assert_eq!(triangle_real_edges(&[0, 2, 1], [0, 2, 1]), Vec3::ONE);
+    }
+
+    #[test]
+    fn test_only_quad_diagonals_are_not_real() {
+        for cell_type in [
+            VolumeCellType::Tet,
+            VolumeCellType::Hex,
+            VolumeCellType::Prism,
+            VolumeCellType::Pyramid,
+        ] {
+            for face in face_data_for(cell_type) {
+                let expected_diagonals = usize::from(face.polygon.len() == 4);
+                for &tri in face.triangulation {
+                    let flags = triangle_real_edges(face.polygon, tri);
+                    let diagonals = flags.to_array().iter().filter(|&&f| f == 0.0).count();
+                    assert_eq!(
+                        diagonals, expected_diagonals,
+                        "{cell_type:?} face {:?} triangle {tri:?}",
+                        face.polygon
+                    );
+                }
             }
         }
     }
