@@ -14,11 +14,12 @@ pub struct ScreenshotOptions {
     pub transparent_background: bool,
 }
 
-/// Saves raw BGRA pixel data to an image file.
+/// Saves raw RGBA pixel data to an image file.
 ///
 /// # Arguments
 /// * `filename` - Output filename (supports .png, .jpg, .jpeg)
-/// * `data` - Raw BGRA pixel data (4 bytes per pixel, as from wgpu `Bgra8UnormSrgb` format)
+/// * `data` - Raw RGBA pixel data (4 bytes per pixel, row by row from the top-left
+///   pixel), as `RenderEngine::capture_screenshot` returns it
 /// * `width` - Image width in pixels
 /// * `height` - Image height in pixels
 ///
@@ -37,16 +38,7 @@ pub fn save_image(
         .map(str::to_lowercase)
         .unwrap_or_default();
 
-    // Convert BGRA to RGBA (wgpu surface format is Bgra8UnormSrgb)
-    let mut rgba_data = data.to_vec();
-    for chunk in rgba_data.as_chunks_mut::<4>().0 {
-        chunk.swap(0, 2); // Swap B and R
-    }
-
-    // Create image buffer from converted RGBA data
-    // Note: wgpu uses top-left origin, so no vertical flip needed
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(width, height, rgba_data).ok_or(ScreenshotError::InvalidImageData)?;
+    let img = rgba_image(data, width, height)?;
 
     match extension.as_str() {
         "png" => {
@@ -65,30 +57,54 @@ pub fn save_image(
     Ok(())
 }
 
-/// Saves raw BGRA pixel data to a PNG buffer in memory.
+/// Saves raw RGBA pixel data to a PNG buffer in memory.
 ///
 /// # Arguments
-/// * `data` - Raw BGRA pixel data (4 bytes per pixel, as from wgpu `Bgra8UnormSrgb` format)
+/// * `data` - Raw RGBA pixel data (4 bytes per pixel, row by row from the top-left
+///   pixel), as `RenderEngine::capture_screenshot` returns it
 /// * `width` - Image width in pixels
 /// * `height` - Image height in pixels
 ///
 /// # Returns
 /// PNG-encoded image data as a byte vector.
+///
+/// # Errors
+/// Returns an error if the data size does not match the dimensions or the
+/// PNG encoding fails.
 pub fn save_to_buffer(data: &[u8], width: u32, height: u32) -> Result<Vec<u8>, ScreenshotError> {
-    // Convert BGRA to RGBA
-    let mut rgba_data = data.to_vec();
-    for chunk in rgba_data.as_chunks_mut::<4>().0 {
-        chunk.swap(0, 2); // Swap B and R
-    }
-
-    // Note: wgpu uses top-left origin, so no vertical flip needed
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(width, height, rgba_data).ok_or(ScreenshotError::InvalidImageData)?;
+    let img = rgba_image(data, width, height)?;
 
     let mut buffer = std::io::Cursor::new(Vec::new());
     img.write_to(&mut buffer, image::ImageFormat::Png)?;
 
     Ok(buffer.into_inner())
+}
+
+/// Wraps RGBA pixel data in an image buffer.
+///
+/// wgpu uses a top-left origin, so the rows need no vertical flip.
+fn rgba_image(
+    data: &[u8],
+    width: u32,
+    height: u32,
+) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, ScreenshotError> {
+    ImageBuffer::from_raw(width, height, data.to_vec()).ok_or(ScreenshotError::InvalidImageData)
+}
+
+/// Converts pixel data of a capture texture to RGBA in place.
+///
+/// The capture texture has the surface format. It is BGRA on most desktops
+/// and RGBA on others and in headless rendering. The function swaps red and
+/// blue for the BGRA formats and leaves the data of other formats unchanged.
+pub(crate) fn convert_to_rgba(format: wgpu::TextureFormat, data: &mut [u8]) {
+    if matches!(
+        format,
+        wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb
+    ) {
+        for pixel in data.as_chunks_mut::<4>().0 {
+            pixel.swap(0, 2);
+        }
+    }
 }
 
 /// Error type for screenshot operations.
@@ -108,4 +124,66 @@ pub enum ScreenshotError {
 
     #[error("GPU buffer mapping failed")]
     BufferMapFailed,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Two pixels: opaque red and half-transparent blue, in RGBA order.
+    const RGBA: [u8; 8] = [255, 0, 0, 255, 0, 0, 255, 128];
+
+    #[test]
+    fn bgra_capture_converts_to_rgba() {
+        for format in [
+            wgpu::TextureFormat::Bgra8Unorm,
+            wgpu::TextureFormat::Bgra8UnormSrgb,
+        ] {
+            // The same two pixels, in BGRA order
+            let mut data = [0, 0, 255, 255, 255, 0, 0, 128];
+            convert_to_rgba(format, &mut data);
+            assert_eq!(data, RGBA, "{format:?} must convert to RGBA");
+        }
+    }
+
+    #[test]
+    fn rgba_capture_stays_unchanged() {
+        for format in [
+            wgpu::TextureFormat::Rgba8Unorm,
+            wgpu::TextureFormat::Rgba8UnormSrgb,
+        ] {
+            let mut data = RGBA;
+            convert_to_rgba(format, &mut data);
+            assert_eq!(data, RGBA, "{format:?} must stay unchanged");
+        }
+    }
+
+    #[test]
+    fn save_image_writes_rgba_input_unchanged() {
+        let path = std::env::temp_dir().join(format!(
+            "polyscope_save_image_test_{}.png",
+            std::process::id()
+        ));
+        let filename = path.to_str().expect("UTF-8 temp path");
+        save_image(filename, &RGBA, 2, 1).expect("save PNG");
+        let decoded = image::open(&path).expect("decode PNG").to_rgba8();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(decoded.dimensions(), (2, 1));
+        assert_eq!(decoded.into_raw(), RGBA.to_vec());
+    }
+
+    #[test]
+    fn save_to_buffer_encodes_rgba_input_unchanged() {
+        let png = save_to_buffer(&RGBA, 2, 1).expect("encode PNG");
+        let decoded = image::load_from_memory(&png)
+            .expect("decode PNG")
+            .to_rgba8();
+        assert_eq!(decoded.into_raw(), RGBA.to_vec());
+    }
+
+    #[test]
+    fn save_image_rejects_wrong_data_size() {
+        let result = save_to_buffer(&RGBA, 3, 1);
+        assert!(matches!(result, Err(ScreenshotError::InvalidImageData)));
+    }
 }

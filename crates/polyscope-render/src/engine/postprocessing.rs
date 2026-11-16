@@ -147,7 +147,9 @@ impl RenderEngine {
     /// This method copies the screenshot texture to a buffer and reads it back.
     /// Call this after rendering to the view returned by `create_screenshot_target()`.
     ///
-    /// Returns the raw RGBA pixel data.
+    /// Returns the raw pixel data in RGBA order (4 bytes per pixel, row by row
+    /// from the top-left pixel). The capture texture has the surface format;
+    /// data of a BGRA texture is converted to RGBA.
     pub fn capture_screenshot(&mut self) -> Result<Vec<u8>, crate::screenshot::ScreenshotError> {
         let texture = self
             .screenshot_texture
@@ -217,6 +219,7 @@ impl RenderEngine {
 
         drop(data);
         buffer.unmap();
+        crate::screenshot::convert_to_rgba(texture.format(), &mut result);
 
         // Clean up screenshot resources
         self.screenshot_texture = None;
