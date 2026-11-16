@@ -364,6 +364,40 @@ impl CurveNetwork {
         None
     }
 
+    /// Returns the currently active node vector quantity, if any.
+    #[must_use]
+    pub fn active_node_vector_quantity(&self) -> Option<&CurveNodeVectorQuantity> {
+        self.quantities
+            .iter()
+            .filter(|q| q.is_enabled())
+            .find_map(|q| q.as_any().downcast_ref::<CurveNodeVectorQuantity>())
+    }
+
+    /// Returns the currently active node vector quantity (mutable), if any.
+    pub fn active_node_vector_quantity_mut(&mut self) -> Option<&mut CurveNodeVectorQuantity> {
+        self.quantities
+            .iter_mut()
+            .filter(|q| q.is_enabled())
+            .find_map(|q| q.as_any_mut().downcast_mut::<CurveNodeVectorQuantity>())
+    }
+
+    /// Returns the currently active edge vector quantity, if any.
+    #[must_use]
+    pub fn active_edge_vector_quantity(&self) -> Option<&CurveEdgeVectorQuantity> {
+        self.quantities
+            .iter()
+            .filter(|q| q.is_enabled())
+            .find_map(|q| q.as_any().downcast_ref::<CurveEdgeVectorQuantity>())
+    }
+
+    /// Returns the currently active edge vector quantity (mutable), if any.
+    pub fn active_edge_vector_quantity_mut(&mut self) -> Option<&mut CurveEdgeVectorQuantity> {
+        self.quantities
+            .iter_mut()
+            .filter(|q| q.is_enabled())
+            .find_map(|q| q.as_any_mut().downcast_mut::<CurveEdgeVectorQuantity>())
+    }
+
     /// Builds the egui UI for this curve network.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, available_materials: &[&str]) {
         let mut color = [self.color.x, self.color.y, self.color.z];
@@ -430,12 +464,18 @@ impl CurveNetwork {
     }
 
     /// Initializes GPU resources for this curve network.
+    ///
+    /// A curve network without nodes or without edges gets no GPU resources and
+    /// draws nothing, because wgpu rejects zero-size storage buffer bindings.
     pub fn init_gpu_resources(
         &mut self,
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
     ) {
+        if self.node_positions.is_empty() || self.edge_tail_inds.is_empty() {
+            return;
+        }
         self.render_data = Some(CurveNetworkRenderData::new(
             device,
             bind_group_layout,

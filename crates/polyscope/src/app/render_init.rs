@@ -74,10 +74,10 @@ pub fn update_uniforms(engine: &mut RenderEngine) {
 /// This includes:
 /// - PointCloud: init_gpu_resources + vector quantity init
 /// - SurfaceMesh: init_gpu_resources + shadow resources + ALL vector/intrinsic/one-form quantity init
-/// - CurveNetwork: init_gpu_resources + tube resources + node resources
+/// - CurveNetwork: init_gpu_resources + tube resources + node resources + node/edge vector quantity init
 /// - CameraView: init_render_data
 /// - VolumeGrid: init_render_data (base wireframe only, NOT quantity init)
-/// - VolumeMesh: init_render_data + slice plane culling
+/// - VolumeMesh: init_render_data + slice plane culling + vertex/cell vector quantity init
 ///
 /// Windowed-only extras (pick resources, VolumeGrid quantity init) are kept in render() inline.
 pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
@@ -237,6 +237,38 @@ pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
                         engine.camera_buffer(),
                     );
                 }
+
+                // Initialize node vector quantity render data if enabled
+                if cn
+                    .active_node_vector_quantity()
+                    .is_some_and(|vq| vq.render_data().is_none())
+                {
+                    let nodes = cn.nodes().to_vec();
+                    if let Some(vq) = cn.active_node_vector_quantity_mut() {
+                        vq.init_gpu_resources(
+                            &engine.device,
+                            engine.vector_bind_group_layout(),
+                            engine.camera_buffer(),
+                            &nodes,
+                        );
+                    }
+                }
+
+                // Initialize edge vector quantity render data if enabled
+                if cn
+                    .active_edge_vector_quantity()
+                    .is_some_and(|vq| vq.render_data().is_none())
+                {
+                    let centers = cn.edge_centers().to_vec();
+                    if let Some(vq) = cn.active_edge_vector_quantity_mut() {
+                        vq.init_gpu_resources(
+                            &engine.device,
+                            engine.vector_bind_group_layout(),
+                            engine.camera_buffer(),
+                            &centers,
+                        );
+                    }
+                }
             }
 
             if structure.type_name() == "CameraView"
@@ -299,6 +331,13 @@ pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
                         engine.camera_buffer(),
                     );
                 }
+
+                // Initialize vertex and cell vector quantity render data if enabled
+                vm.init_vector_quantity_gpu_resources(
+                    &engine.device,
+                    engine.vector_bind_group_layout(),
+                    engine.camera_buffer(),
+                );
             }
         }
     });
@@ -364,6 +403,15 @@ pub fn update_gpu_buffers(engine: &RenderEngine, update_pick_uniforms: bool) {
                 && let Some(cn) = structure.as_any().downcast_ref::<CurveNetwork>()
             {
                 cn.update_gpu_buffers(&engine.queue, &engine.color_maps);
+
+                // Update node and edge vector quantity uniforms
+                let model = structure.transform();
+                if let Some(vq) = cn.active_node_vector_quantity() {
+                    vq.update_uniforms(&engine.queue, &model);
+                }
+                if let Some(vq) = cn.active_edge_vector_quantity() {
+                    vq.update_uniforms(&engine.queue, &model);
+                }
             }
 
             if structure.type_name() == "VolumeGrid"
@@ -379,6 +427,7 @@ pub fn update_gpu_buffers(engine: &RenderEngine, update_pick_uniforms: bool) {
                 if update_pick_uniforms {
                     vm.update_pick_uniforms(&engine.queue);
                 }
+                vm.update_vector_quantity_uniforms(&engine.queue);
             }
         }
     });

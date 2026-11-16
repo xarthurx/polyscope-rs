@@ -65,7 +65,7 @@ pub mod vector_render;
 pub mod volume_grid_render;
 
 pub use camera::{AxisDirection, Camera, CameraState, NavigationStyle, ProjectionMode};
-pub use color_maps::{ColorMap, ColorMapRegistry};
+pub use color_maps::{BUILTIN_COLOR_MAP_NAMES, ColorMap, ColorMapRegistry};
 pub use curve_network_render::{CurveNetworkRenderData, CurveNetworkUniforms};
 pub use depth_peel_pass::DepthPeelPass;
 pub use engine::RenderEngine;

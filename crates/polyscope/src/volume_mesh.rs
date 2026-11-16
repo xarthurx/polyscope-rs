@@ -188,6 +188,15 @@ impl VolumeMeshHandle {
         self
     }
 
+    /// Sets the material (for example "clay", "wax" or "candy").
+    pub fn set_material(&self, material: &str) -> &Self {
+        use polyscope_core::Structure;
+        with_volume_mesh(&self.name, |vm| {
+            vm.set_material(material);
+        });
+        self
+    }
+
     /// Adds a vertex scalar quantity.
     pub fn add_vertex_scalar_quantity(&self, name: impl Into<String>, values: Vec<f32>) -> &Self {
         let name = name.into();

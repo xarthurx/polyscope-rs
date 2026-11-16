@@ -53,14 +53,14 @@ impl VectorRenderData {
     ) -> Self {
         let num_vectors = bases.len().min(vectors.len()) as u32;
 
-        let base_data: Vec<f32> = bases.iter().flat_map(|p| [p.x, p.y, p.z, 0.0]).collect();
+        let base_data = storage_vec4_data(bases);
         let base_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vector bases"),
             contents: bytemuck::cast_slice(&base_data),
             usage: wgpu::BufferUsages::STORAGE,
         });
 
-        let vector_data: Vec<f32> = vectors.iter().flat_map(|v| [v.x, v.y, v.z, 0.0]).collect();
+        let vector_data = storage_vec4_data(vectors);
         let vector_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vectors"),
             contents: bytemuck::cast_slice(&vector_data),
@@ -110,4 +110,15 @@ impl VectorRenderData {
     pub fn update_uniforms(&self, queue: &wgpu::Queue, uniforms: &VectorUniforms) {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[*uniforms]));
     }
+}
+
+/// Packs points as `vec4` storage data with at least one element.
+///
+/// wgpu rejects zero-size storage buffer bindings. An empty input therefore gives
+/// one unused element, and the draw call uses zero instances.
+fn storage_vec4_data(points: &[Vec3]) -> Vec<f32> {
+    if points.is_empty() {
+        return vec![0.0; 4];
+    }
+    points.iter().flat_map(|p| [p.x, p.y, p.z, 0.0]).collect()
 }

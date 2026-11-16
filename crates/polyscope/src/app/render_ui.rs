@@ -269,12 +269,12 @@ impl App {
                                 if type_name == "VolumeGrid"
                                     && let Some(vg) = s.as_any_mut().downcast_mut::<VolumeGrid>()
                                 {
-                                    vg.build_egui_ui(ui, &colormap_name_refs);
+                                    vg.build_egui_ui(ui, &colormap_name_refs, &available_materials);
                                 }
                                 if type_name == "VolumeMesh"
                                     && let Some(vm) = s.as_any_mut().downcast_mut::<VolumeMesh>()
                                 {
-                                    vm.build_egui_ui(ui);
+                                    vm.build_egui_ui(ui, &available_materials);
                                 }
                             }
                         });

@@ -448,12 +448,18 @@ impl SurfaceMesh {
     // === GPU resource methods ===
 
     /// Initializes GPU resources for rendering.
+    ///
+    /// A mesh without faces gets no GPU resources and draws nothing,
+    /// because wgpu rejects zero-size storage buffer bindings.
     pub fn init_gpu_resources(
         &mut self,
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
     ) {
+        if self.triangulation.is_empty() {
+            return;
+        }
         self.render_data = Some(SurfaceMeshRenderData::new(
             device,
             bind_group_layout,

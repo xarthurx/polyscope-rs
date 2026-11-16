@@ -97,6 +97,7 @@ pub struct VolumeMesh {
     interior_color: Vec4,
     edge_color: Vec4,
     edge_width: f32,
+    material: String,
 
     // GPU resources (renders exterior faces)
     render_data: Option<SurfaceMeshRenderData>,
@@ -139,6 +140,7 @@ impl VolumeMesh {
             interior_color,
             edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
             edge_width: 0.0,
+            material: "clay".to_string(),
             render_data: None,
             pick_uniform_buffer: None,
             pick_bind_group: None,
@@ -440,6 +442,32 @@ impl VolumeMesh {
         (positions, faces)
     }
 
+    /// Generates the `edge_is_real` flags for the rendered triangles, three per triangle.
+    ///
+    /// The triangle order matches `generate_render_geometry_with_culling(planes)`, and
+    /// `generate_render_geometry()` when `planes` is empty. Internal diagonals of
+    /// quad faces get a 0.0 flag, so the wireframe shows only the polygon edges.
+    fn generate_edge_is_real(&self, planes: &[(Vec3, Vec3)]) -> Vec<Vec3> {
+        let face_counts = self.compute_face_counts_with_culling(planes);
+        let mut edge_is_real = Vec::new();
+        for (cell_idx, cell) in self.cells.iter().enumerate() {
+            if !self.is_cell_visible(cell, planes) {
+                continue;
+            }
+            for face in cell_data::face_data_for(self.cell_type(cell_idx)) {
+                let key = cell_data::canonical_face_key(cell, face.polygon);
+                if face_counts.get(&key) != Some(&1) {
+                    continue;
+                }
+                for &tri in face.triangulation {
+                    let flags = cell_data::triangle_real_edges(face.polygon, tri);
+                    edge_is_real.extend([flags; 3]);
+                }
+            }
+        }
+        edge_is_real
+    }
+
     /// Generates render geometry including any enabled quantity data.
     #[must_use]
     pub fn generate_render_geometry_with_quantities(&self) -> VolumeMeshRenderGeometry {
@@ -574,9 +602,9 @@ impl VolumeMesh {
             normals[*c as usize] = normal;
         }
 
-        // For volume meshes, all edges are "real" (not internal triangulation edges)
-        // edge_is_real is per-triangle-vertex, 3 values per triangle
-        let edge_is_real: Vec<Vec3> = vec![Vec3::ONE; triangles.len() * 3];
+        // edge_is_real is per triangle corner, 3 values per triangle.
+        // Quad faces mark their triangulation diagonal as not real.
+        let edge_is_real = self.generate_edge_is_real(&[]);
 
         let render_data = SurfaceMeshRenderData::new(
             device,
@@ -636,7 +664,7 @@ impl VolumeMesh {
             normals[*c as usize] = normal;
         }
 
-        let edge_is_real: Vec<Vec3> = vec![Vec3::ONE; triangles.len() * 3];
+        let edge_is_real = self.generate_edge_is_real(planes);
 
         let render_data = SurfaceMeshRenderData::new(
             device,
@@ -927,7 +955,10 @@ impl VolumeMesh {
     }
 
     /// Builds the egui UI for this volume mesh.
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+    ///
+    /// `available_materials` lists the registered material names for the material
+    /// selector. If it is empty, the selector shows the built-in materials.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, available_materials: &[&str]) {
         // Info — count each cell type
         let mut counts = [0usize; 4]; // Tet, Hex, Prism, Pyramid
         for cell in &self.cells {
@@ -942,6 +973,8 @@ impl VolumeMesh {
             counts[VolumeCellType::Prism as usize],
             counts[VolumeCellType::Pyramid as usize],
         ));
+
+        polyscope_ui::build_material_selector(ui, &mut self.material, available_materials);
 
         // Color
         ui.horizontal(|ui| {
@@ -1248,6 +1281,14 @@ impl Structure for VolumeMesh {
 
     fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
+    }
+
+    fn material(&self) -> &str {
+        &self.material
+    }
+
+    fn set_material(&mut self, material: &str) {
+        self.material = material.to_string();
     }
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {
@@ -1623,6 +1664,20 @@ mod tests {
             12,
             "Single hex should have 12 triangles (6 quads)"
         );
+    }
+
+    #[test]
+    fn test_hex_edge_is_real_hides_quad_diagonals() {
+        let vertices = (0..8).map(|i| Vec3::splat(i as f32)).collect();
+        let mesh = VolumeMesh::new_hex_mesh("test", vertices, vec![[0, 1, 2, 3, 4, 5, 6, 7]]);
+
+        let (_, faces) = mesh.generate_render_geometry();
+        let edge_is_real = mesh.generate_edge_is_real(&[]);
+        assert_eq!(edge_is_real.len(), faces.len() * 3);
+        // Each triangle of a quad face has two polygon edges and one diagonal.
+        for flags in &edge_is_real {
+            assert_eq!(flags.x + flags.y + flags.z, 2.0);
+        }
     }
 
     #[test]

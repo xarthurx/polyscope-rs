@@ -2,7 +2,7 @@
 
 use glam::{Vec3, Vec4};
 use polyscope_core::quantity::{EdgeQuantity, Quantity, QuantityKind, VertexQuantity};
-use polyscope_render::{ColorMap, CurveNetworkRenderData};
+use polyscope_render::{ColorMap, CurveNetworkRenderData, VectorRenderData, VectorUniforms};
 
 /// A scalar quantity on curve network nodes.
 pub struct CurveNodeScalarQuantity {
@@ -88,7 +88,6 @@ impl CurveNodeScalarQuantity {
 
     /// Builds the egui UI for this scalar quantity.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
-        let colormaps = ["viridis", "blues", "reds", "coolwarm", "rainbow"];
         polyscope_ui::build_scalar_quantity_ui(
             ui,
             &self.name,
@@ -96,7 +95,7 @@ impl CurveNodeScalarQuantity {
             &mut self.colormap_name,
             &mut self.range_min,
             &mut self.range_max,
-            &colormaps,
+            &polyscope_render::BUILTIN_COLOR_MAP_NAMES,
         )
     }
 }
@@ -229,7 +228,6 @@ impl CurveEdgeScalarQuantity {
 
     /// Builds the egui UI for this scalar quantity.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
-        let colormaps = ["viridis", "blues", "reds", "coolwarm", "rainbow"];
         polyscope_ui::build_scalar_quantity_ui(
             ui,
             &self.name,
@@ -237,7 +235,7 @@ impl CurveEdgeScalarQuantity {
             &mut self.colormap_name,
             &mut self.range_min,
             &mut self.range_max,
-            &colormaps,
+            &polyscope_render::BUILTIN_COLOR_MAP_NAMES,
         )
     }
 }
@@ -463,6 +461,7 @@ pub struct CurveNodeVectorQuantity {
     length_scale: f32,
     radius: f32,
     color: Vec4,
+    render_data: Option<VectorRenderData>,
 }
 
 impl CurveNodeVectorQuantity {
@@ -480,6 +479,7 @@ impl CurveNodeVectorQuantity {
             length_scale: 1.0,
             radius: 0.005,
             color: Vec4::new(0.8, 0.2, 0.2, 1.0),
+            render_data: None,
         }
     }
 
@@ -487,6 +487,41 @@ impl CurveNodeVectorQuantity {
     #[must_use]
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
+    }
+
+    /// Initializes GPU resources for this vector quantity.
+    ///
+    /// `node_positions` are the arrow bases in object space.
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        node_positions: &[Vec3],
+    ) {
+        self.render_data = Some(VectorRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            node_positions,
+            &self.vectors,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    #[must_use]
+    pub fn render_data(&self) -> Option<&VectorRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU uniforms with the given model transform.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, model: &glam::Mat4) {
+        if let Some(render_data) = &self.render_data {
+            render_data.update_uniforms(
+                queue,
+                &vector_uniforms(model, self.length_scale, self.radius, self.color),
+            );
+        }
     }
 
     /// Gets the length scale.
@@ -574,7 +609,12 @@ impl Quantity for CurveNodeVectorQuantity {
     }
 
     fn refresh(&mut self) {
-        // GPU resources refreshed externally
+        // The arrow bases may have moved, so rebuild the GPU data on the next frame.
+        self.render_data = None;
+    }
+
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
     }
 
     fn data_size(&self) -> usize {
@@ -593,6 +633,7 @@ pub struct CurveEdgeVectorQuantity {
     length_scale: f32,
     radius: f32,
     color: Vec4,
+    render_data: Option<VectorRenderData>,
 }
 
 impl CurveEdgeVectorQuantity {
@@ -610,6 +651,7 @@ impl CurveEdgeVectorQuantity {
             length_scale: 1.0,
             radius: 0.005,
             color: Vec4::new(0.2, 0.8, 0.2, 1.0),
+            render_data: None,
         }
     }
 
@@ -617,6 +659,41 @@ impl CurveEdgeVectorQuantity {
     #[must_use]
     pub fn vectors(&self) -> &[Vec3] {
         &self.vectors
+    }
+
+    /// Initializes GPU resources for this vector quantity.
+    ///
+    /// `edge_centers` are the arrow bases in object space (the edge midpoints).
+    pub fn init_gpu_resources(
+        &mut self,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        edge_centers: &[Vec3],
+    ) {
+        self.render_data = Some(VectorRenderData::new(
+            device,
+            bind_group_layout,
+            camera_buffer,
+            edge_centers,
+            &self.vectors,
+        ));
+    }
+
+    /// Returns the render data if initialized.
+    #[must_use]
+    pub fn render_data(&self) -> Option<&VectorRenderData> {
+        self.render_data.as_ref()
+    }
+
+    /// Updates GPU uniforms with the given model transform.
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, model: &glam::Mat4) {
+        if let Some(render_data) = &self.render_data {
+            render_data.update_uniforms(
+                queue,
+                &vector_uniforms(model, self.length_scale, self.radius, self.color),
+            );
+        }
     }
 
     /// Gets the length scale.
@@ -704,7 +781,12 @@ impl Quantity for CurveEdgeVectorQuantity {
     }
 
     fn refresh(&mut self) {
-        // GPU resources refreshed externally
+        // The arrow bases may have moved, so rebuild the GPU data on the next frame.
+        self.render_data = None;
+    }
+
+    fn clear_gpu_resources(&mut self) {
+        self.render_data = None;
     }
 
     fn data_size(&self) -> usize {
@@ -713,6 +795,22 @@ impl Quantity for CurveEdgeVectorQuantity {
 }
 
 impl EdgeQuantity for CurveEdgeVectorQuantity {}
+
+/// Builds the vector arrow uniforms from the quantity settings.
+fn vector_uniforms(
+    model: &glam::Mat4,
+    length_scale: f32,
+    radius: f32,
+    color: Vec4,
+) -> VectorUniforms {
+    VectorUniforms {
+        model: model.to_cols_array(),
+        length_scale,
+        radius,
+        _padding: [0.0; 2],
+        color: color.to_array(),
+    }
+}
 
 #[cfg(test)]
 mod tests {

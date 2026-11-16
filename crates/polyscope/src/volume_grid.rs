@@ -113,6 +113,15 @@ impl VolumeGridHandle {
         self
     }
 
+    /// Sets the material of the gridcubes and isosurfaces (for example "clay" or "wax").
+    pub fn set_material(&self, material: &str) -> &Self {
+        use polyscope_core::Structure;
+        with_volume_grid(&self.name, |vg| {
+            vg.set_material(material);
+        });
+        self
+    }
+
     /// Adds a node scalar quantity.
     pub fn add_node_scalar_quantity(&self, name: &str, values: Vec<f32>) -> &Self {
         with_volume_grid(&self.name, |vg| {
