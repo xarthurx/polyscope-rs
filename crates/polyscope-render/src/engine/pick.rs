@@ -2,6 +2,10 @@ use std::num::NonZeroU64;
 
 use super::RenderEngine;
 
+/// Depth format of the pick pass. It is copyable, so a click can read the
+/// depth of the picked surface (C++ `pickAtBufferInds` reads the pick depth).
+const PICK_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
 /// A contiguous range of global pick indices assigned to a structure.
 #[derive(Debug, Clone)]
 pub struct PickRange {
@@ -116,8 +120,8 @@ impl RenderEngine {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth24Plus,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: PICK_DEPTH_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
         let pick_depth_view =
@@ -226,7 +230,7 @@ impl RenderEngine {
                     ..wgpu::PrimitiveState::default()
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
-                    format: wgpu::TextureFormat::Depth24Plus,
+                    format: PICK_DEPTH_FORMAT,
                     depth_write_enabled: Some(true),
                     depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
@@ -311,7 +315,7 @@ impl RenderEngine {
                     ..wgpu::PrimitiveState::default()
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
-                    format: wgpu::TextureFormat::Depth24Plus,
+                    format: PICK_DEPTH_FORMAT,
                     depth_write_enabled: Some(true),
                     depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
@@ -435,7 +439,7 @@ impl RenderEngine {
                     ..wgpu::PrimitiveState::default()
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
-                    format: wgpu::TextureFormat::Depth24Plus,
+                    format: PICK_DEPTH_FORMAT,
                     depth_write_enabled: Some(true),
                     depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
@@ -565,7 +569,7 @@ impl RenderEngine {
                     ..wgpu::PrimitiveState::default()
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
-                    format: wgpu::TextureFormat::Depth24Plus,
+                    format: PICK_DEPTH_FORMAT,
                     depth_write_enabled: Some(true),
                     depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
@@ -686,7 +690,7 @@ impl RenderEngine {
                     ..wgpu::PrimitiveState::default()
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
-                    format: wgpu::TextureFormat::Depth24Plus,
+                    format: PICK_DEPTH_FORMAT,
                     depth_write_enabled: Some(true),
                     depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
@@ -786,6 +790,81 @@ impl RenderEngine {
         // Decode flat 24-bit global index from RGB
         let global_index = crate::pick::color_to_index(pixel[0], pixel[1], pixel[2]);
         Some(global_index)
+    }
+
+    /// Reads the pick depth buffer at (x, y).
+    ///
+    /// Returns the depth in normalized device coordinates (0 at the near plane,
+    /// 1 at the far plane and for the background). Returns None if the picking
+    /// system is not initialized or the coordinates are out of bounds.
+    ///
+    /// wgpu copies depth textures only as a whole, so this call copies the full
+    /// pick depth buffer. Call it for single events such as a double-click.
+    pub fn pick_depth_at(&self, x: u32, y: u32) -> Option<f32> {
+        let depth_texture = self.pick_depth_texture.as_ref()?;
+        let (width, height) = self.pick_buffer_size;
+        if x >= width || y >= height {
+            return None;
+        }
+
+        let bytes_per_row = (width * 4).next_multiple_of(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
+        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Pick Depth Readback Buffer"),
+            size: u64::from(bytes_per_row) * u64::from(height),
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Pick Depth Readback Encoder"),
+            });
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: depth_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::DepthOnly,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        // Map the full buffer: a mapped range must start at an 8-byte boundary.
+        let buffer_slice = buffer.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send(result).unwrap();
+        });
+        let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
+        rx.recv().unwrap().ok()?;
+
+        let data = buffer_slice
+            .get_mapped_range()
+            .expect("buffer slice is mapped for reading");
+        let offset = (y * bytes_per_row + x * 4) as usize;
+        let depth = f32::from_ne_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        drop(data);
+        buffer.unmap();
+        Some(depth)
     }
 
     /// Returns the pick texture view for external rendering.

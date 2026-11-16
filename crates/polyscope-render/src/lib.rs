@@ -70,7 +70,7 @@ pub use curve_network_render::{CurveNetworkRenderData, CurveNetworkUniforms};
 pub use depth_peel_pass::DepthPeelPass;
 pub use engine::RenderEngine;
 pub use error::{RenderError, RenderResult};
-pub use ground_plane::{GroundPlaneRenderData, GroundPlaneUniforms};
+pub use ground_plane::{GroundPlaneFrame, GroundPlaneRenderData, GroundPlaneUniforms};
 pub use materials::{Material, MaterialRegistry, MaterialUniforms};
 pub use pick::{
     MeshPickUniforms, PickElementType, PickResult, PickUniforms, TubePickUniforms, color_to_index,

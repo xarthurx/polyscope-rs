@@ -12,7 +12,11 @@ pub fn apply_camera_settings(
 ) {
     camera.navigation_style = settings.navigation_style.into();
     camera.projection_mode = settings.projection_mode.into();
-    camera.set_up_direction(settings.up_direction.into());
+    // Any camera setting change calls this function. Change the view only for a new up direction.
+    let up_direction: polyscope_render::AxisDirection = settings.up_direction.into();
+    if up_direction != camera.up_direction {
+        camera.set_up_direction(up_direction);
+    }
     camera.set_fov_degrees(settings.fov_degrees);
     camera.set_near(settings.near);
     camera.set_far(settings.far);

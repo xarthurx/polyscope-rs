@@ -28,6 +28,17 @@ pub fn auto_fit_camera(engine: &mut RenderEngine, camera_fitted: bool) -> bool {
     camera_fitted
 }
 
+/// Resets the camera to the home view of the scene if its view matrix is not valid.
+/// C++ Polyscope calls `ensureViewValid()` before it draws each frame.
+pub fn ensure_view_valid(engine: &mut RenderEngine) {
+    if engine.camera.is_view_valid() {
+        return;
+    }
+    let (min, max) = crate::with_context(|ctx| ctx.bounding_box);
+    engine.camera.ensure_view_valid(min, max);
+    log::warn!("The camera view was not valid. The camera is reset to the home view.");
+}
+
 /// Drain deferred material load queue and load materials into the engine.
 pub fn drain_material_queue(engine: &mut RenderEngine) {
     let pending_materials: Vec<MaterialLoadRequest> =

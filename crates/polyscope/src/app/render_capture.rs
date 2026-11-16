@@ -63,6 +63,9 @@ impl App {
         // Auto-fit camera to scene
         self.camera_fitted = super::render_init::auto_fit_camera(engine, self.camera_fitted);
 
+        // Fall back to the home view if the view matrix is not valid
+        super::render_init::ensure_view_valid(engine);
+
         // Drain deferred material load queue
         super::render_init::drain_material_queue(engine);
 
@@ -233,11 +236,11 @@ impl App {
         }
 
         // Render ground plane
-        let (scene_center, scene_min_y, length_scale) = crate::with_context(|ctx| {
+        let (scene_center, scene_bounds, length_scale) = crate::with_context(|ctx| {
             let center = ctx.center();
             (
                 [center.x, center.y, center.z],
-                ctx.bounding_box.0.y,
+                ctx.bounding_box,
                 ctx.length_scale,
             )
         });
@@ -256,7 +259,7 @@ impl App {
             &screenshot_view,
             ground_plane.mode != GroundPlaneMode::None,
             scene_center,
-            scene_min_y,
+            scene_bounds,
             length_scale,
             height_override,
             ground_plane.shadow_darkness,

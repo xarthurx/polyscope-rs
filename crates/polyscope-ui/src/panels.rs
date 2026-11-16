@@ -857,7 +857,7 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                         .add(
                             DragValue::new(&mut settings.ortho_scale)
                                 .speed(0.1)
-                                .range(0.1..=100.0),
+                                .range(f32::MIN_POSITIVE..=f32::MAX),
                         )
                         .changed()
                     {
@@ -866,14 +866,15 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                 });
             }
 
-            // Clip planes
+            // Clip planes. The ranges only keep the values positive: a fixed range
+            // would clamp the planes of very small or very large scenes.
             ui.horizontal(|ui| {
                 ui.label("Near:");
                 if ui
                     .add(
                         DragValue::new(&mut settings.near)
                             .speed(0.001)
-                            .range(0.001..=10.0),
+                            .range(f32::MIN_POSITIVE..=f32::MAX),
                     )
                     .changed()
                 {
@@ -887,7 +888,7 @@ pub fn build_camera_settings_section(ui: &mut Ui, settings: &mut CameraSettings)
                     .add(
                         DragValue::new(&mut settings.far)
                             .speed(1.0)
-                            .range(10.0..=10000.0),
+                            .range(f32::MIN_POSITIVE..=f32::MAX),
                     )
                     .changed()
                 {
@@ -1697,4 +1698,52 @@ pub fn build_structure_tree_with_ui<F, U>(
                     });
             }
         });
+}
+
+#[cfg(test)]
+mod camera_settings_tests {
+    use super::*;
+
+    /// Draws the camera section twice with its header open.
+    /// Returns the settings and whether the section reported a change.
+    fn draw_camera_section(mut settings: CameraSettings) -> (CameraSettings, bool) {
+        let ctx = Context::default();
+        // Show the bodies of collapsed headers too.
+        ctx.memory_mut(|mem| mem.set_everything_is_visible(true));
+        let mut changed = false;
+        for _ in 0..2 {
+            let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                changed |= build_camera_settings_section(ui, &mut settings);
+            });
+            // No renderer consumes the font textures in this test.
+            output.textures_delta.clear();
+        }
+        (settings, changed)
+    }
+
+    /// The camera section must not clamp the clip planes or the orthographic
+    /// scale of very small or very large scenes.
+    #[test]
+    fn camera_section_keeps_values_at_any_scale() {
+        for (near, far, ortho_scale) in [(1.7e-5, 1.7, 6e-3), (1.7e3, 1.7e8, 6e5)] {
+            for projection_mode in [0, 1] {
+                let input = CameraSettings {
+                    projection_mode,
+                    near,
+                    far,
+                    ortho_scale,
+                    ..CameraSettings::default()
+                };
+                let (out, changed) = draw_camera_section(input);
+                assert!(!changed, "drawing alone must not change the settings");
+                assert!(out.near.to_bits() == near.to_bits(), "near: {}", out.near);
+                assert!(out.far.to_bits() == far.to_bits(), "far: {}", out.far);
+                assert!(
+                    out.ortho_scale.to_bits() == ortho_scale.to_bits(),
+                    "ortho scale: {}",
+                    out.ortho_scale
+                );
+            }
+        }
+    }
 }

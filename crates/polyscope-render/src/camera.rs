@@ -166,6 +166,22 @@ impl AxisDirection {
         }
     }
 
+    /// Returns the up direction whose default front direction is this direction.
+    ///
+    /// This is the inverse of [`Self::default_front_direction`]
+    /// (C++ Polyscope `defaultOrthogonalUpDir`).
+    #[must_use]
+    pub fn default_up_direction(self) -> AxisDirection {
+        match self {
+            AxisDirection::NegZ => AxisDirection::PosY,
+            AxisDirection::PosZ => AxisDirection::NegY,
+            AxisDirection::PosX => AxisDirection::PosZ,
+            AxisDirection::NegX => AxisDirection::NegZ,
+            AxisDirection::PosY => AxisDirection::PosX,
+            AxisDirection::NegY => AxisDirection::NegX,
+        }
+    }
+
     /// Converts from a u32 index (used in UI) to `AxisDirection`.
     /// Order: 0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z
     #[must_use]
@@ -219,8 +235,14 @@ pub struct CameraFlight {
     initial_fov: f32,
     /// End FOV in radians.
     target_fov: f32,
-    /// Camera-to-target distance (preserved throughout flight).
-    target_dist: f32,
+    /// Camera-to-target distance at the start of the flight.
+    initial_dist: f32,
+    /// Camera position at the end of the flight.
+    final_position: Vec3,
+    /// Camera target at the end of the flight.
+    final_target: Vec3,
+    /// Camera up vector at the end of the flight.
+    final_up: Vec3,
 }
 
 /// A 3D camera for viewing the scene.
@@ -326,6 +348,32 @@ impl Camera {
     #[must_use]
     pub fn view_projection_matrix(&self) -> Mat4 {
         self.projection_matrix() * self.view_matrix()
+    }
+
+    /// Returns the world position at a screen position and depth-buffer value
+    /// (C++ `screenCoordsAndDepthToWorldPosition`).
+    ///
+    /// `screen` is in pixels from the top-left corner of a `width` x `height`
+    /// viewport. `depth` is the normalized device depth: 0 at the near plane and
+    /// 1 at the far plane. Returns None for the background (depth 1 or more)
+    /// and for a result that is not finite.
+    #[must_use]
+    pub fn screen_depth_to_world(
+        &self,
+        screen: glam::Vec2,
+        depth: f32,
+        width: u32,
+        height: u32,
+    ) -> Option<Vec3> {
+        if depth.is_nan() || depth >= 1.0 || width == 0 || height == 0 {
+            return None;
+        }
+        let ndc_x = screen.x / width as f32 * 2.0 - 1.0;
+        let ndc_y = 1.0 - screen.y / height as f32 * 2.0;
+        let world =
+            self.view_projection_matrix().inverse() * glam::Vec4::new(ndc_x, ndc_y, depth, 1.0);
+        let position = world.truncate() / world.w;
+        position.is_finite().then_some(position)
     }
 
     /// Returns the camera's forward direction.
@@ -605,31 +653,76 @@ impl Camera {
 
     /// Zooms the camera (moves toward/away from target for perspective,
     /// adjusts `ortho_scale` for orthographic).
+    ///
+    /// In perspective mode, `delta` is a world-space distance. The camera never
+    /// reaches the target: the distance keeps a floor of 1e-5 of its current value,
+    /// as in C++ Polyscope `processZoom`. No floor depends on the scene size.
     pub fn zoom(&mut self, delta: f32) {
         match self.projection_mode {
             ProjectionMode::Perspective => {
                 let direction = self.forward();
                 let distance = (self.position - self.target).length();
-                let new_distance = (distance - delta).max(0.1);
-                self.position = self.target - direction * new_distance;
+                // The second term keeps the distance above the f32 resolution at the target.
+                let min_distance =
+                    (distance * 1e-5).max(16.0 * f32::EPSILON * self.target.abs().max_element());
+                // A zoom in never moves the camera away from the target.
+                let new_distance = (distance - delta).max(min_distance.min(distance));
+                let new_position = self.target - direction * new_distance;
+                // Below this length, the view direction is not accurate in f32.
+                if (self.target - new_position).length_squared() >= f32::MIN_POSITIVE {
+                    self.position = new_position;
+                }
             }
             ProjectionMode::Orthographic => {
                 // For orthographic, adjust the scale (smaller = zoom in, larger = zoom out)
-                // delta > 0 means zoom in (scroll up), so decrease scale
-                // Use a proportional factor based on current scale for consistent feel
-                let zoom_factor = 1.0 - delta * 0.4;
-                self.ortho_scale = (self.ortho_scale * zoom_factor).clamp(0.01, 1000.0);
+                // delta > 0 means zoom in (scroll up), so decrease scale.
+                // The factor is relative, so the zoom works at any scene scale.
+                let zoom_factor = (1.0 - delta * 0.4).max(0.1);
+                self.ortho_scale = (self.ortho_scale * zoom_factor).max(f32::MIN_POSITIVE);
             }
         }
     }
 
-    /// Resets the camera to look at the given bounding box.
+    /// Zooms the camera by `scroll` mouse-wheel steps. Positive values zoom in.
+    ///
+    /// In perspective mode, the step is relative to the camera-to-target distance,
+    /// as in the C++ Polyscope default (`ViewRelativeMode::CenterRelative`).
+    /// Thus one step has the same visual effect at any scene scale.
+    pub fn zoom_scroll(&mut self, scroll: f32) {
+        let delta = match self.projection_mode {
+            // C++ uses processZoom(0.5 * scroll) and a step of 0.15 * distance * amount.
+            ProjectionMode::Perspective => 0.075 * scroll * self.position.distance(self.target),
+            ProjectionMode::Orthographic => 0.2 * scroll,
+        };
+        self.zoom(delta);
+    }
+
+    /// Returns the world up vector and the home look direction.
+    ///
+    /// The home look direction is the front direction. If the front direction lies
+    /// along the up axis, the default front direction for the up direction
+    /// replaces it, so the home view stays valid (C++ `computeHomeView`).
+    fn home_frame(&self) -> (Vec3, Vec3) {
+        let up = self.up_direction.to_vec3();
+        let mut front = self.front_direction.to_vec3();
+        if up.dot(front).abs() > 0.01 {
+            front = self.up_direction.default_front_direction().to_vec3();
+        }
+        (up, front)
+    }
+
+    /// Resets the camera to the home view of the given bounding box.
+    ///
+    /// The camera looks at the box center along the front direction, with the
+    /// up direction on top of the view.
     pub fn look_at_box(&mut self, min: Vec3, max: Vec3) {
         let center = (min + max) * 0.5;
         let size = (max - min).length();
         let extents = max - min;
+        let (up, front) = self.home_frame();
 
         self.target = center;
+        self.up = up;
 
         // Compute camera distance using FOV so the bounding sphere is fully visible.
         // self.fov is in radians already.
@@ -639,15 +732,37 @@ impl Camera {
         let radius = size * 0.5;
         // Add a small margin (1.1x) so objects don't touch the viewport edge
         let distance = (radius / half_fov.tan()) * 1.1;
-        self.position = center + Vec3::new(0.0, 0.0, distance);
+        self.position = center - front * distance;
 
         self.near = size * 0.001;
         self.far = size * 100.0;
 
         // Set ortho_scale to fit the model in view
         // Use the larger of height or width/aspect_ratio to ensure model fits
-        let half_height = extents.y.max(extents.x / self.aspect_ratio) * 0.6;
-        self.ortho_scale = half_height.max(0.1);
+        let right = front.cross(up);
+        let half_height = extents
+            .dot(up.abs())
+            .max(extents.dot(right.abs()) / self.aspect_ratio)
+            * 0.6;
+        // The floor applies when the box is flat in the view plane. It scales with the box.
+        self.ortho_scale = half_height.max(size * 0.05).max(f32::MIN_POSITIVE);
+    }
+
+    /// Returns whether the view matrix is valid (all entries finite).
+    #[must_use]
+    pub fn is_view_valid(&self) -> bool {
+        self.view_matrix().is_finite()
+    }
+
+    /// Resets the camera to the home view of the given box if the view is not
+    /// valid (C++ `ensureViewValid`). Returns `true` if a reset took place.
+    pub fn ensure_view_valid(&mut self, min: Vec3, max: Vec3) -> bool {
+        if self.is_view_valid() {
+            return false;
+        }
+        self.cancel_flight();
+        self.look_at_box(min, max);
+        true
     }
 
     /// Sets the navigation style.
@@ -660,12 +775,45 @@ impl Camera {
         self.projection_mode = mode;
     }
 
-    /// Sets the up direction and updates both the up vector and front direction.
-    /// The front direction is automatically derived using right-hand coordinate conventions.
+    /// Sets the up direction and updates the view (C++ `setUpDir`).
+    ///
+    /// The front direction changes to the default front direction for `direction`
+    /// (right-hand coordinate conventions). Except in Free and None navigation, the
+    /// camera then uses the new up vector. If the camera looks along the new up
+    /// axis, it moves around the target to look along the front direction.
+    /// Thus the view matrix stays valid.
     pub fn set_up_direction(&mut self, direction: AxisDirection) {
         self.up_direction = direction;
-        self.up = direction.to_vec3();
         self.front_direction = direction.default_front_direction();
+
+        match self.navigation_style {
+            // C++ keeps the view unchanged for these styles.
+            NavigationStyle::Free | NavigationStyle::None => {}
+            NavigationStyle::Turntable
+            | NavigationStyle::Planar
+            | NavigationStyle::Arcball
+            | NavigationStyle::FirstPerson => {
+                let up = direction.to_vec3();
+                // 0.99 is the pole limit of the turntable orbit.
+                if self.forward().dot(up).abs() > 0.99 {
+                    let distance = self.position.distance(self.target);
+                    self.position = self.target - self.front_direction.to_vec3() * distance;
+                }
+                self.up = up;
+            }
+        }
+    }
+
+    /// Sets the front direction (C++ `setFrontDir`).
+    ///
+    /// The front direction sets the look direction of the home view; the current
+    /// view does not change. If the front direction lies along the up axis, the
+    /// up direction changes to the default up direction for `direction`.
+    pub fn set_front_direction(&mut self, direction: AxisDirection) {
+        if direction.to_vec3().dot(self.up_direction.to_vec3()).abs() > 0.1 {
+            self.set_up_direction(direction.default_up_direction());
+        }
+        self.front_direction = direction;
     }
 
     /// Sets the movement speed.
@@ -673,9 +821,9 @@ impl Camera {
         self.move_speed = speed.max(0.01);
     }
 
-    /// Sets the orthographic scale.
+    /// Sets the orthographic scale. The scale stays positive; no other limit applies.
     pub fn set_ortho_scale(&mut self, scale: f32) {
-        self.ortho_scale = scale.max(0.01);
+        self.ortho_scale = scale.max(f32::MIN_POSITIVE);
     }
 
     /// Sets the field of view in radians.
@@ -684,13 +832,18 @@ impl Camera {
     }
 
     /// Sets the near clipping plane.
+    ///
+    /// The near plane stays positive. No other limit applies, so the value is
+    /// valid at any scene scale.
     pub fn set_near(&mut self, near: f32) {
-        self.near = near.max(0.001);
+        self.near = near.max(f32::MIN_POSITIVE);
     }
 
     /// Sets the far clipping plane.
+    ///
+    /// The far plane stays beyond the near plane. No other limit applies.
     pub fn set_far(&mut self, far: f32) {
-        self.far = far.max(self.near + 0.1);
+        self.far = far.max(self.near.next_up());
     }
 
     // ========================================================================
@@ -727,10 +880,31 @@ impl Camera {
     ///
     /// The `target_view` is a 4x4 view matrix (world-to-eye). The `target_fov`
     /// is in radians. `duration_secs` controls the flight length (C++ Polyscope
-    /// default is 0.4 seconds).
+    /// default is 0.4 seconds). A view matrix has no target point, so the final
+    /// target is at the current camera-to-target distance. To end at a given
+    /// target, use [`Self::start_flight_to_pose`].
     pub fn start_flight_to(&mut self, target_view: Mat4, target_fov: f32, duration_secs: f32) {
-        let current_view = self.view_matrix();
         let current_dist = (self.position - self.target).length().max(0.01);
+        let (rot_end, t_end) = Self::decompose_view_matrix(&target_view.inverse());
+        let (position, target, up) = Self::camera_from_inverse_view(&rot_end, &t_end, current_dist);
+        self.start_flight_to_pose(position, target, up, target_fov, duration_secs);
+    }
+
+    /// Starts a smooth animated flight that ends exactly at the given camera pose.
+    ///
+    /// `position`, `target` and `up` define the final view, as the camera fields
+    /// do. The camera-to-target distance changes smoothly during the flight.
+    /// When the flight ends, the camera fields equal the given values.
+    pub fn start_flight_to_pose(
+        &mut self,
+        position: Vec3,
+        target: Vec3,
+        up: Vec3,
+        target_fov: f32,
+        duration_secs: f32,
+    ) {
+        let current_view = self.view_matrix();
+        let target_view = glam::camera::rh::view::look_at_mat4(position, target, up);
 
         // Interpolate the *inverse* view matrix (camera-to-world), then invert back.
         // This produces smoother motion when far from the origin (C++ commit 067f760).
@@ -746,14 +920,17 @@ impl Camera {
             target_t: t_end,
             initial_fov: self.fov,
             target_fov,
-            target_dist: current_dist,
+            initial_dist: self.position.distance(self.target),
+            final_position: position,
+            final_target: target,
+            final_up: up,
         });
     }
 
     /// Updates the camera flight animation. Call once per frame.
     ///
-    /// When the flight completes, the camera is set exactly to the target
-    /// position and `self.flight` is cleared.
+    /// When the flight completes, the camera is set exactly to the requested
+    /// pose and `self.flight` is cleared.
     pub fn update_flight(&mut self) {
         let Some(flight) = &self.flight else {
             return;
@@ -761,15 +938,12 @@ impl Camera {
 
         let elapsed = flight.start_time.elapsed().as_secs_f32();
         let t = (elapsed / flight.duration_secs).min(1.0);
-        let dist = flight.target_dist;
 
         if t >= 1.0 {
-            // Flight complete — set final position exactly
-            let (position, target, up) =
-                Self::camera_from_inverse_view(&flight.target_rot, &flight.target_t, dist);
-            self.position = position;
-            self.target = target;
-            self.up = up;
+            // Flight complete: set the requested pose exactly
+            self.position = flight.final_position;
+            self.target = flight.final_target;
+            self.up = flight.final_up;
             self.fov = flight.target_fov;
             self.flight = None;
         } else {
@@ -791,12 +965,50 @@ impl Camera {
             // Interpolate FOV with raw t (matching C++ Polyscope)
             let fov = (1.0 - t) * flight.initial_fov + t * flight.target_fov;
 
+            // The view center moves smoothly to the requested target.
+            let final_dist = flight.final_position.distance(flight.final_target);
+            let dist = flight.initial_dist + (final_dist - flight.initial_dist) * t_smooth;
+
             let (position, target, up) =
                 Self::camera_from_inverse_view(&interp_rot, &interp_t, dist);
             self.position = position;
             self.target = target;
             self.up = up;
             self.fov = fov;
+        }
+    }
+
+    /// Sets a new view center and flies the view to it, as C++
+    /// `setViewCenterAndLookAt` does for each navigation style.
+    ///
+    /// - Planar: the camera moves parallel to the view plane until `center` is
+    ///   straight ahead. The view does not rotate.
+    /// - None: the view does not change.
+    /// - The other styles: the camera stays in place and turns to `center`,
+    ///   with the world up direction on top of the view.
+    pub fn set_view_center(&mut self, center: Vec3) {
+        const FLIGHT_SECS: f32 = 0.4;
+        match self.navigation_style {
+            NavigationStyle::None => {}
+            NavigationStyle::Planar => {
+                let look = self.forward();
+                let position = center - look * look.dot(center - self.position);
+                self.start_flight_to_pose(position, center, self.up, self.fov, FLIGHT_SECS);
+            }
+            NavigationStyle::Turntable
+            | NavigationStyle::Free
+            | NavigationStyle::Arcball
+            | NavigationStyle::FirstPerson => {
+                let world_up = self.up_direction.to_vec3();
+                let look = (center - self.position).normalize_or_zero();
+                // Keep the current up vector if the new view looks along the world up axis.
+                let up = if look.cross(world_up).length_squared() > 1e-6 {
+                    world_up
+                } else {
+                    self.up
+                };
+                self.start_flight_to_pose(self.position, center, up, self.fov, FLIGHT_SECS);
+            }
         }
     }
 
@@ -908,8 +1120,7 @@ impl CameraState {
                 camera.flight = None;
             }
             ViewTransition::FlyTo => {
-                let target_view = glam::camera::rh::view::look_at_mat4(new_pos, new_target, new_up);
-                camera.start_flight_to(target_view, self.fov, 0.4);
+                camera.start_flight_to_pose(new_pos, new_target, new_up, self.fov, 0.4);
             }
         }
     }
@@ -1092,6 +1303,48 @@ mod tests {
         assert!((fresh.ortho_scale - cam.ortho_scale).abs() < 1e-5);
     }
 
+    /// Moves the start of an active flight back by `secs` seconds.
+    fn age_flight(camera: &mut Camera, secs: f32) {
+        let flight = camera.flight.as_mut().expect("flight must be active");
+        flight.start_time = Instant::now()
+            .checked_sub(std::time::Duration::from_secs_f32(secs))
+            .expect("instant in range");
+    }
+
+    /// After a flight ends, every camera field must equal the requested state,
+    /// also when the camera-to-target distance changes.
+    #[test]
+    fn test_camera_state_flyto_ends_at_requested_state() {
+        let cam = make_camera_state_input();
+        let state = CameraState::from_camera(&cam);
+        let mut fresh = Camera::new(1.5);
+        fresh.position = Vec3::new(-1.0, -1.0, -1.0);
+        fresh.target = Vec3::ZERO;
+        fresh.up = Vec3::Y;
+        let start_dist = fresh.position.distance(fresh.target);
+        let end_dist = cam.position.distance(cam.target);
+        assert!((start_dist - end_dist).abs() > 1.0, "distances must differ");
+
+        state.apply(&mut fresh, ViewTransition::FlyTo);
+
+        // Mid-flight: the view is valid and the distance lies between both ends.
+        age_flight(&mut fresh, 0.2);
+        fresh.update_flight();
+        assert!(fresh.is_in_flight());
+        assert!(fresh.is_view_valid());
+        let mid_dist = fresh.position.distance(fresh.target);
+        assert!(mid_dist > start_dist.min(end_dist) && mid_dist < start_dist.max(end_dist));
+
+        // Step past the end of the flight.
+        age_flight(&mut fresh, 1.0);
+        fresh.update_flight();
+        assert!(!fresh.is_in_flight());
+        assert_eq!(CameraState::from_camera(&fresh), state);
+        assert_eq!(fresh.position, cam.position);
+        assert_eq!(fresh.target, cam.target);
+        assert_eq!(fresh.up, cam.up);
+    }
+
     #[test]
     fn test_camera_state_unknown_enum_falls_back_in_apply() {
         let mut bad = CameraState::from_camera(&make_camera_state_input());
@@ -1150,6 +1403,288 @@ mod tests {
             new_distance < initial_distance,
             "Perspective zoom in should decrease distance"
         );
+    }
+
+    /// A scene of size 0.01 gives a fitted camera about 0.013 from the target.
+    /// One scroll step in must move the camera closer, not out to an absolute floor.
+    #[test]
+    fn test_zoom_in_small_scene_moves_closer() {
+        let mut camera = Camera::new(1.0);
+        camera.look_at_box(Vec3::splat(-0.005), Vec3::splat(0.005));
+        let fitted = camera.position.distance(camera.target);
+        assert!(fitted < 0.1, "fitted distance {fitted} must be small");
+
+        let mut direct = camera.clone();
+        direct.zoom(0.1 * fitted);
+        let after_direct = direct.position.distance(direct.target);
+        assert!(
+            (after_direct - 0.9 * fitted).abs() < fitted * 1e-4,
+            "zoom must not apply an absolute floor: {fitted} -> {after_direct}"
+        );
+
+        camera.zoom_scroll(1.0);
+        let after = camera.position.distance(camera.target);
+        assert!(
+            after < fitted,
+            "scroll-in must decrease the distance: {fitted} -> {after}"
+        );
+        // The step is relative to the distance (C++ CenterRelative: 0.075 per step).
+        assert!((after - fitted * 0.925).abs() < fitted * 1e-4);
+
+        // Many steps in never reach or cross the target, also far from the origin.
+        for offset in [Vec3::ZERO, Vec3::new(1000.0, -50.0, 3.0)] {
+            camera.look_at_box(offset - 0.005, offset + 0.005);
+            for _ in 0..1000 {
+                camera.zoom_scroll(5.0);
+            }
+            let close = camera.position.distance(camera.target);
+            assert!(close > 0.0 && close < fitted, "offset {offset}: {close}");
+            assert!(camera.view_matrix().is_finite());
+            assert!(camera.forward().dot(Vec3::NEG_Z) > 0.999);
+        }
+    }
+
+    /// The clip-plane and ortho-scale setters keep the fitted values of a small
+    /// or large scene. They only keep near > 0, far > near and scale > 0.
+    #[test]
+    fn test_clip_setters_keep_values_at_any_scale() {
+        for half in [0.005_f32, 5.0e4] {
+            let mut camera = Camera::new(1.0);
+            camera.look_at_box(Vec3::splat(-half), Vec3::splat(half));
+            let (near, far, ortho_scale) = (camera.near, camera.far, camera.ortho_scale);
+            // The fitted ortho scale follows the box (0.6 of its height).
+            assert!((ortho_scale - 1.2 * half).abs() < 1e-4 * half);
+            camera.set_near(near);
+            camera.set_far(far);
+            camera.set_ortho_scale(ortho_scale);
+            assert_eq!(camera.near.to_bits(), near.to_bits());
+            assert_eq!(camera.far.to_bits(), far.to_bits());
+            assert_eq!(camera.ortho_scale.to_bits(), ortho_scale.to_bits());
+        }
+
+        let mut camera = Camera::new(1.0);
+        camera.set_near(0.0);
+        assert!(camera.near > 0.0);
+        camera.set_near(1e-6);
+        camera.set_far(1e-7);
+        assert!(camera.far > camera.near);
+        camera.set_ortho_scale(-1.0);
+        assert!(camera.ortho_scale > 0.0);
+    }
+
+    const ALL_AXES: [AxisDirection; 6] = [
+        AxisDirection::PosX,
+        AxisDirection::NegX,
+        AxisDirection::PosY,
+        AxisDirection::NegY,
+        AxisDirection::PosZ,
+        AxisDirection::NegZ,
+    ];
+
+    /// Asserts a finite view that looks at `target` with `up` on top.
+    fn assert_looks_at(camera: &Camera, target: Vec3, up: Vec3, label: &str) {
+        assert!(camera.is_view_valid(), "{label}: view not finite");
+        let to_target = (target - camera.position).normalize();
+        assert!(
+            camera.forward().dot(to_target) > 0.9999,
+            "{label}: not at target"
+        );
+        assert!(camera.camera_up().dot(up) > 0.0, "{label}: up not on top");
+    }
+
+    /// Changing the up direction from any view must keep a valid view of the
+    /// target (C++ commit 1e5ff25). Free and None navigation keep the view.
+    #[test]
+    fn test_set_up_direction_keeps_view_valid() {
+        let styles = [
+            NavigationStyle::Turntable,
+            NavigationStyle::Planar,
+            NavigationStyle::Arcball,
+            NavigationStyle::FirstPerson,
+            NavigationStyle::Free,
+            NavigationStyle::None,
+        ];
+        let center = Vec3::new(1.0, 2.0, 3.0);
+        for style in styles {
+            for up in ALL_AXES {
+                let mut camera = Camera::new(1.5);
+                camera.look_at_box(center - 0.5, center + 0.5);
+                camera.navigation_style = style;
+                let view_before = camera.view_matrix();
+                camera.set_up_direction(up);
+                let label = format!("{style:?} up {}", up.name());
+                assert!(camera.is_view_valid(), "{label}: view not finite");
+                let up_vec = camera.up_direction.to_vec3();
+                assert!(up_vec.dot(camera.front_direction.to_vec3()).abs() < 1e-6);
+                if matches!(style, NavigationStyle::Free | NavigationStyle::None) {
+                    assert_eq!(camera.view_matrix(), view_before, "{label}");
+                } else {
+                    assert_looks_at(&camera, center, up.to_vec3(), &label);
+                }
+            }
+        }
+    }
+
+    /// The home view must honour every pair of up and front directions.
+    #[test]
+    fn test_home_view_honours_up_and_front() {
+        let center = Vec3::new(-2.0, 0.5, 4.0);
+        for up in ALL_AXES {
+            for front in ALL_AXES {
+                let label = format!("up {} front {}", up.name(), front.name());
+                let orthogonal = up.to_vec3().dot(front.to_vec3()) == 0.0;
+
+                // Fields set directly, as `CameraState::apply` does.
+                let mut camera = Camera::new(1.5);
+                camera.up_direction = up;
+                camera.front_direction = front;
+                camera.look_at_box(center - 1.0, center + 1.0);
+                assert_looks_at(&camera, center, up.to_vec3(), &label);
+                assert!(camera.forward().dot(up.to_vec3()).abs() < 1e-6, "{label}");
+                if orthogonal {
+                    assert!(camera.forward().dot(front.to_vec3()) > 0.9999, "{label}");
+                }
+
+                // Setters: the front direction wins over a parallel up direction.
+                let mut camera = Camera::new(1.5);
+                camera.set_up_direction(up);
+                camera.set_front_direction(front);
+                assert_eq!(camera.front_direction, front, "{label}");
+                if orthogonal {
+                    assert_eq!(camera.up_direction, up, "{label}");
+                }
+                camera.look_at_box(center - 1.0, center + 1.0);
+                let up_vec = camera.up_direction.to_vec3();
+                assert_looks_at(&camera, center, up_vec, &label);
+                assert!(camera.forward().dot(front.to_vec3()) > 0.9999, "{label}");
+            }
+        }
+    }
+
+    /// The default home view must not change: the camera sits on +Z.
+    #[test]
+    fn test_default_home_view_is_unchanged() {
+        let mut camera = Camera::new(1.5);
+        camera.look_at_box(Vec3::new(-1.0, 0.0, 2.0), Vec3::new(3.0, 1.0, 4.0));
+        assert_eq!(camera.position.x, 1.0);
+        assert_eq!(camera.position.y, 0.5);
+        assert!(camera.position.z > 3.0);
+        assert_eq!(camera.up, Vec3::Y);
+    }
+
+    /// A view that is not valid falls back to the home view (C++ `ensureViewValid`).
+    #[test]
+    fn test_invalid_view_falls_back_to_home_view() {
+        let mut camera = Camera::new(1.5);
+        camera.look_at_box(Vec3::ZERO, Vec3::ONE);
+        assert!(!camera.ensure_view_valid(Vec3::ZERO, Vec3::ONE));
+
+        camera.up = camera.forward();
+        assert!(!camera.is_view_valid());
+        assert!(camera.ensure_view_valid(Vec3::ZERO, Vec3::ONE));
+        assert_looks_at(&camera, Vec3::splat(0.5), Vec3::Y, "after fallback");
+    }
+
+    /// A new view center changes the view as C++ `setViewCenterAndLookAt` does
+    /// for each navigation style (upstream commit 1b41445).
+    #[test]
+    fn test_set_view_center_per_navigation_style() {
+        let styles = [
+            NavigationStyle::Turntable,
+            NavigationStyle::Free,
+            NavigationStyle::Planar,
+            NavigationStyle::Arcball,
+            NavigationStyle::FirstPerson,
+            NavigationStyle::None,
+        ];
+        let new_center = Vec3::new(0.4, -0.3, 0.2);
+        for style in styles {
+            let mut camera = Camera::new(1.5);
+            camera.look_at_box(Vec3::splat(-1.0), Vec3::splat(1.0));
+            camera.navigation_style = style;
+            let before = camera.clone();
+
+            camera.set_view_center(new_center);
+            if camera.is_in_flight() {
+                age_flight(&mut camera, 1.0);
+                camera.update_flight();
+            }
+            assert!(camera.is_view_valid(), "{style:?}");
+
+            match style {
+                NavigationStyle::None => {
+                    assert_eq!(camera.position, before.position);
+                    assert_eq!(camera.target, before.target);
+                }
+                NavigationStyle::Planar => {
+                    // The view translates in its plane and does not rotate.
+                    assert_eq!(camera.target, new_center);
+                    assert!(
+                        camera.forward().dot(before.forward()) > 0.99999,
+                        "{style:?}"
+                    );
+                    let shift = camera.position - before.position;
+                    assert!(shift.dot(before.forward()).abs() < 1e-5, "{style:?}");
+                    assert!(camera.camera_up().dot(before.camera_up()) > 0.99999);
+                }
+                _ => {
+                    // The camera stays in place and turns to the new center.
+                    assert_eq!(camera.position, before.position, "{style:?}");
+                    assert_eq!(camera.target, new_center, "{style:?}");
+                    assert_eq!(camera.up, Vec3::Y, "{style:?}");
+                }
+            }
+        }
+    }
+
+    /// A screen position and its depth-buffer value give back the world point.
+    #[test]
+    fn test_screen_depth_to_world_round_trip() {
+        let (width, height) = (800_u32, 600_u32);
+        for mode in [ProjectionMode::Perspective, ProjectionMode::Orthographic] {
+            let mut camera = Camera::new(width as f32 / height as f32);
+            camera.projection_mode = mode;
+            camera.look_at_box(Vec3::new(-1.0, 0.0, 2.0), Vec3::new(3.0, 1.0, 4.0));
+            let point = Vec3::new(0.3, 0.8, 3.1);
+            let clip = camera.view_projection_matrix() * point.extend(1.0);
+            let ndc = clip.truncate() / clip.w;
+            let screen = glam::Vec2::new(
+                f32::midpoint(ndc.x, 1.0) * width as f32,
+                f32::midpoint(-ndc.y, 1.0) * height as f32,
+            );
+            let back = camera
+                .screen_depth_to_world(screen, ndc.z, width, height)
+                .expect("finite position");
+            // The f32 depth of a perspective projection limits the precision.
+            assert!(back.distance(point) < 1e-2, "{mode:?}: {back} vs {point}");
+            assert!(
+                camera
+                    .screen_depth_to_world(screen, 1.0, width, height)
+                    .is_none()
+            );
+        }
+    }
+
+    /// The scroll-zoom step is relative, so it has the same effect at any scale.
+    #[test]
+    fn test_zoom_scroll_is_scale_invariant() {
+        for scale in [1e-3_f32, 1.0, 1e3] {
+            let mut camera = Camera::new(1.0);
+            camera.look_at_box(Vec3::splat(-scale), Vec3::splat(scale));
+            let before = camera.position.distance(camera.target);
+            camera.zoom_scroll(-2.0);
+            let ratio = camera.position.distance(camera.target) / before;
+            assert!((ratio - 1.15).abs() < 1e-4, "scale {scale}: ratio {ratio}");
+
+            camera.projection_mode = ProjectionMode::Orthographic;
+            camera.ortho_scale = scale;
+            camera.zoom_scroll(1.0);
+            let ratio = camera.ortho_scale / scale;
+            assert!(
+                (ratio - 0.92).abs() < 1e-4,
+                "scale {scale}: ortho ratio {ratio}"
+            );
+        }
     }
 
     #[test]

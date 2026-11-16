@@ -33,8 +33,9 @@ struct MeshUniforms {
 struct ReflectionUniforms {
     reflection_matrix: mat4x4<f32>,
     intensity: f32,
-    ground_height: f32,
-    _padding: vec2<f32>,
+    ground_height: f32, // coordinate of the ground plane on the up axis
+    up_axis: u32,       // 0 = X, 1 = Y, 2 = Z
+    up_sign: f32,       // 1 for a positive up direction, -1 for a negative one
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -57,6 +58,11 @@ struct SlicePlanesArray {
 }
 
 @group(1) @binding(0) var<uniform> reflection: ReflectionUniforms;
+
+// True if the world position `p` lies above the ground plane.
+fn above_ground(p: vec3<f32>) -> bool {
+    return reflection.up_sign * p[reflection.up_axis] > reflection.up_sign * reflection.ground_height;
+}
 
 // Matcap textures (Group 2)
 @group(2) @binding(0) var matcap_r: texture_2d<f32>;
@@ -125,7 +131,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
     // Clip pixels above ground plane (reflected geometry should not poke through)
-    if (in.world_position.y > reflection.ground_height) {
+    if (above_ground(in.world_position)) {
         discard;
     }
 

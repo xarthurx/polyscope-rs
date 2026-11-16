@@ -10,6 +10,9 @@ mod render_scene;
 mod render_ui;
 mod view_state;
 
+#[cfg(test)]
+pub(crate) use picking::ClickHit;
+
 use std::collections::HashSet;
 pub(super) use std::sync::Arc;
 
@@ -25,7 +28,7 @@ pub(super) use winit::{
 };
 
 pub(super) use polyscope_core::{GroundPlaneMode, Options, Structure};
-pub(super) use polyscope_render::{PickResult, RenderEngine, reflection};
+pub(super) use polyscope_render::{PickResult, RenderEngine};
 pub(super) use polyscope_structures::{
     CameraView, CurveNetwork, PointCloud, SurfaceMesh, VolumeGrid, VolumeMesh,
 };
@@ -54,6 +57,8 @@ pub struct App {
     // Double-click detection
     pub(super) last_left_click_time: Option<std::time::Instant>,
     pub(super) last_left_click_screen_pos: Option<(f64, f64)>,
+    // Single-click pick that waits until it cannot become a double-click
+    pub(super) pending_pick: Option<picking::PendingPick>,
     // GPU picking - selected element index (from GPU pick)
     pub(super) selected_element_index: Option<u32>,
     // Screenshot state
@@ -108,6 +113,7 @@ impl App {
             last_click_pos: None,
             last_left_click_time: None,
             last_left_click_screen_pos: None,
+            pending_pick: None,
             selected_element_index: None,
             screenshot_pending: None,
             screenshot_counter: 0,

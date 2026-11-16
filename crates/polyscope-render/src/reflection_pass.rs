@@ -7,12 +7,15 @@ use wgpu::util::DeviceExt;
 /// GPU representation of reflection uniforms.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[allow(clippy::pub_underscore_fields)]
 pub struct ReflectionUniforms {
     pub reflection_matrix: [[f32; 4]; 4],
     pub intensity: f32,
+    /// Coordinate of the ground plane on the up axis.
     pub ground_height: f32,
-    pub _padding: [f32; 2],
+    /// Index of the up axis: 0 = X, 1 = Y, 2 = Z.
+    pub up_axis: u32,
+    /// 1 for a positive up direction, -1 for a negative up direction.
+    pub up_sign: f32,
 }
 
 impl Default for ReflectionUniforms {
@@ -21,7 +24,8 @@ impl Default for ReflectionUniforms {
             reflection_matrix: Mat4::IDENTITY.to_cols_array_2d(),
             intensity: 0.25,
             ground_height: 0.0,
-            _padding: [0.0; 2],
+            up_axis: 1,
+            up_sign: 1.0,
         }
     }
 }
@@ -85,18 +89,23 @@ impl ReflectionPass {
     }
 
     /// Updates the reflection uniforms.
+    ///
+    /// The shaders discard reflected geometry above the ground plane at
+    /// `ground_height` on the up axis of `frame`.
     pub fn update_uniforms(
         &self,
         queue: &wgpu::Queue,
         reflection_matrix: Mat4,
         intensity: f32,
         ground_height: f32,
+        frame: crate::ground_plane::GroundPlaneFrame,
     ) {
         let uniforms = ReflectionUniforms {
             reflection_matrix: reflection_matrix.to_cols_array_2d(),
             intensity,
             ground_height,
-            _padding: [0.0; 2],
+            up_axis: frame.axis as u32,
+            up_sign: frame.sign,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
     }
@@ -123,7 +132,7 @@ mod tests {
         // Ensure uniform is correctly aligned for GPU
         assert_eq!(
             std::mem::size_of::<ReflectionUniforms>(),
-            64 + 4 + 4 + 8 // 4x4 matrix + intensity + ground_height + padding
+            64 + 4 + 4 + 4 + 4 // 4x4 matrix + intensity + ground_height + up_axis + up_sign
         );
     }
 }

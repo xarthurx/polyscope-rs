@@ -1,6 +1,153 @@
-use super::{App, CurveNetwork, PointCloud, SurfaceMesh, Vec3, VolumeMesh};
+use std::time::{Duration, Instant};
+
+use super::{App, CurveNetwork, PickResult, PointCloud, SurfaceMesh, Vec3, VolumeMesh};
+
+/// Longest time between the two clicks of a double-click.
+pub(super) const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(500);
+
+/// Time that a single-click pick waits before it changes the selection.
+/// C++ uses the double-click time plus a 50 ms margin.
+const PICK_DELAY: Duration = DOUBLE_CLICK_TIME.saturating_add(Duration::from_millis(50));
+
+/// The object that a single click in the 3D view hit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ClickHit {
+    /// A slice plane, by name.
+    Plane(String),
+    /// An element of a structure.
+    Structure {
+        type_name: String,
+        name: String,
+        element_index: u32,
+    },
+}
+
+/// A single-click pick that waits until the click cannot become a double-click.
+#[derive(Debug, Clone)]
+pub(crate) struct PendingPick {
+    /// The hit, or `None` for the background.
+    hit: Option<ClickHit>,
+    /// Screen position of the click.
+    screen_pos: glam::Vec2,
+    /// Time of the click.
+    time: Instant,
+}
 
 impl App {
+    /// Queues the pick of a single click (C++ commit 022deea).
+    ///
+    /// The pick changes the selection only when a double-click is no longer
+    /// possible, so the first click of a double-click does not change it.
+    pub(crate) fn queue_click_pick(&mut self, hit: Option<ClickHit>, screen_pos: glam::Vec2) {
+        self.pending_pick = Some(PendingPick {
+            hit,
+            screen_pos,
+            time: Instant::now(),
+        });
+    }
+
+    /// Cancels the queued pick, for example on a double-click.
+    pub(crate) fn cancel_pending_pick(&mut self) {
+        self.pending_pick = None;
+    }
+
+    /// Applies the queued pick when the pick delay has passed at `now`.
+    ///
+    /// As in C++, the pick applies at once when a selection exists already.
+    pub(crate) fn update_pending_pick(&mut self, now: Instant) {
+        let Some(pending) = &self.pending_pick else {
+            return;
+        };
+        if self.selection.is_none() && now.saturating_duration_since(pending.time) < PICK_DELAY {
+            return;
+        }
+        if let Some(pending) = self.pending_pick.take() {
+            self.apply_click_hit(pending.hit, pending.screen_pos);
+        }
+    }
+
+    /// Changes the selection to the hit of a click. `None` clears the selection.
+    fn apply_click_hit(&mut self, hit: Option<ClickHit>, click_screen: glam::Vec2) {
+        // The hit object can disappear while the pick waits.
+        let hit = hit.filter(|hit| {
+            crate::with_context(|ctx| match hit {
+                ClickHit::Plane(name) => ctx.has_slice_plane(name),
+                ClickHit::Structure {
+                    type_name, name, ..
+                } => {
+                    // A VolumeGrid pick name is "gridname/quantityname".
+                    let structure_name = if type_name == "VolumeGrid" {
+                        name.split('/').next().unwrap_or(name)
+                    } else {
+                        name
+                    };
+                    ctx.registry.get(type_name, structure_name).is_some()
+                }
+            })
+        });
+
+        match hit {
+            Some(ClickHit::Plane(plane_name)) => {
+                log::debug!("[CLICK DEBUG] Hit plane '{plane_name}'");
+                // Select the slice plane and clear structure selection
+                self.selection = None;
+                self.selected_element_index = None;
+                self.selection_info = polyscope_ui::SelectionInfo::default();
+                crate::deselect_structure();
+                self.select_slice_plane_by_name(&plane_name);
+            }
+            Some(ClickHit::Structure {
+                type_name,
+                name,
+                element_index,
+            }) => {
+                log::debug!(
+                    "[CLICK DEBUG] Hit structure '{type_name}::{name}' element {element_index}"
+                );
+                self.selected_element_index = Some(element_index);
+                self.deselect_slice_plane_selection();
+
+                let element_type = match type_name.as_str() {
+                    "PointCloud" => polyscope_render::PickElementType::Point,
+                    "SurfaceMesh" => polyscope_render::PickElementType::Face,
+                    "VolumeMesh" => polyscope_render::PickElementType::Cell,
+                    "CurveNetwork" => polyscope_render::PickElementType::Edge,
+                    "VolumeGrid" => polyscope_render::PickElementType::Vertex,
+                    _ => polyscope_render::PickElementType::None,
+                };
+
+                // For VolumeGrid, pick name is "gridname/quantityname"
+                // Extract the grid name for structure selection
+                let structure_name = if type_name == "VolumeGrid" {
+                    name.split('/').next().unwrap_or(&name).to_string()
+                } else {
+                    name.clone()
+                };
+
+                self.selection = Some(PickResult {
+                    hit: true,
+                    structure_type: type_name.clone(),
+                    structure_name: structure_name.clone(),
+                    element_index: u64::from(element_index),
+                    element_type,
+                    screen_pos: click_screen,
+                    depth: 0.5,
+                });
+                crate::select_structure(&type_name, &structure_name);
+                self.selection_info = crate::get_selection_info();
+            }
+            None => {
+                log::debug!("[CLICK DEBUG] No hit - DESELECTING");
+                // Nothing was clicked - deselect
+                self.selection = None;
+                self.selected_element_index = None;
+                self.selection_info = polyscope_ui::SelectionInfo::default();
+                crate::deselect_structure();
+                self.deselect_slice_plane_selection();
+            }
+        }
+    }
+
     /// Performs GPU-based picking to find which structure and element is at the given screen position.
     ///
     /// Uses the GPU pick buffer to determine the exact structure and element at the click position.
@@ -19,6 +166,24 @@ impl App {
         // Look up structure info from global index
         let (type_name, name, local_index) = engine.lookup_global_index(global_index)?;
         Some((type_name.to_string(), name.to_string(), local_index))
+    }
+
+    /// Returns the world position of the structure at a screen position.
+    ///
+    /// Like C++ `pickAtScreenCoords`, this reads the pick buffer for the hit and the
+    /// pick depth buffer for the position. Thus it works for every structure type
+    /// in the pick pass. Returns None for the background.
+    pub(super) fn pick_world_position_at(&self, screen: glam::Vec2) -> Option<Vec3> {
+        let engine = self.engine.as_ref()?;
+        if screen.x < 0.0 || screen.y < 0.0 {
+            return None;
+        }
+        let (x, y) = (screen.x as u32, screen.y as u32);
+        self.gpu_pick_at(x, y)?;
+        let depth = engine.pick_depth_at(x, y)?;
+        engine
+            .camera
+            .screen_depth_to_world(screen, depth, engine.width, engine.height)
     }
 
     pub(super) fn screen_ray(

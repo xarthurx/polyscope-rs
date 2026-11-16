@@ -112,8 +112,16 @@ fn test_basics() {
         assert!(get_volume_mesh("nonexistent").is_none());
     }
 
+    // Test 7: shutdown clears the file-drop callback (C++ commit 8cbdf24)
+    set_file_drop_callback(|_paths| {});
+    assert!(with_context(|ctx| ctx.file_drop_callback.is_some()));
+
     // Shutdown
     shutdown();
+    assert!(
+        with_context(|ctx| ctx.file_drop_callback.is_none()),
+        "shutdown must clear the file-drop callback"
+    );
 }
 
 /// This test requires a display and opens a window.
