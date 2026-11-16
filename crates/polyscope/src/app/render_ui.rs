@@ -443,6 +443,7 @@ impl App {
                                             cn.update_gpu_buffers(
                                                 &engine.queue,
                                                 &engine.color_maps,
+                                                ctx.length_scale,
                                             );
                                         }
                                     } else if type_name == "VolumeMesh"

@@ -577,12 +577,28 @@ impl CurveNetwork {
         self.pick_bind_group.as_ref()
     }
 
+    /// Returns the tube radius in world units.
+    ///
+    /// A relative radius is a fraction of the scene length scale, as in C++
+    /// Polyscope. An absolute radius does not depend on the scene.
+    #[must_use]
+    pub fn world_radius(&self, scene_length_scale: f32) -> f32 {
+        if self.radius_is_relative {
+            self.radius * scene_length_scale
+        } else {
+            self.radius
+        }
+    }
+
     /// Updates pick uniforms (e.g., when radius changes).
-    pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
+    ///
+    /// `scene_length_scale` is the length scale of the full scene.
+    pub fn update_pick_uniforms(&self, queue: &wgpu::Queue, scene_length_scale: f32) {
+        let radius = self.world_radius(scene_length_scale);
         if let Some(buffer) = &self.pick_uniform_buffer {
             let pick_uniforms = PickUniforms {
                 global_start: self.global_start,
-                point_radius: self.radius,
+                point_radius: radius,
                 ..PickUniforms::default()
             };
             queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[pick_uniforms]));
@@ -592,8 +608,9 @@ impl CurveNetwork {
         if let Some(buffer) = &self.tube_pick_uniform_buffer {
             let tube_pick_uniforms = TubePickUniforms {
                 global_start: self.global_start,
-                radius: self.radius,
-                min_pick_radius: 0.02, // Fixed minimum for easier selection
+                radius,
+                // A minimum radius makes thin curves easier to select.
+                min_pick_radius: 0.01 * scene_length_scale,
                 _padding: 0.0,
             };
             queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[tube_pick_uniforms]));
@@ -661,10 +678,19 @@ impl CurveNetwork {
     }
 
     /// Updates GPU buffers based on current state.
-    pub fn update_gpu_buffers(&self, queue: &wgpu::Queue, color_maps: &ColorMapRegistry) {
+    ///
+    /// `scene_length_scale` is the length scale of the full scene. A relative
+    /// radius is a fraction of it.
+    pub fn update_gpu_buffers(
+        &self,
+        queue: &wgpu::Queue,
+        color_maps: &ColorMapRegistry,
+        scene_length_scale: f32,
+    ) {
         let Some(render_data) = &self.render_data else {
             return;
         };
+        let radius = self.world_radius(scene_length_scale);
 
         // The node spheres use the point pipeline, which applies the model
         // matrix of the node uniforms. So the node buffer holds object-space
@@ -683,9 +709,10 @@ impl CurveNetwork {
             &self.edge_tip_inds,
         );
 
+        // The shaders take the radius in world units.
         let uniforms = CurveNetworkUniforms {
             color: self.color.to_array(),
-            radius: self.radius,
+            radius,
             radius_is_relative: u32::from(self.radius_is_relative),
             render_mode: self.render_mode,
             _padding: 0.0,
@@ -699,7 +726,7 @@ impl CurveNetwork {
             let node_uniforms = PointUniforms {
                 model_matrix,
                 // Make spheres slightly larger than tubes to ensure they fill gaps at joints
-                point_radius: self.radius * 1.02,
+                point_radius: radius * 1.02,
                 use_per_point_color: 0, // Use base color
                 _padding: [0.0; 2],
                 base_color: self.color.to_array(),
@@ -972,6 +999,8 @@ mod tests {
         assert_eq!(cn.color(), Vec4::new(0.2, 0.5, 0.8, 1.0));
         assert_eq!(cn.radius(), 0.005);
         assert!(cn.radius_is_relative());
+        // A relative radius is a fraction of the scene length scale.
+        assert!((cn.world_radius(4.0) - 0.02).abs() < 1e-7);
 
         // Test setters
         cn.set_color(Vec3::new(1.0, 0.0, 0.0));
@@ -980,6 +1009,8 @@ mod tests {
         cn.set_radius(0.1, false);
         assert_eq!(cn.radius(), 0.1);
         assert!(!cn.radius_is_relative());
+        // An absolute radius does not depend on the scene.
+        assert!((cn.world_radius(4.0) - 0.1).abs() < 1e-7);
 
         // Test material getter/setter
         assert_eq!(cn.material(), "default");

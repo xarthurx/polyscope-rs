@@ -184,7 +184,7 @@ fn main() {
     polyscope_rs::register_curve_network_line("helix", helix_pts);
     polyscope_rs::with_curve_network("helix", |cn| {
         cn.set_color(Vec3::new(0.9, 0.5, 0.1));
-        cn.set_radius(0.03, true);
+        cn.set_radius(0.03, false);
     });
 
     println!("Ground Plane and Shadows Demo");

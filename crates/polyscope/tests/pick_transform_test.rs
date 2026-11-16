@@ -149,8 +149,9 @@ fn check_curve_network(engine: &mut RenderEngine, offset: Vec3) {
         start,
     );
     cn.set_transform(Mat4::from_translation(offset));
-    cn.update_gpu_buffers(&engine.queue, &engine.color_maps);
-    cn.update_pick_uniforms(&engine.queue);
+    // The scene length scale only matters for a relative radius.
+    cn.update_gpu_buffers(&engine.queue, &engine.color_maps, 1.0);
+    cn.update_pick_uniforms(&engine.queue, 1.0);
     let bind_group = cn.pick_bind_group().expect("curve pick bind group");
     draw_pick(
         engine,

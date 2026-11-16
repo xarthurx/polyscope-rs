@@ -146,7 +146,7 @@ fn main() {
     polyscope_rs::register_curve_network_line("helix_1", helix1_pts);
     polyscope_rs::with_curve_network("helix_1", |cn| {
         cn.set_color(Vec3::new(1.0, 0.8, 0.0));
-        cn.set_radius(0.02, true);
+        cn.set_radius(0.02, false);
     });
 
     // Helix 2
@@ -154,7 +154,7 @@ fn main() {
     polyscope_rs::register_curve_network_line("helix_2", helix2_pts);
     polyscope_rs::with_curve_network("helix_2", |cn| {
         cn.set_color(Vec3::new(0.0, 0.8, 1.0));
-        cn.set_radius(0.02, true);
+        cn.set_radius(0.02, false);
     });
 
     // Helix 3
@@ -162,7 +162,7 @@ fn main() {
     polyscope_rs::register_curve_network_line("helix_3", helix3_pts);
     polyscope_rs::with_curve_network("helix_3", |cn| {
         cn.set_color(Vec3::new(1.0, 0.0, 0.8));
-        cn.set_radius(0.02, true);
+        cn.set_radius(0.02, false);
     });
 
     // === Create groups ===

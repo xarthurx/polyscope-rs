@@ -10,7 +10,7 @@
 //! Outputs PNG files to docs/images/
 
 use glam::{UVec3, Vec3};
-use polyscope_rs::Structure;
+use polyscope_rs::{HasQuantities, Structure};
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::fs::File;
@@ -260,6 +260,9 @@ fn scene_point_cloud() {
     pc.add_color_quantity("position_color", colors);
     polyscope_rs::with_point_cloud("fibonacci_sphere", |pc| {
         pc.set_point_radius(0.008);
+        if let Some(q) = pc.get_quantity_mut("position_color") {
+            q.set_enabled(true);
+        }
     });
 }
 
@@ -284,6 +287,11 @@ fn scene_surface_mesh() {
 
     let handle = polyscope_rs::register_surface_mesh("spot", verts, faces);
     handle.add_vertex_color_quantity("height_color", colors);
+    polyscope_rs::with_surface_mesh("spot", |mesh| {
+        if let Some(q) = mesh.get_quantity_mut("height_color") {
+            q.set_enabled(true);
+        }
+    });
 }
 
 /// Screenshot 4: Curve network
@@ -303,7 +311,8 @@ fn scene_curve_network() {
     polyscope_rs::register_curve_network_line("trefoil_knot", nodes.clone());
     polyscope_rs::with_curve_network("trefoil_knot", |cn| {
         cn.set_color(Vec3::new(0.9, 0.4, 0.1));
-        cn.set_radius(0.08, true);
+        cn.set_radius(0.08, false);
+        cn.set_render_mode(1); // tubes
         cn.set_material("candy");
     });
 
@@ -322,7 +331,8 @@ fn scene_curve_network() {
     polyscope_rs::register_curve_network_line("helix", helix);
     polyscope_rs::with_curve_network("helix", |cn| {
         cn.set_color(Vec3::new(0.2, 0.6, 0.9));
-        cn.set_radius(0.06, true);
+        cn.set_radius(0.06, false);
+        cn.set_render_mode(1); // tubes
         cn.set_material("ceramic");
     });
 }
@@ -348,6 +358,7 @@ fn scene_volume_mesh() {
         polyscope_rs::with_volume_mesh("bunny", |m| {
             m.add_vertex_scalar_quantity("height", scalars);
         });
+        mesh.set_quantity_enabled("height", true);
     }
 }
 
@@ -365,13 +376,14 @@ fn scene_volume_grid() {
     let nx = dim.x as usize;
     let ny = dim.y as usize;
     let nz = dim.z as usize;
-    let mut values = Vec::with_capacity((nx + 1) * (ny + 1) * (nz + 1));
-    for k in 0..=nz {
-        for j in 0..=ny {
-            for i in 0..=nx {
-                let x = bound_min.x + (i as f32 / nx as f32) * (bound_max.x - bound_min.x);
-                let y = bound_min.y + (j as f32 / ny as f32) * (bound_max.y - bound_min.y);
-                let z = bound_min.z + (k as f32 / nz as f32) * (bound_max.z - bound_min.z);
+    // One value per node. Node (i, j, k) has the index i + j * nx + k * nx * ny.
+    let mut values = Vec::with_capacity(nx * ny * nz);
+    for k in 0..nz {
+        for j in 0..ny {
+            for i in 0..nx {
+                let x = bound_min.x + (i as f32 / (nx - 1) as f32) * (bound_max.x - bound_min.x);
+                let y = bound_min.y + (j as f32 / (ny - 1) as f32) * (bound_max.y - bound_min.y);
+                let z = bound_min.z + (k as f32 / (nz - 1) as f32) * (bound_max.z - bound_min.z);
                 let r = (x * x + y * y + z * z).sqrt();
                 let val = (3.0 * r).sin() / (r + 0.1);
                 values.push(val);
@@ -380,6 +392,7 @@ fn scene_volume_grid() {
     }
 
     vg.add_node_scalar_quantity("sinc_field", values);
+    vg.set_quantity_enabled("sinc_field", true);
 }
 
 fn normalize_mesh_f32(vertices: &mut [Vec3], target_size: f32) {

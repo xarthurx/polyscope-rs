@@ -33,7 +33,7 @@ fn main() {
     let _helix = polyscope_rs::register_curve_network_line("helix", helix_nodes.clone());
 
     polyscope_rs::with_curve_network("helix", |c| {
-        c.set_radius(0.02, true);
+        c.set_radius(0.02, false);
         c.set_color(Vec3::new(0.2, 0.8, 0.4));
 
         // Add node vector quantity (tangent vectors)
@@ -69,7 +69,7 @@ fn main() {
     let _circle = polyscope_rs::register_curve_network_loop("circle", circle_nodes);
 
     polyscope_rs::with_curve_network("circle", |c| {
-        c.set_radius(0.015, true);
+        c.set_radius(0.015, false);
         c.set_color(Vec3::new(0.8, 0.2, 0.4));
     });
 
@@ -103,7 +103,7 @@ fn main() {
     let _grid = polyscope_rs::register_curve_network("grid", grid_nodes, grid_edges);
 
     polyscope_rs::with_curve_network("grid", |c| {
-        c.set_radius(0.01, true);
+        c.set_radius(0.01, false);
         c.set_color(Vec3::new(0.9, 0.7, 0.2));
     });
 
@@ -120,7 +120,7 @@ fn main() {
     let _segments = polyscope_rs::register_curve_network_segments("segments", segment_nodes);
 
     polyscope_rs::with_curve_network("segments", |c| {
-        c.set_radius(0.025, true);
+        c.set_radius(0.025, false);
         c.set_color(Vec3::new(0.4, 0.4, 0.8));
     });
 
