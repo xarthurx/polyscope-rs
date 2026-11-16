@@ -1,13 +1,60 @@
 //! Visual 3D gizmo integration using transform-gizmo-egui.
 //!
-//! Shows all gizmo modes (translate, rotate, scale) simultaneously.
+//! The gizmo shows the handles of the selected mode (translate, rotate or
+//! scale) and snaps to the configured increments.
 
 use egui::Ui;
 use glam::{DMat4, Mat4, Quat, Vec3};
+use polyscope_core::GizmoMode as PolyscopeGizmoMode;
 use transform_gizmo_egui::{
-    Gizmo, GizmoConfig, GizmoExt, GizmoMode, GizmoOrientation, GizmoVisuals,
+    EnumSet, Gizmo, GizmoConfig, GizmoExt, GizmoMode, GizmoOrientation, GizmoVisuals,
     config::TransformPivotPoint, math::Transform, mint,
 };
+
+use crate::GizmoSettings;
+
+/// Handle, orientation and snap configuration of the gizmo for one interaction.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ModeConfig {
+    modes: EnumSet<GizmoMode>,
+    orientation: GizmoOrientation,
+    snapping: bool,
+    /// Rotation increment in radians.
+    snap_angle: f32,
+    snap_distance: f32,
+    snap_scale: f32,
+}
+
+impl ModeConfig {
+    /// Builds the configuration from the UI settings.
+    ///
+    /// If `allow_scale` is false (slice planes), the scale mode shows the
+    /// translation and rotation handles. Snapping is on only if every shown
+    /// handle kind has a positive increment.
+    fn new(settings: &GizmoSettings, allow_scale: bool) -> Self {
+        let translate = (GizmoMode::all_translate(), settings.snap_translate);
+        let rotate = (GizmoMode::all_rotate(), settings.snap_rotate);
+        let scale = (GizmoMode::all_scale(), settings.snap_scale);
+        let kinds: &[(EnumSet<GizmoMode>, f32)] = match settings.mode {
+            PolyscopeGizmoMode::Translate => &[translate],
+            PolyscopeGizmoMode::Rotate => &[rotate],
+            PolyscopeGizmoMode::Scale if allow_scale => &[scale],
+            PolyscopeGizmoMode::Scale => &[translate, rotate],
+        };
+        Self {
+            modes: kinds.iter().fold(EnumSet::empty(), |acc, (m, _)| acc | *m),
+            orientation: if settings.local_space {
+                GizmoOrientation::Local
+            } else {
+                GizmoOrientation::Global
+            },
+            snapping: kinds.iter().all(|(_, snap)| *snap > 0.0),
+            snap_angle: settings.snap_rotate.to_radians(),
+            snap_distance: settings.snap_translate,
+            snap_scale: settings.snap_scale,
+        }
+    }
+}
 
 /// Wrapper around transform-gizmo-egui for polyscope integration.
 pub struct TransformGizmo {
@@ -31,7 +78,7 @@ impl TransformGizmo {
 
     /// Draws the gizmo and handles interaction.
     ///
-    /// Shows all modes (translate, rotate, scale) simultaneously.
+    /// Shows the handles of the mode in `settings` and snaps to its increments.
     /// Returns the updated transform if the gizmo was manipulated.
     ///
     /// # Arguments
@@ -39,7 +86,7 @@ impl TransformGizmo {
     /// * `view_matrix` - Camera view matrix
     /// * `projection_matrix` - Camera projection matrix
     /// * `model_matrix` - Current transform of the object
-    /// * `local_space` - If true, use local coordinates; if false, use world coordinates
+    /// * `settings` - Mode, coordinate space and snap increments
     /// * `viewport` - Viewport rect
     pub fn interact(
         &mut self,
@@ -47,15 +94,52 @@ impl TransformGizmo {
         view_matrix: Mat4,
         projection_matrix: Mat4,
         model_matrix: Mat4,
-        local_space: bool,
+        settings: &GizmoSettings,
         viewport: egui::Rect,
     ) -> Option<Mat4> {
-        let orientation = if local_space {
-            GizmoOrientation::Local
-        } else {
-            GizmoOrientation::Global
-        };
+        let mode_config = ModeConfig::new(settings, true);
+        self.interact_with(
+            ui,
+            view_matrix,
+            projection_matrix,
+            model_matrix,
+            mode_config,
+            viewport,
+        )
+    }
 
+    /// Same as [`Self::interact`], for objects without scale (slice planes).
+    ///
+    /// The scale mode shows the translation and rotation handles.
+    pub fn interact_without_scale(
+        &mut self,
+        ui: &mut Ui,
+        view_matrix: Mat4,
+        projection_matrix: Mat4,
+        model_matrix: Mat4,
+        settings: &GizmoSettings,
+        viewport: egui::Rect,
+    ) -> Option<Mat4> {
+        let mode_config = ModeConfig::new(settings, false);
+        self.interact_with(
+            ui,
+            view_matrix,
+            projection_matrix,
+            model_matrix,
+            mode_config,
+            viewport,
+        )
+    }
+
+    fn interact_with(
+        &mut self,
+        ui: &mut Ui,
+        view_matrix: Mat4,
+        projection_matrix: Mat4,
+        model_matrix: Mat4,
+        mode_config: ModeConfig,
+        viewport: egui::Rect,
+    ) -> Option<Mat4> {
         // Convert glam Mat4 (f32) to DMat4 (f64) for transform-gizmo
         let view_f64 = mat4_to_dmat4(view_matrix);
         let proj_f64 = mat4_to_dmat4(projection_matrix);
@@ -91,14 +175,14 @@ impl TransformGizmo {
             view_matrix: view_mint,
             projection_matrix: proj_mint,
             viewport,
-            modes: GizmoMode::all(),
+            modes: mode_config.modes,
             mode_override: None,
-            orientation,
+            orientation: mode_config.orientation,
             pivot_point: TransformPivotPoint::MedianPoint,
-            snapping: false,
-            snap_angle: 0.0,
-            snap_distance: 0.0,
-            snap_scale: 0.0,
+            snapping: mode_config.snapping,
+            snap_angle: mode_config.snap_angle,
+            snap_distance: mode_config.snap_distance,
+            snap_scale: mode_config.snap_scale,
             visuals: GizmoVisuals::default(),
             pixels_per_point: ui.ctx().pixels_per_point(),
         };
@@ -226,6 +310,49 @@ mod tests {
         let gizmo = TransformGizmo::new();
         // Just verify it can be created
         drop(gizmo);
+    }
+
+    #[test]
+    fn test_mode_config_follows_mode_and_snap() {
+        let mut settings = GizmoSettings::default();
+        let config = ModeConfig::new(&settings, true);
+        assert_eq!(config.modes, GizmoMode::all_translate());
+        assert!(!config.snapping, "zero increments must not snap");
+
+        settings.mode = PolyscopeGizmoMode::Rotate;
+        settings.snap_rotate = 15.0;
+        let config = ModeConfig::new(&settings, true);
+        assert_eq!(config.modes, GizmoMode::all_rotate());
+        assert!(config.snapping);
+        assert!((config.snap_angle - 15.0_f32.to_radians()).abs() < 1e-6);
+
+        settings.mode = PolyscopeGizmoMode::Scale;
+        settings.snap_scale = 0.25;
+        settings.local_space = true;
+        let config = ModeConfig::new(&settings, true);
+        assert_eq!(config.modes, GizmoMode::all_scale());
+        assert!(config.snapping);
+        assert!((config.snap_scale - 0.25).abs() < 1e-6);
+        assert_eq!(config.orientation, GizmoOrientation::Local);
+    }
+
+    #[test]
+    fn test_mode_config_without_scale() {
+        let mut settings = GizmoSettings {
+            mode: PolyscopeGizmoMode::Scale,
+            snap_translate: 0.5,
+            ..GizmoSettings::default()
+        };
+        let config = ModeConfig::new(&settings, false);
+        assert_eq!(
+            config.modes,
+            GizmoMode::all_translate() | GizmoMode::all_rotate()
+        );
+        // The rotation increment is zero, so snapping must stay off.
+        assert!(!config.snapping);
+
+        settings.snap_rotate = 10.0;
+        assert!(ModeConfig::new(&settings, false).snapping);
     }
 
     #[test]

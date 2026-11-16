@@ -47,6 +47,9 @@ impl App {
         // Sync scene extents from context
         self.scene_extents = crate::get_scene_extents();
 
+        // Sync gizmo settings from context, so that API calls show in the UI
+        self.gizmo_settings = crate::get_gizmo_settings();
+
         let mut camera_changed = false;
         let mut scene_extents_changed = false;
         let mut screenshot_requested = false;
@@ -336,7 +339,7 @@ impl App {
                             view_matrix,
                             projection_matrix,
                             current_transform,
-                            self.gizmo_settings.local_space,
+                            &self.gizmo_settings,
                             full_window_viewport,
                         ) {
                             // Decompose the new transform from gizmo
@@ -487,12 +490,12 @@ impl App {
                             return;
                         }
 
-                        if let Some(new_transform) = self.transform_gizmo.interact(
+                        if let Some(new_transform) = self.transform_gizmo.interact_without_scale(
                             ui,
                             view_matrix,
                             projection_matrix,
                             current_transform,
-                            self.gizmo_settings.local_space,
+                            &self.gizmo_settings,
                             full_window_viewport,
                         ) {
                             let (new_origin, rotation, _scale) =

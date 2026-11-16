@@ -847,6 +847,7 @@ mod tests {
         let _guard = setup();
 
         // Set known values
+        set_gizmo_mode(GizmoMode::Rotate);
         set_gizmo_space(GizmoSpace::Local);
         set_gizmo_visible(false);
         set_gizmo_snap_translate(0.5);
@@ -854,6 +855,7 @@ mod tests {
         set_gizmo_snap_scale(0.1);
 
         let settings = get_gizmo_settings();
+        assert_eq!(settings.mode, GizmoMode::Rotate);
         assert!(settings.local_space); // Local
         assert!(!settings.visible);
         assert!((settings.snap_translate - 0.5).abs() < 0.001);
@@ -866,6 +868,7 @@ mod tests {
         let _guard = setup();
 
         let settings = polyscope_ui::GizmoSettings {
+            mode: GizmoMode::Scale,
             local_space: false, // World
             visible: true,
             snap_translate: 1.0,
@@ -875,8 +878,13 @@ mod tests {
 
         apply_gizmo_settings(&settings);
 
+        assert_eq!(get_gizmo_mode(), GizmoMode::Scale);
         assert_eq!(get_gizmo_space(), GizmoSpace::World);
         assert!(is_gizmo_visible());
+        let applied = get_gizmo_settings();
+        assert!((applied.snap_translate - 1.0).abs() < 0.001);
+        assert!((applied.snap_rotate - 45.0).abs() < 0.001);
+        assert!((applied.snap_scale - 0.25).abs() < 0.001);
     }
 
     #[test]

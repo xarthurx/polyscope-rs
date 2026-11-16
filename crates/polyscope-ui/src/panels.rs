@@ -240,6 +240,8 @@ pub enum GroupsAction {
 /// Gizmo settings for UI.
 #[derive(Debug, Clone)]
 pub struct GizmoSettings {
+    /// Transformation mode of the gizmo handles.
+    pub mode: polyscope_core::GizmoMode,
     /// Use local coordinate space (true) or world space (false).
     pub local_space: bool,
     /// Whether gizmo is visible.
@@ -255,6 +257,7 @@ pub struct GizmoSettings {
 impl Default for GizmoSettings {
     fn default() -> Self {
         Self {
+            mode: polyscope_core::GizmoMode::Translate,
             local_space: false, // World space by default
             visible: true,
             snap_translate: 0.0,
@@ -487,12 +490,81 @@ pub fn build_gizmo_section(
                         }
                     }
                 });
+
+                if settings.visible && build_gizmo_mode_and_snap(ui, settings) {
+                    action = GizmoAction::SettingsChanged;
+                }
             } else {
                 ui.label("No selection");
             }
         });
 
     action
+}
+
+/// Builds the gizmo mode selector and the snap increments (0 = off).
+/// Returns true if a setting changed.
+fn build_gizmo_mode_and_snap(ui: &mut Ui, settings: &mut GizmoSettings) -> bool {
+    use polyscope_core::GizmoMode;
+
+    let mut changed = false;
+    egui::Grid::new("gizmo_mode_snap_grid")
+        .num_columns(2)
+        .show(ui, |ui| {
+            ui.label("Mode:");
+            ui.horizontal(|ui| {
+                for (mode, label, hover) in [
+                    (GizmoMode::Translate, "T", "Translate"),
+                    (GizmoMode::Rotate, "R", "Rotate"),
+                    (GizmoMode::Scale, "S", "Scale"),
+                ] {
+                    if ui
+                        .selectable_label(settings.mode == mode, label)
+                        .on_hover_text(hover)
+                        .clicked()
+                    {
+                        settings.mode = mode;
+                        changed = true;
+                    }
+                }
+            });
+            ui.end_row();
+
+            ui.label("Snap move:");
+            changed |= ui
+                .add(
+                    DragValue::new(&mut settings.snap_translate)
+                        .speed(0.01)
+                        .range(0.0..=f32::MAX),
+                )
+                .on_hover_text("Translation increment (0 = off)")
+                .changed();
+            ui.end_row();
+
+            ui.label("Snap angle:");
+            changed |= ui
+                .add(
+                    DragValue::new(&mut settings.snap_rotate)
+                        .speed(1.0)
+                        .range(0.0..=180.0)
+                        .suffix("°"),
+                )
+                .on_hover_text("Rotation increment (0 = off)")
+                .changed();
+            ui.end_row();
+
+            ui.label("Snap scale:");
+            changed |= ui
+                .add(
+                    DragValue::new(&mut settings.snap_scale)
+                        .speed(0.01)
+                        .range(0.0..=f32::MAX),
+                )
+                .on_hover_text("Scale increment (0 = off)")
+                .changed();
+            ui.end_row();
+        });
+    changed
 }
 
 /// Counts the total number of structures in a group and all its descendant groups.

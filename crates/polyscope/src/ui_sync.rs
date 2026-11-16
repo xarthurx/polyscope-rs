@@ -324,6 +324,7 @@ pub fn get_gizmo_settings() -> polyscope_ui::GizmoSettings {
     with_context(|ctx| {
         let gizmo = ctx.gizmo();
         polyscope_ui::GizmoSettings {
+            mode: gizmo.mode,
             local_space: matches!(gizmo.space, GizmoSpace::Local),
             visible: gizmo.visible,
             snap_translate: gizmo.snap_translate,
@@ -337,6 +338,7 @@ pub fn get_gizmo_settings() -> polyscope_ui::GizmoSettings {
 pub fn apply_gizmo_settings(settings: &polyscope_ui::GizmoSettings) {
     with_context_mut(|ctx| {
         let gizmo = ctx.gizmo_mut();
+        gizmo.mode = settings.mode;
         gizmo.space = if settings.local_space {
             GizmoSpace::Local
         } else {
