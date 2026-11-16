@@ -558,6 +558,20 @@ mod tests {
         assert!(ViewState::validate(&s).is_err());
     }
 
+    // The tests below share the global context. The lock makes them run one
+    // at a time, so one test cannot change the view buffers of another test.
+    static CONTEXT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Returns the guard that serializes the tests that use the global context.
+    ///
+    /// Keep the guard alive for the full test.
+    fn lock_context() -> std::sync::MutexGuard<'static, ()> {
+        // A failed test poisons the lock. The other tests must still run.
+        CONTEXT_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     fn ensure_initialized() {
         // Tests share the global OnceLock-backed context. Initialize it once.
         let _ = crate::state::init_context();
@@ -575,6 +589,7 @@ mod tests {
 
     #[test]
     fn test_current_view_state_returns_error_when_no_snapshot() {
+        let _guard = lock_context();
         clear_view_buffers();
         let err = current_view_state().unwrap_err();
         assert!(matches!(err, crate::error::PolyscopeError::NoActiveView));
@@ -582,6 +597,7 @@ mod tests {
 
     #[test]
     fn test_save_view_to_json_roundtrip_via_buffers() {
+        let _guard = lock_context();
         install_snapshot(dummy_view_state());
         let json = save_view_to_json().unwrap();
         assert!(json.contains("\"version\""));
@@ -593,6 +609,7 @@ mod tests {
 
     #[test]
     fn test_load_view_from_json_queues_pending() {
+        let _guard = lock_context();
         install_snapshot(dummy_view_state());
         let json = save_view_to_json().unwrap();
         load_view_from_json(&json, ViewTransition::Instant).unwrap();
