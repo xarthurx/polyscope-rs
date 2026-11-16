@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-polyscope-rs is a Rust-native 3D visualization library for geometric data, ported from C++ [Polyscope](https://polyscope.run). **Core paradigm**: Structures (geometric objects) + Quantities (data on structures). Version 0.5.10, ~100% feature parity with C++ Polyscope 2.x.
+polyscope-rs is a Rust-native 3D visualization library for geometric data, ported from C++ [Polyscope](https://polyscope.run). **Core paradigm**: Structures (geometric objects) + Quantities (data on structures). Version 0.5.10. Partial parity with C++ Polyscope 2.x: [Feature Status](docs/feature-status.md) lists every C++ feature that is not ported yet and the last audited upstream commit.
 
 ## Build Commands
 
@@ -15,6 +15,11 @@ cargo test             # Run tests
 cargo clippy           # Lint (must be zero warnings)
 cargo fmt              # Format code
 ```
+
+Minimum Rust version: 1.96 (`rust-version` in the workspace `Cargo.toml`).
+
+The CI runner has no GPU. To check that the GPU tests skip correctly, hide the Vulkan driver:
+`VK_ICD_FILENAMES=/dev/null VK_DRIVER_FILES=/dev/null cargo test --workspace --no-fail-fast`
 
 ## Workspace Structure
 
@@ -31,8 +36,11 @@ crates/
 
 - **State**: Global `OnceLock<RwLock<Context>>` via `with_context()` / `with_context_mut()`
 - **Bind groups**: Group 0 = per-object uniforms, Group 1 = slice planes/reflection, Group 2 = matcap textures
-- **Render loop** (`app/render.rs`): shadow map -> slice planes -> ground plane -> depth prepass -> main pass -> surface mesh -> depth peel -> SSAO -> tone mapping
-- **Headless rendering** (`headless.rs`): `render_to_image()` / `render_to_file()` create a throwaway `App` + headless `RenderEngine`, clear stale GPU resources via `Structure::clear_gpu_resources()`, render one frame, and capture pixels
+- **Render look**: `Options` (`polyscope-core/src/options.rs`) is the single source of truth for background, ground plane, transparency, SSAA, SSAO and max FPS. The UI panels edit it, and saved views (`view_state`) round-trip it.
+- **Frame pipeline**: `app/render_frame.rs` holds `prepare_frame`, `configure_frame` and `encode_scene` (slice planes -> ground plane with stencil and reflections -> depth prepass -> main pass -> mesh pass -> depth peel -> SSAO, all into the HDR texture). The window (`app/render.rs`), screenshots and headless rendering all use it, then tone map. Do not add a second pass list.
+- **Tone mapping**: the shader applies `pow(color, 1 / gamma)`. On an sRGB output texture it stores the decoded value, so the display shows the gamma curve once, as C++ Polyscope does.
+- **Headless rendering** (`headless.rs`): `render_to_image()` / `render_to_file()` create a throwaway `App` + headless `RenderEngine`, clear stale GPU resources via `Structure::clear_gpu_resources()` before and after the frame, render one frame, and capture RGBA pixels
+- **Backends**: the engine requests only `wgpu::Backends::PRIMARY` (Vulkan, Metal, DirectX 12, WebGPU). The OpenGL backend cannot compile some shaders.
 
 ## Critical Rules
 
@@ -42,7 +50,9 @@ crates/
 
 3. **Clippy**: Must be zero warnings at all times.
 
-4. **File size limit (2000 lines)**: No single source file should exceed 2,000 lines. When adding functionality causes a file to approach or exceed this limit, **stop and notify the user** before proceeding. Propose a split strategy (e.g., extract a submodule, move quantities into their own file, separate rendering logic from data logic) and get approval before restructuring. This keeps files navigable and avoids monolithic modules that are hard to review and maintain.
+4. **Tests and the global context**: unit tests in `crates/polyscope/src/lib.rs` share one global context. Start each one with `let _guard = setup();`. Each integration test file that renders has one `#[test]` function. A GPU test must skip, not fail, when `render_to_image` or `RenderEngine::new_headless` returns an error (no adapter).
+
+5. **File size limit (2000 lines)**: No single source file should exceed 2,000 lines. When adding functionality causes a file to approach or exceed this limit, **stop and notify the user** before proceeding. Propose a split strategy (e.g., extract a submodule, move quantities into their own file, separate rendering logic from data logic) and get approval before restructuring. This keeps files navigable and avoids monolithic modules that are hard to review and maintain.
 
 ## Documentation
 
