@@ -592,7 +592,7 @@ with_context_mut(|ctx| {
 
 | Field | Type | Default | Purpose |
 |-------|------|---------|---------|
-| `background_color` | `Vec3` | (0.1, 0.1, 0.1) | Background color (linear RGB) |
+| `background_color` | `Vec3` | (1.0, 1.0, 1.0), white | Background color (linear RGB) |
 | `ground_plane` | `GroundPlaneConfig` | Tile mode | Mode, height, shadow darkness, reflection intensity |
 | `transparency_mode` | `TransparencyMode` | `Simple` | Transparency mode |
 | `transparency_render_passes` | `u32` | 8 | Number of depth-peeling passes in Pretty mode |

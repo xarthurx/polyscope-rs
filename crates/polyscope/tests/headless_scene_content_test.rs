@@ -215,7 +215,11 @@ fn headless_scene_content() {
         return;
     };
 
+    // The default background is white, like the tiles of the ground plane.
+    // A dark background makes the ground plane visible against it.
+    with_context_mut(|ctx| ctx.options.background_color = Vec3::splat(0.1));
     check_ground_plane(background_pixel());
+    with_context_mut(|ctx| ctx.options.background_color = Options::default().background_color);
     set_ground_plane(GroundPlaneMode::None);
     let background = background_pixel();
     check_tubes_cover_more_than_lines(background);

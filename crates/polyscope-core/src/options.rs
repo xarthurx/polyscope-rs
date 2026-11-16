@@ -54,7 +54,8 @@ impl Default for Options {
         Self {
             auto_compute_scene_extents: true,
             ground_plane: GroundPlaneConfig::default(),
-            background_color: Vec3::new(0.1, 0.1, 0.1),
+            // White, as in C++ Polyscope (`bgColor`).
+            background_color: Vec3::ONE,
             transparency_mode: TransparencyMode::Simple,
             transparency_render_passes: 8,
             ssaa_factor: 1,

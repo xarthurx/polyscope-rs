@@ -326,7 +326,7 @@ These features exist in both libraries but behave differently.
 - **Front direction.** In polyscope-rs, the front direction is the direction that the camera looks along. In C++, it is the side where the camera sits.
 - **Home view.** The home view distance comes from the field of view and the bounding sphere. C++ uses 1.5 times the length scale and an offset along the up direction.
 - **`TransparencyMode::None`.** It renders like `Simple`. In C++, `None` turns transparency off.
-- **Default values.** The background is dark gray (0.1, 0.1, 0.1); C++ uses white. The ground plane mode is Tile; C++ uses TileReflection.
+- **Default values.** The ground plane mode is Tile; C++ uses TileReflection.
 - **More default values.** The shadow darkness is 0.4; C++ uses 0.25. The transparency mode is Simple; C++ uses None.
 - **Screenshot background.** `ScreenshotOptions::transparent_background` is false by default. C++ uses a transparent background by default.
 - **View files.** The JSON format is Rust-native. It stores the field of view in radians and also stores the render look. C++ view files do not load.

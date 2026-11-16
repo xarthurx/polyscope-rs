@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The default background color is white, as in C++ Polyscope. It was dark
+  gray (0.1, 0.1, 0.1). Set `Options::background_color` for another color.
+
+### Added
+- `Camera::update_flight_at(now)` steps a camera flight to a given time.
+  `Camera::update_flight` calls it with the current time.
+
 ## [0.6.0] - 2026-11-16
 
 This release updates all dependencies and fixes the defects that an audit
