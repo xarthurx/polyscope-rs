@@ -1,7 +1,7 @@
+use super::picking::{ClickHit, DOUBLE_CLICK_TIME};
 use super::{
     ActiveEventLoop, App, ApplicationHandler, Arc, EguiIntegration, ElementState, FutureExt,
-    KeyCode, LogicalSize, MouseButton, PickResult, RenderEngine, Vec3, Window, WindowEvent,
-    WindowId,
+    KeyCode, LogicalSize, MouseButton, RenderEngine, Vec3, Window, WindowEvent, WindowId,
 };
 
 impl ApplicationHandler for App {
@@ -142,6 +142,9 @@ impl ApplicationHandler for App {
                 }
                 self.last_frame_time = Some(now);
 
+                // Apply a queued click pick once it cannot become a double-click
+                self.update_pending_pick(now);
+
                 self.render();
                 if let Some(window) = &self.window {
                     window.request_redraw();
@@ -241,6 +244,11 @@ impl ApplicationHandler for App {
                 // Threshold for distinguishing click from drag (in pixels)
                 const DRAG_THRESHOLD: f64 = 5.0;
 
+                // A right-button release cancels a queued pick (C++ processInputEvents).
+                if let (MouseButton::Right, ElementState::Released) = (button, state) {
+                    self.cancel_pending_pick();
+                }
+
                 if let (MouseButton::Left, ElementState::Released) = (button, state) {
                     // DEBUG: Log click event
                     log::debug!(
@@ -266,17 +274,16 @@ impl ApplicationHandler for App {
                     }
 
                     // Double-click detection
-                    const DOUBLE_CLICK_TIME_MS: u128 = 500;
                     const DOUBLE_CLICK_DIST: f64 = 10.0;
 
                     let is_double_click = if let (Some(prev_time), Some(prev_pos)) =
                         (self.last_left_click_time, self.last_left_click_screen_pos)
                     {
-                        let elapsed = prev_time.elapsed().as_millis();
+                        let elapsed = prev_time.elapsed();
                         let dist = ((self.mouse_pos.0 - prev_pos.0).powi(2)
                             + (self.mouse_pos.1 - prev_pos.1).powi(2))
                         .sqrt();
-                        elapsed < DOUBLE_CLICK_TIME_MS && dist < DOUBLE_CLICK_DIST
+                        elapsed < DOUBLE_CLICK_TIME && dist < DOUBLE_CLICK_DIST
                     } else {
                         false
                     };
@@ -294,6 +301,9 @@ impl ApplicationHandler for App {
                     // Handle double-click: set view center to clicked 3D point
                     if is_double_click && !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD
                     {
+                        // Cancel the pick of the first click
+                        self.cancel_pending_pick();
+
                         // The pick buffers give the hit point for every structure type.
                         let click_screen =
                             glam::Vec2::new(self.mouse_pos.0 as f32, self.mouse_pos.1 as f32);
@@ -331,11 +341,7 @@ impl ApplicationHandler for App {
                             );
                             let Some((ray_origin, ray_dir)) = ray else {
                                 log::debug!("[CLICK DEBUG] No ray - deselecting");
-                                self.selection = None;
-                                self.selected_element_index = None;
-                                self.selection_info = polyscope_ui::SelectionInfo::default();
-                                crate::deselect_structure();
-                                self.deselect_slice_plane_selection();
+                                self.queue_click_pick(None, click_screen);
                                 self.last_click_pos = None;
                                 return;
                             };
@@ -396,15 +402,6 @@ impl ApplicationHandler for App {
                             }
                             log::debug!("[CLICK DEBUG] point_hit: {point_hit:?}");
                             log::debug!("[CLICK DEBUG] curve_hit: {curve_hit:?}");
-
-                            enum ClickHit {
-                                Plane(String),
-                                Structure {
-                                    type_name: String,
-                                    name: String,
-                                    element_index: u32,
-                                },
-                            }
 
                             let mut best_hit: Option<(ClickHit, f32)> = None;
 
@@ -472,69 +469,10 @@ impl ApplicationHandler for App {
                                 }
                             }
 
-                            match &best_hit {
-                                Some((ClickHit::Plane(plane_name), t)) => {
-                                    log::debug!("[CLICK DEBUG] Hit plane '{plane_name}' at t={t}");
-                                    // Select the slice plane and clear structure selection
-                                    self.selection = None;
-                                    self.selected_element_index = None;
-                                    self.selection_info = polyscope_ui::SelectionInfo::default();
-                                    crate::deselect_structure();
-                                    self.select_slice_plane_by_name(plane_name);
-                                }
-                                Some((
-                                    ClickHit::Structure {
-                                        type_name,
-                                        name,
-                                        element_index,
-                                    },
-                                    t,
-                                )) => {
-                                    log::debug!(
-                                        "[CLICK DEBUG] Hit structure '{type_name}::{name}' element {element_index} at t={t}"
-                                    );
-                                    self.selected_element_index = Some(*element_index);
-                                    self.deselect_slice_plane_selection();
-
-                                    let element_type = match type_name.as_str() {
-                                        "PointCloud" => polyscope_render::PickElementType::Point,
-                                        "SurfaceMesh" => polyscope_render::PickElementType::Face,
-                                        "VolumeMesh" => polyscope_render::PickElementType::Cell,
-                                        "CurveNetwork" => polyscope_render::PickElementType::Edge,
-                                        "VolumeGrid" => polyscope_render::PickElementType::Vertex,
-                                        _ => polyscope_render::PickElementType::None,
-                                    };
-
-                                    // For VolumeGrid, pick name is "gridname/quantityname"
-                                    // Extract the grid name for structure selection
-                                    let structure_name = if type_name == "VolumeGrid" {
-                                        name.split('/').next().unwrap_or(name).to_string()
-                                    } else {
-                                        name.clone()
-                                    };
-
-                                    self.selection = Some(PickResult {
-                                        hit: true,
-                                        structure_type: type_name.clone(),
-                                        structure_name: structure_name.clone(),
-                                        element_index: u64::from(*element_index),
-                                        element_type,
-                                        screen_pos: click_screen,
-                                        depth: 0.5,
-                                    });
-                                    crate::select_structure(type_name, &structure_name);
-                                    self.selection_info = crate::get_selection_info();
-                                }
-                                None => {
-                                    log::debug!("[CLICK DEBUG] No hit - DESELECTING");
-                                    // Nothing was clicked - deselect
-                                    self.selection = None;
-                                    self.selected_element_index = None;
-                                    self.selection_info = polyscope_ui::SelectionInfo::default();
-                                    crate::deselect_structure();
-                                    self.deselect_slice_plane_selection();
-                                }
-                            }
+                            log::debug!("[CLICK DEBUG] best_hit: {best_hit:?}");
+                            // The first click of a double-click must not change the
+                            // selection, so the pick waits (C++ commit 022deea).
+                            self.queue_click_pick(best_hit.map(|(hit, _)| hit), click_screen);
                         }
                     } else {
                         log::debug!(

@@ -969,6 +969,66 @@ mod tests {
         assert!(bb_max.z > bb_min.z);
     }
 
+    /// A single click changes the selection only after the double-click time,
+    /// and a double-click cancels it (C++ commit 022deea).
+    #[test]
+    fn test_click_pick_waits_for_double_click() {
+        use crate::app::{App, ClickHit};
+        use std::time::{Duration, Instant};
+
+        let _guard = setup();
+        deselect_structure();
+        let name = unique_name("click_pick_pc");
+        register_point_cloud(&name, vec![Vec3::ZERO, Vec3::X]);
+        let hit = || {
+            Some(ClickHit::Structure {
+                type_name: "PointCloud".to_string(),
+                name: name.clone(),
+                element_index: 1,
+            })
+        };
+        let screen = glam::Vec2::new(10.0, 20.0);
+        let later = || Instant::now() + Duration::from_secs(1);
+
+        let mut app = App::new();
+
+        // The first click does not select at once.
+        app.queue_click_pick(hit(), screen);
+        app.update_pending_pick(Instant::now());
+        assert!(app.selection.is_none());
+        assert!(with_context(|ctx| ctx.selected_structure().is_none()));
+
+        // The second click of a double-click cancels the pick.
+        app.cancel_pending_pick();
+        app.update_pending_pick(later());
+        assert!(app.selection.is_none());
+
+        // A single click selects after the delay.
+        app.queue_click_pick(hit(), screen);
+        app.update_pending_pick(later());
+        let selection = app.selection.as_ref().expect("selection after the delay");
+        assert_eq!(selection.structure_name, name);
+        assert_eq!(selection.element_index, 1);
+        assert_eq!(
+            with_context(|ctx| ctx
+                .selected_structure()
+                .map(|(t, n)| (t.to_owned(), n.to_owned()))),
+            Some(("PointCloud".to_owned(), name.clone()))
+        );
+
+        // With a selection, a click applies at once, as in C++.
+        app.queue_click_pick(None, screen);
+        app.update_pending_pick(Instant::now());
+        assert!(app.selection.is_none());
+
+        // A structure removed during the delay is not selected.
+        app.queue_click_pick(hit(), screen);
+        remove_structure(&name);
+        app.update_pending_pick(later());
+        assert!(app.selection.is_none());
+        assert!(with_context(|ctx| ctx.selected_structure().is_none()));
+    }
+
     #[test]
     fn test_single_point_scene_has_nonzero_length_scale() {
         let _guard = setup();

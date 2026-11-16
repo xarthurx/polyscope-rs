@@ -9,6 +9,9 @@ mod render_scene;
 mod render_ui;
 mod view_state;
 
+#[cfg(test)]
+pub(crate) use picking::ClickHit;
+
 use std::collections::HashSet;
 pub(super) use std::sync::Arc;
 
@@ -54,6 +57,8 @@ pub struct App {
     // Double-click detection
     pub(super) last_left_click_time: Option<std::time::Instant>,
     pub(super) last_left_click_screen_pos: Option<(f64, f64)>,
+    // Single-click pick that waits until it cannot become a double-click
+    pub(super) pending_pick: Option<picking::PendingPick>,
     // GPU picking - selected element index (from GPU pick)
     pub(super) selected_element_index: Option<u32>,
     // Ground plane settings
@@ -111,6 +116,7 @@ impl App {
             last_click_pos: None,
             last_left_click_time: None,
             last_left_click_screen_pos: None,
+            pending_pick: None,
             selected_element_index: None,
             ground_plane: GroundPlaneConfig::default(),
             screenshot_pending: None,
