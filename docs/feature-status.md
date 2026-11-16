@@ -327,7 +327,7 @@ These features exist in both libraries but behave differently.
 - **More default values.** The shadow darkness is 0.4; C++ uses 0.25. The transparency mode is Simple; C++ uses None.
 - **Screenshot background.** `ScreenshotOptions::transparent_background` is false by default. C++ uses a transparent background by default.
 - **View files.** The JSON format is Rust-native. It stores the field of view in radians and also stores the render look. C++ view files do not load.
-- **Scalar colors.** Point clouds, surface meshes, curve networks and volume meshes compute the scalar colors per vertex on the CPU. The GPU interpolates them. C++ samples the colormap per pixel.
+- **Scalar colors.** Point clouds, surface meshes, curve networks and volume meshes compute one scalar color per element on the CPU. The GPU interpolates vertex colors across faces. C++ samples the colormap per pixel.
 - **Shadows.** Shadows show in the Tile, TileReflection and ShadowOnly modes. C++ shows a shadow in the ShadowOnly mode only, from all structures.
 - **Pretty transparency.** Depth peeling applies to surface meshes only. C++ peels all structures and the ground plane.
 - **Volume mesh slicing.** A slice plane removes each cell whose center is on the cut side. No cut surface shows.
@@ -461,5 +461,5 @@ The engine uses only the Vulkan, Metal, DirectX 12 and WebGPU backends of wgpu. 
 
 If no supported backend is available:
 
-- `render_to_image` and `render_to_file` return an error with the message "no graphics adapter found (Vulkan, Metal or DirectX 12 is necessary)".
+- `render_to_image` and `render_to_file` return an error that contains the message "no graphics adapter found (Vulkan, Metal or DirectX 12 is necessary)".
 - `show()` stops with a panic: "failed to create render engine: AdapterCreationFailed".
