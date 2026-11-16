@@ -7,36 +7,143 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- View save/restore: serialize the camera + render-look state (background,
-  ground plane, transparency, SSAO, SSAA) to a JSON file and load it back.
-  New API: `save_view_to_file`, `load_view_from_file`, `save_view_to_json`,
-  `load_view_from_json`, `current_view_state`, `apply_view_state`, plus the
-  `ViewTransition` enum (`Instant` / `FlyTo`). Two UI buttons in the View
-  Controls section open native file dialogs (via `rfd`). JSON format is
-  Rust-native (not byte-compatible with C++ Polyscope view files) and
-  versioned. Headless rendering honors a loaded view and skips auto-fit, so
-  scripts can do `load_view_from_file(...)?; render_to_file(...)?` for
-  reproducible figures. New example `view_state_demo`.
-- Volume Mesh now supports prism (wedge) and pyramid cell types in addition to
-  tetrahedra and hexahedra. New constructors: `register_prism_mesh`,
-  `register_pyramid_mesh`, `VolumeMesh::new_prism_mesh`,
-  `VolumeMesh::new_pyramid_mesh`. Mixed-cell meshes are supported by using the
-  8-slot cell array with sentinel `u32::MAX` indices in unused slots
-  (matches upstream Polyscope PR #353).
-- `slice_prism` and `slice_pyramid` helpers in
-  `polyscope_structures::volume_mesh::slice_geometry`.
-- Example `volume_mesh_mixed_cells_demo` showing all four cell types.
+## [0.6.0] - 2026-11-16
+
+This release updates all dependencies and fixes the defects that an audit
+against C++ Polyscope found. It contains breaking changes.
+[Feature Status](docs/feature-status.md) lists the C++ features that are not
+ported yet.
+
+### Breaking changes
+- Dependencies: wgpu 27 → 30, egui 0.33 → 0.36, glam 0.29 → 0.34,
+  transform-gizmo-egui 0.8 → 0.11, pollster 0.4 → 1.0, rfd 0.15 → 0.18. The
+  public API uses `glam` types, so your code must use glam 0.34.
+- The minimum Rust version is 1.96 (was 1.85).
+- `Options`: `background_color` is a `Vec3` (was `Vec4`). The new field
+  `ground_plane` (`GroundPlaneConfig`) holds the ground plane settings. The
+  fields `ground_plane_enabled`, `ground_plane_mode`, `ground_plane_height`,
+  `transparency_enabled`, `invoke_user_callback_for_nested_show` and
+  `give_focus_on_show` are removed. They had no effect.
+- `polyscope_core::options::GroundPlaneMode` (a duplicate enum) and
+  `GroundPlaneConfig::shadow_blur_iters` are removed. They had no effect.
+- View state JSON: `ground_plane.enabled` and `transparency.enabled` are
+  removed. `ground_plane` has the new fields `height_is_relative`,
+  `shadow_darkness` and `reflection_intensity`. The SSAA factor must be 1, 2 or 4.
+- `VolumeMesh::build_egui_ui` and `VolumeGrid::build_egui_ui` take the list of
+  material names. The `build_egui_ui` methods of the volume mesh quantities
+  return `bool`.
+- `TransformGizmo::interact` takes `&GizmoSettings`.
+- `RenderEngine::render_ground_plane` takes the scene bounds, not the minimum
+  Y coordinate.
+- `VolumeMesh::cell_type` classifies cells by the number of sentinel indices
+  (0/2/3/4 → Hex/Prism/Pyramid/Tet), not by `cell[4] == u32::MAX`. Mixed meshes
+  from external pipelines must put the sentinels in the trailing slots. Tet
+  meshes from `new_tet_mesh` work as before.
+- The engine requests only the Vulkan, Metal, DirectX 12 and WebGPU backends.
+  The OpenGL backend never worked: it stopped with a shader validation panic.
+  A machine without a supported backend now gets the error
+  `AdapterCreationFailed`.
 
 ### Changed
-- `VolumeMesh::cell_type` now classifies cells by sentinel count (0/2/3/4 →
-  Hex/Prism/Pyramid/Tet) instead of by `cell[4] == u32::MAX`. Mixed meshes
-  produced by external pipelines must place sentinels in the correct trailing
-  slots; tet meshes built with `new_tet_mesh` continue to work unchanged.
+- `Options` is the source of truth for the render look. Background color,
+  ground plane, transparency mode, transparency render passes, SSAA factor,
+  SSAO and maximum frame rate take effect when you set them with
+  `with_context_mut(|ctx| ctx.options…)`, in the viewer and in headless
+  rendering. The UI panels show and edit the same values.
+- The viewer limits its frame rate to `Options::max_fps` (default 60, 0 = no
+  limit). The "Max FPS" control had no effect before.
+- A single click selects after 0.35 s, so the first click of a double-click
+  does not change the selection. A double-click needs the second click within
+  0.30 s and 6 pixels. These are the values of C++ Polyscope.
+- The transform gizmo shows the handles of one mode at a time. The default
+  mode is `Translate`.
+- Scroll zoom uses a step relative to the distance to the view center.
+  First-person movement and camera flights also scale with the scene.
+- The built-in colormaps use the exact tables of C++ Polyscope. The colors of
+  `viridis`, `blues`, `reds`, `coolwarm` and `rainbow` change slightly.
+- The SSAO noise texture uses a fixed seed, so renders are the same on each
+  run (upstream commit 8740ddc). The `rand` dependency is removed.
+- SSAO is off when the SSAA factor is above 1. The combination gave a wrong
+  image before.
+- The unused dependencies `ply-rs` and `log` (in `polyscope-core`) are removed.
+
+### Added
+- View save/restore: write the camera and the render look (background, ground
+  plane, transparency, SSAO, SSAA) to a JSON file and load it back. API:
+  `save_view_to_file`, `load_view_from_file`, `save_view_to_json`,
+  `load_view_from_json`, `current_view_state`, `apply_view_state`, `ViewState`
+  and `ViewTransition` (`Instant` / `FlyTo`), all exported from
+  `polyscope_rs`. Two buttons in the View section open native file dialogs
+  (`rfd`). The JSON format is Rust-native and versioned; it is not the format
+  of C++ Polyscope. Headless rendering uses a loaded view and skips the
+  automatic camera fit. New example `view_state_demo`.
+- Volume meshes support prism (wedge) and pyramid cells in addition to
+  tetrahedra and hexahedra: `register_prism_mesh`, `register_pyramid_mesh`,
+  `VolumeMesh::new_prism_mesh`, `VolumeMesh::new_pyramid_mesh`. Mixed meshes
+  use the 8-slot cell array with `u32::MAX` in unused slots (upstream PR #353).
+  New helpers `slice_prism` and `slice_pyramid`. New example
+  `volume_mesh_mixed_cells_demo`.
+- All 15 built-in colormaps of C++ Polyscope: viridis, plasma, inferno, magma,
+  gray, coolwarm, blues, reds, pink-green, phase, spectral, rainbow, jet,
+  turbo, hsv. Each colormap selector lists them. `BUILTIN_COLOR_MAP_NAMES`
+  holds the names. `scripts/extract_colormaps.py` extracts the tables from the
+  C++ source.
+- Volume mesh scalar and color quantities color the mesh. The volume mesh
+  panel lists all quantities with their controls.
+  `VolumeMeshHandle::set_quantity_enabled` enables a quantity from code.
+- `set_material` on volume meshes and volume grids, with a material selector
+  in their panels.
+- Transparent-background screenshots (`ScreenshotOptions::transparent_background`),
+  and `render_to_image_with_options` / `render_to_file_with_options` for
+  headless rendering.
+- The Transform panel has a gizmo mode selector (translate, rotate, scale) and
+  snap fields. `set_gizmo_mode` and the snap setters take effect.
+- A double-click or Ctrl+Shift+click sets the view center on every structure
+  type, and the view flies to the new center. Camera views are in the pick
+  pass. A right click without a drag clears the selection. A held Shift, Ctrl
+  or Alt key suppresses the pick. (Upstream commits 61fc32a, 1b41445, 022deea.)
+- The ground plane, its shadow light and its reflection follow the up
+  direction. With Z up, the plane lies under the scene in the XY plane.
+- `Camera::set_front_direction`. Reset View uses the up and front directions.
+- The option types `GroundPlaneConfig`, `GroundPlaneMode`, `TransparencyMode`
+  and `SsaoConfig` are exported from `polyscope_rs`.
 
 ### Fixed
-- Prism side quad 2 triangle winding now produces outward-facing normals
-  (was inward in upstream `stencilPrism`).
+- CI: a new clippy lint (`manual_midpoint`) and unit tests that used one
+  global context at the same time made the CI of `main` fail. The tests now
+  run one at a time and start from a clean scene.
+- A windowed screenshot of a scene with a surface mesh or a volume mesh
+  stopped the viewer with a wgpu validation error.
+- A loaded view did not apply the transparency mode and the SSAA factor, and
+  a saved view did not contain the transparency mode of the UI.
+- Vector quantities on curve networks and on volume meshes were stored but
+  not drawn.
+- `PointCloudHandle::add_scalar_quantity`, `add_vector_quantity` and
+  `add_color_quantity` did not add the quantity.
+- `update_points`, `update_vertices` and `update_node_positions` did not
+  change the image of a running viewer. A changed node count stopped the
+  viewer.
+- A point cloud, curve network or surface mesh with no elements stopped the
+  renderer with a wgpu validation error.
+- Wireframes showed the triangulation diagonals of quad and polygon faces, on
+  volume meshes and on surface meshes.
+- The bounding boxes of volume meshes and volume grids ignored the transform.
+- Zoom moved the camera away from the scene in small scenes. Fixed clip plane
+  and orthographic scale limits clipped small and large scenes.
+- A change of the up direction to the axis of the view gave an empty view,
+  and Reset View did not repair it (upstream commit 1e5ff25). An invalid view
+  now falls back to the home view.
+- A camera flight ended at the wrong view center, for example after
+  "Load View…".
+- A double-click rotated the view in Planar navigation.
+- A scene with one point had a length scale of 0, so zoom, new slice planes
+  and the shadow light did not work (upstream commit 3198ab5).
+- The point cloud pick ignored the model transform.
+- `shutdown()` did not clear the file-drop callback (upstream commit 8cbdf24).
+- A removed structure or slice plane stayed selected.
+- The gizmo ignored `set_gizmo_mode` and the snap settings.
+- Prism side quad 2 has the correct triangle winding; its normals pointed
+  inward (the same defect is in upstream `stencilPrism`).
 
 ## [0.5.10] - 2026-05-04
 
