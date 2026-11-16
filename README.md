@@ -177,7 +177,7 @@ cargo run --example <demo_name>
 | Transparency | `cargo run --example transparency_demo` | Depth peeling (Pretty) and alpha blending (Simple) modes |
 | View State | `cargo run --example view_state_demo` | Save and load a view, then render the restored view headless |
 
-The `generate_screenshots` example is a tool. It renders the images in `docs/images/` without a window.
+The `generate_screenshots` example is a tool. It renders six gallery scenes without a window to `docs/images/screenshot_*.png`. The images in this README are window captures of the demos above.
 
 **Controls** (common to all demos):
 - Left drag: Orbit camera

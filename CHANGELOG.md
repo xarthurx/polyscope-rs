@@ -11,9 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The default background color is white, as in C++ Polyscope. It was dark
   gray (0.1, 0.1, 0.1). Set `Options::background_color` for another color.
 
+- The "Add" button of the Slice Planes panel adds a plane with an automatic
+  name ("Scene Slice Plane N") when the name field is empty, as the
+  "Add plane" button of C++ Polyscope does. Before, it did nothing.
+
 ### Added
 - `Camera::update_flight_at(now)` steps a camera flight to a given time.
   `Camera::update_flight` calls it with the current time.
+
+### Documentation
+- New README images, taken with the 0.6 render look and the white background.
 
 ## [0.6.0] - 2026-11-16
 
