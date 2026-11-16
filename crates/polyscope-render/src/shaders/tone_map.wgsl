@@ -6,7 +6,10 @@ struct ToneMapUniforms {
     white_level: f32,
     gamma: f32,
     ssao_enabled: u32, // 0 = disabled, 1 = enabled
-    _padding: vec4<f32>, // Pad to 32 bytes (workaround for wgpu late binding size validation)
+    output_is_srgb: u32, // 1 = the output texture encodes stored values as sRGB
+    _pad0: u32, // Pad to 32 bytes (workaround for wgpu late binding size validation)
+    _pad1: u32,
+    _pad2: u32,
 }
 
 @group(0) @binding(0) var input_texture: texture_2d<f32>;
@@ -48,6 +51,13 @@ fn gamma_correct(color: vec3<f32>, gamma: f32) -> vec3<f32> {
     return pow(color, vec3<f32>(1.0 / gamma));
 }
 
+// Inverse of the sRGB encoding that an sRGB texture applies on store
+fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
+    let low = c / 12.92;
+    let high = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
+    return select(high, low, c <= vec3<f32>(0.04045));
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Sample the HDR input
@@ -70,6 +80,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Clamp to valid range
     color = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
+
+    // An sRGB target encodes the stored value again. Store the decoded value,
+    // so the displayed value is the gamma-corrected color (C++ Polyscope draws
+    // to a linear framebuffer).
+    if (uniforms.output_is_srgb == 1u) {
+        color = srgb_to_linear(color);
+    }
 
     return vec4<f32>(color, hdr_color.a);
 }

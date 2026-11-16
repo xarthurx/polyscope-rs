@@ -11,9 +11,15 @@ pub struct ToneMapUniforms {
     pub white_level: f32,
     pub gamma: f32,
     pub ssao_enabled: u32, // 0 = disabled, 1 = enabled
+    /// 1 if the output texture has an sRGB format, else 0.
+    ///
+    /// An sRGB texture encodes each stored value. The shader then stores the
+    /// decoded value, so the displayed value is `pow(color, 1 / gamma)`, as in
+    /// C++ Polyscope.
+    pub output_is_srgb: u32,
     /// Padding to 32 bytes (workaround for wgpu late binding size validation).
     #[allow(clippy::pub_underscore_fields)]
-    pub _padding: [f32; 4],
+    pub _padding: [u32; 3],
 }
 
 impl Default for ToneMapUniforms {
@@ -23,7 +29,8 @@ impl Default for ToneMapUniforms {
             white_level: 1.0,
             gamma: 2.2,
             ssao_enabled: 0,
-            _padding: [0.0; 4],
+            output_is_srgb: 0,
+            _padding: [0; 3],
         }
     }
 }
@@ -31,6 +38,8 @@ impl Default for ToneMapUniforms {
 /// Tone mapping render resources.
 pub struct ToneMapPass {
     pipeline: wgpu::RenderPipeline,
+    /// Whether the output texture has an sRGB format.
+    output_is_srgb: bool,
     bind_group_layout: wgpu::BindGroupLayout,
     uniform_buffer: wgpu::Buffer,
     sampler: wgpu::Sampler,
@@ -148,6 +157,7 @@ impl ToneMapPass {
 
         Self {
             pipeline,
+            output_is_srgb: output_format.is_srgb(),
             bind_group_layout,
             uniform_buffer,
             sampler,
@@ -168,7 +178,8 @@ impl ToneMapPass {
             white_level,
             gamma,
             ssao_enabled: u32::from(ssao_enabled),
-            _padding: [0.0; 4],
+            output_is_srgb: u32::from(self.output_is_srgb),
+            _padding: [0; 3],
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
     }
