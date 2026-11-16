@@ -1264,7 +1264,7 @@ pub fn build_tone_mapping_section(ui: &mut Ui, settings: &mut ToneMappingSetting
 pub enum SlicePlanesAction {
     /// No action.
     None,
-    /// Add a new slice plane with the given name.
+    /// Add a new slice plane with the given name. An empty name selects an automatic name.
     Add(String),
     /// Remove slice plane at the given index.
     Remove(usize),
@@ -1450,7 +1450,9 @@ pub fn build_slice_planes_section(
             ui.horizontal(|ui| {
                 ui.label("New plane:");
                 ui.add_sized([80.0, 18.0], egui::TextEdit::singleline(new_plane_name));
-                if ui.button("Add").clicked() && !new_plane_name.is_empty() {
+                // An empty name adds an automatically named plane, as the
+                // "Add plane" button of C++ Polyscope does.
+                if ui.button("Add").clicked() {
                     action = SlicePlanesAction::Add(new_plane_name.clone());
                 }
             });

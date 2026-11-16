@@ -159,7 +159,13 @@ pub fn handle_slice_plane_action(
     match action {
         polyscope_ui::SlicePlanesAction::None => {}
         polyscope_ui::SlicePlanesAction::Add(name) => {
-            add_slice_plane(&name);
+            // An empty name gets an automatic name ("Scene Slice Plane N").
+            let name = if name.is_empty() {
+                crate::add_slice_plane_auto().name().to_string()
+            } else {
+                add_slice_plane(&name);
+                name
+            };
             // Get the actual settings from the created plane (it has scene-relative values)
             let settings = with_context(|ctx| {
                 if let Some(plane) = ctx.get_slice_plane(&name) {

@@ -395,6 +395,19 @@ mod tests {
     }
 
     #[test]
+    fn test_add_action_with_empty_name_adds_auto_named_plane() {
+        let _guard = setup();
+        let mut settings = Vec::new();
+        handle_slice_plane_action(
+            polyscope_ui::SlicePlanesAction::Add(String::new()),
+            &mut settings,
+        );
+        assert_eq!(settings.len(), 1);
+        assert_eq!(settings[0].name, "Scene Slice Plane 0");
+        assert!(get_slice_plane("Scene Slice Plane 0").is_some());
+    }
+
+    #[test]
     fn test_removed_structure_does_not_stay_selected() {
         let _guard = setup();
         let kept = unique_name("selected_kept");
