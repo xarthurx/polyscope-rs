@@ -1,5 +1,5 @@
 //! Headless tests for scene content that the window draws: curve network
-//! tubes, volume grid gridcubes and the ground plane.
+//! tubes and node spheres, volume grid gridcubes and the ground plane.
 //!
 //! Headless rendering uses the scene passes of the window, so these images
 //! show what the window shows. One test function, because the global context
@@ -39,6 +39,16 @@ fn count_non_background(pixels: &[u8], background: [u8; 4]) -> usize {
         .0
         .iter()
         .filter(|p| pixel_diff(**p, background) > 8)
+        .count()
+}
+
+/// Returns the number of pixels that differ by more than `threshold` levels.
+fn count_changed(a: &[u8], b: &[u8], threshold: u8) -> usize {
+    a.as_chunks::<4>()
+        .0
+        .iter()
+        .zip(b.as_chunks::<4>().0)
+        .filter(|(p, q)| pixel_diff(**p, **q) > threshold)
         .count()
 }
 
@@ -154,6 +164,48 @@ fn check_ground_plane(background: [u8; 4]) {
     );
 }
 
+/// A transformed curve network in tube mode draws its node spheres on its
+/// tube ends: it equals an untransformed network with moved nodes.
+///
+/// Both renders use the same camera and no ground plane, so only the
+/// curve network can differ.
+fn check_transformed_node_spheres() {
+    let offset = Vec3::new(0.6, 0.3, 0.0);
+    let nodes = vec![
+        Vec3::new(0.0, 0.0, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+        Vec3::new(1.0, 1.0, 0.0),
+    ];
+    let edges = vec![[0, 1], [1, 2]];
+    let setup = |cn: &mut CurveNetwork| {
+        cn.set_render_mode(1);
+        cn.set_radius(0.08, false);
+    };
+
+    remove_all_structures();
+    let moved_nodes: Vec<Vec3> = nodes.iter().map(|p| *p + offset).collect();
+    register_curve_network("curve", moved_nodes, edges.clone());
+    with_curve_network("curve", setup);
+    let reference = render();
+    let view = current_view_state().expect("view state after a render");
+
+    remove_all_structures();
+    register_curve_network("curve", nodes, edges);
+    with_curve_network("curve", |cn| {
+        setup(cn);
+        cn.set_transform(Mat4::from_translation(offset));
+    });
+    apply_view_state(&view, ViewTransition::Instant).expect("queue view state");
+    let transformed = render();
+
+    let changed = count_changed(&transformed, &reference, 16);
+    assert!(
+        changed < 20,
+        "the node spheres of a transformed curve network must sit on its tube ends; \
+         {changed} pixels differ from the untransformed reference"
+    );
+}
+
 #[test]
 fn headless_scene_content() {
     let _ = init();
@@ -168,6 +220,7 @@ fn headless_scene_content() {
     let background = background_pixel();
     check_tubes_cover_more_than_lines(background);
     check_volume_grid_gridcubes();
+    check_transformed_node_spheres();
     set_ground_plane(GroundPlaneMode::default());
 
     remove_all_structures();
