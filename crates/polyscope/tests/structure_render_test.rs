@@ -231,6 +231,51 @@ fn check_volume_mesh_material() {
     );
 }
 
+/// Checks that empty structures register and render without a panic.
+///
+/// wgpu rejects zero-size storage buffer bindings, so empty data must not
+/// reach the GPU. Enabled vector quantities on empty data are included.
+fn check_empty_structures() {
+    let cases: [(&str, fn()); 5] = [
+        ("a point cloud with 0 points", || {
+            register_point_cloud("empty_pc", vec![]);
+            with_point_cloud("empty_pc", |pc| {
+                pc.add_vector_quantity("vecs", vec![]);
+                pc.get_quantity_mut("vecs").unwrap().set_enabled(true);
+            });
+        }),
+        ("a curve network with 0 edges", || {
+            register_curve_network("no_edges", vec![Vec3::ZERO, Vec3::X], vec![]);
+            with_curve_network("no_edges", |cn| {
+                cn.add_edge_vector_quantity("vecs", vec![]);
+                cn.get_quantity_mut("vecs").unwrap().set_enabled(true);
+            });
+        }),
+        ("a curve network with 0 nodes", || {
+            register_curve_network("no_nodes", vec![], vec![]);
+        }),
+        ("a surface mesh with 0 faces", || {
+            register_surface_mesh(
+                "no_faces",
+                vec![Vec3::ZERO, Vec3::X, Vec3::Y],
+                Vec::<Vec<u32>>::new(),
+            );
+        }),
+        ("a volume mesh with 0 cells", || {
+            let vm = register_volume_mesh("no_cells", vec![Vec3::ZERO, Vec3::X], vec![]);
+            vm.add_cell_vector_quantity("vecs", vec![]);
+            set_volume_quantity_enabled("no_cells", "vecs", true);
+        }),
+    ];
+    for (label, register) in cases {
+        remove_all_structures();
+        register();
+        let pixels = render_to_image(WIDTH, HEIGHT)
+            .unwrap_or_else(|e| panic!("rendering {label} failed: {e}"));
+        assert_eq!(pixels.len(), (WIDTH * HEIGHT * 4) as usize);
+    }
+}
+
 #[test]
 fn structure_render_tests() {
     let _ = init();
@@ -246,6 +291,7 @@ fn structure_render_tests() {
     check_volume_mesh_vectors();
     check_quad_wireframes();
     check_volume_mesh_material();
+    check_empty_structures();
 
     remove_all_structures();
 }

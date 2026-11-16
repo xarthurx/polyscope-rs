@@ -464,12 +464,18 @@ impl CurveNetwork {
     }
 
     /// Initializes GPU resources for this curve network.
+    ///
+    /// A curve network without nodes or without edges gets no GPU resources and
+    /// draws nothing, because wgpu rejects zero-size storage buffer bindings.
     pub fn init_gpu_resources(
         &mut self,
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
     ) {
+        if self.node_positions.is_empty() || self.edge_tail_inds.is_empty() {
+            return;
+        }
         self.render_data = Some(CurveNetworkRenderData::new(
             device,
             bind_group_layout,

@@ -91,12 +91,18 @@ impl PointCloud {
     }
 
     /// Initializes GPU resources for this point cloud.
+    ///
+    /// A point cloud without points gets no GPU resources and draws nothing,
+    /// because wgpu rejects zero-size storage buffer bindings.
     pub fn init_gpu_resources(
         &mut self,
         device: &wgpu::Device,
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
     ) {
+        if self.points.is_empty() {
+            return;
+        }
         self.render_data = Some(PointCloudRenderData::new(
             device,
             bind_group_layout,
