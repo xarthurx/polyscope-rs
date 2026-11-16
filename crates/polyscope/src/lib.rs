@@ -455,7 +455,7 @@ mod tests {
         }
 
         fn frame(&mut self) -> Vec<u8> {
-            self.app.render_frame_headless();
+            self.app.render_frame_headless(false);
             self.app.capture_to_buffer().expect("capture failed")
         }
     }
