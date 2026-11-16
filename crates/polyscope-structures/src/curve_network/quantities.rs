@@ -88,7 +88,6 @@ impl CurveNodeScalarQuantity {
 
     /// Builds the egui UI for this scalar quantity.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
-        let colormaps = ["viridis", "blues", "reds", "coolwarm", "rainbow"];
         polyscope_ui::build_scalar_quantity_ui(
             ui,
             &self.name,
@@ -96,7 +95,7 @@ impl CurveNodeScalarQuantity {
             &mut self.colormap_name,
             &mut self.range_min,
             &mut self.range_max,
-            &colormaps,
+            &polyscope_render::BUILTIN_COLOR_MAP_NAMES,
         )
     }
 }
@@ -229,7 +228,6 @@ impl CurveEdgeScalarQuantity {
 
     /// Builds the egui UI for this scalar quantity.
     pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
-        let colormaps = ["viridis", "blues", "reds", "coolwarm", "rainbow"];
         polyscope_ui::build_scalar_quantity_ui(
             ui,
             &self.name,
@@ -237,7 +235,7 @@ impl CurveEdgeScalarQuantity {
             &mut self.colormap_name,
             &mut self.range_min,
             &mut self.range_max,
-            &colormaps,
+            &polyscope_render::BUILTIN_COLOR_MAP_NAMES,
         )
     }
 }

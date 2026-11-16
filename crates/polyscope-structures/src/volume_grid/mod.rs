@@ -342,9 +342,8 @@ impl VolumeGrid {
         colormap_names: &[&str],
         available_materials: &[&str],
     ) {
-        let default_names = ["viridis", "blues", "reds", "coolwarm", "rainbow"];
         let names = if colormap_names.is_empty() {
-            &default_names[..]
+            &polyscope_render::BUILTIN_COLOR_MAP_NAMES[..]
         } else {
             colormap_names
         };
