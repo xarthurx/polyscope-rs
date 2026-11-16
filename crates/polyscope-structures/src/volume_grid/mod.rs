@@ -61,7 +61,7 @@ impl VolumeGrid {
             color: Vec4::new(0.5, 0.5, 0.5, 1.0),
             edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
             edge_width: 1.0,
-            cube_size_factor: 0.0,
+            cube_size_factor: 1.0,
             material: "clay".to_string(),
             render_data: None,
         }
@@ -188,7 +188,10 @@ impl VolumeGrid {
         self.cube_size_factor
     }
 
-    /// Sets the cube size factor (0 = no cubes, 1 = full size).
+    /// Sets the cube size factor (0 = no cubes, 1 = full size, the default).
+    ///
+    /// C++ Polyscope uses the opposite value: its factor is a shrink amount
+    /// (0 = full size).
     pub fn set_cube_size_factor(&mut self, factor: f32) -> &mut Self {
         self.cube_size_factor = factor.clamp(0.0, 1.0);
         self

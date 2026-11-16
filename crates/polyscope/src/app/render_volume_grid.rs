@@ -65,9 +65,9 @@ pub(super) fn init_volume_grid_quantities(engine: &RenderEngine) -> Vec<Isosurfa
                                             }
                                         }
                                     }
-                                    let half_size = grid_spacing.min_element()
-                                        * 0.5
-                                        * cube_size_factor.max(0.5);
+                                    // Half the cell size. The shader applies the cube
+                                    // size factor.
+                                    let half_size = grid_spacing.min_element() * 0.5;
 
                                     // Sample colormap
                                     let colormap_colors: Vec<Vec3> =
@@ -120,7 +120,7 @@ pub(super) fn init_volume_grid_quantities(engine: &RenderEngine) -> Vec<Isosurfa
                             let (data_min, data_max) = nsq.data_range();
                             let uniforms = GridcubeUniforms {
                                 model: transform.to_cols_array_2d(),
-                                cube_size_factor: cube_size_factor.max(0.5),
+                                cube_size_factor,
                                 data_min,
                                 data_max,
                                 transparency: 0.0,
@@ -185,8 +185,8 @@ pub(super) fn init_volume_grid_quantities(engine: &RenderEngine) -> Vec<Isosurfa
                                     }
                                 }
                             }
-                            let half_size =
-                                cell_spacing.min_element() * 0.5 * cube_size_factor.max(0.5);
+                            // Half the cell size. The shader applies the cube size factor.
+                            let half_size = cell_spacing.min_element() * 0.5;
 
                             let colormap_colors: Vec<Vec3> =
                                 if let Some(cm) = engine.color_maps.get(csq.color_map()) {
@@ -213,7 +213,7 @@ pub(super) fn init_volume_grid_quantities(engine: &RenderEngine) -> Vec<Isosurfa
                             let (data_min, data_max) = csq.data_range();
                             let uniforms = GridcubeUniforms {
                                 model: transform.to_cols_array_2d(),
-                                cube_size_factor: cube_size_factor.max(0.5),
+                                cube_size_factor,
                                 data_min,
                                 data_max,
                                 transparency: 0.0,

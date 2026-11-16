@@ -169,7 +169,7 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                             nsq.update_pick_uniforms(
                                 &engine.queue,
                                 transform.to_cols_array_2d(),
-                                cube_size_factor.max(0.5),
+                                cube_size_factor,
                             );
                         }
 
@@ -198,7 +198,7 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                             csq.update_pick_uniforms(
                                 &engine.queue,
                                 transform.to_cols_array_2d(),
-                                cube_size_factor.max(0.5),
+                                cube_size_factor,
                             );
                         }
                     }

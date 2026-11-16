@@ -138,7 +138,7 @@ impl VolumeGridHandle {
         self
     }
 
-    /// Sets the cube size factor (0 = no cubes, 1 = full size).
+    /// Sets the cube size factor (0 = no cubes, 1 = full size, the default).
     pub fn set_cube_size_factor(&self, factor: f32) -> &Self {
         with_volume_grid(&self.name, |vg| {
             vg.set_cube_size_factor(factor);

@@ -288,8 +288,9 @@ impl IsosurfaceRenderData {
 
 /// GPU resources for gridcube visualization.
 pub struct GridcubeRenderData {
-    /// Combined buffer: first 36 entries are unit cube template vertices (vec4),
-    /// followed by per-instance data (vec4: xyz=center, w=`half_size`).
+    /// Combined buffer: first 36 entries are cube template vertices (vec4) with
+    /// corners at ±1, followed by per-instance data (vec4: xyz=center,
+    /// w=`half_size`). The shaders scale the template by the half size.
     pub position_buffer: wgpu::Buffer,
     /// Cube template normals (36 entries, vec4).
     pub normal_buffer: wgpu::Buffer,
@@ -313,7 +314,7 @@ pub struct GridcubeRenderData {
     pub shadow_model_buffer: Option<wgpu::Buffer>,
 }
 
-/// Generates the 36 vertices and 36 normals for a unit cube ([-0.5, 0.5]^3).
+/// Generates the 36 vertices and 36 normals of a cube with corners at ±1 ([-1, 1]^3).
 /// Returns (positions, normals) as vec4 arrays.
 fn generate_unit_cube() -> (Vec<[f32; 4]>, Vec<[f32; 4]>) {
     // 6 faces, 2 triangles each, 3 vertices each = 36 vertices
@@ -323,60 +324,60 @@ fn generate_unit_cube() -> (Vec<[f32; 4]>, Vec<[f32; 4]>) {
         (
             [1.0, 0.0, 0.0],
             [
-                [0.5, -0.5, -0.5],
-                [0.5, 0.5, -0.5],
-                [0.5, 0.5, 0.5],
-                [0.5, -0.5, 0.5],
+                [1.0, -1.0, -1.0],
+                [1.0, 1.0, -1.0],
+                [1.0, 1.0, 1.0],
+                [1.0, -1.0, 1.0],
             ],
         ),
         // -X face
         (
             [-1.0, 0.0, 0.0],
             [
-                [-0.5, -0.5, 0.5],
-                [-0.5, 0.5, 0.5],
-                [-0.5, 0.5, -0.5],
-                [-0.5, -0.5, -0.5],
+                [-1.0, -1.0, 1.0],
+                [-1.0, 1.0, 1.0],
+                [-1.0, 1.0, -1.0],
+                [-1.0, -1.0, -1.0],
             ],
         ),
         // +Y face
         (
             [0.0, 1.0, 0.0],
             [
-                [-0.5, 0.5, -0.5],
-                [-0.5, 0.5, 0.5],
-                [0.5, 0.5, 0.5],
-                [0.5, 0.5, -0.5],
+                [-1.0, 1.0, -1.0],
+                [-1.0, 1.0, 1.0],
+                [1.0, 1.0, 1.0],
+                [1.0, 1.0, -1.0],
             ],
         ),
         // -Y face
         (
             [0.0, -1.0, 0.0],
             [
-                [-0.5, -0.5, 0.5],
-                [-0.5, -0.5, -0.5],
-                [0.5, -0.5, -0.5],
-                [0.5, -0.5, 0.5],
+                [-1.0, -1.0, 1.0],
+                [-1.0, -1.0, -1.0],
+                [1.0, -1.0, -1.0],
+                [1.0, -1.0, 1.0],
             ],
         ),
         // +Z face
         (
             [0.0, 0.0, 1.0],
             [
-                [-0.5, -0.5, 0.5],
-                [0.5, -0.5, 0.5],
-                [0.5, 0.5, 0.5],
-                [-0.5, 0.5, 0.5],
+                [-1.0, -1.0, 1.0],
+                [1.0, -1.0, 1.0],
+                [1.0, 1.0, 1.0],
+                [-1.0, 1.0, 1.0],
             ],
         ),
         // -Z face
         (
             [0.0, 0.0, -1.0],
             [
-                [0.5, -0.5, -0.5],
-                [-0.5, -0.5, -0.5],
-                [-0.5, 0.5, -0.5],
-                [0.5, 0.5, -0.5],
+                [1.0, -1.0, -1.0],
+                [-1.0, -1.0, -1.0],
+                [-1.0, 1.0, -1.0],
+                [1.0, 1.0, -1.0],
             ],
         ),
     ];
@@ -749,11 +750,12 @@ mod tests {
         assert_eq!(positions.len(), 36);
         assert_eq!(normals.len(), 36);
 
-        // All positions should be within [-0.5, 0.5]
+        // All corners are at ±1: the template has a half size of 1, so the
+        // shaders scale it by the half size of a cell.
         for p in &positions {
-            assert!(p[0].abs() <= 0.5 + f32::EPSILON);
-            assert!(p[1].abs() <= 0.5 + f32::EPSILON);
-            assert!(p[2].abs() <= 0.5 + f32::EPSILON);
+            assert!((p[0].abs() - 1.0).abs() < f32::EPSILON);
+            assert!((p[1].abs() - 1.0).abs() < f32::EPSILON);
+            assert!((p[2].abs() - 1.0).abs() < f32::EPSILON);
             assert!((p[3] - 1.0).abs() < f32::EPSILON); // w = 1.0
         }
 
