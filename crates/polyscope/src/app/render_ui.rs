@@ -322,9 +322,8 @@ impl App {
 
                 // Use Area instead of CentralPanel to avoid consuming all mouse events
                 // The gizmo handles its own interaction detection
-                egui::Area::new(egui::Id::new("gizmo_overlay"))
+                polyscope_ui::TransformGizmo::overlay_area(egui::Id::new("gizmo_overlay"))
                     .fixed_pos(egui::Pos2::ZERO)
-                    .interactable(false) // Don't consume mouse events at the area level
                     .show(&egui.context, |ui| {
                         // Set the clip rect to full window
                         ui.set_clip_rect(full_window_viewport);
@@ -480,9 +479,9 @@ impl App {
                     glam::Vec3::ONE, // No scale for slice planes
                 );
 
-                egui::Area::new(egui::Id::new("slice_plane_gizmo_overlay"))
+                let area_id = egui::Id::new("slice_plane_gizmo_overlay");
+                polyscope_ui::TransformGizmo::overlay_area(area_id)
                     .fixed_pos(egui::Pos2::ZERO)
-                    .interactable(false)
                     .show(&egui.context, |ui| {
                         ui.set_clip_rect(full_window_viewport);
 
