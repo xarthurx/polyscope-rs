@@ -2,12 +2,74 @@ use std::time::{Duration, Instant};
 
 use super::{App, CurveNetwork, PickResult, PointCloud, SurfaceMesh, Vec3, VolumeMesh};
 
-/// Longest time between the two clicks of a double-click.
-pub(super) const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(500);
+/// Longest time between the two clicks of a double-click. C++ Polyscope uses
+/// the Dear `ImGui` default `io.MouseDoubleClickTime` of 0.30 s.
+pub(super) const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(300);
+
+/// Longest distance in pixels between the two clicks of a double-click
+/// (Dear `ImGui` default `io.MouseDoubleClickMaxDist`).
+pub(super) const DOUBLE_CLICK_DIST: f64 = 6.0;
 
 /// Time that a single-click pick waits before it changes the selection.
 /// C++ uses the double-click time plus a 50 ms margin.
 const PICK_DELAY: Duration = DOUBLE_CLICK_TIME.saturating_add(Duration::from_millis(50));
+
+/// Distance in pixels from the press position at which a drag starts
+/// (Dear `ImGui` default `io.MouseDragThreshold`).
+const DRAG_START_DIST: f64 = 6.0;
+
+/// Drag length below which a release is still a click. The length adds the
+/// moves after the drag start, as fractions of the window size
+/// (C++ `dragIgnoreThreshold`).
+const DRAG_IGNORE_THRESHOLD: f64 = 0.01;
+
+/// What a mouse-button release in the 3D view does (C++ `processInputEvents`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReleaseAction {
+    /// Nothing happens.
+    Nothing,
+    /// Queue a pick that changes the selection later.
+    QueuePick,
+    /// Set the view center at the cursor and cancel a queued pick.
+    SetViewCenter,
+    /// Clear the selection and cancel a queued pick.
+    ClearSelection,
+    /// Cancel a queued pick only.
+    CancelPick,
+}
+
+/// Returns the action of a mouse-button release, as C++ Polyscope decides it.
+///
+/// - Left: a double-click or a Ctrl+Shift click sets the view center. A click
+///   without Shift, Ctrl or Alt queues a pick.
+/// - Right, without Shift, Ctrl or Alt: a click clears the selection. Each
+///   release cancels a queued pick.
+///
+/// The end of a drag is not a click. On macOS, Cmd acts as Ctrl, as in Dear `ImGui`.
+pub(crate) fn release_action(
+    button: winit::event::MouseButton,
+    is_click: bool,
+    is_double_click: bool,
+    modifiers: winit::keyboard::ModifiersState,
+) -> ReleaseAction {
+    use winit::event::MouseButton;
+    let ctrl = if cfg!(target_os = "macos") {
+        modifiers.super_key()
+    } else {
+        modifiers.control_key()
+    };
+    let shift = modifiers.shift_key();
+    let any_modifier = shift || ctrl || modifiers.alt_key();
+    match button {
+        MouseButton::Left if is_click && (is_double_click || (ctrl && shift)) => {
+            ReleaseAction::SetViewCenter
+        }
+        MouseButton::Left if is_click && !any_modifier => ReleaseAction::QueuePick,
+        MouseButton::Right if !any_modifier && is_click => ReleaseAction::ClearSelection,
+        MouseButton::Right if !any_modifier => ReleaseAction::CancelPick,
+        _ => ReleaseAction::Nothing,
+    }
+}
 
 /// The object that a single click in the 3D view hit.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +96,45 @@ pub(crate) struct PendingPick {
 }
 
 impl App {
+    /// Starts the drag tracking of a mouse-button press at the cursor.
+    pub(crate) fn begin_mouse_press(&mut self) {
+        self.mouse_press_pos = Some(self.mouse_pos);
+        self.mouse_dragging = false;
+        self.drag_distance = 0.0;
+    }
+
+    /// Tracks a cursor move of `delta` pixels while a button is held, as C++
+    /// Polyscope does with Dear `ImGui`.
+    ///
+    /// A drag starts when the cursor is `DRAG_START_DIST` pixels from the press
+    /// position. After that, each move adds |dx| / width + |dy| / height.
+    pub(crate) fn track_mouse_drag(&mut self, delta: (f64, f64), window_size: (u32, u32)) {
+        if !self.mouse_dragging {
+            let Some(press) = self.mouse_press_pos else {
+                return;
+            };
+            let from_press = (self.mouse_pos.0 - press.0).hypot(self.mouse_pos.1 - press.1);
+            if from_press < DRAG_START_DIST {
+                return;
+            }
+            self.mouse_dragging = true;
+        }
+        let width = f64::from(window_size.0.max(1));
+        let height = f64::from(window_size.1.max(1));
+        self.drag_distance += delta.0.abs() / width + delta.1.abs() / height;
+    }
+
+    /// Returns whether a release now is a click, not the end of a drag.
+    pub(crate) fn release_is_click(&self) -> bool {
+        self.drag_distance < DRAG_IGNORE_THRESHOLD
+    }
+
+    /// Clears the selection and cancels a queued pick.
+    pub(crate) fn clear_selection(&mut self) {
+        self.cancel_pending_pick();
+        self.apply_click_hit(None, glam::Vec2::ZERO);
+    }
+
     /// Queues the pick of a single click (C++ commit 022deea).
     ///
     /// The pick changes the selection only when a double-click is no longer

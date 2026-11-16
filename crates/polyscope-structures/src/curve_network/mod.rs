@@ -533,10 +533,11 @@ impl CurveNetwork {
         self.global_start = global_start;
 
         // Create pick uniform buffer
+        // The edge vertex buffer holds world-space positions, so the model is the identity.
         let pick_uniforms = PickUniforms {
             global_start,
             point_radius: self.radius, // Used as line_width in shader
-            _padding: [0.0; 2],
+            ..PickUniforms::default()
         };
         let pick_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("curve network pick uniforms"),
@@ -582,7 +583,7 @@ impl CurveNetwork {
             let pick_uniforms = PickUniforms {
                 global_start: self.global_start,
                 point_radius: self.radius,
-                _padding: [0.0; 2],
+                ..PickUniforms::default()
             };
             queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[pick_uniforms]));
         }

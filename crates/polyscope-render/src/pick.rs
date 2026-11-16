@@ -69,6 +69,9 @@ pub struct PickUniforms {
     pub point_radius: f32,
     /// Padding to align to 16 bytes.
     pub _padding: [f32; 2],
+    /// Model transform of the point positions, as in the point render shader.
+    /// Curve networks upload world-space positions and keep the identity.
+    pub model: [[f32; 4]; 4],
 }
 
 impl Default for PickUniforms {
@@ -77,6 +80,7 @@ impl Default for PickUniforms {
             global_start: 0,
             point_radius: 0.01,
             _padding: [0.0; 2],
+            model: glam::Mat4::IDENTITY.to_cols_array_2d(),
         }
     }
 }

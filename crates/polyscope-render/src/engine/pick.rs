@@ -171,14 +171,14 @@ impl RenderEngine {
                             },
                             count: None,
                         },
-                        // Pick uniforms
+                        // Pick uniforms (`PickUniforms`: 16 bytes + model matrix)
                         wgpu::BindGroupLayoutEntry {
                             binding: 1,
                             visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                             ty: wgpu::BindingType::Buffer {
                                 ty: wgpu::BufferBindingType::Uniform,
                                 has_dynamic_offset: false,
-                                min_binding_size: NonZeroU64::new(16),
+                                min_binding_size: NonZeroU64::new(80),
                             },
                             count: None,
                         },

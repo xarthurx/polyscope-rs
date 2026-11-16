@@ -11,7 +11,7 @@ mod render_ui;
 mod view_state;
 
 #[cfg(test)]
-pub(crate) use picking::ClickHit;
+pub(crate) use picking::{ClickHit, ReleaseAction, release_action};
 
 use std::collections::HashSet;
 pub(super) use std::sync::Arc;
@@ -49,7 +49,11 @@ pub struct App {
     pub(super) right_mouse_down: bool,
     // Modifier keys
     pub(super) shift_down: bool,
-    // Drag tracking - accumulated distance since mouse press
+    pub(super) modifiers: winit::keyboard::ModifiersState,
+    // Drag tracking (C++ Polyscope rules): position at the last button press,
+    // whether the drag has started, and the drag length as window fractions
+    pub(super) mouse_press_pos: Option<(f64, f64)>,
+    pub(super) mouse_dragging: bool,
     pub(super) drag_distance: f64,
     // Selection state
     pub(super) selection: Option<PickResult>,
@@ -108,6 +112,9 @@ impl App {
             left_mouse_down: false,
             right_mouse_down: false,
             shift_down: false,
+            modifiers: winit::keyboard::ModifiersState::empty(),
+            mouse_press_pos: None,
+            mouse_dragging: false,
             drag_distance: 0.0,
             selection: None,
             last_click_pos: None,

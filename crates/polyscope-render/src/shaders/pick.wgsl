@@ -18,6 +18,7 @@ struct PickUniforms {
     global_start: u32,
     point_radius: f32,
     _padding: vec2<f32>,
+    model: mat4x4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -57,8 +58,10 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    // Get point position (stored as vec4, using xyz)
-    let world_pos = point_positions[instance_index].xyz;
+    // Get point position (stored as vec4, using xyz) and apply the model
+    // transform, as the point render shader does
+    let local_pos = point_positions[instance_index].xyz;
+    let world_pos = (pick_uniforms.model * vec4<f32>(local_pos, 1.0)).xyz;
     let view_pos = (camera.view * vec4<f32>(world_pos, 1.0)).xyz;
 
     // Get quad vertex

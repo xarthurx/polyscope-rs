@@ -623,6 +623,13 @@ impl Camera {
         }
     }
 
+    /// Returns the first-person move distance for `dt` seconds. As in C++ Polyscope
+    /// (`CenterRelative` mode), it is relative to the camera-to-target distance.
+    #[must_use]
+    pub fn first_person_step(&self, dt: f32) -> f32 {
+        self.position.distance(self.target) * dt * self.move_speed
+    }
+
     /// First-person WASD movement in camera-local coordinates.
     /// `delta` is (right, up, forward) movement in camera space,
     /// pre-scaled by `move_speed` and delta time by the caller.
@@ -884,7 +891,10 @@ impl Camera {
     /// target is at the current camera-to-target distance. To end at a given
     /// target, use [`Self::start_flight_to_pose`].
     pub fn start_flight_to(&mut self, target_view: Mat4, target_fov: f32, duration_secs: f32) {
-        let current_dist = (self.position - self.target).length().max(0.01);
+        // A degenerate view has no distance: use the near plane, which scales with the scene.
+        let current_dist = Some(self.position.distance(self.target))
+            .filter(|d| *d > 0.0)
+            .unwrap_or(self.near);
         let (rot_end, t_end) = Self::decompose_view_matrix(&target_view.inverse());
         let (position, target, up) = Self::camera_from_inverse_view(&rot_end, &t_end, current_dist);
         self.start_flight_to_pose(position, target, up, target_fov, duration_secs);

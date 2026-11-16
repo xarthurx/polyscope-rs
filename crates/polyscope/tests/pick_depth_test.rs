@@ -54,11 +54,12 @@ fn pick_depth_gives_world_position_of_point_cloud_hit() {
     engine.queue.submit(std::iter::once(encoder.finish()));
 
     // The pixels at the center show the point (even and odd columns).
-    for (x, y) in [(SIZE / 2, SIZE / 2), (SIZE / 2 + 1, SIZE / 2 - 1)] {
+    for (px, py) in [(32_u16, 32_u16), (33, 31)] {
+        let (x, y) = (u32::from(px), u32::from(py));
         assert_eq!(engine.pick_at(x, y), Some(global_start));
         let depth = engine.pick_depth_at(x, y).expect("depth readback");
         assert!(depth > 0.0 && depth < 1.0, "depth {depth}");
-        let screen = glam::Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
+        let screen = glam::Vec2::new(f32::from(px) + 0.5, f32::from(py) + 0.5);
         let hit = engine
             .camera
             .screen_depth_to_world(screen, depth, SIZE, SIZE)

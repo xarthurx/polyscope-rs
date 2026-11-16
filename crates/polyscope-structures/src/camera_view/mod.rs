@@ -30,6 +30,8 @@ pub struct CameraView {
 
     // GPU resources (reuses CurveNetwork edge rendering)
     render_data: Option<CurveNetworkRenderData>,
+    /// Pick bind group for the wireframe edges (reuses the curve network line pick).
+    pick_bind_group: Option<wgpu::BindGroup>,
     /// Length scale used when geometry was last generated (to regenerate if it changes).
     prepared_length_scale: f32,
 
@@ -51,6 +53,7 @@ impl CameraView {
             widget_focal_length_is_relative: true,
             widget_thickness: 0.02,
             render_data: None,
+            pick_bind_group: None,
             prepared_length_scale: 0.0,
             fly_to_requested: false,
         }
@@ -249,6 +252,8 @@ impl CameraView {
         render_data.update_uniforms(queue, &uniforms);
 
         self.render_data = Some(render_data);
+        // The pick bind group refers to the old edge buffer.
+        self.pick_bind_group = None;
         self.prepared_length_scale = length_scale;
     }
 
@@ -256,6 +261,56 @@ impl CameraView {
     #[must_use]
     pub fn render_data(&self) -> Option<&CurveNetworkRenderData> {
         self.render_data.as_ref()
+    }
+
+    /// Initializes the pick resources for the wireframe edges.
+    ///
+    /// Uses the curve network line pick pipeline and its bind group layout. The
+    /// edge buffer holds world-space positions, so the model is the identity.
+    pub fn init_pick_resources(
+        &mut self,
+        device: &wgpu::Device,
+        pick_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_buffer: &wgpu::Buffer,
+        global_start: u32,
+    ) {
+        use wgpu::util::DeviceExt;
+        let Some(render_data) = &self.render_data else {
+            return;
+        };
+        let uniforms = polyscope_render::PickUniforms {
+            global_start,
+            ..polyscope_render::PickUniforms::default()
+        };
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("camera view pick uniforms"),
+            contents: bytemuck::cast_slice(&[uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+        self.pick_bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("camera view pick bind group"),
+            layout: pick_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: render_data.edge_vertex_buffer.as_entire_binding(),
+                },
+            ],
+        }));
+    }
+
+    /// Returns the pick bind group if initialized.
+    #[must_use]
+    pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.pick_bind_group.as_ref()
     }
 
     /// Returns true if the user has requested to fly to this camera view.
@@ -380,6 +435,7 @@ impl Structure for CameraView {
 
     fn clear_gpu_resources(&mut self) {
         self.render_data = None;
+        self.pick_bind_group = None;
         for quantity in &mut self.quantities {
             quantity.clear_gpu_resources();
         }

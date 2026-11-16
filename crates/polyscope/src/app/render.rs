@@ -1,6 +1,6 @@
 use super::{
-    App, CurveNetwork, GroundPlaneMode, PointCloud, ScreenDescriptor, Structure, SurfaceMesh, Vec3,
-    VolumeGrid, VolumeMesh, render_peel, render_scene,
+    App, CameraView, CurveNetwork, GroundPlaneMode, PointCloud, ScreenDescriptor, Structure,
+    SurfaceMesh, Vec3, VolumeGrid, VolumeMesh, render_peel, render_scene,
 };
 use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::HasQuantities;
@@ -130,6 +130,23 @@ impl App {
                 }
 
                 // CameraView init moved to shared function
+                // CameraView: windowed-only pick resources (curve network line pick)
+                if structure.type_name() == "CameraView"
+                    && let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>()
+                    && cv.pick_bind_group().is_none()
+                    && let Some(num_edges) = cv.render_data().map(|rd| rd.num_edges)
+                {
+                    if !engine.has_curve_network_pick_pipeline() {
+                        engine.init_curve_network_pick_pipeline();
+                    }
+                    let global_start = engine.assign_pick_range("CameraView", cv.name(), num_edges);
+                    cv.init_pick_resources(
+                        &engine.device,
+                        engine.pick_bind_group_layout(),
+                        engine.camera_buffer(),
+                        global_start,
+                    );
+                }
 
                 // VolumeGrid: windowed-only quantity initialization (gridcube/isosurface)
                 if structure.type_name() == "VolumeGrid"
@@ -538,6 +555,23 @@ impl App {
                         }
                     }
                 });
+
+                // Draw camera view wireframes to pick buffer (C++ camera views are pickable)
+                if engine.has_curve_network_pick_pipeline() {
+                    pick_pass.set_pipeline(engine.curve_network_pick_pipeline());
+                    crate::with_context(|ctx| {
+                        for structure in ctx.registry.iter() {
+                            if ctx.is_structure_visible(structure)
+                                && let Some(cv) = structure.as_any().downcast_ref::<CameraView>()
+                                && let (Some(bind_group), Some(render_data)) =
+                                    (cv.pick_bind_group(), cv.render_data())
+                            {
+                                pick_pass.set_bind_group(0, bind_group, &[]);
+                                pick_pass.draw(0..render_data.num_edges * 2, 0..1);
+                            }
+                        }
+                    });
+                }
 
                 // Draw surface meshes and volume meshes to pick buffer
                 // (both use the same mesh pick pipeline with face/cell index mapping)

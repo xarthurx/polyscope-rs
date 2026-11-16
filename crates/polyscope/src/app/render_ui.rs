@@ -592,15 +592,14 @@ impl App {
                 let position = params.position();
                 let look_dir = params.look_dir();
                 let (_, up, _) = params.camera_frame();
-                // Build target view matrix using look_at_rh (same convention as Camera::view_matrix)
-                let current_dist = (engine.camera.position - engine.camera.target).length();
-                let dist = if current_dist > 0.01 {
-                    current_dist
-                } else {
-                    1.0
-                };
-                let target_point = position + look_dir * dist;
-                let target_view = glam::camera::rh::view::look_at_mat4(position, target_point, up);
+                // Build the target view matrix from the look direction (same convention as
+                // Camera::view_matrix). No distance is needed: the flight keeps the current
+                // camera-to-target distance.
+                let target_view = glam::camera::rh::view::look_to_mat4(
+                    position,
+                    look_dir.normalize(),
+                    up.normalize(),
+                );
                 let target_fov = params.fov_vertical_degrees().to_radians();
                 engine.camera.start_flight_to(target_view, target_fov, 0.4);
             }
