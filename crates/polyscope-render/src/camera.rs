@@ -235,8 +235,14 @@ pub struct CameraFlight {
     initial_fov: f32,
     /// End FOV in radians.
     target_fov: f32,
-    /// Camera-to-target distance (preserved throughout flight).
-    target_dist: f32,
+    /// Camera-to-target distance at the start of the flight.
+    initial_dist: f32,
+    /// Camera position at the end of the flight.
+    final_position: Vec3,
+    /// Camera target at the end of the flight.
+    final_target: Vec3,
+    /// Camera up vector at the end of the flight.
+    final_up: Vec3,
 }
 
 /// A 3D camera for viewing the scene.
@@ -848,10 +854,31 @@ impl Camera {
     ///
     /// The `target_view` is a 4x4 view matrix (world-to-eye). The `target_fov`
     /// is in radians. `duration_secs` controls the flight length (C++ Polyscope
-    /// default is 0.4 seconds).
+    /// default is 0.4 seconds). A view matrix has no target point, so the final
+    /// target is at the current camera-to-target distance. To end at a given
+    /// target, use [`Self::start_flight_to_pose`].
     pub fn start_flight_to(&mut self, target_view: Mat4, target_fov: f32, duration_secs: f32) {
-        let current_view = self.view_matrix();
         let current_dist = (self.position - self.target).length().max(0.01);
+        let (rot_end, t_end) = Self::decompose_view_matrix(&target_view.inverse());
+        let (position, target, up) = Self::camera_from_inverse_view(&rot_end, &t_end, current_dist);
+        self.start_flight_to_pose(position, target, up, target_fov, duration_secs);
+    }
+
+    /// Starts a smooth animated flight that ends exactly at the given camera pose.
+    ///
+    /// `position`, `target` and `up` define the final view, as the camera fields
+    /// do. The camera-to-target distance changes smoothly during the flight.
+    /// When the flight ends, the camera fields equal the given values.
+    pub fn start_flight_to_pose(
+        &mut self,
+        position: Vec3,
+        target: Vec3,
+        up: Vec3,
+        target_fov: f32,
+        duration_secs: f32,
+    ) {
+        let current_view = self.view_matrix();
+        let target_view = glam::camera::rh::view::look_at_mat4(position, target, up);
 
         // Interpolate the *inverse* view matrix (camera-to-world), then invert back.
         // This produces smoother motion when far from the origin (C++ commit 067f760).
@@ -867,14 +894,17 @@ impl Camera {
             target_t: t_end,
             initial_fov: self.fov,
             target_fov,
-            target_dist: current_dist,
+            initial_dist: self.position.distance(self.target),
+            final_position: position,
+            final_target: target,
+            final_up: up,
         });
     }
 
     /// Updates the camera flight animation. Call once per frame.
     ///
-    /// When the flight completes, the camera is set exactly to the target
-    /// position and `self.flight` is cleared.
+    /// When the flight completes, the camera is set exactly to the requested
+    /// pose and `self.flight` is cleared.
     pub fn update_flight(&mut self) {
         let Some(flight) = &self.flight else {
             return;
@@ -882,15 +912,12 @@ impl Camera {
 
         let elapsed = flight.start_time.elapsed().as_secs_f32();
         let t = (elapsed / flight.duration_secs).min(1.0);
-        let dist = flight.target_dist;
 
         if t >= 1.0 {
-            // Flight complete — set final position exactly
-            let (position, target, up) =
-                Self::camera_from_inverse_view(&flight.target_rot, &flight.target_t, dist);
-            self.position = position;
-            self.target = target;
-            self.up = up;
+            // Flight complete: set the requested pose exactly
+            self.position = flight.final_position;
+            self.target = flight.final_target;
+            self.up = flight.final_up;
             self.fov = flight.target_fov;
             self.flight = None;
         } else {
@@ -911,6 +938,10 @@ impl Camera {
 
             // Interpolate FOV with raw t (matching C++ Polyscope)
             let fov = (1.0 - t) * flight.initial_fov + t * flight.target_fov;
+
+            // The view center moves smoothly to the requested target.
+            let final_dist = flight.final_position.distance(flight.final_target);
+            let dist = flight.initial_dist + (final_dist - flight.initial_dist) * t_smooth;
 
             let (position, target, up) =
                 Self::camera_from_inverse_view(&interp_rot, &interp_t, dist);
@@ -1029,8 +1060,7 @@ impl CameraState {
                 camera.flight = None;
             }
             ViewTransition::FlyTo => {
-                let target_view = glam::camera::rh::view::look_at_mat4(new_pos, new_target, new_up);
-                camera.start_flight_to(target_view, self.fov, 0.4);
+                camera.start_flight_to_pose(new_pos, new_target, new_up, self.fov, 0.4);
             }
         }
     }
@@ -1211,6 +1241,48 @@ mod tests {
         // Non-pose fields apply immediately
         assert_eq!(fresh.projection_mode, cam.projection_mode);
         assert!((fresh.ortho_scale - cam.ortho_scale).abs() < 1e-5);
+    }
+
+    /// Moves the start of an active flight back by `secs` seconds.
+    fn age_flight(camera: &mut Camera, secs: f32) {
+        let flight = camera.flight.as_mut().expect("flight must be active");
+        flight.start_time = Instant::now()
+            .checked_sub(std::time::Duration::from_secs_f32(secs))
+            .expect("instant in range");
+    }
+
+    /// After a flight ends, every camera field must equal the requested state,
+    /// also when the camera-to-target distance changes.
+    #[test]
+    fn test_camera_state_flyto_ends_at_requested_state() {
+        let cam = make_camera_state_input();
+        let state = CameraState::from_camera(&cam);
+        let mut fresh = Camera::new(1.5);
+        fresh.position = Vec3::new(-1.0, -1.0, -1.0);
+        fresh.target = Vec3::ZERO;
+        fresh.up = Vec3::Y;
+        let start_dist = fresh.position.distance(fresh.target);
+        let end_dist = cam.position.distance(cam.target);
+        assert!((start_dist - end_dist).abs() > 1.0, "distances must differ");
+
+        state.apply(&mut fresh, ViewTransition::FlyTo);
+
+        // Mid-flight: the view is valid and the distance lies between both ends.
+        age_flight(&mut fresh, 0.2);
+        fresh.update_flight();
+        assert!(fresh.is_in_flight());
+        assert!(fresh.is_view_valid());
+        let mid_dist = fresh.position.distance(fresh.target);
+        assert!(mid_dist > start_dist.min(end_dist) && mid_dist < start_dist.max(end_dist));
+
+        // Step past the end of the flight.
+        age_flight(&mut fresh, 1.0);
+        fresh.update_flight();
+        assert!(!fresh.is_in_flight());
+        assert_eq!(CameraState::from_camera(&fresh), state);
+        assert_eq!(fresh.position, cam.position);
+        assert_eq!(fresh.target, cam.target);
+        assert_eq!(fresh.up, cam.up);
     }
 
     #[test]
