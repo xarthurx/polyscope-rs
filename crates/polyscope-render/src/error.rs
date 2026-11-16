@@ -5,8 +5,8 @@ use thiserror::Error;
 /// Errors that can occur during rendering operations.
 #[derive(Error, Debug)]
 pub enum RenderError {
-    /// Failed to create wgpu adapter.
-    #[error("failed to create graphics adapter")]
+    /// No graphics adapter with a supported backend is available.
+    #[error("no graphics adapter found (Vulkan, Metal or DirectX 12 is necessary)")]
     AdapterCreationFailed,
 
     /// Failed to create wgpu device.

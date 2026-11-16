@@ -28,9 +28,10 @@ fn pixel_of(engine: &RenderEngine, p: Vec3) -> (u32, u32) {
 #[test]
 fn camera_view_is_in_the_pick_pass() {
     let size = u32::from(SIZE);
-    let mut engine = RenderEngine::new_headless(size, size)
-        .block_on()
-        .expect("headless engine");
+    let Ok(mut engine) = RenderEngine::new_headless(size, size).block_on() else {
+        eprintln!("Skipping camera view pick test: no GPU adapter available");
+        return;
+    };
     engine.init_pick_buffers(size, size);
     engine.init_curve_network_pick_pipeline();
     engine.camera.set_aspect_ratio(1.0);

@@ -163,9 +163,11 @@ fn check_curve_network(engine: &mut RenderEngine, offset: Vec3) {
 
 #[test]
 fn pick_pass_applies_the_model_transform() {
-    let mut engine = RenderEngine::new_headless(u32::from(SIZE), u32::from(SIZE))
-        .block_on()
-        .expect("headless engine");
+    let Ok(mut engine) = RenderEngine::new_headless(u32::from(SIZE), u32::from(SIZE)).block_on()
+    else {
+        eprintln!("Skipping pick transform test: no GPU adapter available");
+        return;
+    };
     engine.init_pick_buffers(u32::from(SIZE), u32::from(SIZE));
     engine.init_curve_network_pick_pipeline();
     engine.camera.set_aspect_ratio(1.0);

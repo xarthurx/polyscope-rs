@@ -266,11 +266,19 @@ pub struct RenderEngine {
     pub(crate) gridcube_pick_bind_group_layout: Option<wgpu::BindGroupLayout>,
 }
 
+/// The wgpu backends that the engine can use: Vulkan, Metal, DirectX 12 and WebGPU.
+///
+/// The OpenGL backend is not in the list. Some shaders sample depth textures in a
+/// way that the OpenGL backend cannot compile, so the engine fails there. Without
+/// a supported backend, engine creation returns
+/// [`RenderError::AdapterCreationFailed`].
+const SUPPORTED_BACKENDS: wgpu::Backends = wgpu::Backends::PRIMARY;
+
 impl RenderEngine {
     /// Creates a new windowed render engine.
     pub async fn new_windowed(window: Arc<winit::window::Window>) -> RenderResult<Self> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends: SUPPORTED_BACKENDS,
             ..wgpu::InstanceDescriptor::new_with_display_handle(Box::new(window.clone()))
         });
 
@@ -611,7 +619,7 @@ impl RenderEngine {
     /// Creates a new headless render engine.
     pub async fn new_headless(width: u32, height: u32) -> RenderResult<Self> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends: SUPPORTED_BACKENDS,
             ..wgpu::InstanceDescriptor::new_without_display_handle()
         });
 
