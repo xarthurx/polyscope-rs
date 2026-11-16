@@ -97,6 +97,7 @@ pub struct VolumeMesh {
     interior_color: Vec4,
     edge_color: Vec4,
     edge_width: f32,
+    material: String,
 
     // GPU resources (renders exterior faces)
     render_data: Option<SurfaceMeshRenderData>,
@@ -139,6 +140,7 @@ impl VolumeMesh {
             interior_color,
             edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
             edge_width: 0.0,
+            material: "clay".to_string(),
             render_data: None,
             pick_uniform_buffer: None,
             pick_bind_group: None,
@@ -953,7 +955,10 @@ impl VolumeMesh {
     }
 
     /// Builds the egui UI for this volume mesh.
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
+    ///
+    /// `available_materials` lists the registered material names for the material
+    /// selector. If it is empty, the selector shows the built-in materials.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, available_materials: &[&str]) {
         // Info — count each cell type
         let mut counts = [0usize; 4]; // Tet, Hex, Prism, Pyramid
         for cell in &self.cells {
@@ -968,6 +973,8 @@ impl VolumeMesh {
             counts[VolumeCellType::Prism as usize],
             counts[VolumeCellType::Pyramid as usize],
         ));
+
+        polyscope_ui::build_material_selector(ui, &mut self.material, available_materials);
 
         // Color
         ui.horizontal(|ui| {
@@ -1274,6 +1281,14 @@ impl Structure for VolumeMesh {
 
     fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
+    }
+
+    fn material(&self) -> &str {
+        &self.material
+    }
+
+    fn set_material(&mut self, material: &str) {
+        self.material = material.to_string();
     }
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {

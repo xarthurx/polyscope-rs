@@ -214,6 +214,23 @@ fn check_quad_wireframes() {
     );
 }
 
+/// Checks that the material of a volume mesh changes its shading.
+fn check_volume_mesh_material() {
+    remove_all_structures();
+    let vm = register_hex_mesh(
+        "vm_material",
+        unit_cube_vertices(),
+        vec![[0, 1, 2, 3, 4, 5, 6, 7]],
+    );
+    let clay = render();
+    vm.set_material("candy");
+    let candy = render();
+    assert!(
+        count_changed_pixels(&clay, &candy) > 0,
+        "a different volume mesh material must change the image"
+    );
+}
+
 #[test]
 fn structure_render_tests() {
     let _ = init();
@@ -228,6 +245,7 @@ fn structure_render_tests() {
     check_curve_network_vectors();
     check_volume_mesh_vectors();
     check_quad_wireframes();
+    check_volume_mesh_material();
 
     remove_all_structures();
 }

@@ -396,6 +396,29 @@ mod tests {
     }
 
     #[test]
+    fn test_volume_structure_set_material() {
+        let _guard = setup();
+
+        let vm_name = unique_name("vm_material");
+        let vm = register_tet_mesh(
+            &vm_name,
+            vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z],
+            vec![[0, 1, 2, 3]],
+        );
+        let vm_material = || with_volume_mesh_ref(&vm_name, |m| m.material().to_string());
+        assert_eq!(vm_material().as_deref(), Some("clay"));
+        vm.set_material("wax");
+        assert_eq!(vm_material().as_deref(), Some("wax"));
+
+        let vg_name = unique_name("vg_material");
+        let vg = register_volume_grid(&vg_name, glam::UVec3::splat(3), Vec3::ZERO, Vec3::ONE);
+        let vg_material = || with_volume_grid_ref(&vg_name, |g| g.material().to_string());
+        assert_eq!(vg_material().as_deref(), Some("clay"));
+        vg.set_material("candy");
+        assert_eq!(vg_material().as_deref(), Some("candy"));
+    }
+
+    #[test]
     fn test_register_curve_network_loop() {
         let _guard = setup();
         let name = unique_name("loop");

@@ -35,6 +35,7 @@ pub struct VolumeGrid {
     edge_color: Vec4,
     edge_width: f32,
     cube_size_factor: f32,
+    material: String,
 
     // GPU resources (bounding box wireframe)
     render_data: Option<CurveNetworkRenderData>,
@@ -61,6 +62,7 @@ impl VolumeGrid {
             edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
             edge_width: 1.0,
             cube_size_factor: 0.0,
+            material: "clay".to_string(),
             render_data: None,
         }
     }
@@ -332,7 +334,14 @@ impl VolumeGrid {
     /// # Arguments
     /// * `colormap_names` - Available colormap names for quantity visualization.
     ///   If empty, defaults to built-in names.
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui, colormap_names: &[&str]) {
+    /// * `available_materials` - Registered material names for the material selector.
+    ///   If empty, defaults to the built-in materials.
+    pub fn build_egui_ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        colormap_names: &[&str],
+        available_materials: &[&str],
+    ) {
         let default_names = ["viridis", "blues", "reds", "coolwarm", "rainbow"];
         let names = if colormap_names.is_empty() {
             &default_names[..]
@@ -347,6 +356,9 @@ impl VolumeGrid {
             self.node_dim.z,
             self.num_nodes()
         ));
+
+        // The material applies to the gridcubes and the isosurfaces.
+        polyscope_ui::build_material_selector(ui, &mut self.material, available_materials);
 
         // Color picker
         ui.horizontal(|ui| {
@@ -417,6 +429,14 @@ impl Structure for VolumeGrid {
 
     fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
+    }
+
+    fn material(&self) -> &str {
+        &self.material
+    }
+
+    fn set_material(&mut self, material: &str) {
+        self.material = material.to_string();
     }
 
     fn draw(&self, _ctx: &mut dyn RenderContext) {
