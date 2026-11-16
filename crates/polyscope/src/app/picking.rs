@@ -21,6 +21,24 @@ impl App {
         Some((type_name.to_string(), name.to_string(), local_index))
     }
 
+    /// Returns the world position of the structure at a screen position.
+    ///
+    /// Like C++ `pickAtScreenCoords`, this reads the pick buffer for the hit and the
+    /// pick depth buffer for the position. Thus it works for every structure type
+    /// in the pick pass. Returns None for the background.
+    pub(super) fn pick_world_position_at(&self, screen: glam::Vec2) -> Option<Vec3> {
+        let engine = self.engine.as_ref()?;
+        if screen.x < 0.0 || screen.y < 0.0 {
+            return None;
+        }
+        let (x, y) = (screen.x as u32, screen.y as u32);
+        self.gpu_pick_at(x, y)?;
+        let depth = engine.pick_depth_at(x, y)?;
+        engine
+            .camera
+            .screen_depth_to_world(screen, depth, engine.width, engine.height)
+    }
+
     pub(super) fn screen_ray(
         &self,
         click_pos: glam::Vec2,

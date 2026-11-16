@@ -294,42 +294,19 @@ impl ApplicationHandler for App {
                     // Handle double-click: set view center to clicked 3D point
                     if is_double_click && !mouse_in_ui_panel && self.drag_distance < DRAG_THRESHOLD
                     {
-                        // Extract camera data before mutable borrow
-                        let ray_data = if let Some(engine) = &self.engine {
-                            let click_screen =
-                                glam::Vec2::new(self.mouse_pos.0 as f32, self.mouse_pos.1 as f32);
-                            self.screen_ray(
-                                click_screen,
-                                engine.width,
-                                engine.height,
-                                &engine.camera,
-                            )
-                        } else {
-                            None
-                        };
-
-                        if let Some((ray_origin, ray_dir)) = ray_data {
-                            let plane_params = crate::with_context(|ctx| {
-                                ctx.slice_planes()
-                                    .filter(|p| p.is_enabled())
-                                    .map(|p| (p.origin(), p.normal()))
-                                    .collect::<Vec<_>>()
-                            });
-
-                            if let Some((_type_name, _name, t)) =
-                                self.pick_structure_at_ray(ray_origin, ray_dir, &plane_params)
-                            {
-                                let hit_point = ray_origin + ray_dir * t;
-                                if let Some(engine) = &mut self.engine {
-                                    engine.camera.target = hit_point;
-                                    log::info!(
-                                        "Double-click: set view center to ({:.3}, {:.3}, {:.3})",
-                                        hit_point.x,
-                                        hit_point.y,
-                                        hit_point.z
-                                    );
-                                }
-                            }
+                        // The pick buffers give the hit point for every structure type.
+                        let click_screen =
+                            glam::Vec2::new(self.mouse_pos.0 as f32, self.mouse_pos.1 as f32);
+                        if let Some(hit_point) = self.pick_world_position_at(click_screen)
+                            && let Some(engine) = &mut self.engine
+                        {
+                            engine.camera.target = hit_point;
+                            log::info!(
+                                "Double-click: set view center to ({:.3}, {:.3}, {:.3})",
+                                hit_point.x,
+                                hit_point.y,
+                                hit_point.z
+                            );
                         }
 
                         // Reset double-click state so triple-click doesn't re-trigger

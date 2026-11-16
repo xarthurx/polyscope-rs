@@ -350,6 +350,32 @@ impl Camera {
         self.projection_matrix() * self.view_matrix()
     }
 
+    /// Returns the world position at a screen position and depth-buffer value
+    /// (C++ `screenCoordsAndDepthToWorldPosition`).
+    ///
+    /// `screen` is in pixels from the top-left corner of a `width` x `height`
+    /// viewport. `depth` is the normalized device depth: 0 at the near plane and
+    /// 1 at the far plane. Returns None for the background (depth 1 or more)
+    /// and for a result that is not finite.
+    #[must_use]
+    pub fn screen_depth_to_world(
+        &self,
+        screen: glam::Vec2,
+        depth: f32,
+        width: u32,
+        height: u32,
+    ) -> Option<Vec3> {
+        if depth.is_nan() || depth >= 1.0 || width == 0 || height == 0 {
+            return None;
+        }
+        let ndc_x = screen.x / width as f32 * 2.0 - 1.0;
+        let ndc_y = 1.0 - screen.y / height as f32 * 2.0;
+        let world =
+            self.view_projection_matrix().inverse() * glam::Vec4::new(ndc_x, ndc_y, depth, 1.0);
+        let position = world.truncate() / world.w;
+        position.is_finite().then_some(position)
+    }
+
     /// Returns the camera's forward direction.
     #[must_use]
     pub fn forward(&self) -> Vec3 {
@@ -1523,6 +1549,34 @@ mod tests {
         assert!(!camera.is_view_valid());
         assert!(camera.ensure_view_valid(Vec3::ZERO, Vec3::ONE));
         assert_looks_at(&camera, Vec3::splat(0.5), Vec3::Y, "after fallback");
+    }
+
+    /// A screen position and its depth-buffer value give back the world point.
+    #[test]
+    fn test_screen_depth_to_world_round_trip() {
+        let (width, height) = (800_u32, 600_u32);
+        for mode in [ProjectionMode::Perspective, ProjectionMode::Orthographic] {
+            let mut camera = Camera::new(width as f32 / height as f32);
+            camera.projection_mode = mode;
+            camera.look_at_box(Vec3::new(-1.0, 0.0, 2.0), Vec3::new(3.0, 1.0, 4.0));
+            let point = Vec3::new(0.3, 0.8, 3.1);
+            let clip = camera.view_projection_matrix() * point.extend(1.0);
+            let ndc = clip.truncate() / clip.w;
+            let screen = glam::Vec2::new(
+                f32::midpoint(ndc.x, 1.0) * width as f32,
+                f32::midpoint(-ndc.y, 1.0) * height as f32,
+            );
+            let back = camera
+                .screen_depth_to_world(screen, ndc.z, width, height)
+                .expect("finite position");
+            // The f32 depth of a perspective projection limits the precision.
+            assert!(back.distance(point) < 1e-2, "{mode:?}: {back} vs {point}");
+            assert!(
+                camera
+                    .screen_depth_to_world(screen, 1.0, width, height)
+                    .is_none()
+            );
+        }
     }
 
     /// The scroll-zoom step is relative, so it has the same effect at any scale.
