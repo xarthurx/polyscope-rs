@@ -856,6 +856,8 @@ impl Structure for CurveNetwork {
 
     fn refresh(&mut self) {
         self.recompute_geometry();
+        // The node count may have changed, so rebuild the GPU buffers on the next frame.
+        self.clear_gpu_resources();
         for quantity in &mut self.quantities {
             quantity.refresh();
         }

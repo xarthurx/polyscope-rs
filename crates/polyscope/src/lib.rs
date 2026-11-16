@@ -437,6 +437,152 @@ mod tests {
         assert_eq!(num_quantities, Some(3));
     }
 
+    /// Renders frames with one long-lived headless engine.
+    ///
+    /// `render_to_image` clears all GPU data on every call, so it cannot show
+    /// stale GPU data. This renderer keeps the GPU data between frames.
+    struct LiveRenderer {
+        app: app::App,
+    }
+
+    impl LiveRenderer {
+        fn new() -> Option<Self> {
+            use pollster::FutureExt;
+            let engine = RenderEngine::new_headless(160, 120).block_on().ok()?;
+            let mut app = app::App::new();
+            app.engine = Some(engine);
+            Some(Self { app })
+        }
+
+        fn frame(&mut self) -> Vec<u8> {
+            self.app.render_frame_headless();
+            self.app.capture_to_buffer().expect("capture failed")
+        }
+    }
+
+    /// Checks that `update` shows in the next frame of a long-lived engine.
+    ///
+    /// The reference image comes from the same engine and camera after all
+    /// GPU data is cleared and built again from the updated structures.
+    fn assert_update_reaches_gpu(label: &str, update: impl FnOnce()) {
+        let Some(mut renderer) = LiveRenderer::new() else {
+            eprintln!("Skipping {label}: no GPU adapter available");
+            return;
+        };
+        let before = renderer.frame();
+        update();
+        let updated = renderer.frame();
+        with_context_mut(|ctx| {
+            for structure in ctx.registry.iter_mut() {
+                structure.clear_gpu_resources();
+            }
+        });
+        let rebuilt = renderer.frame();
+        assert!(
+            before != rebuilt,
+            "{label}: the update must change the image"
+        );
+        let stale_pixels = updated
+            .chunks(4)
+            .zip(rebuilt.chunks(4))
+            .filter(|(a, b)| a != b)
+            .count();
+        assert_eq!(
+            stale_pixels, 0,
+            "{label}: the next frame shows old GPU data"
+        );
+    }
+
+    /// Enables one quantity of a structure through the `HasQuantities` trait.
+    fn enable_quantity(structure: &mut dyn HasQuantities, quantity: &str) {
+        structure
+            .get_quantity_mut(quantity)
+            .expect("quantity not found")
+            .set_enabled(true);
+    }
+
+    #[test]
+    fn test_position_updates_reach_the_gpu() {
+        let _guard = setup();
+        let moved = |points: &[Vec3]| -> Vec<Vec3> {
+            points
+                .iter()
+                .map(|p| *p * 0.6 + Vec3::new(0.3, 0.2, 0.0))
+                .collect()
+        };
+        let square = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(1.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        ];
+
+        remove_all_structures();
+        register_point_cloud("live_pc", square.clone());
+        with_point_cloud("live_pc", |pc| {
+            pc.add_vector_quantity("vecs", vec![Vec3::new(0.2, 0.1, 0.0); 4]);
+            enable_quantity(pc, "vecs");
+        });
+        assert_update_reaches_gpu("point cloud with vectors", || {
+            with_point_cloud("live_pc", |pc| pc.update_points(moved(&square)));
+        });
+
+        remove_all_structures();
+        register_point_cloud("live_pc_count", square.clone());
+        assert_update_reaches_gpu("point cloud with a new point count", || {
+            let mut points = moved(&square);
+            points.push(Vec3::new(0.5, 0.5, 0.0));
+            with_point_cloud("live_pc_count", |pc| pc.update_points(points));
+        });
+
+        remove_all_structures();
+        register_surface_mesh("live_mesh", square.clone(), vec![vec![0u32, 1, 2, 3]]);
+        with_surface_mesh("live_mesh", |mesh| {
+            mesh.add_vertex_vector_quantity("vertex_vecs", vec![Vec3::new(0.2, 0.1, 0.3); 4]);
+            mesh.add_face_vector_quantity("face_vecs", vec![Vec3::new(-0.2, 0.1, 0.3)]);
+            enable_quantity(mesh, "vertex_vecs");
+            enable_quantity(mesh, "face_vecs");
+        });
+        assert_update_reaches_gpu("surface mesh with vectors", || {
+            with_surface_mesh("live_mesh", |mesh| mesh.update_vertices(moved(&square)));
+        });
+
+        remove_all_structures();
+        register_curve_network_line("live_cn", square.clone());
+        with_curve_network("live_cn", |cn| {
+            cn.add_node_vector_quantity("node_vecs", vec![Vec3::new(0.2, 0.1, 0.0); 4]);
+            cn.add_edge_vector_quantity("edge_vecs", vec![Vec3::new(-0.2, 0.1, 0.0); 3]);
+            enable_quantity(cn, "node_vecs");
+            enable_quantity(cn, "edge_vecs");
+        });
+        assert_update_reaches_gpu("curve network with vectors", || {
+            with_curve_network("live_cn", |cn| cn.update_node_positions(moved(&square)));
+        });
+
+        remove_all_structures();
+        register_curve_network_line("live_cn_count", square.clone());
+        assert_update_reaches_gpu("curve network with a new node count", || {
+            let mut nodes = moved(&square);
+            nodes.push(Vec3::new(0.5, 0.5, 0.0));
+            with_curve_network("live_cn_count", |cn| cn.update_node_positions(nodes));
+        });
+
+        remove_all_structures();
+        register_point_cloud("live_frame", vec![Vec3::splat(-2.0), Vec3::splat(2.0)]);
+        let cv = register_camera_view_look_at("live_cv", Vec3::ZERO, Vec3::Z, Vec3::Y, 45.0, 1.5);
+        assert_update_reaches_gpu("camera view", || {
+            cv.set_params(CameraParameters::look_at(
+                Vec3::new(0.5, 0.5, 0.0),
+                Vec3::X,
+                Vec3::Y,
+                60.0,
+                1.5,
+            ));
+        });
+
+        remove_all_structures();
+    }
+
     #[test]
     fn test_register_curve_network_loop() {
         let _guard = setup();

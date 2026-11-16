@@ -276,6 +276,164 @@ fn check_empty_structures() {
     }
 }
 
+/// Returns the RGB value of one pixel of an RGBA buffer.
+fn pixel(image: &[u8], x: u32, y: u32) -> [i32; 3] {
+    let i = ((y * WIDTH + x) * 4) as usize;
+    [image[i], image[i + 1], image[i + 2]].map(i32::from)
+}
+
+/// Returns the largest channel difference between two pixels.
+fn pixel_distance(a: [i32; 3], b: [i32; 3]) -> i32 {
+    (0..3).map(|c| (a[c] - b[c]).abs()).max().unwrap_or(0)
+}
+
+/// Returns the image positions of the left and right cell of a hex pair.
+///
+/// The cells face the camera. The function scans the middle row of `image` for
+/// pixels that differ from the background and splits that span into two halves.
+fn hex_pair_cell_centers(image: &[u8]) -> [(u32, u32); 2] {
+    let y = HEIGHT / 2;
+    let background = pixel(image, 0, 0);
+    let covered: Vec<u32> = (0..WIDTH)
+        .filter(|&x| pixel(image, x, y) != background)
+        .collect();
+    let (first, last) = (covered[0], covered[covered.len() - 1]);
+    let quarter = (last - first) / 4;
+    [(first + quarter, y), (last - quarter, y)]
+}
+
+/// Checks that scalar and color quantities color a volume mesh.
+fn check_volume_mesh_color_quantities() {
+    remove_all_structures();
+    register_hex_row("vm_colors", 2, false);
+    let vm = get_volume_mesh("vm_colors").expect("volume mesh not registered");
+    vm.add_vertex_scalar_quantity("vertex_scalar", (0..16).map(|i| i as f32).collect())
+        .add_cell_scalar_quantity("cell_scalar", vec![0.0, 1.0])
+        .add_vertex_color_quantity(
+            "vertex_color",
+            (0..16)
+                .map(|i| Vec3::new(i as f32 / 15.0, 0.3, 1.0 - i as f32 / 15.0))
+                .collect(),
+        )
+        .add_cell_color_quantity("cell_color", vec![Vec3::X, Vec3::Z]);
+
+    let plain = render();
+    for name in ["vertex_scalar", "cell_scalar", "vertex_color", "cell_color"] {
+        vm.set_quantity_enabled(name, true);
+        let colored = render();
+        assert!(
+            count_changed_pixels(&plain, &colored) > 0,
+            "an enabled volume mesh {name} quantity must change the image"
+        );
+    }
+
+    // Enabling the cell color quantity disabled the other color quantities.
+    let enabled: Vec<bool> = with_volume_mesh_ref("vm_colors", |vm| {
+        vm.quantities().iter().map(|q| q.is_enabled()).collect()
+    })
+    .unwrap();
+    assert_eq!(enabled, [false, false, false, true]);
+
+    // Removing the active quantity restores the base color.
+    with_volume_mesh("vm_colors", |vm| vm.remove_quantity("cell_color"));
+    assert_eq!(
+        count_changed_pixels(&plain, &render()),
+        0,
+        "without an enabled quantity the mesh must use its base color"
+    );
+}
+
+/// Checks that cell scalars 0 and 1 give the two end colors of the color map.
+fn check_volume_mesh_cell_scalar_colors() {
+    remove_all_structures();
+    register_hex_row("vm_cells", 2, false);
+    let vm = get_volume_mesh("vm_cells").expect("volume mesh not registered");
+    let viridis = ColorMapRegistry::new()
+        .get("viridis")
+        .expect("viridis missing")
+        .clone();
+    vm.add_cell_scalar_quantity("t", vec![0.0, 1.0])
+        .add_cell_color_quantity("ends", vec![viridis.sample(0.0), viridis.sample(1.0)]);
+
+    vm.set_quantity_enabled("t", true);
+    let scalar_image = render();
+    let [left, right] = hex_pair_cell_centers(&scalar_image);
+    let left_color = pixel(&scalar_image, left.0, left.1);
+    let right_color = pixel(&scalar_image, right.0, right.1);
+
+    // Viridis starts dark purple (blue above green) and ends yellow (blue low).
+    assert!(
+        pixel_distance(left_color, right_color) > 60,
+        "the two cells must get clearly different colors: {left_color:?} {right_color:?}"
+    );
+    assert!(
+        left_color[2] > left_color[1],
+        "cell 0 must be purple: {left_color:?}"
+    );
+    assert!(
+        right_color[0] > right_color[2] + 50 && right_color[1] > right_color[2] + 50,
+        "cell 1 must be yellow: {right_color:?}"
+    );
+
+    // The same mesh colored directly with the two end colors looks the same.
+    vm.set_quantity_enabled("ends", true);
+    let ends_image = render();
+    for (x, y) in [left, right] {
+        assert!(pixel_distance(pixel(&scalar_image, x, y), pixel(&ends_image, x, y)) <= 2);
+    }
+
+    // A new color map and a new range change the colors at once.
+    vm.set_quantity_enabled("t", true);
+    with_volume_mesh("vm_cells", |vm| {
+        let q = vm.get_quantity_mut("t").unwrap();
+        let q = q.as_any_mut();
+        let q = q
+            .downcast_mut::<polyscope_structures::volume_mesh::VolumeMeshCellScalarQuantity>()
+            .unwrap();
+        q.set_color_map("coolwarm");
+    });
+    let coolwarm_image = render();
+    assert!(pixel_distance(pixel(&coolwarm_image, left.0, left.1), left_color) > 20);
+    with_volume_mesh("vm_cells", |vm| {
+        let q = vm.get_quantity_mut("t").unwrap();
+        let q = q.as_any_mut();
+        let q = q
+            .downcast_mut::<polyscope_structures::volume_mesh::VolumeMeshCellScalarQuantity>()
+            .unwrap();
+        q.set_color_map("viridis").set_data_range(0.0, 2.0);
+    });
+    let range_image = render();
+    assert!(pixel_distance(pixel(&range_image, right.0, right.1), right_color) > 20);
+    with_volume_mesh("vm_cells", |vm| {
+        let q = vm.get_quantity_mut("t").unwrap();
+        let q = q.as_any_mut();
+        let q = q
+            .downcast_mut::<polyscope_structures::volume_mesh::VolumeMeshCellScalarQuantity>()
+            .unwrap();
+        q.set_data_range(0.0, 1.0);
+    });
+
+    // After a transform the quantity still colors the mesh.
+    with_volume_mesh("vm_cells", |vm| {
+        vm.set_transform(Mat4::from_rotation_y(0.4))
+    });
+    let moved_colored = render();
+    vm.set_quantity_enabled("t", false);
+    let moved_plain = render();
+    assert!(count_changed_pixels(&moved_colored, &moved_plain) > 0);
+    vm.set_quantity_enabled("t", true);
+    with_volume_mesh("vm_cells", |vm| vm.set_transform(Mat4::IDENTITY));
+
+    // A slice plane culls the left cell. The right cell, now first in the
+    // render data, keeps its color.
+    add_slice_plane_with_pose("cull_left", Vec3::new(1.0, 0.0, 0.0), Vec3::X);
+    let culled_image = render();
+    remove_all_slice_planes();
+    assert!(pixel_distance(pixel(&culled_image, right.0, right.1), right_color) <= 2);
+    // The background replaces the culled cell.
+    assert!(pixel_distance(pixel(&culled_image, left.0, left.1), left_color) > 20);
+}
+
 #[test]
 fn structure_render_tests() {
     let _ = init();
@@ -292,6 +450,8 @@ fn structure_render_tests() {
     check_quad_wireframes();
     check_volume_mesh_material();
     check_empty_structures();
+    check_volume_mesh_color_quantities();
+    check_volume_mesh_cell_scalar_colors();
 
     remove_all_structures();
 }

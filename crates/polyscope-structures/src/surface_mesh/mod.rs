@@ -804,6 +804,8 @@ impl Structure for SurfaceMesh {
 
     fn refresh(&mut self) {
         self.recompute();
+        // The GPU buffers hold the old geometry, so rebuild them on the next frame.
+        self.clear_gpu_resources();
         for quantity in &mut self.quantities {
             quantity.refresh();
         }
