@@ -218,6 +218,12 @@ impl Context {
                 };
                 let offset = Vec3::splat(offset_scale / 2.0);
                 self.bounding_box = (min - offset, max + offset);
+
+                // A zero length scale comes from a degenerate box. Use the size of the
+                // perturbed box instead, as C++ `updateStructureExtents()` does.
+                if self.length_scale == 0.0 {
+                    self.length_scale = (self.bounding_box.1 - self.bounding_box.0).length();
+                }
             }
         } else {
             self.bounding_box = (Vec3::ZERO, Vec3::ONE);

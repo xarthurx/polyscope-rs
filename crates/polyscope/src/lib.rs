@@ -968,4 +968,24 @@ mod tests {
         assert!(bb_max.y > bb_min.y);
         assert!(bb_max.z > bb_min.z);
     }
+
+    #[test]
+    fn test_single_point_scene_has_nonzero_length_scale() {
+        let _guard = setup();
+        // Clear all structures so only the one-point cloud contributes.
+        remove_all_structures();
+        let name = unique_name("single_point_scale");
+        register_point_cloud(&name, vec![Vec3::new(1.0, 2.0, 3.0)]);
+
+        let (length_scale, (bb_min, bb_max)) =
+            with_context(|ctx| (ctx.length_scale, ctx.bounding_box));
+        assert!(
+            length_scale > 0.0,
+            "one-point scene must have a positive length scale, got {length_scale}"
+        );
+        // C++ uses the diagonal of the perturbed box (1e-3 per axis).
+        let expected = (bb_max - bb_min).length();
+        assert!((length_scale - expected).abs() < 1e-9);
+        assert!((length_scale - 3.0_f32.sqrt() * 1e-3).abs() < 1e-6);
+    }
 }
