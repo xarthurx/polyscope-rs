@@ -367,6 +367,8 @@ The order of the tiers is the order of priority. No dates are planned.
 
 ### Tier 2
 
+- [ ] Curve networks: upload the edge positions in object space and apply the model matrix in the edge and tube shaders. Today the CPU transforms the edge positions, which breaks the project rule that GPU positions are never in world space.
+- [ ] Curve networks: draw tubes by default, as C++ does. Today a new curve network draws one-pixel lines until `set_render_mode(1)`.
 - [ ] The missing quantities and options of each structure (see [Not ported yet](#not-ported-yet)).
 - [ ] Sparse Volume Grid.
 - [ ] SimpleTriangleMesh.
