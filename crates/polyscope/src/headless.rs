@@ -5,6 +5,7 @@
 //! and automated screenshot generation.
 
 use crate::Result;
+use crate::ScreenshotOptions;
 use crate::app::App;
 use pollster::FutureExt;
 use polyscope_core::state::with_context_mut;
@@ -27,7 +28,20 @@ use polyscope_render::RenderEngine;
 /// render_to_file("output.png", 800, 600).unwrap();
 /// ```
 pub fn render_to_file(filename: &str, width: u32, height: u32) -> Result<()> {
-    let data = render_to_image(width, height)?;
+    render_to_file_with_options(filename, width, height, &ScreenshotOptions::default())
+}
+
+/// Renders the current scene to a file with screenshot options.
+///
+/// Same as [`render_to_file`]. With `transparent_background`, a PNG file
+/// gets alpha 0 where only the background shows. JPEG files have no alpha.
+pub fn render_to_file_with_options(
+    filename: &str,
+    width: u32,
+    height: u32,
+    options: &ScreenshotOptions,
+) -> Result<()> {
+    let data = render_to_image_with_options(width, height, options)?;
     polyscope_render::save_image(filename, &data, width, height)
         .map_err(|e| crate::PolyscopeError::RenderError(format!("Failed to save image: {e}")))
 }
@@ -50,6 +64,19 @@ pub fn render_to_file(filename: &str, width: u32, height: u32) -> Result<()> {
 /// assert_eq!(pixels.len(), 800 * 600 * 4);
 /// ```
 pub fn render_to_image(width: u32, height: u32) -> Result<Vec<u8>> {
+    render_to_image_with_options(width, height, &ScreenshotOptions::default())
+}
+
+/// Renders the current scene to a raw RGBA pixel buffer with screenshot options.
+///
+/// Same as [`render_to_image`]. With `transparent_background`, pixels where
+/// only the background shows get alpha 0, and scene pixels keep the alpha of
+/// the scene.
+pub fn render_to_image_with_options(
+    width: u32,
+    height: u32,
+    options: &ScreenshotOptions,
+) -> Result<Vec<u8>> {
     let mut app = App::new();
 
     // Create headless render engine
@@ -80,7 +107,7 @@ pub fn render_to_image(width: u32, height: u32) -> Result<Vec<u8>> {
     }
 
     // Render one frame and capture
-    app.render_frame_headless();
+    app.render_frame_headless(options.transparent_background);
 
     // Publish a fresh view-state snapshot for callers querying after a headless render.
     with_context_mut(|ctx| {

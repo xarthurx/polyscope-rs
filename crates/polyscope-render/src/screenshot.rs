@@ -6,7 +6,11 @@ use std::path::Path;
 /// Options for taking screenshots.
 #[derive(Debug, Clone, Default)]
 pub struct ScreenshotOptions {
-    /// Whether to use transparent background (PNG only).
+    /// Whether to use a transparent background.
+    ///
+    /// Pixels where only the background shows get alpha 0. Scene pixels keep
+    /// the alpha of the scene (for example of transparent meshes). PNG files
+    /// store the alpha; JPEG files have no alpha channel.
     pub transparent_background: bool,
 }
 

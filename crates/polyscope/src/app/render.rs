@@ -1105,7 +1105,7 @@ impl App {
 
         // Handle screenshot if pending (local request from F12 key)
         if let Some(filename) = self.screenshot_pending.take() {
-            self.capture_screenshot(filename);
+            self.capture_screenshot(filename, &crate::ScreenshotOptions::default());
         }
 
         // Handle screenshot request from public API (screenshot() / screenshot_to_file())
@@ -1115,7 +1115,7 @@ impl App {
                 self.screenshot_counter += 1;
                 name
             });
-            self.capture_screenshot(filename);
+            self.capture_screenshot(filename, &request.options);
         }
 
         // Publish a fresh snapshot for save_view_to_json callers, in one
