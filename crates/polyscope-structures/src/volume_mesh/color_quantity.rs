@@ -30,15 +30,11 @@ impl VolumeMeshVertexColorQuantity {
         &self.colors
     }
 
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let mut enabled = self.enabled;
-            if ui.checkbox(&mut enabled, "").changed() {
-                self.enabled = enabled;
-            }
-            ui.label(&self.name);
-            ui.label("(vertex color)");
-        });
+    /// Builds the egui UI for this quantity: enable checkbox and color count.
+    ///
+    /// Returns true if a setting changed.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        polyscope_ui::build_color_quantity_ui(ui, &self.name, &mut self.enabled, self.colors.len())
     }
 }
 
@@ -100,15 +96,11 @@ impl VolumeMeshCellColorQuantity {
         &self.colors
     }
 
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let mut enabled = self.enabled;
-            if ui.checkbox(&mut enabled, "").changed() {
-                self.enabled = enabled;
-            }
-            ui.label(&self.name);
-            ui.label("(cell color)");
-        });
+    /// Builds the egui UI for this quantity: enable checkbox and color count.
+    ///
+    /// Returns true if a setting changed.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        polyscope_ui::build_color_quantity_ui(ui, &self.name, &mut self.enabled, self.colors.len())
     }
 }
 

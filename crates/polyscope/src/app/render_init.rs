@@ -413,6 +413,7 @@ pub fn update_gpu_buffers(engine: &RenderEngine, update_pick_uniforms: bool) {
                 && let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>()
             {
                 vm.update_gpu_buffers(&engine.queue);
+                vm.update_quantity_colors(&engine.queue, &engine.color_maps);
                 if update_pick_uniforms {
                     vm.update_pick_uniforms(&engine.queue);
                 }

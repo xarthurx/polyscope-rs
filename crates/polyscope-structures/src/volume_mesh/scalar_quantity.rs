@@ -75,16 +75,19 @@ impl VolumeMeshVertexScalarQuantity {
         self
     }
 
-    /// Builds egui UI for this quantity.
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let mut enabled = self.enabled;
-            if ui.checkbox(&mut enabled, "").changed() {
-                self.enabled = enabled;
-            }
-            ui.label(&self.name);
-            ui.label(format!("[{:.3}, {:.3}]", self.data_min, self.data_max));
-        });
+    /// Builds the egui UI for this quantity: enable checkbox, color map and range.
+    ///
+    /// Returns true if a setting changed.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        polyscope_ui::build_scalar_quantity_ui(
+            ui,
+            &self.name,
+            &mut self.enabled,
+            &mut self.color_map,
+            &mut self.data_min,
+            &mut self.data_max,
+            &polyscope_render::BUILTIN_COLOR_MAP_NAMES,
+        )
     }
 }
 
@@ -192,16 +195,19 @@ impl VolumeMeshCellScalarQuantity {
         self
     }
 
-    /// Builds egui UI for this quantity.
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let mut enabled = self.enabled;
-            if ui.checkbox(&mut enabled, "").changed() {
-                self.enabled = enabled;
-            }
-            ui.label(&self.name);
-            ui.label(format!("[{:.3}, {:.3}]", self.data_min, self.data_max));
-        });
+    /// Builds the egui UI for this quantity: enable checkbox, color map and range.
+    ///
+    /// Returns true if a setting changed.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        polyscope_ui::build_scalar_quantity_ui(
+            ui,
+            &self.name,
+            &mut self.enabled,
+            &mut self.color_map,
+            &mut self.data_min,
+            &mut self.data_max,
+            &polyscope_render::BUILTIN_COLOR_MAP_NAMES,
+        )
     }
 }
 

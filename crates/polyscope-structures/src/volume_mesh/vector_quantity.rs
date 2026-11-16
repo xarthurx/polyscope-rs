@@ -97,26 +97,18 @@ impl VolumeMeshVertexVectorQuantity {
         }
     }
 
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let mut enabled = self.enabled;
-            if ui.checkbox(&mut enabled, "").changed() {
-                self.enabled = enabled;
-            }
-            ui.label(&self.name);
-            ui.label("(vertex vector)");
-        });
-
-        if self.enabled {
-            ui.horizontal(|ui| {
-                ui.label("Length:");
-                ui.add(
-                    egui::DragValue::new(&mut self.vector_length_scale)
-                        .speed(0.01)
-                        .range(0.001..=10.0),
-                );
-            });
-        }
+    /// Builds the egui UI for this quantity: enable checkbox, length, radius and color.
+    ///
+    /// Returns true if a setting changed.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        build_vector_ui(
+            ui,
+            &self.name,
+            &mut self.enabled,
+            &mut self.vector_length_scale,
+            &mut self.vector_radius,
+            &mut self.vector_color,
+        )
     }
 }
 
@@ -248,26 +240,18 @@ impl VolumeMeshCellVectorQuantity {
         }
     }
 
-    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let mut enabled = self.enabled;
-            if ui.checkbox(&mut enabled, "").changed() {
-                self.enabled = enabled;
-            }
-            ui.label(&self.name);
-            ui.label("(cell vector)");
-        });
-
-        if self.enabled {
-            ui.horizontal(|ui| {
-                ui.label("Length:");
-                ui.add(
-                    egui::DragValue::new(&mut self.vector_length_scale)
-                        .speed(0.01)
-                        .range(0.001..=10.0),
-                );
-            });
-        }
+    /// Builds the egui UI for this quantity: enable checkbox, length, radius and color.
+    ///
+    /// Returns true if a setting changed.
+    pub fn build_egui_ui(&mut self, ui: &mut egui::Ui) -> bool {
+        build_vector_ui(
+            ui,
+            &self.name,
+            &mut self.enabled,
+            &mut self.vector_length_scale,
+            &mut self.vector_radius,
+            &mut self.vector_color,
+        )
     }
 }
 
@@ -307,6 +291,24 @@ impl Quantity for VolumeMeshCellVectorQuantity {
 }
 
 impl CellQuantity for VolumeMeshCellVectorQuantity {}
+
+/// Builds the vector quantity UI and writes the edited color back.
+fn build_vector_ui(
+    ui: &mut egui::Ui,
+    name: &str,
+    enabled: &mut bool,
+    length_scale: &mut f32,
+    radius: &mut f32,
+    color: &mut Vec4,
+) -> bool {
+    let mut rgb = [color.x, color.y, color.z];
+    let changed =
+        polyscope_ui::build_vector_quantity_ui(ui, name, enabled, length_scale, radius, &mut rgb);
+    if changed {
+        *color = Vec4::new(rgb[0], rgb[1], rgb[2], color.w);
+    }
+    changed
+}
 
 impl VolumeMesh {
     /// Returns the currently active vertex vector quantity, if any.

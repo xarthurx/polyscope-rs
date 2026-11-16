@@ -314,6 +314,19 @@ impl SurfaceMeshRenderData {
         );
     }
 
+    /// Updates the color buffer with one color per triangle corner.
+    ///
+    /// `colors` follow the triangle order of the render data, three per triangle.
+    /// Colors past the last corner are ignored.
+    pub fn update_corner_colors(&self, queue: &wgpu::Queue, colors: &[Vec4]) {
+        let num_corners = colors.len().min(self.num_indices as usize);
+        let color_data: Vec<f32> = colors[..num_corners]
+            .iter()
+            .flat_map(Vec4::to_array)
+            .collect();
+        queue.write_buffer(&self.color_buffer, 0, bytemuck::cast_slice(&color_data));
+    }
+
     /// Clears the color buffer (sets all colors to zero, which means use `surface_color`).
     pub fn clear_colors(&self, queue: &wgpu::Queue) {
         let zero_colors: Vec<f32> = vec![0.0; self.num_indices as usize * 4];

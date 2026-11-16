@@ -197,6 +197,17 @@ impl VolumeMeshHandle {
         self
     }
 
+    /// Enables or disables a quantity by name.
+    ///
+    /// At most one scalar or color quantity colors the mesh. Enabling one
+    /// disables the other scalar and color quantities.
+    pub fn set_quantity_enabled(&self, quantity_name: &str, enabled: bool) -> &Self {
+        with_volume_mesh(&self.name, |vm| {
+            vm.set_quantity_enabled(quantity_name, enabled);
+        });
+        self
+    }
+
     /// Adds a vertex scalar quantity.
     pub fn add_vertex_scalar_quantity(&self, name: impl Into<String>, values: Vec<f32>) -> &Self {
         let name = name.into();
