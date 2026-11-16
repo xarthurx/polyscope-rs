@@ -127,6 +127,7 @@ impl PointCloud {
             global_start,
             point_radius: self.point_radius,
             _padding: [0.0; 2],
+            model: self.transform.to_cols_array_2d(),
         };
         let pick_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("point cloud pick uniforms"),
@@ -166,13 +167,14 @@ impl PointCloud {
         self.pick_bind_group.as_ref()
     }
 
-    /// Updates pick uniforms (e.g., when point radius changes).
+    /// Updates pick uniforms (e.g., when the point radius or the transform changes).
     pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
         if let Some(buffer) = &self.pick_uniform_buffer {
             let pick_uniforms = PickUniforms {
                 global_start: self.global_start,
                 point_radius: self.point_radius,
                 _padding: [0.0; 2],
+                model: self.transform.to_cols_array_2d(),
             };
             queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[pick_uniforms]));
         }
