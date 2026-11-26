@@ -4,6 +4,7 @@
 
 use super::{CameraView, CurveNetwork, PointCloud, Structure, SurfaceMesh, VolumeGrid, VolumeMesh};
 use polyscope_core::quantity::Quantity;
+use polyscope_core::registry::Registry;
 use polyscope_core::structure::HasQuantities;
 use polyscope_render::RenderEngine;
 use polyscope_structures::volume_grid::{
@@ -14,6 +15,13 @@ use polyscope_structures::volume_grid::{
 /// pick uniforms of volume grid quantities.
 pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
     crate::with_context_mut(|ctx| {
+        // Remove the pick ranges of removed structures and quantities. Later
+        // ranges can then use their indices.
+        let registry = &ctx.registry;
+        engine.retain_pick_ranges(|type_name, name| {
+            pick_range_owner_exists(registry, type_name, name)
+        });
+
         for structure in ctx.registry.iter_mut() {
             // PointCloud: windowed-only pick resources
             if structure.type_name() == "PointCloud" {
@@ -227,6 +235,24 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
             }
         }
     });
+}
+
+/// Returns whether the owner of a pick range exists: a structure, or a
+/// gridcube quantity of a volume grid. A gridcube quantity has the pick name
+/// `<grid name>/<quantity name>`.
+fn pick_range_owner_exists(registry: &Registry, type_name: &str, name: &str) -> bool {
+    registry.contains(type_name, name)
+        || (type_name == "VolumeGrid"
+            && registry
+                .iter()
+                .filter_map(|structure| structure.as_any().downcast_ref::<VolumeGrid>())
+                .any(|grid| {
+                    name.strip_prefix(grid.name())
+                        .and_then(|rest| rest.strip_prefix('/'))
+                        .is_some_and(|quantity| {
+                            grid.quantities().iter().any(|q| q.name() == quantity)
+                        })
+                }))
 }
 
 /// Draws all visible structures into the pick buffer.

@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   view, as C++ Polyscope does (upstream commit 08fd238). Before, the view used
   the extents of the last register or remove call. It did not follow a later
   transform change or position update.
+- After the element count of a structure changed, a click on a new element
+  selected an element of another structure, or nothing. Examples are
+  `update_points` with more points, and a new registration of a structure with
+  more elements. A structure now gets new pick indices when its element count
+  changes. A removed structure frees its pick indices, so a long session does
+  not use up the 2^24 pick indices.
 
 ### Documentation
 - [Feature Status](docs/feature-status.md): the upstream sync point is C++

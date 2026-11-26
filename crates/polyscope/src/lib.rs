@@ -1598,13 +1598,6 @@ mod tests {
         app.render_pick_frame();
         app.render_pick_frame();
         // A point 0.15 away from the tube axis, in the image plane.
-        let pixel_of = |engine: &RenderEngine, p: Vec3| {
-            let clip = engine.camera.view_projection_matrix() * p.extend(1.0);
-            let ndc = clip.truncate() / clip.w;
-            let x = f32::midpoint(ndc.x, 1.0) * engine.width as f32;
-            let y = f32::midpoint(-ndc.y, 1.0) * engine.height as f32;
-            (x as u32, y as u32)
-        };
         let engine = app.engine.as_ref().expect("engine");
         let up = engine.camera.up_direction.to_vec3();
         let (x, y) = pixel_of(engine, up * 0.15);
@@ -1622,5 +1615,83 @@ mod tests {
         app.render_pick_frame();
         app.render_pick_frame();
         assert!(hit(app), "the pick pass must use the new tube radius");
+    }
+
+    /// Returns the pixel of a world position in the image of the engine.
+    fn pixel_of(engine: &RenderEngine, p: Vec3) -> (u32, u32) {
+        let clip = engine.camera.view_projection_matrix() * p.extend(1.0);
+        let ndc = clip.truncate() / clip.w;
+        let x = f32::midpoint(ndc.x, 1.0) * engine.width as f32;
+        let y = f32::midpoint(-ndc.y, 1.0) * engine.height as f32;
+        (x as u32, y as u32)
+    }
+
+    /// Reads the pick buffer at the pixel of a world position. Returns the
+    /// structure type, the structure name and the element index.
+    fn pick_at_position(app: &app::App, p: Vec3) -> Option<(String, String, u32)> {
+        let engine = app.engine.as_ref().expect("engine");
+        let (x, y) = pixel_of(engine, p);
+        let index = engine.pick_at(x, y)?;
+        let (type_name, name, element) = engine.lookup_global_index(index)?;
+        Some((type_name.to_owned(), name.to_owned(), element))
+    }
+
+    /// A structure gets new pick indices when its element count changes, and
+    /// a removed structure frees its pick indices.
+    #[test]
+    fn test_pick_ranges_follow_element_count_changes() {
+        let _guard = setup();
+        // The corners of a cube. The camera fits the cube, so it shows all test points.
+        let corners = vec![Vec3::splat(-1.0), Vec3::splat(1.0)];
+        register_point_cloud("pick_grow", corners.clone());
+        with_point_cloud("pick_grow", |pc| pc.set_point_radius(0.1));
+        let Some(mut renderer) = LiveRenderer::new() else {
+            eprintln!("Skipping pick range test: no GPU adapter available");
+            return;
+        };
+        let app = &mut renderer.app;
+        let engine = app.engine.as_mut().expect("engine");
+        let (width, height) = (engine.width, engine.height);
+        engine.init_pick_buffers(width, height);
+        app.render_pick_frame();
+
+        // A row of four points in the image plane, at a height above the center.
+        let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+        let (right, up) = (view.row(0).truncate(), view.row(1).truncate());
+        let row = |height: f32| -> Vec<Vec3> {
+            [-0.6, -0.2, 0.2, 0.6]
+                .iter()
+                .map(|&x| right * x + up * height)
+                .collect()
+        };
+        let element =
+            |name: &str, index: u32| Some(("PointCloud".to_owned(), name.to_owned(), index));
+
+        // The second point cloud gets the pick indices after the first one.
+        register_point_cloud("pick_other", row(0.5));
+        with_point_cloud("pick_other", |pc| pc.set_point_radius(0.1));
+        app.render_pick_frame();
+
+        // The first point cloud gets two more points.
+        let mut grown = corners;
+        grown.extend_from_slice(&row(-0.5)[..2]);
+        with_point_cloud("pick_grow", |pc| pc.update_points(grown.clone()));
+        app.render_pick_frame();
+        assert_eq!(
+            pick_at_position(app, grown[2]),
+            element("pick_grow", 2),
+            "a new point must not show as an element of another structure"
+        );
+        assert_eq!(pick_at_position(app, row(0.5)[0]), element("pick_other", 0));
+
+        // A removed structure frees its pick indices.
+        remove_structure("pick_other");
+        app.render_pick_frame();
+        let engine = app.engine.as_ref().expect("engine");
+        assert_eq!(
+            engine.get_pick_range_start("PointCloud", "pick_other"),
+            None
+        );
+        assert_eq!(pick_at_position(app, grown[3]), element("pick_grow", 3));
     }
 }

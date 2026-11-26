@@ -4,6 +4,8 @@
 //! with a unique color encoding its ID. When the user clicks, we read the pixel
 //! at that position and decode the color to find what was clicked.
 
+use std::collections::HashMap;
+
 use glam::Vec2;
 
 /// Element type for pick results.
@@ -156,9 +158,186 @@ pub fn index_to_color(index: u32) -> [u8; 3] {
     ]
 }
 
+/// Number of global pick indices. The pick buffer stores an index in the 24
+/// bits of its RGB channels. Index 0 is the background.
+pub(crate) const PICK_INDEX_COUNT: u32 = 1 << 24;
+
+/// The global pick indices `[start, start + count)` of one structure.
+#[derive(Debug, Clone, Copy)]
+struct PickRange {
+    start: u32,
+    count: u32,
+}
+
+/// The pick index ranges of all structures.
+///
+/// Each structure owns one range of global pick indices, one index for each
+/// pickable element. A structure gets a new range when its element count
+/// changes. A removed range frees its indices, and later ranges can use them.
+/// Thus updates and new structures do not use up the `PICK_INDEX_COUNT` indices.
+#[derive(Debug, Default)]
+pub(crate) struct PickRanges {
+    /// The ranges, keyed by structure type name and structure name.
+    ranges: HashMap<(String, String), PickRange>,
+    /// True after the warning that the pick indices are not sufficient.
+    overflow_warned: bool,
+}
+
+impl PickRanges {
+    /// Returns the first index of the range of a structure with `count` elements.
+    ///
+    /// If the structure has a range of the same size, the range stays.
+    /// Otherwise the structure gets the first free range of `count` indices.
+    pub(crate) fn assign(&mut self, type_name: &str, name: &str, count: u32) -> u32 {
+        let key = (type_name.to_owned(), name.to_owned());
+        if let Some(range) = self.ranges.get(&key)
+            && range.count == count
+        {
+            return range.start;
+        }
+        // Remove the old range first. The new range can then use its indices.
+        self.ranges.remove(&key);
+        let start = self.first_free_start(count);
+        self.ranges.insert(key, PickRange { start, count });
+        start
+    }
+
+    /// Removes the range of a structure. Its indices become free.
+    pub(crate) fn remove(&mut self, type_name: &str, name: &str) {
+        self.ranges.remove(&(type_name.to_owned(), name.to_owned()));
+    }
+
+    /// Keeps only the ranges for which `keep(type_name, name)` is true.
+    pub(crate) fn retain(&mut self, mut keep: impl FnMut(&str, &str) -> bool) {
+        self.ranges
+            .retain(|(type_name, name), _| keep(type_name, name));
+    }
+
+    /// Returns `(type_name, name, local_index)` of the structure that owns a
+    /// global pick index. Returns None for the background and for free indices.
+    pub(crate) fn lookup(&self, global_index: u32) -> Option<(&str, &str, u32)> {
+        self.ranges.iter().find_map(|((type_name, name), range)| {
+            let local = global_index.checked_sub(range.start)?;
+            (local < range.count).then_some((type_name.as_str(), name.as_str(), local))
+        })
+    }
+
+    /// Returns the first index of the range of a structure, if it has a range.
+    pub(crate) fn start(&self, type_name: &str, name: &str) -> Option<u32> {
+        self.ranges
+            .get(&(type_name.to_owned(), name.to_owned()))
+            .map(|range| range.start)
+    }
+
+    /// Returns the start of the first free range of `count` indices.
+    ///
+    /// If no free range is sufficiently large, the range starts after the last
+    /// range. Its indices above the limit then show as other indices in the
+    /// pick buffer, so a click can select the wrong element. A warning tells
+    /// this once.
+    fn first_free_start(&mut self, count: u32) -> u32 {
+        let mut used: Vec<(u64, u64)> = self
+            .ranges
+            .values()
+            .map(|range| {
+                let start = u64::from(range.start);
+                (start, start + u64::from(range.count))
+            })
+            .collect();
+        used.sort_unstable();
+
+        let count = u64::from(count);
+        let mut start = 1; // Index 0 is the background.
+        for (used_start, used_end) in used {
+            if used_start >= start + count {
+                break; // The free indices before this range hold the new range.
+            }
+            start = start.max(used_end);
+        }
+
+        if start + count > u64::from(PICK_INDEX_COUNT) && !self.overflow_warned {
+            self.overflow_warned = true;
+            log::warn!(
+                "The scene has more pickable elements than the {} indices of the pick buffer. \
+                 A click on some elements selects a different element.",
+                PICK_INDEX_COUNT - 1
+            );
+        }
+        u32::try_from(start).unwrap_or(u32::MAX)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_pick_range_follows_the_element_count() {
+        let mut ranges = PickRanges::default();
+        assert_eq!(ranges.assign("PointCloud", "a", 2), 1);
+        assert_eq!(ranges.assign("PointCloud", "b", 4), 3);
+        // The same count keeps the range.
+        assert_eq!(ranges.assign("PointCloud", "a", 2), 1);
+        // A larger count gets new indices. They do not overlap the range of "b".
+        assert_eq!(ranges.assign("PointCloud", "a", 4), 7);
+        assert_eq!(ranges.lookup(10), Some(("PointCloud", "a", 3)));
+        assert_eq!(ranges.lookup(3), Some(("PointCloud", "b", 0)));
+        assert_eq!(ranges.lookup(1), None);
+        // A smaller count can use the free indices before the range of "b".
+        assert_eq!(ranges.assign("PointCloud", "a", 1), 1);
+        assert_eq!(ranges.lookup(7), None);
+        assert_eq!(ranges.lookup(0), None);
+    }
+
+    #[test]
+    fn test_removed_pick_ranges_free_their_indices() {
+        let mut ranges = PickRanges::default();
+        ranges.assign("PointCloud", "a", 2); // [1, 3)
+        ranges.assign("PointCloud", "b", 4); // [3, 7)
+        ranges.assign("PointCloud", "c", 1); // [7, 8)
+        ranges.retain(|_, name| name != "b");
+        assert_eq!(ranges.start("PointCloud", "b"), None);
+        assert_eq!(ranges.lookup(4), None);
+        // A new range gets the first free indices that hold it.
+        assert_eq!(ranges.assign("SurfaceMesh", "d", 3), 3);
+        assert_eq!(ranges.assign("SurfaceMesh", "e", 2), 8);
+        ranges.remove("PointCloud", "a");
+        assert_eq!(ranges.assign("SurfaceMesh", "f", 2), 1);
+        // A range without elements owns no index.
+        ranges.assign("PointCloud", "empty", 0);
+        assert_eq!(ranges.lookup(1), Some(("SurfaceMesh", "f", 0)));
+    }
+
+    #[test]
+    fn test_pick_ranges_do_not_use_up_the_indices() {
+        // Without the reuse of free indices, each loop needs more than the
+        // 2^24 indices of the pick buffer.
+        let mut ranges = PickRanges::default();
+        // A structure that changes its element count in each frame.
+        for frame in 0..200u32 {
+            let count = 100_000 + (frame % 2) * 100_000;
+            let start = ranges.assign("PointCloud", "animated", count);
+            assert!(start + count <= PICK_INDEX_COUNT, "frame {frame}");
+        }
+        // In each frame, a new structure replaces the structure of the frame before.
+        for frame in 0..200u32 {
+            ranges.retain(|_, name| name == "animated");
+            let start = ranges.assign("PointCloud", &format!("frame_{frame}"), 100_000);
+            assert!(start + 100_000 <= PICK_INDEX_COUNT, "frame {frame}");
+        }
+    }
+
+    #[test]
+    fn test_pick_ranges_past_the_index_limit() {
+        let mut ranges = PickRanges::default();
+        let all = PICK_INDEX_COUNT - 1;
+        assert_eq!(ranges.assign("PointCloud", "large", all), 1);
+        // No free index is left. The new range starts after the last range,
+        // and the first range stays as it is.
+        assert_eq!(ranges.assign("PointCloud", "more", 10), PICK_INDEX_COUNT);
+        assert_eq!(ranges.lookup(all), Some(("PointCloud", "large", all - 1)));
+        assert_eq!(ranges.lookup(u32::MAX), None);
+    }
 
     #[test]
     fn test_color_index_roundtrip() {
