@@ -209,17 +209,10 @@ impl App {
         let hit = hit.filter(|hit| {
             crate::with_context(|ctx| match hit {
                 ClickHit::Plane(name) => ctx.has_slice_plane(name),
+                // A pick reports the structure, also for a volume grid quantity.
                 ClickHit::Structure {
                     type_name, name, ..
-                } => {
-                    // A VolumeGrid pick name is "gridname/quantityname".
-                    let structure_name = if type_name == "VolumeGrid" {
-                        name.split('/').next().unwrap_or(name)
-                    } else {
-                        name
-                    };
-                    ctx.registry.get(type_name, structure_name).is_some()
-                }
+                } => ctx.registry.get(type_name, name).is_some(),
             })
         });
 
@@ -253,13 +246,7 @@ impl App {
                     _ => polyscope_render::PickElementType::None,
                 };
 
-                // For VolumeGrid, pick name is "gridname/quantityname"
-                // Extract the grid name for structure selection
-                let structure_name = if type_name == "VolumeGrid" {
-                    name.split('/').next().unwrap_or(&name).to_string()
-                } else {
-                    name.clone()
-                };
+                let structure_name = name;
 
                 self.selection = Some(PickResult {
                     hit: true,

@@ -52,6 +52,16 @@ fn index_to_color(index: u32) -> vec3<f32> {
     return vec3<f32>(r, g, b);
 }
 
+// Encode the global pick index `start + local` into RGB color. An index past
+// the 24 bits of the pick buffer draws as the background, also when the sum
+// overflows `u32`, so it cannot select a different element.
+fn encode_pick_index(start: u32, local: u32) -> vec3<f32> {
+    if (start >= 0x1000000u || local >= 0x1000000u - start) {
+        return vec3<f32>(0.0, 0.0, 0.0);
+    }
+    return index_to_color(start + local);
+}
+
 // Ray-cylinder intersection
 fn ray_cylinder_intersect(
     ray_origin: vec3<f32>,
@@ -183,7 +193,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     out.depth = clip_pos.z / clip_pos.w;
 
     // Output encoded pick ID
-    let pick_color = index_to_color(pick.global_start + in.edge_id);
+    let pick_color = encode_pick_index(pick.global_start, in.edge_id);
     out.color = vec4<f32>(pick_color, 1.0);
 
     return out;

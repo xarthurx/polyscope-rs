@@ -32,6 +32,10 @@ pub struct CameraView {
     render_data: Option<CurveNetworkRenderData>,
     /// Pick bind group for the wireframe edges (reuses the curve network line pick).
     pick_bind_group: Option<wgpu::BindGroup>,
+    /// Pick uniforms of the wireframe edges.
+    pick_uniform_buffer: Option<wgpu::Buffer>,
+    /// First global pick index of the wireframe edges.
+    pick_global_start: u32,
     /// Length scale used when geometry was last generated (to regenerate if it changes).
     prepared_length_scale: f32,
 
@@ -54,6 +58,8 @@ impl CameraView {
             widget_thickness: 0.02,
             render_data: None,
             pick_bind_group: None,
+            pick_uniform_buffer: None,
+            pick_global_start: 0,
             prepared_length_scale: 0.0,
             fly_to_requested: false,
         }
@@ -254,6 +260,7 @@ impl CameraView {
         self.render_data = Some(render_data);
         // The pick bind group refers to the old edge buffer.
         self.pick_bind_group = None;
+        self.pick_uniform_buffer = None;
         self.prepared_length_scale = length_scale;
     }
 
@@ -285,7 +292,7 @@ impl CameraView {
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("camera view pick uniforms"),
             contents: bytemuck::cast_slice(&[uniforms]),
-            usage: wgpu::BufferUsages::UNIFORM,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
         self.pick_bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("camera view pick bind group"),
@@ -305,12 +312,37 @@ impl CameraView {
                 },
             ],
         }));
+        self.pick_uniform_buffer = Some(uniform_buffer);
+        self.pick_global_start = global_start;
     }
 
     /// Returns the pick bind group if initialized.
     #[must_use]
     pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
         self.pick_bind_group.as_ref()
+    }
+
+    /// Returns the first global pick index.
+    #[must_use]
+    pub fn pick_global_start(&self) -> u32 {
+        self.pick_global_start
+    }
+
+    /// Sets the first global pick index. The next `update_pick_uniforms`
+    /// call writes it to the GPU.
+    pub fn set_pick_global_start(&mut self, global_start: u32) {
+        self.pick_global_start = global_start;
+    }
+
+    /// Writes the pick uniforms of the wireframe edges.
+    pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let uniforms = polyscope_render::PickUniforms {
+                global_start: self.pick_global_start,
+                ..polyscope_render::PickUniforms::default()
+            };
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        }
     }
 
     /// Returns true if the user has requested to fly to this camera view.
@@ -436,6 +468,7 @@ impl Structure for CameraView {
     fn clear_gpu_resources(&mut self) {
         self.render_data = None;
         self.pick_bind_group = None;
+        self.pick_uniform_buffer = None;
         for quantity in &mut self.quantities {
             quantity.clear_gpu_resources();
         }

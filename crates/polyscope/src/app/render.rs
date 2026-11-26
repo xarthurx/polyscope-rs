@@ -27,7 +27,7 @@ impl App {
         self.prepare_frame(true);
 
         // Render pick pass (GPU picking)
-        if let Some(engine) = &self.engine {
+        if let Some(engine) = &mut self.engine {
             render_pick::render_pick_pass(engine);
         }
 

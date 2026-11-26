@@ -7,7 +7,7 @@
 
 use super::{
     App, CurveNetwork, GroundPlaneMode, Options, PointCloud, SurfaceMesh, VolumeMesh, render_init,
-    render_peel, render_pick, render_scene, render_volume_grid,
+    render_peel, render_scene, render_volume_grid,
 };
 use polyscope_render::RenderEngine;
 
@@ -37,9 +37,7 @@ impl App {
         render_init::update_uniforms(engine);
         render_init::init_structure_gpu_resources(engine);
         let isosurface_meshes = render_volume_grid::init_volume_grid_quantities(engine);
-        if interactive {
-            render_pick::init_pick_resources(engine);
-        }
+        // The pick pass creates the pick resources and gives the pick ranges.
         render_init::update_gpu_buffers(engine, interactive);
 
         // Registration takes the context lock, so it comes after the GPU updates.

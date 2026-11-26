@@ -367,6 +367,18 @@ impl VolumeGridNodeScalarQuantity {
         self.pick_bind_group.as_ref()
     }
 
+    /// Sets the first global pick index. The next `update_pick_uniforms`
+    /// call writes it to the GPU.
+    pub fn set_pick_global_start(&mut self, global_start: u32) {
+        self.global_start = global_start;
+    }
+
+    /// Returns the first global pick index.
+    #[must_use]
+    pub fn pick_global_start(&self) -> u32 {
+        self.global_start
+    }
+
     /// Updates the pick uniform buffer with current model transform and cube size factor.
     pub fn update_pick_uniforms(
         &self,
@@ -808,6 +820,18 @@ impl VolumeGridCellScalarQuantity {
     #[must_use]
     pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
         self.pick_bind_group.as_ref()
+    }
+
+    /// Sets the first global pick index. The next `update_pick_uniforms`
+    /// call writes it to the GPU.
+    pub fn set_pick_global_start(&mut self, global_start: u32) {
+        self.global_start = global_start;
+    }
+
+    /// Returns the first global pick index.
+    #[must_use]
+    pub fn pick_global_start(&self) -> u32 {
+        self.global_start
     }
 
     /// Updates the pick uniform buffer with current model transform and cube size factor.

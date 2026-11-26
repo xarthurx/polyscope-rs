@@ -4,6 +4,8 @@
 //! with a unique color encoding its ID. When the user clicks, we read the pixel
 //! at that position and decode the color to find what was clicked.
 
+use std::collections::HashMap;
+
 use glam::Vec2;
 
 /// Element type for pick results.
@@ -156,9 +158,337 @@ pub fn index_to_color(index: u32) -> [u8; 3] {
     ]
 }
 
+/// Number of global pick indices. The pick buffer stores an index in the 24
+/// bits of its RGB channels. Index 0 is the background. The pick shaders draw
+/// a larger index as the background, so it cannot select another element.
+pub(crate) const PICK_INDEX_COUNT: u32 = 1 << 24;
+
+/// The owner of a pick range: a structure, or one quantity of a structure.
+///
+/// A quantity is its index in the quantities of the structure, not its name.
+/// Thus two quantities with the same name cannot collide, and neither can
+/// structure names that contain `/`.
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct PickOwner {
+    type_name: String,
+    structure: String,
+    /// The index of the quantity, or `None` for the structure itself.
+    quantity: Option<usize>,
+}
+
+impl PickOwner {
+    fn new(type_name: &str, structure: &str, quantity: Option<usize>) -> Self {
+        Self {
+            type_name: type_name.to_owned(),
+            structure: structure.to_owned(),
+            quantity,
+        }
+    }
+}
+
+/// The global pick indices `[start, start + count)` of one owner.
+#[derive(Debug, Clone, Copy)]
+struct PickRange {
+    /// The logical first index. It can be past the limit; the GPU gets it
+    /// through `gpu_start`.
+    start: u64,
+    count: u32,
+}
+
+/// Returns the first index that the GPU gets for a logical first index. A
+/// start past the limit stays at the limit, so `start + element` cannot
+/// overflow `u32` in the shaders, and the shaders draw these elements as the
+/// background.
+fn gpu_start(start: u64) -> u32 {
+    u32::try_from(start.min(u64::from(PICK_INDEX_COUNT))).unwrap_or(PICK_INDEX_COUNT)
+}
+
+/// The pick index ranges of one frame.
+///
+/// The window clears the ranges at the start of each frame. Then each owner
+/// gets the next range, with one index for each pickable element. Thus the
+/// ranges have no gaps, and a count change, a removed owner or an empty owner
+/// leaves no unused indices for later frames.
+#[derive(Debug)]
+pub(crate) struct PickRanges {
+    /// The range of each owner.
+    ranges: HashMap<PickOwner, PickRange>,
+    /// The first index after the last range.
+    next: u64,
+    /// True after the warning that the pick indices are not sufficient.
+    overflow_warned: bool,
+}
+
+impl Default for PickRanges {
+    fn default() -> Self {
+        Self {
+            ranges: HashMap::new(),
+            next: 1, // Index 0 is the background.
+            overflow_warned: false,
+        }
+    }
+}
+
+impl PickRanges {
+    /// Removes all ranges. The next range starts at index 1.
+    pub(crate) fn clear(&mut self) {
+        self.ranges.clear();
+        self.next = 1;
+    }
+
+    /// Returns the first index of the range of a structure with `count` elements.
+    pub(crate) fn assign(&mut self, type_name: &str, name: &str, count: u32) -> u32 {
+        self.assign_owner(PickOwner::new(type_name, name, None), count)
+    }
+
+    /// Returns the first index of the range of the quantity with index
+    /// `quantity` of a structure, for `count` elements.
+    pub(crate) fn assign_quantity(
+        &mut self,
+        type_name: &str,
+        structure: &str,
+        quantity: usize,
+        count: u32,
+    ) -> u32 {
+        self.assign_owner(PickOwner::new(type_name, structure, Some(quantity)), count)
+    }
+
+    /// Returns the first index of the range of an owner with `count` elements.
+    ///
+    /// A range that holds `count` elements keeps its start, and so does the
+    /// last range, which grows or shrinks at its end. Thus a count change does
+    /// not move a range past the limit. Otherwise the owner gets the range
+    /// after the last range. The indices of a range past `PICK_INDEX_COUNT`
+    /// cannot be picked. A warning tells this once.
+    fn assign_owner(&mut self, owner: PickOwner, count: u32) -> u32 {
+        if let Some(range) = self.ranges.get_mut(&owner) {
+            let end = range.start + u64::from(range.count);
+            if count <= range.count || end == self.next {
+                if end == self.next {
+                    self.next = range.start + u64::from(count);
+                }
+                range.count = count;
+                let start = range.start;
+                self.warn_if_past_limit();
+                return gpu_start(start);
+            }
+        }
+        let start = self.next;
+        self.next += u64::from(count);
+        self.warn_if_past_limit();
+        self.ranges.insert(owner, PickRange { start, count });
+        gpu_start(start)
+    }
+
+    /// Logs a warning, once, when the ranges reach past the pick buffer.
+    fn warn_if_past_limit(&mut self) {
+        if self.next > u64::from(PICK_INDEX_COUNT) && !self.overflow_warned {
+            self.overflow_warned = true;
+            log::warn!(
+                "The scene has more pickable elements than the {} indices of the pick buffer. \
+                 The elements past the limit cannot be picked.",
+                PICK_INDEX_COUNT - 1
+            );
+        }
+    }
+
+    /// Removes the ranges of a structure and of its quantities. The next range
+    /// starts after the last remaining range, so the indices of a removed last
+    /// range can be used again.
+    pub(crate) fn remove(&mut self, type_name: &str, name: &str) {
+        self.ranges
+            .retain(|owner, _| owner.type_name != type_name || owner.structure != name);
+        self.next = self
+            .ranges
+            .values()
+            .map(|range| range.start + u64::from(range.count))
+            .max()
+            .unwrap_or(1)
+            .max(1);
+    }
+
+    /// Returns `(type_name, structure_name, local_index)` of the owner of a
+    /// global pick index. For a quantity, it returns the name of its structure.
+    /// Returns None for the background and for an index without an owner.
+    pub(crate) fn lookup(&self, global_index: u32) -> Option<(&str, &str, u32)> {
+        if global_index >= PICK_INDEX_COUNT {
+            return None;
+        }
+        self.ranges.iter().find_map(|(owner, range)| {
+            let local = u64::from(global_index).checked_sub(range.start)?;
+            let local = u32::try_from(local)
+                .ok()
+                .filter(|&local| local < range.count)?;
+            Some((owner.type_name.as_str(), owner.structure.as_str(), local))
+        })
+    }
+
+    /// Returns the first index of the range of a structure, if it has a range.
+    pub(crate) fn start(&self, type_name: &str, name: &str) -> Option<u32> {
+        self.ranges
+            .get(&PickOwner::new(type_name, name, None))
+            .map(|range| gpu_start(range.start))
+    }
+
+    /// Returns the first index of the range of the quantity with index
+    /// `quantity` of a structure, if it has a range.
+    pub(crate) fn quantity_start(
+        &self,
+        type_name: &str,
+        structure: &str,
+        quantity: usize,
+    ) -> Option<u32> {
+        self.ranges
+            .get(&PickOwner::new(type_name, structure, Some(quantity)))
+            .map(|range| gpu_start(range.start))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Gives the ranges of one frame to point clouds with these element counts.
+    fn frame(ranges: &mut PickRanges, owners: &[(&str, u32)]) -> Vec<u32> {
+        ranges.clear();
+        owners
+            .iter()
+            .map(|&(name, count)| ranges.assign("PointCloud", name, count))
+            .collect()
+    }
+
+    #[test]
+    fn test_pick_ranges_of_a_frame_have_no_gaps() {
+        let mut ranges = PickRanges::default();
+        assert_eq!(frame(&mut ranges, &[("a", 2), ("b", 4)]), [1, 3]);
+        // The same owner and count keep the range.
+        assert_eq!(ranges.assign("PointCloud", "a", 2), 1);
+        // A new count in the same frame gets the range after the last range.
+        assert_eq!(ranges.assign("PointCloud", "a", 4), 7);
+        assert_eq!(ranges.lookup(10), Some(("PointCloud", "a", 3)));
+        assert_eq!(ranges.lookup(3), Some(("PointCloud", "b", 0)));
+        assert_eq!(ranges.lookup(1), None);
+        assert_eq!(ranges.lookup(0), None);
+        // The next frame gives the ranges again from index 1.
+        assert_eq!(frame(&mut ranges, &[("a", 4), ("b", 4)]), [1, 5]);
+        // A removed owner and an empty owner leave no gap.
+        assert_eq!(frame(&mut ranges, &[("empty", 0), ("b", 4)]), [1, 1]);
+        assert_eq!(ranges.start("PointCloud", "a"), None);
+        assert_eq!(ranges.lookup(1), Some(("PointCloud", "b", 0)));
+    }
+
+    /// A smaller count keeps the start of the range, and a smaller last range
+    /// gives its free end back.
+    #[test]
+    fn test_smaller_count_keeps_the_start() {
+        let mut ranges = PickRanges::default();
+        let last = PICK_INDEX_COUNT - 1;
+        assert_eq!(ranges.assign("PointCloud", "a", last), 1);
+        assert_eq!(ranges.assign("PointCloud", "a", 1), 1);
+        assert_eq!(ranges.lookup(1), Some(("PointCloud", "a", 0)));
+        assert_eq!(ranges.lookup(2), None);
+        assert_eq!(ranges.assign("PointCloud", "b", 2), 2);
+    }
+
+    /// The last range grows at its end. A range that is not the last one moves
+    /// after the last range when it grows.
+    #[test]
+    fn test_growing_ranges() {
+        let mut ranges = PickRanges::default();
+        let last = PICK_INDEX_COUNT - 1;
+        assert_eq!(ranges.assign("PointCloud", "a", last - 1), 1);
+        assert_eq!(ranges.assign("PointCloud", "a", last), 1);
+        assert_eq!(ranges.lookup(last), Some(("PointCloud", "a", last - 1)));
+
+        assert_eq!(frame(&mut ranges, &[("a", 2), ("b", 2)]), [1, 3]);
+        assert_eq!(ranges.assign("PointCloud", "a", 3), 5);
+        assert_eq!(ranges.lookup(7), Some(("PointCloud", "a", 2)));
+        assert_eq!(ranges.lookup(1), None);
+    }
+
+    /// A removed last range gives its indices back, so the range before it
+    /// can grow at its end.
+    #[test]
+    fn test_removed_last_range_gives_its_indices_back() {
+        let mut ranges = PickRanges::default();
+        let last = PICK_INDEX_COUNT - 1;
+        assert_eq!(ranges.assign("PointCloud", "a", last - 1), 1);
+        assert_eq!(ranges.assign("PointCloud", "b", 1), last);
+        ranges.remove("PointCloud", "b");
+        assert_eq!(ranges.assign("PointCloud", "a", last), 1);
+        assert_eq!(ranges.lookup(last), Some(("PointCloud", "a", last - 1)));
+    }
+
+    /// A range past the limit keeps its logical start. After smaller counts,
+    /// the free indices before the limit can be used again.
+    #[test]
+    fn test_ranges_past_the_limit_can_shrink() {
+        let mut ranges = PickRanges::default();
+        let limit = PICK_INDEX_COUNT;
+        assert_eq!(ranges.assign("PointCloud", "a", limit), 1);
+        assert_eq!(ranges.assign("PointCloud", "b", 1), limit);
+        assert_eq!(ranges.assign("PointCloud", "b", 0), limit);
+        assert_eq!(ranges.assign("PointCloud", "a", 1), 1);
+        assert_eq!(ranges.assign("PointCloud", "c", 1), 2);
+        assert_eq!(ranges.lookup(2), Some(("PointCloud", "c", 0)));
+    }
+
+    /// A range that grows does not move past the 24 bits of the pick buffer
+    /// while all elements fit. Before, it could start after a later range, and
+    /// its indices past 2^24 wrapped to the indices of another structure.
+    #[test]
+    fn test_count_changes_do_not_wrap_pick_indices() {
+        let mut ranges = PickRanges::default();
+        frame(&mut ranges, &[("a", 1), ("b", 4_000_000), ("c", 8_000_000)]);
+        let starts = frame(&mut ranges, &[("a", 1), ("b", 6_000_000), ("c", 8_000_000)]);
+        assert_eq!(starts, [1, 2, 6_000_002]);
+        assert!(starts[2] + 8_000_000 <= PICK_INDEX_COUNT);
+        // The element that wrapped to index 1 before reads back as itself.
+        let color = index_to_color(starts[1] + 4_777_215);
+        let read_back = color_to_index(color[0], color[1], color[2]);
+        assert_eq!(
+            ranges.lookup(read_back),
+            Some(("PointCloud", "b", 4_777_215))
+        );
+    }
+
+    /// A quantity range belongs to the index of the quantity, so two
+    /// quantities with the same name cannot collide, and neither can
+    /// structure names with `/`. A pick reports the structure.
+    #[test]
+    fn test_quantity_ranges_report_the_structure() {
+        let mut ranges = PickRanges::default();
+        // A node quantity and a cell quantity with the same name.
+        assert_eq!(ranges.assign_quantity("VolumeGrid", "g", 0, 8), 1);
+        assert_eq!(ranges.assign_quantity("VolumeGrid", "g", 1, 1), 9);
+        assert_eq!(ranges.lookup(8), Some(("VolumeGrid", "g", 7)));
+        assert_eq!(ranges.lookup(9), Some(("VolumeGrid", "g", 0)));
+        assert_eq!(ranges.quantity_start("VolumeGrid", "g", 0), Some(1));
+        assert_eq!(ranges.start("VolumeGrid", "g"), None);
+        // Structure names that contain `/`.
+        assert_eq!(ranges.assign_quantity("VolumeGrid", "a/b", 0, 2), 10);
+        assert_eq!(ranges.assign_quantity("VolumeGrid", "a", 1, 3), 12);
+        assert_eq!(ranges.lookup(11), Some(("VolumeGrid", "a/b", 1)));
+        assert_eq!(ranges.lookup(14), Some(("VolumeGrid", "a", 2)));
+        // The removal of a structure removes the ranges of its quantities.
+        ranges.remove("VolumeGrid", "a");
+        assert_eq!(ranges.lookup(14), None);
+        assert_eq!(ranges.lookup(11), Some(("VolumeGrid", "a/b", 1)));
+    }
+
+    #[test]
+    fn test_pick_indices_past_the_limit_cannot_be_picked() {
+        let mut ranges = PickRanges::default();
+        let last = PICK_INDEX_COUNT - 1;
+        assert_eq!(ranges.assign("PointCloud", "large", last - 4), 1);
+        // A range can end past the limit. Its first indices stay pickable.
+        assert_eq!(ranges.assign("PointCloud", "partial", 10), last - 3);
+        assert_eq!(ranges.lookup(last), Some(("PointCloud", "partial", 3)));
+        // A range after the limit starts at the limit, so no index wraps.
+        assert_eq!(ranges.assign("PointCloud", "past", 10), PICK_INDEX_COUNT);
+        assert_eq!(ranges.lookup(PICK_INDEX_COUNT), None);
+        assert_eq!(ranges.lookup(1), Some(("PointCloud", "large", 0)));
+    }
 
     #[test]
     fn test_color_index_roundtrip() {

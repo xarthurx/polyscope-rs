@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `RenderEngine::clear_pick_ranges`, `RenderEngine::assign_quantity_pick_range`
+  and `RenderEngine::get_quantity_pick_range_start`.
+- `set_pick_global_start` and `pick_global_start` for point clouds, surface
+  meshes, curve networks, camera views, volume meshes and volume grid scalar
+  quantities, and `CameraView::update_pick_uniforms`.
+
+### Changed
+- `RenderEngine::lookup_global_index` reports the volume grid name for a
+  gridcube pick. Before, it reported `<grid>/<quantity>`. A grid name with `/`,
+  or two quantities with the same name, could then give the wrong owner.
+
+### Fixed
+- The "Reset View" button refreshes the scene extents before it sets the home
+  view, as C++ Polyscope does (upstream commit 08fd238). Before, the view used
+  the extents of the last register or remove call. It did not follow a later
+  transform change or position update.
+- After the element count of a structure changed, a click on a new element
+  selected an element of another structure, or nothing. Examples are
+  `update_points` with more points, and a new registration of a structure with
+  more elements. Each window frame now gives all structures their pick index
+  ranges again, one after the other, from their current element counts. Thus
+  a removed or empty structure keeps no pick indices, and a long session does
+  not use up the 2^24 pick indices. Hidden structures get no pick indices.
+  One lock of the context covers the whole pick pass, so another thread cannot
+  change the registry between the pick ranges, the pick uniforms and the draws.
+- A volume mesh kept its pick resources when a slice plane culled cells or
+  showed them again, so the pick buffer drew the old cell geometry. A visible
+  cell could then be missing from the pick buffer. The volume mesh now creates
+  its pick resources again when its render data changes, and it takes the
+  cell of each picked triangle from the render data.
+- If a scene has more pickable elements than the 2^24 - 1 indices of the pick
+  buffer, the pick buffer shows the elements past the limit as the background,
+  and a warning is logged once. Before, their indices wrapped to the indices
+  of other elements.
+
+### Documentation
+- [Feature Status](docs/feature-status.md): the upstream sync point is C++
+  commit 4efedba. The page lists the new C++ features that are not ported:
+  multiple viewports and the new `SimpleTriangleMesh` functions.
+- Feature Status lists two known issues of the click code: a click on a
+  surface mesh or a volume mesh selects element 0, and a click does not select
+  a volume grid. It also lists one known issue of the pick pass: if another
+  thread moves a structure during a frame, the pick buffer of that frame can
+  use the new position while the window shows the old one.
+
 ## [0.6.1] - 2026-11-16
 
 ### Changed

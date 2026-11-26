@@ -564,6 +564,7 @@ impl VolumeMesh {
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
     ) {
+        self.clear_pick_resources();
         let (positions, triangles) = self.generate_render_geometry();
 
         if triangles.is_empty() {
@@ -625,6 +626,7 @@ impl VolumeMesh {
             return;
         }
 
+        self.clear_pick_resources();
         let (positions, triangles) = self.generate_render_geometry_with_culling(planes);
 
         if triangles.is_empty() {
@@ -673,6 +675,14 @@ impl VolumeMesh {
         self.init_render_data(device, bind_group_layout, camera_buffer);
     }
 
+    /// Drops the pick resources. They refer to the vertex buffer and the cell
+    /// order of the render data, so new render data needs new pick resources.
+    fn clear_pick_resources(&mut self) {
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
+        self.pick_cell_index_buffer = None;
+    }
+
     /// Returns true if the mesh is currently showing culled geometry.
     #[must_use]
     pub fn is_culled(&self) -> bool {
@@ -694,50 +704,6 @@ impl VolumeMesh {
         } else {
             self.generate_render_geometry_with_culling(planes)
         }
-    }
-
-    /// Generates cell index per triangle mapping for GPU picking.
-    ///
-    /// Returns one `u32` per triangle indicating which cell that triangle belongs to.
-    /// Matches the triangle ordering from `generate_render_geometry()`.
-    fn generate_cell_index_per_triangle(&self) -> Vec<u32> {
-        let face_counts = self.compute_face_counts();
-        let mut cell_indices = Vec::new();
-        for (cell_idx, cell) in self.cells.iter().enumerate() {
-            let ct = self.cell_type(cell_idx);
-            for face in cell_data::face_data_for(ct) {
-                let key = cell_data::canonical_face_key(cell, face.polygon);
-                if face_counts.get(&key) != Some(&1) {
-                    continue;
-                }
-                for _tri in face.triangulation {
-                    cell_indices.push(cell_idx as u32);
-                }
-            }
-        }
-        cell_indices
-    }
-
-    /// Generates cell index per triangle mapping with cell culling.
-    fn generate_cell_index_per_triangle_with_culling(&self, planes: &[(Vec3, Vec3)]) -> Vec<u32> {
-        let face_counts = self.compute_face_counts_with_culling(planes);
-        let mut cell_indices = Vec::new();
-        for (cell_idx, cell) in self.cells.iter().enumerate() {
-            if !self.is_cell_visible(cell, planes) {
-                continue;
-            }
-            let ct = self.cell_type(cell_idx);
-            for face in cell_data::face_data_for(ct) {
-                let key = cell_data::canonical_face_key(cell, face.polygon);
-                if face_counts.get(&key) != Some(&1) {
-                    continue;
-                }
-                for _tri in face.triangulation {
-                    cell_indices.push(cell_idx as u32);
-                }
-            }
-        }
-        cell_indices
     }
 
     /// Initializes GPU resources for pick rendering.
@@ -767,14 +733,17 @@ impl VolumeMesh {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        // Build cell index mapping: tri_index -> cell_index
-        let cell_index_data = if self.culling_plane_cache.is_some() {
-            self.generate_cell_index_per_triangle_with_culling(
-                self.culling_plane_cache.as_deref().unwrap_or(&[]),
-            )
-        } else {
-            self.generate_cell_index_per_triangle()
-        };
+        // Build cell index mapping: tri_index -> cell_index. The corner
+        // sources belong to the current render data, three corners per
+        // triangle, so the mapping matches the drawn triangles, also when the
+        // culling cache was cleared after the render data was built.
+        let cell_index_data: Vec<u32> = self
+            .corner_sources
+            .cells
+            .iter()
+            .step_by(3)
+            .copied()
+            .collect();
 
         let pick_cell_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("volume mesh pick cell indices"),
@@ -817,6 +786,18 @@ impl VolumeMesh {
     #[must_use]
     pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
         self.pick_bind_group.as_ref()
+    }
+
+    /// Sets the first global pick index. The next `update_pick_uniforms`
+    /// call writes it to the GPU.
+    pub fn set_pick_global_start(&mut self, global_start: u32) {
+        self.global_start = global_start;
+    }
+
+    /// Returns the first global pick index.
+    #[must_use]
+    pub fn pick_global_start(&self) -> u32 {
+        self.global_start
     }
 
     /// Updates pick uniforms (model transform) when the structure is moved.

@@ -6,79 +6,83 @@ use super::RenderEngine;
 /// depth of the picked surface (C++ `pickAtBufferInds` reads the pick depth).
 const PICK_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
-/// A contiguous range of global pick indices assigned to a structure.
-#[derive(Debug, Clone)]
-pub struct PickRange {
-    /// The starting global index for this structure's elements.
-    pub global_start: u32,
-    /// Number of elements in this range.
-    pub count: u32,
-    /// Structure type name (e.g., `PointCloud`, `SurfaceMesh`).
-    pub type_name: String,
-    /// Structure name.
-    pub name: String,
-}
-
 impl RenderEngine {
     // ========== Pick System - Range-Based ID Management ==========
+
+    /// Removes all pick ranges. The next range starts at index 1.
+    ///
+    /// The window calls this function at the start of each frame. Then each
+    /// structure gets the next range for its current element count, so the
+    /// ranges of a frame have no gaps.
+    pub fn clear_pick_ranges(&mut self) {
+        self.pick_ranges.clear();
+    }
 
     /// Assigns a contiguous range of global pick indices to a structure.
     ///
     /// Returns the `global_start` index. The structure owns indices
-    /// `[global_start, global_start + num_elements)`.
+    /// `[global_start, global_start + num_elements)` until the next
+    /// [`Self::clear_pick_ranges`] call. A range that holds `num_elements`
+    /// keeps its start, and so does the last range, which grows or shrinks at
+    /// its end. Otherwise the structure gets the range after the last range,
+    /// and the start of its earlier range is no longer valid.
     ///
     /// Index 0 is reserved as background (no hit), so all ranges start from >= 1.
+    /// The pick buffer holds 24 bits. The pick shaders draw a larger index as
+    /// the background, so the elements past this limit cannot be picked.
     pub fn assign_pick_range(&mut self, type_name: &str, name: &str, num_elements: u32) -> u32 {
-        let key = (type_name.to_string(), name.to_string());
-
-        // If already assigned, return existing start
-        if let Some(range) = self.pick_ranges.get(&key) {
-            return range.global_start;
-        }
-
-        let global_start = self.next_global_index;
-        self.next_global_index += num_elements;
-
-        let range = PickRange {
-            global_start,
-            count: num_elements,
-            type_name: type_name.to_string(),
-            name: name.to_string(),
-        };
-
-        self.pick_ranges.insert(key, range);
-
-        global_start
+        self.pick_ranges.assign(type_name, name, num_elements)
     }
 
-    /// Removes a structure's pick range.
+    /// Assigns a contiguous range of global pick indices to a quantity of a
+    /// structure, for example to the gridcubes of a volume grid quantity.
     ///
-    /// The range is freed but the global index counter is not decremented
-    /// (monotonic allocation — no fragmentation complexity).
+    /// `quantity_index` is the index of the quantity in the quantities of the
+    /// structure. Thus two quantities with the same name cannot collide, and
+    /// neither can structure names that contain `/`.
+    /// [`Self::lookup_global_index`] reports the structure for these indices.
+    /// Otherwise it works as [`Self::assign_pick_range`].
+    pub fn assign_quantity_pick_range(
+        &mut self,
+        type_name: &str,
+        structure_name: &str,
+        quantity_index: usize,
+        num_elements: u32,
+    ) -> u32 {
+        self.pick_ranges
+            .assign_quantity(type_name, structure_name, quantity_index, num_elements)
+    }
+
+    /// Removes the pick ranges of a structure and of its quantities. If they
+    /// were the last ranges, the next range starts after the last remaining
+    /// range.
     pub fn remove_pick_range(&mut self, type_name: &str, name: &str) {
-        let key = (type_name.to_string(), name.to_string());
-        self.pick_ranges.remove(&key);
+        self.pick_ranges.remove(type_name, name);
     }
 
     /// Looks up which structure owns a global pick index.
     ///
     /// Returns `(type_name, name, local_element_index)` or None if no structure
-    /// owns this index (background or freed range).
+    /// owns this index (background or freed range). For the range of a
+    /// quantity, `name` is the name of its structure.
     pub fn lookup_global_index(&self, global_index: u32) -> Option<(&str, &str, u32)> {
-        for range in self.pick_ranges.values() {
-            if global_index >= range.global_start && global_index < range.global_start + range.count
-            {
-                let local = global_index - range.global_start;
-                return Some((&range.type_name, &range.name, local));
-            }
-        }
-        None
+        self.pick_ranges.lookup(global_index)
     }
 
     /// Gets the `global_start` for a structure's pick range, if assigned.
     pub fn get_pick_range_start(&self, type_name: &str, name: &str) -> Option<u32> {
-        let key = (type_name.to_string(), name.to_string());
-        self.pick_ranges.get(&key).map(|r| r.global_start)
+        self.pick_ranges.start(type_name, name)
+    }
+
+    /// Gets the `global_start` for the pick range of a quantity, if assigned.
+    pub fn get_quantity_pick_range_start(
+        &self,
+        type_name: &str,
+        structure_name: &str,
+        quantity_index: usize,
+    ) -> Option<u32> {
+        self.pick_ranges
+            .quantity_start(type_name, structure_name, quantity_index)
     }
 
     // ========== Pick System - GPU Resources ==========

@@ -173,6 +173,18 @@ impl PointCloud {
         self.pick_bind_group.as_ref()
     }
 
+    /// Sets the first global pick index. The next `update_pick_uniforms`
+    /// call writes it to the GPU.
+    pub fn set_pick_global_start(&mut self, global_start: u32) {
+        self.global_start = global_start;
+    }
+
+    /// Returns the first global pick index.
+    #[must_use]
+    pub fn pick_global_start(&self) -> u32 {
+        self.global_start
+    }
+
     /// Updates pick uniforms (e.g., when the point radius or the transform changes).
     pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
         if let Some(buffer) = &self.pick_uniform_buffer {

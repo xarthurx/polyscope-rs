@@ -85,6 +85,7 @@ A dash (—) means that C++ Polyscope also has no such quantity on the structure
 | Frame rate limit | Full | `Options::max_fps` (default 60, 0 = unlimited) limits the window. |
 | Camera navigation | Full | Turntable, Free, Planar, Arcball, First Person and None. |
 | Projection | Full | Perspective and orthographic. |
+| Multiple viewports | Missing | One viewport and one camera for the window. |
 | Camera flights | Partial | Double-click, view load and the camera view "fly to" action. The duration is fixed at 0.4 s. No API. |
 | Scene extents | Full | Automatic, or manual in the Scene Extents panel. |
 | Floating images | Missing | Stored, not displayed. |
@@ -95,7 +96,7 @@ A dash (—) means that C++ Polyscope also has no such quantity on the structure
 |---------|--------|-------|
 | Mouse navigation | Partial | Rotate, pan, zoom and view center. No Ctrl+Shift+drag zoom and no Shift+scroll clip-plane shift. |
 | Click selection | Full | The C++ click rules: delayed single-click pick, double-click, modifier keys, drag threshold. |
-| Element picking | Partial | Surface meshes report a face, curve networks an edge. No vertex, corner or node picks. |
+| Element picking | Partial | Point clouds report a point, curve networks an edge. A click on a surface mesh or a volume mesh reports element 0, see [Known Issues](#known-issues). No vertex, corner or node picks. |
 | Selection panel | Partial | Shows the structure and the element index. No quantity values. |
 | Keyboard | Partial | W, A, S, D, Q, E in First Person navigation. Esc and F12. No Ctrl+C or Ctrl+V for the view. |
 | Gizmo | Partial | One gizmo for the selected structure or slice plane. Translate, rotate or scale. Snap increments. |
@@ -172,6 +173,8 @@ One line per item. The C++ names are in backticks.
 - `getViewAsJson` and `setViewFromJson` in the C++ JSON format.
 - Ctrl+C and Ctrl+V to copy and paste the view.
 - The alpha channel of `bgColor`.
+- Multiple viewports in one window: `createViewportGrid`, `setNumViewports`, `activateViewport`, `setActiveViewportRelativeLocation`, `setActiveViewportRelativeSize` and `setViewportsShareNavigation` (upstream 16b6852).
+- The viewport forms of the coordinate functions, such as `screenCoordsToWorldRayViewport`, `screenCoordsGlobalToViewport` and `bufferIndsViewportToGlobal` (upstream 16b6852, 4efedba).
 
 ### Picking and selection
 
@@ -183,6 +186,7 @@ One line per item. The C++ names are in backticks.
 - `MeshSelectionMode` and `SurfaceMesh::setSelectionMode`.
 - `SurfaceMesh::selectVertex`.
 - `buildPickUI`: the Selection panel shows no quantity values.
+- `pickAtScreenCoordsViewport` and `pickAtBufferIndsViewport`, and the `PickResult` fields `viewportInd`, `viewportScreenCoords` and `viewportBufferInds` (upstream 16b6852, 4efedba).
 
 ### Interaction and UI
 
@@ -212,6 +216,7 @@ One line per item. The C++ names are in backticks.
 - `getStructure(type, "")` for the only structure of a type (upstream d3e6ca6).
 - The 2D input forms: `registerPointCloud2D`, `registerCurveNetwork2D`, `addVectorQuantity2D` and similar.
 - `ScaledValue`: `set_point_radius` and the vector length and radius have no relative or absolute flag.
+- `setViewportVisibility`, `setViewportVisibilityAll`, `setViewportVisibilityExclusive` and `getViewportVisibility` (upstream 16b6852).
 
 ### Quantities (all types)
 
@@ -277,7 +282,7 @@ One line per item. The C++ names are in backticks.
 ### Missing structures
 
 - `SparseVolumeGrid` (upstream 3fa1cb7, 8ac360d).
-- `SimpleTriangleMesh`.
+- `SimpleTriangleMesh`, with its vertex and face scalar and color quantities, vertex and face picks, `updateVertexPositions`, `updateMesh`, `reserveMeshCapacity` and edge wireframe (upstream cc3bcca, 8231aec, 296906a, 96d73bc).
 
 ### Images and implicit surfaces
 
@@ -287,7 +292,7 @@ One line per item. The C++ names are in backticks.
 - `addDepthRenderImageQuantity`, `addColorRenderImageQuantity` and `addRawColorRenderImageQuantity`.
 - `addScalarRenderImageQuantity` and `addRawColorAlphaRenderImageQuantity`.
 - Render image options and updates: `setMaterial`, `setAllowFullscreenCompositing`, `updateBuffers`.
-- Render images in depth peeling and under slice planes (upstream cc4d603, 8968b55).
+- Render images in depth peeling and under slice planes (upstream cc4d603, 8968b55, 7d3b9bc).
 - Image quantities on structures: `Structure::addScalarImageQuantity` and the other `add*ImageQuantity` functions.
 - `renderImplicitSurface` and its variants, `ImplicitRenderOpts` and `ImplicitRenderMode`.
 
@@ -351,6 +356,9 @@ These features exist in both libraries but behave differently.
 - **Pretty mode depth precision.** The min-depth texture of depth peeling is `Rgba16Float`, because WebGPU cannot blend `R32Float` without the optional `float32-blendable` feature. Thus the depth epsilon is `2e-3` (C++: `1e-6`). Pretty transparency can merge layers that are closer than about 0.002 in depth.
 - **Pretty mode non-linear opacity.** Depth peeling renders both faces of closed meshes. The effective alpha is `2a - a^2`. C++ Polyscope gives the same result.
 - **Tone mapping values.** Exposure, white level and gamma are not part of `Options` or of a saved view. Only the Tone Mapping panel sets them.
+- **Click on a mesh element.** A click on a surface mesh or a volume mesh selects the mesh with element 0. The click code (`app/input.rs`) gives the face of the pick buffer the distance of the ray hit, and on equal distance the ray hit, with element 0, wins. The click code also ignores the volume mesh cells of the pick buffer.
+- **Click on a volume grid.** A click does not select a volume grid. The click code ignores the gridcubes of the pick buffer.
+- **Changes from another thread during a frame.** The frame preparation uploads the transforms for the scene, and the pick pass reads them again under its own lock. If another thread moves a structure between the two, the pick buffer of that frame uses the new position, and the window shows the old one. The next frame uses the new position in both.
 
 ---
 
@@ -380,12 +388,13 @@ The order of the tiers is the order of priority. No dates are planned.
 - [ ] Remaining options: UI scale, panel width, window size, vsync, program name.
 - [ ] Messages API.
 - [ ] Group helpers: `unparent`, top-level lookup, hidden descendants.
+- [ ] Multiple viewports: a viewport grid, a camera for each viewport or shared navigation, and a viewport visibility for each structure.
 
 ---
 
 ## Upstream Sync Point
 
-C++ Polyscope `master` at commit 4758a88 (2026-09-05) was audited on 2026-11-16. It has no newer commits.
+C++ Polyscope `master` at commit 4efedba (2026-11-25) was audited on 2026-11-26. It has no newer commits.
 
 ### Completed upstream ports
 
@@ -412,6 +421,16 @@ C++ Polyscope `master` at commit 4758a88 (2026-09-05) was audited on 2026-11-16.
 - [x] 8740ddc: the SSAO noise uses a fixed seed, so it is the same on every run.
 - [x] d7a2a04 (partial): `ScreenshotOptions::transparent_background`. No `includeUI` and no `screenshotToBuffer`.
 - [x] 502c80c (partial): the gizmo has a mode selector and snap increments. No user gizmos.
+- [x] 08fd238: the Reset View button refreshes the scene extents before it sets the home view. Structure bounds need no forced recompute, because each call computes them.
+
+### Upstream changes that need no port
+
+- 393bc80 to 243bb3a, 47d6133 and 93476ea: the `ManagedBuffer` refactor and the OpenGL texture types. polyscope-rs has its own wgpu buffers.
+- a206e53: the C++ `SimpleTriangleMesh` shader now premultiplies its color, as the C++ surface mesh shader does. polyscope-rs has no `SimpleTriangleMesh`, and its depth-peel shader premultiplies (`surface_mesh_peel.wgsl`).
+- 16b6852 (part): the projection mode is a run-time uniform. polyscope-rs has no shader variant for a projection mode.
+- 16b6852 (part): the pick read uses the row `height - 1 - y`. polyscope-rs reads row `y`, because wgpu textures start at the top left.
+- 16b6852 (part): more redraw requests for camera changes and camera flights. polyscope-rs draws every frame.
+- 9a562d2, ce256d0 and 3da0aeb: fixes for the C++ CI and the MSVC compiler.
 
 ### Rust-only features
 

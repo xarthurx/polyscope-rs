@@ -224,10 +224,8 @@ pub struct RenderEngine {
     pub(crate) gridcube_bind_group_layout: Option<wgpu::BindGroupLayout>,
 
     // Pick system - range-based ID management (flat 24-bit global index)
-    /// Map from (`type_name`, name) to pick range.
-    pub(crate) pick_ranges: HashMap<(String, String), pick::PickRange>,
-    /// Next available global index (0 is reserved for background).
-    pub(crate) next_global_index: u32,
+    /// The pick index ranges of the structures.
+    pub(crate) pick_ranges: crate::pick::PickRanges,
 
     // Pick system - GPU resources
     /// Pick color texture for element selection.
@@ -570,8 +568,7 @@ impl RenderEngine {
             simple_mesh_bind_group_layout: None,
             gridcube_pipeline: None,
             gridcube_bind_group_layout: None,
-            pick_ranges: HashMap::new(),
-            next_global_index: 1, // 0 is reserved for background
+            pick_ranges: crate::pick::PickRanges::default(),
             pick_texture: None,
             pick_texture_view: None,
             pick_depth_texture: None,
@@ -894,8 +891,7 @@ impl RenderEngine {
             simple_mesh_bind_group_layout: None,
             gridcube_pipeline: None,
             gridcube_bind_group_layout: None,
-            pick_ranges: HashMap::new(),
-            next_global_index: 1, // 0 is reserved for background
+            pick_ranges: crate::pick::PickRanges::default(),
             pick_texture: None,
             pick_texture_view: None,
             pick_depth_texture: None,
