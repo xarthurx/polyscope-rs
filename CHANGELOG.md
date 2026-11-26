@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-26
+
 ### Added
 - `RenderEngine::clear_pick_ranges`, `RenderEngine::assign_quantity_pick_range`
   and `RenderEngine::get_quantity_pick_range_start`.

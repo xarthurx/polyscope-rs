@@ -1,6 +1,6 @@
 # Getting Started with polyscope-rs
 
-A guide to 3D visualization with polyscope-rs 0.6.1.
+A guide to 3D visualization with polyscope-rs 0.6.2.
 
 ## Table of Contents
 
