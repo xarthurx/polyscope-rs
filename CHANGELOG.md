@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The "Reset View" button refreshes the scene extents before it sets the home
+  view, as C++ Polyscope does (upstream commit 08fd238). Before, the view used
+  the extents of the last register or remove call. It did not follow a later
+  transform change or position update.
+
+### Documentation
+- [Feature Status](docs/feature-status.md): the upstream sync point is C++
+  commit 4efedba. The page lists the new C++ features that are not ported:
+  multiple viewports and the new `SimpleTriangleMesh` functions.
+
 ## [0.6.1] - 2026-11-16
 
 ### Changed

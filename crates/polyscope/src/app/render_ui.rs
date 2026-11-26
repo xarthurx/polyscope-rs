@@ -586,8 +586,9 @@ impl App {
 
             // Reset camera to home view (matching C++ Polyscope's resetCameraToHomeView)
             if reset_view_requested {
-                let bbox = crate::with_context(|ctx| ctx.bounding_box);
-                let (min, max) = bbox;
+                // The cached scene extents can be stale. Refresh them first, as
+                // C++ Polyscope does (upstream commit 08fd238).
+                let (min, max) = crate::ui_sync::refresh_scene_extents();
                 if min.x.is_finite() && max.x.is_finite() && (max - min).length() > 0.0 {
                     engine.camera.look_at_box(min, max);
                     engine.camera.fov = std::f32::consts::FRAC_PI_4; // Reset FOV to default 45°

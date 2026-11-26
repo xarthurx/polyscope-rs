@@ -1466,6 +1466,39 @@ mod tests {
         assert!((length_scale - 3.0_f32.sqrt() * 1e-3).abs() < 1e-6);
     }
 
+    /// The Reset View button reads fresh scene extents (C++ commit 08fd238).
+    #[test]
+    fn test_refresh_scene_extents_follows_transform_and_position_updates() {
+        let _guard = setup();
+        let name = unique_name("refresh_extents");
+        register_point_cloud(&name, vec![Vec3::ZERO, Vec3::ONE]);
+
+        // A transform change does not refresh the cached extents. The refresh does.
+        let shift = Vec3::new(10.0, 0.0, 0.0);
+        set_point_cloud_transform(&name, Mat4::from_translation(shift));
+        let (min, max) = crate::ui_sync::refresh_scene_extents();
+        assert!((min - shift).length() < 1e-5, "min={min}");
+        assert!((max - (Vec3::ONE + shift)).length() < 1e-5, "max={max}");
+
+        // The same applies to a position update.
+        with_point_cloud(&name, |pc| {
+            pc.update_points(vec![Vec3::ZERO, Vec3::splat(4.0)]);
+        });
+        let (min, max) = crate::ui_sync::refresh_scene_extents();
+        assert!((min - shift).length() < 1e-5, "min={min}");
+        assert!(
+            (max - (Vec3::splat(4.0) + shift)).length() < 1e-5,
+            "max={max}"
+        );
+
+        // If auto-compute is off, the manual extents stay.
+        set_auto_compute_extents(false);
+        let manual = (Vec3::splat(-2.0), Vec3::splat(2.0));
+        with_context_mut(|ctx| ctx.bounding_box = manual);
+        assert_eq!(crate::ui_sync::refresh_scene_extents(), manual);
+        set_auto_compute_extents(true);
+    }
+
     /// Registers structures that hold GPU resources in structures and quantities.
     fn register_gpu_scene() {
         let square = vec![

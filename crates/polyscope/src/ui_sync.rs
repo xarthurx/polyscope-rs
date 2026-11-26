@@ -63,6 +63,19 @@ pub fn set_auto_compute_extents(auto: bool) {
     });
 }
 
+/// Refreshes the scene extents and returns the scene bounding box.
+///
+/// A transform change or a geometry update does not refresh the cached
+/// extents. The Reset View button calls this function first, as C++ Polyscope
+/// does (upstream commit 08fd238). If auto-compute is off, the manual extents
+/// stay as they are.
+pub(crate) fn refresh_scene_extents() -> (Vec3, Vec3) {
+    with_context_mut(|ctx| {
+        ctx.update_extents();
+        ctx.bounding_box
+    })
+}
+
 // ============================================================================
 // Appearance UI Sync Functions
 // ============================================================================
