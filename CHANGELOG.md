@@ -30,8 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   more elements. Each window frame now gives all structures their pick index
   ranges again, one after the other, from their current element counts. Thus
   a removed or empty structure keeps no pick indices, and a long session does
-  not use up the 2^24 pick indices. The pick pass draws a structure only with
-  the range of its frame.
+  not use up the 2^24 pick indices. Hidden structures get no pick indices.
+  One lock of the context covers the whole pick pass, so another thread cannot
+  change the registry between the pick ranges, the pick uniforms and the draws.
 - If a scene has more pickable elements than the 2^24 - 1 indices of the pick
   buffer, the pick buffer shows the elements past the limit as the background,
   and a warning is logged once. Before, their indices wrapped to the indices

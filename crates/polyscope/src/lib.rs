@@ -1741,10 +1741,10 @@ mod tests {
     }
 
     /// A structure that returns to the registry after the frame preparation,
-    /// as from another thread, does not draw the pick indices of another
-    /// structure in the pick pass of that frame.
+    /// as from another thread, gets its pick range in the pick pass of that
+    /// frame. It cannot draw the pick indices of another structure.
     #[test]
-    fn test_structure_returning_during_a_frame_draws_no_pick_indices() {
+    fn test_structure_returning_before_the_pick_pass_gets_a_pick_range() {
         let _guard = setup();
         // The corners of a cube. The camera fits the cube, so it shows all test points.
         register_point_cloud("race_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
@@ -1775,12 +1775,89 @@ mod tests {
             with_context_mut(|ctx| ctx.registry.register(returning)).expect("register again");
         });
         let element = |name: &str| Some(("PointCloud".to_owned(), name.to_owned(), 0));
-        assert_ne!(pick_at_position(app, left_point), element("race_new"));
-        assert_eq!(pick_at_position(app, right_point), element("race_new"));
-
-        // The next frame gives it a range.
-        app.render_pick_frame();
         assert_eq!(pick_at_position(app, left_point), element("race_returning"));
+        assert_eq!(pick_at_position(app, right_point), element("race_new"));
+    }
+
+    /// A hidden structure gets no pick range, so it cannot use up the pick
+    /// indices of visible structures. It gets a range when it is visible.
+    #[test]
+    fn test_hidden_structures_get_no_pick_range() {
+        let _guard = setup();
+        register_point_cloud("pick_shown", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+        register_point_cloud("pick_hidden", vec![Vec3::ZERO; 3]);
+        with_point_cloud("pick_hidden", |pc| pc.set_enabled(false));
+        let Some(mut renderer) = LiveRenderer::new() else {
+            eprintln!("Skipping hidden structure pick test: no GPU adapter available");
+            return;
+        };
+        let app = &mut renderer.app;
+        let engine = app.engine.as_mut().expect("engine");
+        let (width, height) = (engine.width, engine.height);
+        engine.init_pick_buffers(width, height);
+        app.render_pick_frame();
+        let start = |app: &app::App, name: &str| {
+            let engine = app.engine.as_ref().expect("engine");
+            engine.get_pick_range_start("PointCloud", name)
+        };
+        assert_eq!(start(app, "pick_hidden"), None);
+        assert_eq!(start(app, "pick_shown"), Some(1));
+
+        with_point_cloud("pick_hidden", |pc| pc.set_enabled(true));
+        app.render_pick_frame();
+        assert!(start(app, "pick_hidden").is_some());
+    }
+
+    /// The pick pass gives ranges to surface meshes and volume meshes, and a
+    /// pick reports the face or the cell.
+    #[test]
+    fn test_pick_pass_reports_mesh_faces_and_cells() {
+        let _guard = setup();
+        register_point_cloud("mesh_pick_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+        let Some(mut renderer) = LiveRenderer::new() else {
+            eprintln!("Skipping mesh pick test: no GPU adapter available");
+            return;
+        };
+        let app = &mut renderer.app;
+        let engine = app.engine.as_mut().expect("engine");
+        let (width, height) = (engine.width, engine.height);
+        engine.init_pick_buffers(width, height);
+        app.render_pick_frame();
+
+        // A square of two triangles at the left and a tetrahedron at the
+        // right, in the image plane through the origin.
+        let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+        let (right, up, back) = (
+            view.row(0).truncate(),
+            view.row(1).truncate(),
+            view.row(2).truncate(),
+        );
+        let at = |x: f32, y: f32| right * x + up * y;
+        let square = vec![at(-0.8, 0.3), at(-0.3, 0.3), at(-0.3, 0.8), at(-0.8, 0.8)];
+        register_surface_mesh(
+            "mesh_pick_square",
+            square,
+            vec![vec![0, 1, 2], vec![0, 2, 3]],
+        );
+        let tet = vec![
+            at(0.3, 0.3),
+            at(0.8, 0.3),
+            at(0.55, 0.8),
+            at(0.55, 0.5) + back * 0.2,
+        ];
+        register_tet_mesh("mesh_pick_tet", tet, vec![[0, 1, 2, 3]]);
+        app.render_pick_frame();
+
+        let hit = |type_name: &str, name: &str, index: u32| {
+            Some((type_name.to_owned(), name.to_owned(), index))
+        };
+        let square_hit = |index| hit("SurfaceMesh", "mesh_pick_square", index);
+        assert_eq!(pick_at_position(app, at(-0.4, 0.4)), square_hit(0));
+        assert_eq!(pick_at_position(app, at(-0.7, 0.7)), square_hit(1));
+        assert_eq!(
+            pick_at_position(app, at(0.55, 0.5)),
+            hit("VolumeMesh", "mesh_pick_tet", 0)
+        );
     }
 
     /// A pick on a gridcube reports the volume grid, also when its name
