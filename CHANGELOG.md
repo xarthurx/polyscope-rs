@@ -36,7 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A volume mesh kept its pick resources when a slice plane culled cells or
   showed them again, so the pick buffer drew the old cell geometry. A visible
   cell could then be missing from the pick buffer. The volume mesh now creates
-  its pick resources again when its render data changes.
+  its pick resources again when its render data changes, and it takes the
+  cell of each picked triangle from the render data.
 - If a scene has more pickable elements than the 2^24 - 1 indices of the pick
   buffer, the pick buffer shows the elements past the limit as the background,
   and a warning is logged once. Before, their indices wrapped to the indices

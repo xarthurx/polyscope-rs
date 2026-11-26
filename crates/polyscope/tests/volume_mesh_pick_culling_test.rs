@@ -7,6 +7,7 @@
 //! cannot be picked. The test needs a GPU adapter (real or software fallback).
 
 use pollster::FutureExt;
+use polyscope_core::Structure;
 use polyscope_rs::{RenderEngine, Vec3, VolumeMesh};
 
 /// Width and height of the image.
@@ -127,4 +128,18 @@ fn volume_mesh_pick_follows_slice_plane_culling() {
     assert!(vm.pick_bind_group().is_none());
     init_pick(&mut vm, &engine);
     assert_eq!(pick(&engine, &vm, &cells), [Some(START), Some(0)]);
+
+    // A transform change after the culling, as from another thread before
+    // the pick pass, clears the culling cache but keeps the culled render
+    // data. The new pick resources must still report the visible cell.
+    vm.update_render_data_with_culling(
+        &engine.device,
+        engine.mesh_bind_group_layout(),
+        engine.camera_buffer(),
+        &[(Vec3::ZERO, Vec3::X)],
+    );
+    vm.set_transform(vm.transform());
+    assert!(vm.pick_bind_group().is_none());
+    init_pick(&mut vm, &engine);
+    assert_eq!(pick(&engine, &vm, &cells), [Some(0), Some(START + 1)]);
 }

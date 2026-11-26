@@ -189,8 +189,18 @@ impl PickOwner {
 /// The global pick indices `[start, start + count)` of one owner.
 #[derive(Debug, Clone, Copy)]
 struct PickRange {
-    start: u32,
+    /// The logical first index. It can be past the limit; the GPU gets it
+    /// through `gpu_start`.
+    start: u64,
     count: u32,
+}
+
+/// Returns the first index that the GPU gets for a logical first index. A
+/// start past the limit stays at the limit, so `start + element` cannot
+/// overflow `u32` in the shaders, and the shaders draw these elements as the
+/// background.
+fn gpu_start(start: u64) -> u32 {
+    u32::try_from(start.min(u64::from(PICK_INDEX_COUNT))).unwrap_or(PICK_INDEX_COUNT)
 }
 
 /// The pick index ranges of one frame.
@@ -245,27 +255,34 @@ impl PickRanges {
 
     /// Returns the first index of the range of an owner with `count` elements.
     ///
-    /// If the owner has a range that holds `count` elements, the range keeps
-    /// its start, so it cannot move past the limit, and a smaller last range
-    /// gives its free end back. Otherwise the owner gets the range after the
-    /// last range. The indices of a range past `PICK_INDEX_COUNT` cannot be
-    /// picked. A warning tells this once.
+    /// A range that holds `count` elements keeps its start, and so does the
+    /// last range, which grows or shrinks at its end. Thus a count change does
+    /// not move a range past the limit. Otherwise the owner gets the range
+    /// after the last range. The indices of a range past `PICK_INDEX_COUNT`
+    /// cannot be picked. A warning tells this once.
     fn assign_owner(&mut self, owner: PickOwner, count: u32) -> u32 {
-        if let Some(range) = self.ranges.get_mut(&owner)
-            && count <= range.count
-        {
-            if u64::from(range.start) + u64::from(range.count) == self.next {
-                self.next = u64::from(range.start) + u64::from(count);
+        if let Some(range) = self.ranges.get_mut(&owner) {
+            let end = range.start + u64::from(range.count);
+            if count <= range.count || end == self.next {
+                if end == self.next {
+                    self.next = range.start + u64::from(count);
+                }
+                range.count = count;
+                let start = range.start;
+                self.warn_if_past_limit();
+                return gpu_start(start);
             }
-            range.count = count;
-            return range.start;
         }
-        let limit = u64::from(PICK_INDEX_COUNT);
-        // A start past the limit stays at the limit, so `start + element`
-        // cannot overflow `u32` in the shaders.
-        let start = u32::try_from(self.next.min(limit)).unwrap_or(PICK_INDEX_COUNT);
+        let start = self.next;
         self.next += u64::from(count);
-        if self.next > limit && !self.overflow_warned {
+        self.warn_if_past_limit();
+        self.ranges.insert(owner, PickRange { start, count });
+        gpu_start(start)
+    }
+
+    /// Logs a warning, once, when the ranges reach past the pick buffer.
+    fn warn_if_past_limit(&mut self) {
+        if self.next > u64::from(PICK_INDEX_COUNT) && !self.overflow_warned {
             self.overflow_warned = true;
             log::warn!(
                 "The scene has more pickable elements than the {} indices of the pick buffer. \
@@ -273,8 +290,6 @@ impl PickRanges {
                 PICK_INDEX_COUNT - 1
             );
         }
-        self.ranges.insert(owner, PickRange { start, count });
-        start
     }
 
     /// Removes the ranges of a structure and of its quantities.
@@ -291,12 +306,11 @@ impl PickRanges {
             return None;
         }
         self.ranges.iter().find_map(|(owner, range)| {
-            let local = global_index.checked_sub(range.start)?;
-            (local < range.count).then_some((
-                owner.type_name.as_str(),
-                owner.structure.as_str(),
-                local,
-            ))
+            let local = u64::from(global_index).checked_sub(range.start)?;
+            let local = u32::try_from(local)
+                .ok()
+                .filter(|&local| local < range.count)?;
+            Some((owner.type_name.as_str(), owner.structure.as_str(), local))
         })
     }
 
@@ -304,7 +318,7 @@ impl PickRanges {
     pub(crate) fn start(&self, type_name: &str, name: &str) -> Option<u32> {
         self.ranges
             .get(&PickOwner::new(type_name, name, None))
-            .map(|range| range.start)
+            .map(|range| gpu_start(range.start))
     }
 
     /// Returns the first index of the range of the quantity with index
@@ -317,7 +331,7 @@ impl PickRanges {
     ) -> Option<u32> {
         self.ranges
             .get(&PickOwner::new(type_name, structure, Some(quantity)))
-            .map(|range| range.start)
+            .map(|range| gpu_start(range.start))
     }
 }
 
@@ -365,6 +379,36 @@ mod tests {
         assert_eq!(ranges.lookup(1), Some(("PointCloud", "a", 0)));
         assert_eq!(ranges.lookup(2), None);
         assert_eq!(ranges.assign("PointCloud", "b", 2), 2);
+    }
+
+    /// The last range grows at its end. A range that is not the last one moves
+    /// after the last range when it grows.
+    #[test]
+    fn test_growing_ranges() {
+        let mut ranges = PickRanges::default();
+        let last = PICK_INDEX_COUNT - 1;
+        assert_eq!(ranges.assign("PointCloud", "a", last - 1), 1);
+        assert_eq!(ranges.assign("PointCloud", "a", last), 1);
+        assert_eq!(ranges.lookup(last), Some(("PointCloud", "a", last - 1)));
+
+        assert_eq!(frame(&mut ranges, &[("a", 2), ("b", 2)]), [1, 3]);
+        assert_eq!(ranges.assign("PointCloud", "a", 3), 5);
+        assert_eq!(ranges.lookup(7), Some(("PointCloud", "a", 2)));
+        assert_eq!(ranges.lookup(1), None);
+    }
+
+    /// A range past the limit keeps its logical start. After smaller counts,
+    /// the free indices before the limit can be used again.
+    #[test]
+    fn test_ranges_past_the_limit_can_shrink() {
+        let mut ranges = PickRanges::default();
+        let limit = PICK_INDEX_COUNT;
+        assert_eq!(ranges.assign("PointCloud", "a", limit), 1);
+        assert_eq!(ranges.assign("PointCloud", "b", 1), limit);
+        assert_eq!(ranges.assign("PointCloud", "b", 0), limit);
+        assert_eq!(ranges.assign("PointCloud", "a", 1), 1);
+        assert_eq!(ranges.assign("PointCloud", "c", 1), 2);
+        assert_eq!(ranges.lookup(2), Some(("PointCloud", "c", 0)));
     }
 
     /// A range that grows does not move past the 24 bits of the pick buffer
