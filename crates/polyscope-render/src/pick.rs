@@ -292,10 +292,19 @@ impl PickRanges {
         }
     }
 
-    /// Removes the ranges of a structure and of its quantities.
+    /// Removes the ranges of a structure and of its quantities. The next range
+    /// starts after the last remaining range, so the indices of a removed last
+    /// range can be used again.
     pub(crate) fn remove(&mut self, type_name: &str, name: &str) {
         self.ranges
             .retain(|owner, _| owner.type_name != type_name || owner.structure != name);
+        self.next = self
+            .ranges
+            .values()
+            .map(|range| range.start + u64::from(range.count))
+            .max()
+            .unwrap_or(1)
+            .max(1);
     }
 
     /// Returns `(type_name, structure_name, local_index)` of the owner of a
@@ -395,6 +404,19 @@ mod tests {
         assert_eq!(ranges.assign("PointCloud", "a", 3), 5);
         assert_eq!(ranges.lookup(7), Some(("PointCloud", "a", 2)));
         assert_eq!(ranges.lookup(1), None);
+    }
+
+    /// A removed last range gives its indices back, so the range before it
+    /// can grow at its end.
+    #[test]
+    fn test_removed_last_range_gives_its_indices_back() {
+        let mut ranges = PickRanges::default();
+        let last = PICK_INDEX_COUNT - 1;
+        assert_eq!(ranges.assign("PointCloud", "a", last - 1), 1);
+        assert_eq!(ranges.assign("PointCloud", "b", 1), last);
+        ranges.remove("PointCloud", "b");
+        assert_eq!(ranges.assign("PointCloud", "a", last), 1);
+        assert_eq!(ranges.lookup(last), Some(("PointCloud", "a", last - 1)));
     }
 
     /// A range past the limit keeps its logical start. After smaller counts,

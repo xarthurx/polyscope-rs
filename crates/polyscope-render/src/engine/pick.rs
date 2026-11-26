@@ -22,9 +22,10 @@ impl RenderEngine {
     ///
     /// Returns the `global_start` index. The structure owns indices
     /// `[global_start, global_start + num_elements)` until the next
-    /// [`Self::clear_pick_ranges`] call. If the structure has a range that
-    /// holds `num_elements`, the range keeps its start. Otherwise the structure
-    /// gets the range after the last range.
+    /// [`Self::clear_pick_ranges`] call. A range that holds `num_elements`
+    /// keeps its start, and so does the last range, which grows or shrinks at
+    /// its end. Otherwise the structure gets the range after the last range,
+    /// and the start of its earlier range is no longer valid.
     ///
     /// Index 0 is reserved as background (no hit), so all ranges start from >= 1.
     /// The pick buffer holds 24 bits. The pick shaders draw a larger index as
@@ -52,7 +53,9 @@ impl RenderEngine {
             .assign_quantity(type_name, structure_name, quantity_index, num_elements)
     }
 
-    /// Removes the pick ranges of a structure and of its quantities.
+    /// Removes the pick ranges of a structure and of its quantities. If they
+    /// were the last ranges, the next range starts after the last remaining
+    /// range.
     pub fn remove_pick_range(&mut self, type_name: &str, name: &str) {
         self.pick_ranges.remove(type_name, name);
     }
