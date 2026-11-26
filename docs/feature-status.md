@@ -358,6 +358,7 @@ These features exist in both libraries but behave differently.
 - **Tone mapping values.** Exposure, white level and gamma are not part of `Options` or of a saved view. Only the Tone Mapping panel sets them.
 - **Click on a mesh element.** A click on a surface mesh or a volume mesh selects the mesh with element 0. The click code (`app/input.rs`) gives the face of the pick buffer the distance of the ray hit, and on equal distance the ray hit, with element 0, wins. The click code also ignores the volume mesh cells of the pick buffer.
 - **Click on a volume grid.** A click does not select a volume grid. The click code ignores the gridcubes of the pick buffer.
+- **Changes from another thread during a frame.** The frame preparation uploads the transforms for the scene, and the pick pass reads them again under its own lock. If another thread moves a structure between the two, the pick buffer of that frame uses the new position, and the window shows the old one. The next frame uses the new position in both.
 
 ---
 

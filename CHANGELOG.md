@@ -49,7 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multiple viewports and the new `SimpleTriangleMesh` functions.
 - Feature Status lists two known issues of the click code: a click on a
   surface mesh or a volume mesh selects element 0, and a click does not select
-  a volume grid.
+  a volume grid. It also lists one known issue of the pick pass: if another
+  thread moves a structure during a frame, the pick buffer of that frame can
+  use the new position while the window shows the old one.
 
 ## [0.6.1] - 2026-11-16
 
