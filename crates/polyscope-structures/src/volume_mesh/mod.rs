@@ -564,6 +564,7 @@ impl VolumeMesh {
         bind_group_layout: &wgpu::BindGroupLayout,
         camera_buffer: &wgpu::Buffer,
     ) {
+        self.clear_pick_resources();
         let (positions, triangles) = self.generate_render_geometry();
 
         if triangles.is_empty() {
@@ -625,6 +626,7 @@ impl VolumeMesh {
             return;
         }
 
+        self.clear_pick_resources();
         let (positions, triangles) = self.generate_render_geometry_with_culling(planes);
 
         if triangles.is_empty() {
@@ -671,6 +673,14 @@ impl VolumeMesh {
     ) {
         self.culling_plane_cache = None;
         self.init_render_data(device, bind_group_layout, camera_buffer);
+    }
+
+    /// Drops the pick resources. They refer to the vertex buffer and the cell
+    /// order of the render data, so new render data needs new pick resources.
+    fn clear_pick_resources(&mut self) {
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
+        self.pick_cell_index_buffer = None;
     }
 
     /// Returns true if the mesh is currently showing culled geometry.

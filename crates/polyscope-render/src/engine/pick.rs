@@ -22,9 +22,9 @@ impl RenderEngine {
     ///
     /// Returns the `global_start` index. The structure owns indices
     /// `[global_start, global_start + num_elements)` until the next
-    /// [`Self::clear_pick_ranges`] call. If the structure has a range of the
-    /// same size, the range stays. Otherwise the structure gets the range after
-    /// the last range.
+    /// [`Self::clear_pick_ranges`] call. If the structure has a range that
+    /// holds `num_elements`, the range keeps its start. Otherwise the structure
+    /// gets the range after the last range.
     ///
     /// Index 0 is reserved as background (no hit), so all ranges start from >= 1.
     /// The pick buffer holds 24 bits. The pick shaders draw a larger index as

@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not use up the 2^24 pick indices. Hidden structures get no pick indices.
   One lock of the context covers the whole pick pass, so another thread cannot
   change the registry between the pick ranges, the pick uniforms and the draws.
+- A volume mesh kept its pick resources when a slice plane culled cells or
+  showed them again, so the pick buffer drew the old cell geometry. A visible
+  cell could then be missing from the pick buffer. The volume mesh now creates
+  its pick resources again when its render data changes.
 - If a scene has more pickable elements than the 2^24 - 1 indices of the pick
   buffer, the pick buffer shows the elements past the limit as the background,
   and a warning is logged once. Before, their indices wrapped to the indices

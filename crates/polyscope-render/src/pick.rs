@@ -245,13 +245,19 @@ impl PickRanges {
 
     /// Returns the first index of the range of an owner with `count` elements.
     ///
-    /// If the owner has a range of the same size, the range stays. Otherwise
-    /// the owner gets the range after the last range. The indices of a range
-    /// past `PICK_INDEX_COUNT` cannot be picked. A warning tells this once.
+    /// If the owner has a range that holds `count` elements, the range keeps
+    /// its start, so it cannot move past the limit, and a smaller last range
+    /// gives its free end back. Otherwise the owner gets the range after the
+    /// last range. The indices of a range past `PICK_INDEX_COUNT` cannot be
+    /// picked. A warning tells this once.
     fn assign_owner(&mut self, owner: PickOwner, count: u32) -> u32 {
-        if let Some(range) = self.ranges.get(&owner)
-            && range.count == count
+        if let Some(range) = self.ranges.get_mut(&owner)
+            && count <= range.count
         {
+            if u64::from(range.start) + u64::from(range.count) == self.next {
+                self.next = u64::from(range.start) + u64::from(count);
+            }
+            range.count = count;
             return range.start;
         }
         let limit = u64::from(PICK_INDEX_COUNT);
@@ -346,6 +352,19 @@ mod tests {
         assert_eq!(frame(&mut ranges, &[("empty", 0), ("b", 4)]), [1, 1]);
         assert_eq!(ranges.start("PointCloud", "a"), None);
         assert_eq!(ranges.lookup(1), Some(("PointCloud", "b", 0)));
+    }
+
+    /// A smaller count keeps the start of the range, and a smaller last range
+    /// gives its free end back.
+    #[test]
+    fn test_smaller_count_keeps_the_start() {
+        let mut ranges = PickRanges::default();
+        let last = PICK_INDEX_COUNT - 1;
+        assert_eq!(ranges.assign("PointCloud", "a", last), 1);
+        assert_eq!(ranges.assign("PointCloud", "a", 1), 1);
+        assert_eq!(ranges.lookup(1), Some(("PointCloud", "a", 0)));
+        assert_eq!(ranges.lookup(2), None);
+        assert_eq!(ranges.assign("PointCloud", "b", 2), 2);
     }
 
     /// A range that grows does not move past the 24 bits of the pick buffer
