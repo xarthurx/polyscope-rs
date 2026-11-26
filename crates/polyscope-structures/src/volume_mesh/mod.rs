@@ -819,6 +819,12 @@ impl VolumeMesh {
         self.pick_bind_group.as_ref()
     }
 
+    /// Sets the first global pick index. The next `update_pick_uniforms`
+    /// call writes it to the GPU.
+    pub fn set_pick_global_start(&mut self, global_start: u32) {
+        self.global_start = global_start;
+    }
+
     /// Updates pick uniforms (model transform) when the structure is moved.
     pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
         if let Some(buffer) = &self.pick_uniform_buffer {

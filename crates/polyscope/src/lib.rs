@@ -1637,7 +1637,7 @@ mod tests {
     }
 
     /// A structure gets new pick indices when its element count changes, and
-    /// a removed structure frees its pick indices.
+    /// a removed or empty structure owns no pick indices.
     #[test]
     fn test_pick_ranges_follow_element_count_changes() {
         let _guard = setup();
@@ -1693,5 +1693,109 @@ mod tests {
             None
         );
         assert_eq!(pick_at_position(app, grown[3]), element("pick_grow", 3));
+
+        // An empty structure owns no pick indices.
+        with_point_cloud("pick_grow", |pc| pc.update_points(Vec::new()));
+        app.render_pick_frame();
+        let engine = app.engine.as_ref().expect("engine");
+        assert_eq!(engine.get_pick_range_start("PointCloud", "pick_grow"), None);
+    }
+
+    /// A structure that returns to the registry with its pick resources gets
+    /// a range of the frame. It cannot draw the indices of another structure.
+    #[test]
+    fn test_returning_structure_gets_a_pick_range() {
+        let _guard = setup();
+        // The corners of a cube. The camera fits the cube, so it shows all test points.
+        register_point_cloud("pick_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+        let Some(mut renderer) = LiveRenderer::new() else {
+            eprintln!("Skipping returning structure pick test: no GPU adapter available");
+            return;
+        };
+        let app = &mut renderer.app;
+        let engine = app.engine.as_mut().expect("engine");
+        let (width, height) = (engine.width, engine.height);
+        engine.init_pick_buffers(width, height);
+        app.render_pick_frame();
+
+        let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+        let (right, up) = (view.row(0).truncate(), view.row(1).truncate());
+        let (left_point, right_point) = (up * 0.5 - right * 0.5, up * 0.5 + right * 0.5);
+        register_point_cloud("pick_returning", vec![left_point]);
+        with_point_cloud("pick_returning", |pc| pc.set_point_radius(0.1));
+        app.render_pick_frame();
+
+        // The structure leaves the registry with its pick resources. A new
+        // structure gets the pick indices of the next frame.
+        let returning = with_context_mut(|ctx| ctx.registry.remove("PointCloud", "pick_returning"))
+            .expect("registered structure");
+        register_point_cloud("pick_new", vec![right_point]);
+        with_point_cloud("pick_new", |pc| pc.set_point_radius(0.1));
+        app.render_pick_frame();
+
+        with_context_mut(|ctx| ctx.registry.register(returning)).expect("register again");
+        app.render_pick_frame();
+        let element = |name: &str| Some(("PointCloud".to_owned(), name.to_owned(), 0));
+        assert_eq!(pick_at_position(app, left_point), element("pick_returning"));
+        assert_eq!(pick_at_position(app, right_point), element("pick_new"));
+    }
+
+    /// A pick on a gridcube reports the volume grid, also when its name
+    /// contains `/`. The quantity owns the pick range.
+    #[test]
+    fn test_gridcube_pick_reports_the_volume_grid() {
+        let _guard = setup();
+        let name = unique_name("pick/grid");
+        // Three cells on each axis, so the grid center is inside a cell.
+        let grid = register_volume_grid(
+            &name,
+            glam::UVec3::splat(4),
+            Vec3::splat(-0.5),
+            Vec3::splat(0.5),
+        );
+        grid.add_cell_scalar_quantity("density", vec![1.0; 27]);
+        with_volume_grid(&name, |vg| enable_quantity(vg, "density"));
+        let Some(mut renderer) = LiveRenderer::new() else {
+            eprintln!("Skipping gridcube pick test: no GPU adapter available");
+            return;
+        };
+        let app = &mut renderer.app;
+        let engine = app.engine.as_mut().expect("engine");
+        let (width, height) = (engine.width, engine.height);
+        engine.init_pick_buffers(width, height);
+        // The second frame gives a range to the existing pick resources.
+        app.render_pick_frame();
+        app.render_pick_frame();
+        let (type_name, structure, cell) =
+            pick_at_position(app, Vec3::ZERO).expect("a gridcube at the grid center");
+        assert_eq!(
+            (type_name.as_str(), structure.as_str()),
+            ("VolumeGrid", name.as_str())
+        );
+        assert!(cell < 27, "cell {cell}");
+    }
+
+    /// A click on a volume grid whose name contains `/` selects the grid.
+    #[test]
+    fn test_click_selects_volume_grid_with_slash_in_name() {
+        use crate::app::{App, ClickHit};
+        use std::time::{Duration, Instant};
+
+        let _guard = setup();
+        let name = unique_name("grid/with_slash");
+        register_volume_grid(&name, glam::UVec3::splat(2), Vec3::ZERO, Vec3::ONE);
+        let mut app = App::new();
+        let hit = ClickHit::Structure {
+            type_name: "VolumeGrid".to_string(),
+            name: name.clone(),
+            element_index: 0,
+        };
+        app.queue_click_pick(Some(hit), glam::Vec2::ZERO);
+        app.update_pending_pick(Instant::now() + Duration::from_secs(1));
+        let selection = app
+            .selection
+            .as_ref()
+            .expect("the click must select the grid");
+        assert_eq!(selection.structure_name, name);
     }
 }

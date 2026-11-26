@@ -46,6 +46,11 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 // Encode a flat 24-bit global index into RGB color
 fn index_to_color(index: u32) -> vec3<f32> {
+    // An index past the 24 bits of the pick buffer draws as the background,
+    // so it cannot select a different element.
+    if (index >= 0x1000000u) {
+        return vec3<f32>(0.0, 0.0, 0.0);
+    }
     let r = f32((index >> 16u) & 0xFFu) / 255.0;
     let g = f32((index >> 8u) & 0xFFu) / 255.0;
     let b = f32(index & 0xFFu) / 255.0;

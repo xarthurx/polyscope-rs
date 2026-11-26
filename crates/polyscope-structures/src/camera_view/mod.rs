@@ -32,6 +32,8 @@ pub struct CameraView {
     render_data: Option<CurveNetworkRenderData>,
     /// Pick bind group for the wireframe edges (reuses the curve network line pick).
     pick_bind_group: Option<wgpu::BindGroup>,
+    /// First global pick index of the wireframe edges in `pick_bind_group`.
+    pick_global_start: u32,
     /// Length scale used when geometry was last generated (to regenerate if it changes).
     prepared_length_scale: f32,
 
@@ -54,6 +56,7 @@ impl CameraView {
             widget_thickness: 0.02,
             render_data: None,
             pick_bind_group: None,
+            pick_global_start: 0,
             prepared_length_scale: 0.0,
             fly_to_requested: false,
         }
@@ -305,12 +308,22 @@ impl CameraView {
                 },
             ],
         }));
+        self.pick_global_start = global_start;
     }
 
     /// Returns the pick bind group if initialized.
     #[must_use]
     pub fn pick_bind_group(&self) -> Option<&wgpu::BindGroup> {
         self.pick_bind_group.as_ref()
+    }
+
+    /// Returns the first global pick index of the pick resources.
+    ///
+    /// The pick uniforms keep this index until `init_pick_resources` creates
+    /// them again.
+    #[must_use]
+    pub fn pick_global_start(&self) -> u32 {
+        self.pick_global_start
     }
 
     /// Returns true if the user has requested to fly to this camera view.

@@ -9,36 +9,58 @@ const PICK_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float
 impl RenderEngine {
     // ========== Pick System - Range-Based ID Management ==========
 
+    /// Removes all pick ranges. The next range starts at index 1.
+    ///
+    /// The window calls this function at the start of each frame. Then each
+    /// structure gets the next range for its current element count, so the
+    /// ranges of a frame have no gaps.
+    pub fn clear_pick_ranges(&mut self) {
+        self.pick_ranges.clear();
+    }
+
     /// Assigns a contiguous range of global pick indices to a structure.
     ///
     /// Returns the `global_start` index. The structure owns indices
-    /// `[global_start, global_start + num_elements)`. Call this function each
-    /// time the structure builds its pick resources. If `num_elements` changed,
-    /// the structure gets a new range, so its elements do not use the indices
-    /// of another structure.
+    /// `[global_start, global_start + num_elements)` until the next
+    /// [`Self::clear_pick_ranges`] call. If the structure has a range of the
+    /// same size, the range stays. Otherwise the structure gets the range after
+    /// the last range.
     ///
     /// Index 0 is reserved as background (no hit), so all ranges start from >= 1.
+    /// The pick buffer holds 24 bits. The pick shaders draw a larger index as
+    /// the background, so the elements past this limit cannot be picked.
     pub fn assign_pick_range(&mut self, type_name: &str, name: &str, num_elements: u32) -> u32 {
         self.pick_ranges.assign(type_name, name, num_elements)
     }
 
-    /// Removes a structure's pick range. Later ranges can use its indices.
-    pub fn remove_pick_range(&mut self, type_name: &str, name: &str) {
-        self.pick_ranges.remove(type_name, name);
+    /// Assigns a contiguous range of global pick indices to a quantity of a
+    /// structure, for example to the gridcubes of a volume grid quantity.
+    ///
+    /// The structure name and the quantity name stay separate, so names that
+    /// contain `/` cannot collide. [`Self::lookup_global_index`] reports the
+    /// structure for these indices. Otherwise it works as
+    /// [`Self::assign_pick_range`].
+    pub fn assign_quantity_pick_range(
+        &mut self,
+        type_name: &str,
+        structure_name: &str,
+        quantity_name: &str,
+        num_elements: u32,
+    ) -> u32 {
+        self.pick_ranges
+            .assign_quantity(type_name, structure_name, quantity_name, num_elements)
     }
 
-    /// Keeps only the pick ranges for which `keep(type_name, name)` is true.
-    ///
-    /// Use it to remove the ranges of removed structures. Later ranges can then
-    /// use their indices.
-    pub fn retain_pick_ranges(&mut self, keep: impl FnMut(&str, &str) -> bool) {
-        self.pick_ranges.retain(keep);
+    /// Removes the pick ranges of a structure and of its quantities.
+    pub fn remove_pick_range(&mut self, type_name: &str, name: &str) {
+        self.pick_ranges.remove(type_name, name);
     }
 
     /// Looks up which structure owns a global pick index.
     ///
     /// Returns `(type_name, name, local_element_index)` or None if no structure
-    /// owns this index (background or freed range).
+    /// owns this index (background or freed range). For the range of a
+    /// quantity, `name` is the name of its structure.
     pub fn lookup_global_index(&self, global_index: u32) -> Option<(&str, &str, u32)> {
         self.pick_ranges.lookup(global_index)
     }

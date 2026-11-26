@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `RenderEngine::clear_pick_ranges` and
+  `RenderEngine::assign_quantity_pick_range`.
+- `set_pick_global_start` for point clouds, surface meshes, curve networks,
+  volume meshes and volume grid scalar quantities, and
+  `CameraView::pick_global_start`.
+
 ### Fixed
 - The "Reset View" button refreshes the scene extents before it sets the home
   view, as C++ Polyscope does (upstream commit 08fd238). Before, the view used
@@ -15,9 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - After the element count of a structure changed, a click on a new element
   selected an element of another structure, or nothing. Examples are
   `update_points` with more points, and a new registration of a structure with
-  more elements. A structure now gets new pick indices when its element count
-  changes. A removed structure frees its pick indices, so a long session does
+  more elements. Each window frame now gives all structures their pick index
+  ranges again, one after the other, from their current element counts. Thus
+  a removed or empty structure keeps no pick indices, and a long session does
   not use up the 2^24 pick indices.
+- A click on a volume grid whose name contains `/` did not select the grid.
+- If a scene has more pickable elements than the 2^24 - 1 indices of the pick
+  buffer, the elements past the limit cannot be picked, and a warning is
+  logged once. Before, a click on them could select a different element.
 
 ### Documentation
 - [Feature Status](docs/feature-status.md): the upstream sync point is C++

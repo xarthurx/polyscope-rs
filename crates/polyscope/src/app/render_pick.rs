@@ -4,34 +4,38 @@
 
 use super::{CameraView, CurveNetwork, PointCloud, Structure, SurfaceMesh, VolumeGrid, VolumeMesh};
 use polyscope_core::quantity::Quantity;
-use polyscope_core::registry::Registry;
 use polyscope_core::structure::HasQuantities;
 use polyscope_render::RenderEngine;
 use polyscope_structures::volume_grid::{
     VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,
 };
 
-/// Creates the missing pick resources of all structures and updates the
-/// pick uniforms of volume grid quantities.
+/// Gives the pick ranges of the frame and creates the missing pick resources
+/// of all structures. It also updates the pick uniforms of volume grid
+/// quantities.
+///
+/// Each frame gives all ranges again, one after the other, from the current
+/// element counts. Thus a count change, a removed structure or an empty
+/// structure leaves no unused indices, and two ranges cannot overlap. A
+/// structure that keeps its pick resources gets the first index of its new
+/// range. `update_gpu_buffers` writes it to the pick uniforms later in the
+/// frame, before the pick pass.
 pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
+    engine.clear_pick_ranges();
     crate::with_context_mut(|ctx| {
-        // Remove the pick ranges of removed structures and quantities. Later
-        // ranges can then use their indices.
-        let registry = &ctx.registry;
-        engine.retain_pick_ranges(|type_name, name| {
-            pick_range_owner_exists(registry, type_name, name)
-        });
-
         for structure in ctx.registry.iter_mut() {
-            // PointCloud: windowed-only pick resources
+            // PointCloud: the pick pass draws it with render data
             if structure.type_name() == "PointCloud" {
                 let structure_name = structure.name().to_string();
-                if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>() {
-                    // Initialize pick resources (after render data init by shared function)
-                    if pc.pick_bind_group().is_none() && pc.render_data().is_some() {
-                        let num_points = pc.points().len() as u32;
-                        let global_start =
-                            engine.assign_pick_range("PointCloud", &structure_name, num_points);
+                if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>()
+                    && pc.render_data().is_some()
+                {
+                    let num_points = pc.points().len() as u32;
+                    let global_start =
+                        engine.assign_pick_range("PointCloud", &structure_name, num_points);
+                    if pc.pick_bind_group().is_some() {
+                        pc.set_pick_global_start(global_start);
+                    } else {
                         pc.init_pick_resources(
                             &engine.device,
                             engine.pick_bind_group_layout(),
@@ -42,37 +46,42 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                 }
             }
 
-            // SurfaceMesh: windowed-only pick resources
+            // SurfaceMesh: the pick pass draws it with pick resources
             if structure.type_name() == "SurfaceMesh"
                 && let Some(mesh) = structure.as_any_mut().downcast_mut::<SurfaceMesh>()
             {
-                // Initialize pick resources (after render data init by shared function)
-                if mesh.pick_bind_group().is_none() && mesh.render_data().is_some() {
+                let has_pick = mesh.pick_bind_group().is_some();
+                if has_pick || mesh.render_data().is_some() {
                     let num_faces = mesh.num_faces() as u32;
                     let global_start =
                         engine.assign_pick_range("SurfaceMesh", mesh.name(), num_faces);
-                    mesh.init_pick_resources(
-                        &engine.device,
-                        engine.mesh_pick_bind_group_layout(),
-                        engine.camera_buffer(),
-                        global_start,
-                    );
+                    if has_pick {
+                        mesh.set_pick_global_start(global_start);
+                    } else {
+                        mesh.init_pick_resources(
+                            &engine.device,
+                            engine.mesh_pick_bind_group_layout(),
+                            engine.camera_buffer(),
+                            global_start,
+                        );
+                    }
                 }
             }
 
-            // CurveNetwork: windowed-only pick resources (edge and tube)
+            // CurveNetwork: the pick pass draws it with render data (edge and tube)
             if structure.type_name() == "CurveNetwork"
                 && let Some(cn) = structure.as_any_mut().downcast_mut::<CurveNetwork>()
+                && cn.render_data().is_some()
             {
-                // Initialize pick resources (after render data init by shared function)
-                if cn.pick_bind_group().is_none() && cn.render_data().is_some() {
+                let num_edges = cn.num_edges() as u32;
+                let global_start = engine.assign_pick_range("CurveNetwork", cn.name(), num_edges);
+                if cn.pick_bind_group().is_some() {
+                    cn.set_pick_global_start(global_start);
+                } else {
                     // Initialize curve network pick pipeline if not done
                     if !engine.has_curve_network_pick_pipeline() {
                         engine.init_curve_network_pick_pipeline();
                     }
-                    let num_edges = cn.num_edges() as u32;
-                    let global_start =
-                        engine.assign_pick_range("CurveNetwork", cn.name(), num_edges);
                     cn.init_pick_resources(
                         &engine.device,
                         engine.pick_bind_group_layout(),
@@ -83,7 +92,7 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
 
                 // Initialize tube pick resources (for tube render mode)
                 // This provides a larger clickable area using ray-cylinder intersection
-                if !cn.has_tube_pick_resources() && cn.render_data().is_some() {
+                if !cn.has_tube_pick_resources() {
                     // Initialize tube pick pipeline if not done
                     if !engine.has_curve_network_tube_pick_pipeline() {
                         engine.init_curve_network_tube_pick_pipeline();
@@ -96,23 +105,25 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                 }
             }
 
-            // CameraView init moved to shared function
-            // CameraView: windowed-only pick resources (curve network line pick)
+            // CameraView: the curve network line pick draws its wireframe edges.
+            // It writes its pick uniforms only when it creates them, so a new
+            // first index creates them again.
             if structure.type_name() == "CameraView"
                 && let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>()
-                && cv.pick_bind_group().is_none()
                 && let Some(num_edges) = cv.render_data().map(|rd| rd.num_edges)
             {
-                if !engine.has_curve_network_pick_pipeline() {
-                    engine.init_curve_network_pick_pipeline();
-                }
                 let global_start = engine.assign_pick_range("CameraView", cv.name(), num_edges);
-                cv.init_pick_resources(
-                    &engine.device,
-                    engine.pick_bind_group_layout(),
-                    engine.camera_buffer(),
-                    global_start,
-                );
+                if cv.pick_bind_group().is_none() || cv.pick_global_start() != global_start {
+                    if !engine.has_curve_network_pick_pipeline() {
+                        engine.init_curve_network_pick_pipeline();
+                    }
+                    cv.init_pick_resources(
+                        &engine.device,
+                        engine.pick_bind_group_layout(),
+                        engine.camera_buffer(),
+                        global_start,
+                    );
+                }
             }
 
             // VolumeGrid: pick resources of enabled gridcube quantities
@@ -143,7 +154,8 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                     }
                 }
 
-                // Assign pick ranges and init pick resources for each enabled quantity
+                // Give pick ranges and init pick resources for each enabled
+                // quantity. The range keeps the grid and quantity names apart.
                 if engine.has_gridcube_pick_pipeline() {
                     let vg_name = vg.name().to_string();
                     for quantity in vg.quantities_mut() {
@@ -155,23 +167,27 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                             .as_any_mut()
                             .downcast_mut::<VolumeGridNodeScalarQuantity>()
                         {
+                            // The pick pass draws it in gridcube mode with pick resources.
+                            let has_pick = nsq.pick_bind_group().is_some();
                             if nsq.viz_mode() == VolumeGridVizMode::Gridcube
-                                && nsq.gridcube_render_data().is_some()
-                                && nsq.pick_bind_group().is_none()
+                                && (has_pick || nsq.gridcube_render_data().is_some())
                             {
-                                let num_elements = nsq.num_pick_elements();
-                                let pick_name = format!("{}/{}", vg_name, nsq.name());
-                                let global_start = engine.assign_pick_range(
+                                let global_start = engine.assign_quantity_pick_range(
                                     "VolumeGrid",
-                                    &pick_name,
-                                    num_elements,
+                                    &vg_name,
+                                    nsq.name(),
+                                    nsq.num_pick_elements(),
                                 );
-                                nsq.init_pick_resources(
-                                    &engine.device,
-                                    engine.gridcube_pick_bind_group_layout(),
-                                    engine.camera_buffer(),
-                                    global_start,
-                                );
+                                if has_pick {
+                                    nsq.set_pick_global_start(global_start);
+                                } else {
+                                    nsq.init_pick_resources(
+                                        &engine.device,
+                                        engine.gridcube_pick_bind_group_layout(),
+                                        engine.camera_buffer(),
+                                        global_start,
+                                    );
+                                }
                             }
                             // Update pick uniforms every frame (model may change)
                             nsq.update_pick_uniforms(
@@ -185,22 +201,25 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                             .as_any_mut()
                             .downcast_mut::<VolumeGridCellScalarQuantity>()
                         {
-                            if csq.gridcube_render_data().is_some()
-                                && csq.pick_bind_group().is_none()
-                            {
-                                let num_elements = csq.num_pick_elements();
-                                let pick_name = format!("{}/{}", vg_name, csq.name());
-                                let global_start = engine.assign_pick_range(
+                            // The pick pass draws it with pick resources.
+                            let has_pick = csq.pick_bind_group().is_some();
+                            if has_pick || csq.gridcube_render_data().is_some() {
+                                let global_start = engine.assign_quantity_pick_range(
                                     "VolumeGrid",
-                                    &pick_name,
-                                    num_elements,
+                                    &vg_name,
+                                    csq.name(),
+                                    csq.num_pick_elements(),
                                 );
-                                csq.init_pick_resources(
-                                    &engine.device,
-                                    engine.gridcube_pick_bind_group_layout(),
-                                    engine.camera_buffer(),
-                                    global_start,
-                                );
+                                if has_pick {
+                                    csq.set_pick_global_start(global_start);
+                                } else {
+                                    csq.init_pick_resources(
+                                        &engine.device,
+                                        engine.gridcube_pick_bind_group_layout(),
+                                        engine.camera_buffer(),
+                                        global_start,
+                                    );
+                                }
                             }
                             // Update pick uniforms every frame
                             csq.update_pick_uniforms(
@@ -213,46 +232,31 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                 }
             }
 
-            // VolumeMesh: windowed-only pick resources
-            // (slice plane culling logic moved to shared function)
+            // VolumeMesh: the pick pass draws it with pick resources
             if structure.type_name() == "VolumeMesh"
                 && let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>()
             {
-                // Initialize pick resources (after render data init by shared function)
-                if vm.pick_bind_group().is_none() && vm.render_data().is_some() {
-                    if !engine.has_mesh_pick_pipeline() {
-                        engine.init_mesh_pick_pipeline();
-                    }
+                let has_pick = vm.pick_bind_group().is_some();
+                if has_pick || vm.render_data().is_some() {
                     let num_cells = vm.num_cells() as u32;
                     let global_start = engine.assign_pick_range("VolumeMesh", vm.name(), num_cells);
-                    vm.init_pick_resources(
-                        &engine.device,
-                        engine.mesh_pick_bind_group_layout(),
-                        engine.camera_buffer(),
-                        global_start,
-                    );
+                    if has_pick {
+                        vm.set_pick_global_start(global_start);
+                    } else {
+                        if !engine.has_mesh_pick_pipeline() {
+                            engine.init_mesh_pick_pipeline();
+                        }
+                        vm.init_pick_resources(
+                            &engine.device,
+                            engine.mesh_pick_bind_group_layout(),
+                            engine.camera_buffer(),
+                            global_start,
+                        );
+                    }
                 }
             }
         }
     });
-}
-
-/// Returns whether the owner of a pick range exists: a structure, or a
-/// gridcube quantity of a volume grid. A gridcube quantity has the pick name
-/// `<grid name>/<quantity name>`.
-fn pick_range_owner_exists(registry: &Registry, type_name: &str, name: &str) -> bool {
-    registry.contains(type_name, name)
-        || (type_name == "VolumeGrid"
-            && registry
-                .iter()
-                .filter_map(|structure| structure.as_any().downcast_ref::<VolumeGrid>())
-                .any(|grid| {
-                    name.strip_prefix(grid.name())
-                        .and_then(|rest| rest.strip_prefix('/'))
-                        .is_some_and(|quantity| {
-                            grid.quantities().iter().any(|q| q.name() == quantity)
-                        })
-                }))
 }
 
 /// Draws all visible structures into the pick buffer.
