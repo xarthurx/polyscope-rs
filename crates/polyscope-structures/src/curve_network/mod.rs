@@ -596,6 +596,12 @@ impl CurveNetwork {
         self.global_start = global_start;
     }
 
+    /// Returns the first global pick index.
+    #[must_use]
+    pub fn pick_global_start(&self) -> u32 {
+        self.global_start
+    }
+
     /// Updates pick uniforms (e.g., when radius changes).
     ///
     /// `scene_length_scale` is the length scale of the full scene.

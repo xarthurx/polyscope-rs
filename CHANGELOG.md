@@ -8,11 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `RenderEngine::clear_pick_ranges` and
-  `RenderEngine::assign_quantity_pick_range`.
-- `set_pick_global_start` for point clouds, surface meshes, curve networks,
-  volume meshes and volume grid scalar quantities, and
-  `CameraView::pick_global_start`.
+- `RenderEngine::clear_pick_ranges`, `RenderEngine::assign_quantity_pick_range`
+  and `RenderEngine::get_quantity_pick_range_start`.
+- `set_pick_global_start` and `pick_global_start` for point clouds, surface
+  meshes, curve networks, camera views, volume meshes and volume grid scalar
+  quantities, and `CameraView::update_pick_uniforms`.
+
+### Changed
+- `RenderEngine::lookup_global_index` reports the volume grid name for a
+  gridcube pick. Before, it reported `<grid>/<quantity>`. A grid name with `/`,
+  or two quantities with the same name, could then give the wrong owner.
 
 ### Fixed
 - The "Reset View" button refreshes the scene extents before it sets the home
@@ -25,16 +30,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   more elements. Each window frame now gives all structures their pick index
   ranges again, one after the other, from their current element counts. Thus
   a removed or empty structure keeps no pick indices, and a long session does
-  not use up the 2^24 pick indices.
-- A click on a volume grid whose name contains `/` did not select the grid.
+  not use up the 2^24 pick indices. The pick pass draws a structure only with
+  the range of its frame.
 - If a scene has more pickable elements than the 2^24 - 1 indices of the pick
-  buffer, the elements past the limit cannot be picked, and a warning is
-  logged once. Before, a click on them could select a different element.
+  buffer, the pick buffer shows the elements past the limit as the background,
+  and a warning is logged once. Before, their indices wrapped to the indices
+  of other elements.
 
 ### Documentation
 - [Feature Status](docs/feature-status.md): the upstream sync point is C++
   commit 4efedba. The page lists the new C++ features that are not ported:
   multiple viewports and the new `SimpleTriangleMesh` functions.
+- Feature Status lists two known issues of the click code: a click on a
+  surface mesh or a volume mesh selects element 0, and a click does not select
+  a volume grid.
 
 ## [0.6.1] - 2026-11-16
 

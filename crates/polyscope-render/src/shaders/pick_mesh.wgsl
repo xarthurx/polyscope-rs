@@ -33,15 +33,20 @@ struct VertexOutput {
 
 // Encode a flat 24-bit global index into RGB color
 fn index_to_color(index: u32) -> vec3<f32> {
-    // An index past the 24 bits of the pick buffer draws as the background,
-    // so it cannot select a different element.
-    if (index >= 0x1000000u) {
-        return vec3<f32>(0.0, 0.0, 0.0);
-    }
     let r = f32((index >> 16u) & 0xFFu) / 255.0;
     let g = f32((index >> 8u) & 0xFFu) / 255.0;
     let b = f32(index & 0xFFu) / 255.0;
     return vec3<f32>(r, g, b);
+}
+
+// Encode the global pick index `start + local` into RGB color. An index past
+// the 24 bits of the pick buffer draws as the background, also when the sum
+// overflows `u32`, so it cannot select a different element.
+fn encode_pick_index(start: u32, local: u32) -> vec3<f32> {
+    if (start >= 0x1000000u || local >= 0x1000000u - start) {
+        return vec3<f32>(0.0, 0.0, 0.0);
+    }
+    return index_to_color(start + local);
 }
 
 @vertex
@@ -65,7 +70,6 @@ fn vs_main(
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Look up the polygon face index for this GPU triangle
     let face_index = face_indices[in.tri_index];
-    let global_index = pick.global_start + face_index;
-    let color = index_to_color(global_index);
+    let color = encode_pick_index(pick.global_start, face_index);
     return vec4<f32>(color, 1.0);
 }

@@ -165,22 +165,23 @@ pub(crate) const PICK_INDEX_COUNT: u32 = 1 << 24;
 
 /// The owner of a pick range: a structure, or one quantity of a structure.
 ///
-/// The structure name and the quantity name stay separate, so names that
-/// contain `/` cannot collide.
+/// A quantity is its index in the quantities of the structure, not its name.
+/// Thus two quantities with the same name cannot collide, and neither can
+/// structure names that contain `/`.
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct PickOwner {
     type_name: String,
     structure: String,
-    /// The quantity name, or `None` for the structure itself.
-    quantity: Option<String>,
+    /// The index of the quantity, or `None` for the structure itself.
+    quantity: Option<usize>,
 }
 
 impl PickOwner {
-    fn new(type_name: &str, structure: &str, quantity: Option<&str>) -> Self {
+    fn new(type_name: &str, structure: &str, quantity: Option<usize>) -> Self {
         Self {
             type_name: type_name.to_owned(),
             structure: structure.to_owned(),
-            quantity: quantity.map(str::to_owned),
+            quantity,
         }
     }
 }
@@ -230,12 +231,13 @@ impl PickRanges {
         self.assign_owner(PickOwner::new(type_name, name, None), count)
     }
 
-    /// Returns the first index of the range of a quantity with `count` elements.
+    /// Returns the first index of the range of the quantity with index
+    /// `quantity` of a structure, for `count` elements.
     pub(crate) fn assign_quantity(
         &mut self,
         type_name: &str,
         structure: &str,
-        quantity: &str,
+        quantity: usize,
         count: u32,
     ) -> u32 {
         self.assign_owner(PickOwner::new(type_name, structure, Some(quantity)), count)
@@ -298,6 +300,19 @@ impl PickRanges {
             .get(&PickOwner::new(type_name, name, None))
             .map(|range| range.start)
     }
+
+    /// Returns the first index of the range of the quantity with index
+    /// `quantity` of a structure, if it has a range.
+    pub(crate) fn quantity_start(
+        &self,
+        type_name: &str,
+        structure: &str,
+        quantity: usize,
+    ) -> Option<u32> {
+        self.ranges
+            .get(&PickOwner::new(type_name, structure, Some(quantity)))
+            .map(|range| range.start)
+    }
 }
 
 #[cfg(test)]
@@ -352,18 +367,28 @@ mod tests {
         );
     }
 
+    /// A quantity range belongs to the index of the quantity, so two
+    /// quantities with the same name cannot collide, and neither can
+    /// structure names with `/`. A pick reports the structure.
     #[test]
-    fn test_quantity_names_with_slashes_do_not_collide() {
+    fn test_quantity_ranges_report_the_structure() {
         let mut ranges = PickRanges::default();
-        assert_eq!(ranges.assign_quantity("VolumeGrid", "a/b", "c", 2), 1);
-        assert_eq!(ranges.assign_quantity("VolumeGrid", "a", "b/c", 3), 3);
-        // A pick reports the structure of the quantity.
-        assert_eq!(ranges.lookup(2), Some(("VolumeGrid", "a/b", 1)));
-        assert_eq!(ranges.lookup(5), Some(("VolumeGrid", "a", 2)));
+        // A node quantity and a cell quantity with the same name.
+        assert_eq!(ranges.assign_quantity("VolumeGrid", "g", 0, 8), 1);
+        assert_eq!(ranges.assign_quantity("VolumeGrid", "g", 1, 1), 9);
+        assert_eq!(ranges.lookup(8), Some(("VolumeGrid", "g", 7)));
+        assert_eq!(ranges.lookup(9), Some(("VolumeGrid", "g", 0)));
+        assert_eq!(ranges.quantity_start("VolumeGrid", "g", 0), Some(1));
+        assert_eq!(ranges.start("VolumeGrid", "g"), None);
+        // Structure names that contain `/`.
+        assert_eq!(ranges.assign_quantity("VolumeGrid", "a/b", 0, 2), 10);
+        assert_eq!(ranges.assign_quantity("VolumeGrid", "a", 1, 3), 12);
+        assert_eq!(ranges.lookup(11), Some(("VolumeGrid", "a/b", 1)));
+        assert_eq!(ranges.lookup(14), Some(("VolumeGrid", "a", 2)));
         // The removal of a structure removes the ranges of its quantities.
         ranges.remove("VolumeGrid", "a");
-        assert_eq!(ranges.lookup(5), None);
-        assert_eq!(ranges.lookup(2), Some(("VolumeGrid", "a/b", 1)));
+        assert_eq!(ranges.lookup(14), None);
+        assert_eq!(ranges.lookup(11), Some(("VolumeGrid", "a/b", 1)));
     }
 
     #[test]

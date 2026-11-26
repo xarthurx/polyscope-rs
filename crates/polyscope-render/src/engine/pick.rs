@@ -36,19 +36,20 @@ impl RenderEngine {
     /// Assigns a contiguous range of global pick indices to a quantity of a
     /// structure, for example to the gridcubes of a volume grid quantity.
     ///
-    /// The structure name and the quantity name stay separate, so names that
-    /// contain `/` cannot collide. [`Self::lookup_global_index`] reports the
-    /// structure for these indices. Otherwise it works as
-    /// [`Self::assign_pick_range`].
+    /// `quantity_index` is the index of the quantity in the quantities of the
+    /// structure. Thus two quantities with the same name cannot collide, and
+    /// neither can structure names that contain `/`.
+    /// [`Self::lookup_global_index`] reports the structure for these indices.
+    /// Otherwise it works as [`Self::assign_pick_range`].
     pub fn assign_quantity_pick_range(
         &mut self,
         type_name: &str,
         structure_name: &str,
-        quantity_name: &str,
+        quantity_index: usize,
         num_elements: u32,
     ) -> u32 {
         self.pick_ranges
-            .assign_quantity(type_name, structure_name, quantity_name, num_elements)
+            .assign_quantity(type_name, structure_name, quantity_index, num_elements)
     }
 
     /// Removes the pick ranges of a structure and of its quantities.
@@ -68,6 +69,17 @@ impl RenderEngine {
     /// Gets the `global_start` for a structure's pick range, if assigned.
     pub fn get_pick_range_start(&self, type_name: &str, name: &str) -> Option<u32> {
         self.pick_ranges.start(type_name, name)
+    }
+
+    /// Gets the `global_start` for the pick range of a quantity, if assigned.
+    pub fn get_quantity_pick_range_start(
+        &self,
+        type_name: &str,
+        structure_name: &str,
+        quantity_index: usize,
+    ) -> Option<u32> {
+        self.pick_ranges
+            .quantity_start(type_name, structure_name, quantity_index)
     }
 
     // ========== Pick System - GPU Resources ==========

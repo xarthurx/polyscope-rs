@@ -590,6 +590,12 @@ impl SurfaceMesh {
         self.global_start = global_start;
     }
 
+    /// Returns the first global pick index.
+    #[must_use]
+    pub fn pick_global_start(&self) -> u32 {
+        self.global_start
+    }
+
     /// Updates pick uniforms (model transform) when the structure is moved.
     pub fn update_pick_uniforms(&self, queue: &wgpu::Queue) {
         if let Some(buffer) = &self.pick_uniform_buffer {

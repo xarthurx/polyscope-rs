@@ -45,15 +45,20 @@ const QUAD_VERTICES: array<vec2<f32>, 6> = array<vec2<f32>, 6>(
 
 // Encode a flat 24-bit global index into RGB color
 fn index_to_color(index: u32) -> vec3<f32> {
-    // An index past the 24 bits of the pick buffer draws as the background,
-    // so it cannot select a different element.
-    if (index >= 0x1000000u) {
-        return vec3<f32>(0.0, 0.0, 0.0);
-    }
     let r = f32((index >> 16u) & 0xFFu) / 255.0;
     let g = f32((index >> 8u) & 0xFFu) / 255.0;
     let b = f32(index & 0xFFu) / 255.0;
     return vec3<f32>(r, g, b);
+}
+
+// Encode the global pick index `start + local` into RGB color. An index past
+// the 24 bits of the pick buffer draws as the background, also when the sum
+// overflows `u32`, so it cannot select a different element.
+fn encode_pick_index(start: u32, local: u32) -> vec3<f32> {
+    if (start >= 0x1000000u || local >= 0x1000000u - start) {
+        return vec3<f32>(0.0, 0.0, 0.0);
+    }
+    return index_to_color(start + local);
 }
 
 @vertex
@@ -81,7 +86,7 @@ fn vs_main(
     out.clip_position = camera.proj * vec4<f32>(billboard_pos_view, 1.0);
 
     // Encode the pick color from global_start + instance_index
-    out.pick_color = index_to_color(pick_uniforms.global_start + instance_index);
+    out.pick_color = encode_pick_index(pick_uniforms.global_start, instance_index);
 
     // Pass through for ray-sphere intersection
     out.sphere_center_view = view_pos;

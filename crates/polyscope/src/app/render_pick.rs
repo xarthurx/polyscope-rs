@@ -106,14 +106,17 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
             }
 
             // CameraView: the curve network line pick draws its wireframe edges.
-            // It writes its pick uniforms only when it creates them, so a new
-            // first index creates them again.
+            // `update_gpu_buffers` does not write camera view pick uniforms, so
+            // they are written here.
             if structure.type_name() == "CameraView"
                 && let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>()
                 && let Some(num_edges) = cv.render_data().map(|rd| rd.num_edges)
             {
                 let global_start = engine.assign_pick_range("CameraView", cv.name(), num_edges);
-                if cv.pick_bind_group().is_none() || cv.pick_global_start() != global_start {
+                if cv.pick_bind_group().is_some() {
+                    cv.set_pick_global_start(global_start);
+                    cv.update_pick_uniforms(&engine.queue);
+                } else {
                     if !engine.has_curve_network_pick_pipeline() {
                         engine.init_curve_network_pick_pipeline();
                     }
@@ -155,10 +158,10 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                 }
 
                 // Give pick ranges and init pick resources for each enabled
-                // quantity. The range keeps the grid and quantity names apart.
+                // quantity. The range belongs to the index of the quantity.
                 if engine.has_gridcube_pick_pipeline() {
                     let vg_name = vg.name().to_string();
-                    for quantity in vg.quantities_mut() {
+                    for (index, quantity) in vg.quantities_mut().iter_mut().enumerate() {
                         if !quantity.is_enabled() {
                             continue;
                         }
@@ -175,7 +178,7 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                                 let global_start = engine.assign_quantity_pick_range(
                                     "VolumeGrid",
                                     &vg_name,
-                                    nsq.name(),
+                                    index,
                                     nsq.num_pick_elements(),
                                 );
                                 if has_pick {
@@ -207,7 +210,7 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
                                 let global_start = engine.assign_quantity_pick_range(
                                     "VolumeGrid",
                                     &vg_name,
-                                    csq.name(),
+                                    index,
                                     csq.num_pick_elements(),
                                 );
                                 if has_pick {
@@ -259,6 +262,16 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
     });
 }
 
+/// Returns whether an owner draws with the pick range of this frame.
+///
+/// The frame preparation gives the ranges, and the pick pass reads the
+/// registry again. A structure that joins the registry in between, for
+/// example from another thread, has no range or an old first index. The pick
+/// pass skips it until the next frame.
+fn has_frame_range(engine: &RenderEngine, type_name: &str, name: &str, start: u32) -> bool {
+    engine.get_pick_range_start(type_name, name) == Some(start)
+}
+
 /// Draws all visible structures into the pick buffer.
 pub(super) fn render_pick_pass(engine: &RenderEngine) {
     let mut encoder = engine
@@ -280,6 +293,7 @@ pub(super) fn render_pick_pass(engine: &RenderEngine) {
                     && let Some(pc) = structure.as_any().downcast_ref::<PointCloud>()
                     && let (Some(pick_bind_group), Some(render_data)) =
                         (pc.pick_bind_group(), pc.render_data())
+                    && has_frame_range(engine, "PointCloud", pc.name(), pc.pick_global_start())
                 {
                     pick_pass.set_bind_group(0, pick_bind_group, &[]);
                     // 6 vertices per quad, num_points instances
@@ -301,6 +315,9 @@ pub(super) fn render_pick_pass(engine: &RenderEngine) {
                     let Some(render_data) = cn.render_data() else {
                         continue;
                     };
+                    if !has_frame_range(engine, "CurveNetwork", cn.name(), cn.pick_global_start()) {
+                        continue;
+                    }
 
                     // Use tube picking when available - provides larger clickable area
                     if engine.has_curve_network_tube_pick_pipeline() {
@@ -337,6 +354,7 @@ pub(super) fn render_pick_pass(engine: &RenderEngine) {
                         && let Some(cv) = structure.as_any().downcast_ref::<CameraView>()
                         && let (Some(bind_group), Some(render_data)) =
                             (cv.pick_bind_group(), cv.render_data())
+                        && has_frame_range(engine, "CameraView", cv.name(), cv.pick_global_start())
                     {
                         pick_pass.set_bind_group(0, bind_group, &[]);
                         pick_pass.draw(0..render_data.num_edges * 2, 0..1);
@@ -357,6 +375,12 @@ pub(super) fn render_pick_pass(engine: &RenderEngine) {
                     if structure.type_name() == "SurfaceMesh"
                         && let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>()
                         && let Some(pick_bind_group) = mesh.pick_bind_group()
+                        && has_frame_range(
+                            engine,
+                            "SurfaceMesh",
+                            mesh.name(),
+                            mesh.pick_global_start(),
+                        )
                     {
                         pick_pass.set_bind_group(0, pick_bind_group, &[]);
                         pick_pass.draw(0..mesh.num_triangulation_vertices(), 0..1);
@@ -364,6 +388,7 @@ pub(super) fn render_pick_pass(engine: &RenderEngine) {
                     if structure.type_name() == "VolumeMesh"
                         && let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>()
                         && let Some(pick_bind_group) = vm.pick_bind_group()
+                        && has_frame_range(engine, "VolumeMesh", vm.name(), vm.pick_global_start())
                     {
                         pick_pass.set_bind_group(0, pick_bind_group, &[]);
                         pick_pass.draw(0..vm.num_render_vertices(), 0..1);
@@ -383,7 +408,11 @@ pub(super) fn render_pick_pass(engine: &RenderEngine) {
                     if structure.type_name() == "VolumeGrid"
                         && let Some(vg) = structure.as_any().downcast_ref::<VolumeGrid>()
                     {
-                        for quantity in vg.quantities() {
+                        // A quantity draws only with the pick range of this frame.
+                        let frame_start = |index: usize| {
+                            engine.get_quantity_pick_range_start("VolumeGrid", vg.name(), index)
+                        };
+                        for (index, quantity) in vg.quantities().iter().enumerate() {
                             if !quantity.is_enabled() {
                                 continue;
                             }
@@ -392,6 +421,7 @@ pub(super) fn render_pick_pass(engine: &RenderEngine) {
                                 .downcast_ref::<VolumeGridNodeScalarQuantity>()
                                 && nsq.viz_mode() == VolumeGridVizMode::Gridcube
                                 && let Some(pick_bg) = nsq.pick_bind_group()
+                                && frame_start(index) == Some(nsq.pick_global_start())
                             {
                                 pick_pass.set_bind_group(0, pick_bg, &[]);
                                 pick_pass.draw(0..nsq.pick_total_vertices(), 0..1);
@@ -400,6 +430,7 @@ pub(super) fn render_pick_pass(engine: &RenderEngine) {
                                 .as_any()
                                 .downcast_ref::<VolumeGridCellScalarQuantity>()
                                 && let Some(pick_bg) = csq.pick_bind_group()
+                                && frame_start(index) == Some(csq.pick_global_start())
                             {
                                 pick_pass.set_bind_group(0, pick_bg, &[]);
                                 pick_pass.draw(0..csq.pick_total_vertices(), 0..1);
@@ -420,7 +451,15 @@ impl super::App {
     /// frame preparation, pick pass and scene passes. It works with a
     /// headless engine.
     pub(crate) fn render_pick_frame(&mut self) {
+        self.render_pick_frame_with(|| {});
+    }
+
+    /// Runs `between` after the frame preparation and before the pick pass,
+    /// as another thread can, and then the rest of the frame as
+    /// `render_pick_frame` does.
+    pub(crate) fn render_pick_frame_with(&mut self, between: impl FnOnce()) {
         self.prepare_frame(true);
+        between();
         if let Some(engine) = &self.engine {
             render_pick_pass(engine);
         }
