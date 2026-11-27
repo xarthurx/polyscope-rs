@@ -1,6 +1,9 @@
 use std::time::{Duration, Instant};
 
-use super::{App, CurveNetwork, PickResult, PointCloud, SurfaceMesh, Vec3, VolumeMesh};
+use super::{App, CurveNetwork, PickResult, PointCloud, Structure, Vec3, VolumeGrid};
+use polyscope_core::structure::HasQuantities;
+use polyscope_render::PickElementType;
+use polyscope_structures::volume_grid::VolumeGridCellScalarQuantity;
 
 /// Longest time between the two clicks of a double-click. C++ Polyscope uses
 /// the Dear `ImGui` default `io.MouseDoubleClickTime` of 0.30 s.
@@ -95,7 +98,50 @@ pub(crate) enum ClickHit {
         type_name: String,
         name: String,
         element_index: u32,
+        element_type: PickElementType,
     },
+}
+
+/// An element in the pick buffer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct PickBufferHit {
+    /// Structure type name, for example `PointCloud`.
+    pub type_name: String,
+    /// Structure name.
+    pub name: String,
+    /// The index of the quantity that owns the pick range, for the gridcubes
+    /// of a volume grid quantity.
+    pub quantity_index: Option<usize>,
+    /// The index of the element in its structure or quantity.
+    pub element_index: u32,
+}
+
+/// Returns the element type of an element in the pick buffer.
+///
+/// A gridcube of a volume grid cell quantity is a cell, and a gridcube of a
+/// node quantity is a node, which the selection shows as a vertex.
+fn pick_element_type(structure: &dyn Structure, hit: &PickBufferHit) -> PickElementType {
+    match hit.type_name.as_str() {
+        "PointCloud" => PickElementType::Point,
+        "SurfaceMesh" => PickElementType::Face,
+        "VolumeMesh" => PickElementType::Cell,
+        "CurveNetwork" | "CameraView" => PickElementType::Edge,
+        "VolumeGrid" => {
+            let is_cell = hit
+                .quantity_index
+                .and_then(|index| {
+                    let grid = structure.as_any().downcast_ref::<VolumeGrid>()?;
+                    grid.quantities().get(index)
+                })
+                .is_some_and(|quantity| quantity.as_any().is::<VolumeGridCellScalarQuantity>());
+            if is_cell {
+                PickElementType::Cell
+            } else {
+                PickElementType::Vertex
+            }
+        }
+        _ => PickElementType::None,
+    }
 }
 
 /// A single-click pick that waits until the click cannot become a double-click.
@@ -230,21 +276,13 @@ impl App {
                 type_name,
                 name,
                 element_index,
+                element_type,
             }) => {
                 log::debug!(
-                    "[CLICK DEBUG] Hit structure '{type_name}::{name}' element {element_index}"
+                    "[CLICK DEBUG] Hit structure '{type_name}::{name}' {element_type:?} {element_index}"
                 );
                 self.selected_element_index = Some(element_index);
                 self.deselect_slice_plane_selection();
-
-                let element_type = match type_name.as_str() {
-                    "PointCloud" => polyscope_render::PickElementType::Point,
-                    "SurfaceMesh" => polyscope_render::PickElementType::Face,
-                    "VolumeMesh" => polyscope_render::PickElementType::Cell,
-                    "CurveNetwork" => polyscope_render::PickElementType::Edge,
-                    "VolumeGrid" => polyscope_render::PickElementType::Vertex,
-                    _ => polyscope_render::PickElementType::None,
-                };
 
                 let structure_name = name;
 
@@ -272,11 +310,9 @@ impl App {
         }
     }
 
-    /// Performs GPU-based picking to find which structure and element is at the given screen position.
-    ///
-    /// Uses the GPU pick buffer to determine the exact structure and element at the click position.
-    /// Returns (`type_name`, name, `element_index`) or None if clicking on empty space.
-    pub(super) fn gpu_pick_at(&self, x: u32, y: u32) -> Option<(String, String, u32)> {
+    /// Returns the element in the pick buffer at a pixel, or None for the
+    /// background.
+    pub(super) fn gpu_pick_at(&self, x: u32, y: u32) -> Option<PickBufferHit> {
         let engine = self.engine.as_ref()?;
 
         // Read pick buffer — returns flat 24-bit global index
@@ -287,9 +323,100 @@ impl App {
             return None;
         }
 
-        // Look up structure info from global index
-        let (type_name, name, local_index) = engine.lookup_global_index(global_index)?;
-        Some((type_name.to_string(), name.to_string(), local_index))
+        let owner = engine.lookup_pick_owner(global_index)?;
+        Some(PickBufferHit {
+            type_name: owner.type_name.to_owned(),
+            name: owner.structure_name.to_owned(),
+            quantity_index: owner.quantity_index,
+            element_index: owner.local_index,
+        })
+    }
+
+    /// Returns what a single click at a screen position hits: the nearer of
+    /// the slice plane and the element in the pick buffer under the cursor.
+    ///
+    /// As in C++ Polyscope, the pick buffer gives the structure and the
+    /// element for every structure type. The distance of the element along
+    /// the click ray comes from the pick depth buffer. Points and curve
+    /// network edges have an exact ray test, which gives a better distance.
+    pub(crate) fn click_hit_at(&self, screen: glam::Vec2) -> Option<ClickHit> {
+        let engine = self.engine.as_ref()?;
+        let (ray_origin, ray_dir) =
+            self.screen_ray(screen, engine.width, engine.height, &engine.camera)?;
+        let plane_hit = self.pick_slice_plane_at_ray(ray_origin, ray_dir);
+        let element_hit = self.pick_buffer_hit_at(screen, ray_origin, ray_dir);
+        log::debug!("[CLICK DEBUG] plane_hit: {plane_hit:?}, element_hit: {element_hit:?}");
+        match (plane_hit, element_hit) {
+            // A slice plane wins at the same distance.
+            (Some((plane, plane_t)), Some((_, t))) if plane_t <= t => Some(ClickHit::Plane(plane)),
+            (_, Some((hit, _))) => Some(hit),
+            (plane, None) => plane.map(|(name, _)| ClickHit::Plane(name)),
+        }
+    }
+
+    /// Returns the element in the pick buffer at a screen position and its
+    /// distance along the click ray.
+    ///
+    /// Returns None for the background, and for a structure that is hidden or
+    /// removed after the frame of the pick buffer.
+    fn pick_buffer_hit_at(
+        &self,
+        screen: glam::Vec2,
+        ray_origin: Vec3,
+        ray_dir: Vec3,
+    ) -> Option<(ClickHit, f32)> {
+        if screen.x < 0.0 || screen.y < 0.0 {
+            return None;
+        }
+        let (x, y) = (screen.x as u32, screen.y as u32);
+        let hit = self.gpu_pick_at(x, y)?;
+        let element_type = crate::with_context(|ctx| {
+            let structure = ctx.registry.get(&hit.type_name, &hit.name)?;
+            ctx.is_structure_visible(structure)
+                .then(|| pick_element_type(structure, &hit))
+        })?;
+
+        let ray_t = match hit.type_name.as_str() {
+            "PointCloud" => {
+                self.pick_point_cloud_at_ray(ray_origin, ray_dir, &hit.name, hit.element_index)
+            }
+            "CurveNetwork" => self.pick_curve_network_edge_at_ray(
+                ray_origin,
+                ray_dir,
+                &hit.name,
+                hit.element_index,
+            ),
+            _ => None,
+        };
+        // Without a distance, the element is behind every slice plane.
+        let t = ray_t
+            .or_else(|| self.pick_depth_distance(screen, ray_origin, ray_dir))
+            .unwrap_or(f32::INFINITY);
+
+        let click_hit = ClickHit::Structure {
+            type_name: hit.type_name,
+            name: hit.name,
+            element_index: hit.element_index,
+            element_type,
+        };
+        Some((click_hit, t))
+    }
+
+    /// Returns the distance along the click ray of the surface in the pick
+    /// depth buffer at a screen position.
+    fn pick_depth_distance(
+        &self,
+        screen: glam::Vec2,
+        ray_origin: Vec3,
+        ray_dir: Vec3,
+    ) -> Option<f32> {
+        let engine = self.engine.as_ref()?;
+        let depth = engine.pick_depth_at(screen.x as u32, screen.y as u32)?;
+        let position =
+            engine
+                .camera
+                .screen_depth_to_world(screen, depth, engine.width, engine.height)?;
+        Some((position - ray_origin).dot(ray_dir))
     }
 
     /// Returns the world position of the structure at a screen position.
@@ -398,37 +525,6 @@ impl App {
         best_hit
     }
 
-    pub(super) fn ray_intersect_triangle(
-        &self,
-        ray_origin: Vec3,
-        ray_dir: Vec3,
-        v0: Vec3,
-        v1: Vec3,
-        v2: Vec3,
-    ) -> Option<f32> {
-        let eps = 1e-6;
-        let edge1 = v1 - v0;
-        let edge2 = v2 - v0;
-        let h = ray_dir.cross(edge2);
-        let a = edge1.dot(h);
-        if a.abs() < eps {
-            return None;
-        }
-        let f = 1.0 / a;
-        let s = ray_origin - v0;
-        let u = f * s.dot(h);
-        if !(0.0..=1.0).contains(&u) {
-            return None;
-        }
-        let q = s.cross(edge1);
-        let v = f * ray_dir.dot(q);
-        if v < 0.0 || u + v > 1.0 {
-            return None;
-        }
-        let t = f * edge2.dot(q);
-        if t > eps { Some(t) } else { None }
-    }
-
     pub(super) fn ray_segment_closest_t(
         &self,
         ray_origin: Vec3,
@@ -467,101 +563,6 @@ impl App {
         }
 
         (t >= 0.0).then_some(t)
-    }
-
-    pub(super) fn pick_structure_at_ray(
-        &self,
-        ray_origin: Vec3,
-        ray_dir: Vec3,
-        plane_params: &[(Vec3, Vec3)],
-    ) -> Option<(String, String, f32)> {
-        let mut best_hit: Option<(String, String, f32)> = None;
-
-        crate::with_context(|ctx| {
-            for structure in ctx.registry.iter() {
-                if !ctx.is_structure_visible(structure) {
-                    continue;
-                }
-
-                match structure.type_name() {
-                    "SurfaceMesh" => {
-                        let Some(mesh) = structure.as_any().downcast_ref::<SurfaceMesh>() else {
-                            continue;
-                        };
-                        let model = structure.transform();
-                        let mut world_verts = Vec::with_capacity(mesh.vertices().len());
-                        for v in mesh.vertices() {
-                            world_verts.push((model * v.extend(1.0)).truncate());
-                        }
-
-                        let mut hit_t: Option<f32> = None;
-                        for tri in mesh.triangulation() {
-                            let v0 = world_verts[tri[0] as usize];
-                            let v1 = world_verts[tri[1] as usize];
-                            let v2 = world_verts[tri[2] as usize];
-                            if let Some(t) =
-                                self.ray_intersect_triangle(ray_origin, ray_dir, v0, v1, v2)
-                            {
-                                hit_t = Some(hit_t.map_or(t, |best| best.min(t)));
-                            }
-                        }
-
-                        if let Some(t) = hit_t {
-                            let is_better =
-                                best_hit.as_ref().is_none_or(|(_, _, best_t)| t < *best_t);
-                            if is_better {
-                                best_hit = Some((
-                                    structure.type_name().to_string(),
-                                    structure.name().to_string(),
-                                    t,
-                                ));
-                            }
-                        }
-                    }
-                    "VolumeMesh" => {
-                        let Some(vm) = structure.as_any().downcast_ref::<VolumeMesh>() else {
-                            continue;
-                        };
-                        let model = structure.transform();
-                        let (positions, faces) = vm.pick_triangles(plane_params);
-                        if positions.is_empty() || faces.is_empty() {
-                            continue;
-                        }
-                        let mut world_positions = Vec::with_capacity(positions.len());
-                        for v in positions {
-                            world_positions.push((model * v.extend(1.0)).truncate());
-                        }
-
-                        let mut hit_t: Option<f32> = None;
-                        for tri in faces {
-                            let v0 = world_positions[tri[0] as usize];
-                            let v1 = world_positions[tri[1] as usize];
-                            let v2 = world_positions[tri[2] as usize];
-                            if let Some(t) =
-                                self.ray_intersect_triangle(ray_origin, ray_dir, v0, v1, v2)
-                            {
-                                hit_t = Some(hit_t.map_or(t, |best| best.min(t)));
-                            }
-                        }
-
-                        if let Some(t) = hit_t {
-                            let is_better =
-                                best_hit.as_ref().is_none_or(|(_, _, best_t)| t < *best_t);
-                            if is_better {
-                                best_hit = Some((
-                                    structure.type_name().to_string(),
-                                    structure.name().to_string(),
-                                    t,
-                                ));
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        });
-
-        best_hit
     }
 
     pub(super) fn pick_point_cloud_at_ray(

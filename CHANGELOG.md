@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `RenderEngine::lookup_pick_owner` and `PickOwnerHit`: the owner of a pick
+  index, with the index of the quantity that owns the range.
+
+### Fixed
+- A click on a surface mesh or a volume mesh selected element 0. A click now
+  takes the element from the pick buffer, as C++ Polyscope does: the face of a
+  surface mesh and the cell of a volume mesh. A click no longer tests each
+  mesh triangle on the CPU.
+- A click did not select a volume grid or a camera view. It now selects a
+  volume grid with the cell of a cell quantity or the node of a node quantity,
+  and a camera view with the edge of its wireframe.
+
 ## [0.6.2] - 2026-11-26
 
 ### Added

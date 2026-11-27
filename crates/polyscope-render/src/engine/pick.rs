@@ -69,6 +69,15 @@ impl RenderEngine {
         self.pick_ranges.lookup(global_index)
     }
 
+    /// Looks up the owner of a global pick index, with the index of the
+    /// quantity if a quantity owns the range (the gridcubes of a volume grid
+    /// quantity).
+    ///
+    /// Returns None for the background and for an index without an owner.
+    pub fn lookup_pick_owner(&self, global_index: u32) -> Option<crate::pick::PickOwnerHit<'_>> {
+        self.pick_ranges.lookup_owner(global_index)
+    }
+
     /// Gets the `global_start` for a structure's pick range, if assigned.
     pub fn get_pick_range_start(&self, type_name: &str, name: &str) -> Option<u32> {
         self.pick_ranges.start(type_name, name)

@@ -372,8 +372,7 @@ fn test_grid_quantities_with_the_same_name_get_separate_pick_ranges() {
 }
 
 /// A volume grid hit keeps the full grid name when the selection applies
-/// it, also when the name contains `/`. The click code does not create
-/// volume grid hits yet (see Known Issues in `docs/feature-status.md`).
+/// it, also when the name contains `/`.
 #[test]
 fn test_volume_grid_hit_keeps_a_name_with_slash() {
     use crate::app::{App, ClickHit};
@@ -387,6 +386,7 @@ fn test_volume_grid_hit_keeps_a_name_with_slash() {
         type_name: "VolumeGrid".to_string(),
         name: name.clone(),
         element_index: 0,
+        element_type: polyscope_render::PickElementType::Cell,
     };
     app.queue_click_pick(Some(hit), glam::Vec2::ZERO);
     app.update_pending_pick(Instant::now() + Duration::from_secs(1));
@@ -395,4 +395,176 @@ fn test_volume_grid_hit_keeps_a_name_with_slash() {
         .as_ref()
         .expect("the click must select the grid");
     assert_eq!(selection.structure_name, name);
+}
+
+/// Creates a live renderer with pick buffers, or returns None without a GPU
+/// adapter.
+fn pick_renderer() -> Option<LiveRenderer> {
+    let mut renderer = LiveRenderer::new()?;
+    let engine = renderer.app.engine.as_mut().expect("engine");
+    let (width, height) = (engine.width, engine.height);
+    engine.init_pick_buffers(width, height);
+    Some(renderer)
+}
+
+/// Returns the click hit at the pixel of a world position.
+fn click_at_position(app: &app::App, p: Vec3) -> Option<crate::app::ClickHit> {
+    let engine = app.engine.as_ref().expect("engine");
+    let (x, y) = pixel_of(engine, p);
+    app.click_hit_at(glam::Vec2::new(x as f32 + 0.5, y as f32 + 0.5))
+}
+
+/// Returns a structure hit of a click.
+fn structure_hit(
+    type_name: &str,
+    name: &str,
+    element_index: u32,
+    element_type: polyscope_render::PickElementType,
+) -> Option<crate::app::ClickHit> {
+    Some(crate::app::ClickHit::Structure {
+        type_name: type_name.to_owned(),
+        name: name.to_owned(),
+        element_index,
+        element_type,
+    })
+}
+
+/// A click reports the face of a surface mesh and the cell of a volume mesh
+/// that the pick buffer shows. Before, a click on a mesh reported element 0.
+#[test]
+fn test_click_reports_mesh_faces_and_cells() {
+    use polyscope_render::PickElementType;
+
+    let _guard = setup();
+    register_point_cloud("click_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping mesh click test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    // In the image plane through the origin: a square of two triangles at the
+    // left, and two separate tetrahedra at the right.
+    let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+    let (right, up, back) = (
+        view.row(0).truncate(),
+        view.row(1).truncate(),
+        view.row(2).truncate(),
+    );
+    let at = |x: f32, y: f32| right * x + up * y;
+    let square = vec![at(-0.8, 0.3), at(-0.3, 0.3), at(-0.3, 0.8), at(-0.8, 0.8)];
+    register_surface_mesh("click_square", square, vec![vec![0, 1, 2], vec![0, 2, 3]]);
+    let tet = |x: f32| {
+        [
+            at(x - 0.15, 0.3),
+            at(x + 0.15, 0.3),
+            at(x, 0.7),
+            at(x, 0.45) + back * 0.1,
+        ]
+    };
+    let vertices: Vec<Vec3> = tet(0.35).into_iter().chain(tet(0.75)).collect();
+    register_tet_mesh("click_tets", vertices, vec![[0, 1, 2, 3], [4, 5, 6, 7]]);
+    app.render_pick_frame();
+
+    let face = |index| structure_hit("SurfaceMesh", "click_square", index, PickElementType::Face);
+    assert_eq!(click_at_position(app, at(-0.7, 0.7)), face(1));
+    assert_eq!(click_at_position(app, at(-0.4, 0.4)), face(0));
+    let cell = |index| structure_hit("VolumeMesh", "click_tets", index, PickElementType::Cell);
+    assert_eq!(click_at_position(app, at(0.75, 0.45)), cell(1));
+    assert_eq!(click_at_position(app, at(0.35, 0.45)), cell(0));
+}
+
+/// A click on a gridcube selects the volume grid with the cell of a cell
+/// quantity or the node of a node quantity. Before, a click ignored gridcubes.
+#[test]
+fn test_click_reports_volume_grid_cells_and_nodes() {
+    use crate::app::ClickHit;
+    use polyscope_render::PickElementType;
+
+    let _guard = setup();
+    // Cell gridcubes at the left, node gridcubes at the right. Each grid has
+    // three cubes on each axis.
+    let cells = unique_name("click/cells");
+    let cell_grid = register_volume_grid(
+        &cells,
+        glam::UVec3::splat(4),
+        Vec3::new(-1.0, -0.4, -0.4),
+        Vec3::new(-0.2, 0.4, 0.4),
+    );
+    cell_grid.add_cell_scalar_quantity("density", vec![1.0; 27]);
+    with_volume_grid(&cells, |vg| enable_quantity(vg, "density"));
+    let nodes = unique_name("click_nodes");
+    let node_grid = register_volume_grid(
+        &nodes,
+        glam::UVec3::splat(3),
+        Vec3::new(0.2, -0.4, -0.4),
+        Vec3::new(1.0, 0.4, 0.4),
+    );
+    node_grid.add_node_scalar_quantity("height", vec![1.0; 27]);
+    with_volume_grid(&nodes, |vg| enable_quantity(vg, "height"));
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping volume grid click test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    // At the center of a grid, the click ray passes through the cubes with
+    // i = 1 and j = 1. Their flat index is 4 + 9 k.
+    let center_hit = |p: Vec3| match click_at_position(app, p) {
+        Some(ClickHit::Structure {
+            type_name,
+            name,
+            element_index,
+            element_type,
+        }) if type_name == "VolumeGrid" && element_index % 9 == 4 => Some((name, element_type)),
+        other => panic!("no gridcube at the grid center: {other:?}"),
+    };
+    assert_eq!(
+        center_hit(Vec3::new(-0.6, 0.0, 0.0)),
+        Some((cells, PickElementType::Cell))
+    );
+    assert_eq!(
+        center_hit(Vec3::new(0.6, 0.0, 0.0)),
+        Some((nodes, PickElementType::Vertex))
+    );
+}
+
+/// A click on the wireframe of a camera view selects the camera view.
+/// Before, a click ignored camera views.
+#[test]
+fn test_click_selects_a_camera_view() {
+    use crate::app::ClickHit;
+    use polyscope_render::PickElementType;
+
+    let _guard = setup();
+    register_point_cloud("click_cv_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let name = unique_name("click_camera");
+    // A camera view whose wireframe starts at `root` and points along -X.
+    let root = Vec3::new(0.3, 0.2, 0.0);
+    register_camera_view_look_at(&name, root, Vec3::ZERO, Vec3::Y, 60.0, 1.5);
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping camera view click test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    // The wireframe edges meet at the root: a pixel next to it shows the view.
+    let (rx, ry) = pixel_of(app.engine.as_ref().expect("engine"), root);
+    let hit = (0..3)
+        .flat_map(|i| (0..3).map(move |j| ((rx + i).saturating_sub(1), (ry + j).saturating_sub(1))))
+        .find_map(|(x, y)| {
+            match app.click_hit_at(glam::Vec2::new(x as f32 + 0.5, y as f32 + 0.5)) {
+                Some(ClickHit::Structure {
+                    type_name,
+                    name,
+                    element_type,
+                    ..
+                }) if type_name == "CameraView" => Some((name, element_type)),
+                _ => None,
+            }
+        });
+    assert_eq!(hit, Some((name, PickElementType::Edge)));
 }

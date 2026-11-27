@@ -1269,6 +1269,7 @@ mod tests {
                 type_name: "PointCloud".to_string(),
                 name: name.clone(),
                 element_index: 1,
+                element_type: polyscope_render::PickElementType::Point,
             })
         };
         let screen = glam::Vec2::new(10.0, 20.0);
@@ -1332,6 +1333,7 @@ mod tests {
                 type_name: "PointCloud".to_string(),
                 name: name.clone(),
                 element_index: 0,
+                element_type: polyscope_render::PickElementType::Point,
             }),
             glam::Vec2::ZERO,
         );
