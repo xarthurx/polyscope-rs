@@ -94,9 +94,14 @@ impl Default for PickUniforms {
 pub struct TubePickUniforms {
     /// The starting global index for this structure's elements.
     pub global_start: u32,
-    /// Tube radius for ray-cylinder intersection.
+    /// Radius of the drawn tube, or 0 for a curve that draws lines. Where the
+    /// pick ray hits the drawn tube, the pick depth is the depth of the tube
+    /// surface. Elsewhere, it is the depth of the curve line. Thus the pick
+    /// buffer shows what the window shows.
     pub radius: f32,
-    /// Minimum pick radius - ensures curves are always clickable even when very thin.
+    /// Smallest radius of the click area, so that thin curves are easy to
+    /// select. A curve that draws lines puts the radius of its tube here, so
+    /// its click area stays as wide as the tube.
     pub min_pick_radius: f32,
     /// Padding to align to 16 bytes.
     pub _padding: f32,

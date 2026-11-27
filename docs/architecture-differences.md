@@ -61,7 +61,16 @@ The frame preparation creates the pick resources and writes the pick uniforms (m
 
 The pick depth gives the world position of the hit. A double-click uses it to set the view center on any structure type.
 
-A click takes the structure and the element from the pick buffer, as in C++: a point, a face of a surface mesh, an edge of a curve network or of a camera view wireframe, a cell of a volume mesh, and a node or a cell of a volume grid (from the gridcube quantity). A slice plane under the cursor wins if it is nearer along the click ray. The pick depth at the center of the pixel gives the distance of the element, because the scene uses the same depth to decide what is in front. The click reads the pick depth only when a slice plane is under the cursor. C++ can also pick vertices, edges, halfedges and corners of a surface mesh, and the nodes of a curve network.
+A click takes the structure and the element from the pick buffer, as C++ does. The element is a point, a face of a surface mesh, an edge of a curve network or of a camera view wireframe, a cell of a volume mesh, or a node or a cell of a volume grid. Two element types are different from C++:
+
+- C++ gives a camera view one pick index, so a click selects the full camera view. polyscope-rs gives each edge of the wireframe its own index.
+- C++ finds the node or the cell of a volume grid on the CPU, from the world position of the pick. polyscope-rs gives each gridcube quantity its own pick range, so the gridcube index is the cell of a cell quantity or the node of a node quantity.
+
+C++ can also pick vertices, edges, halfedges and corners of a surface mesh, and the nodes of a curve network.
+
+A slice plane under the cursor wins if it is nearer along the click ray. The pick depth at the center of the pixel gives the distance of the element, because the scene uses the same depth to decide what is in front. The click reads the pick depth only when a slice plane is under the cursor. A scroll or a drag can move the camera before the next frame. Thus a click and a double-click use a copy of the camera of the frame in the pick buffer.
+
+The pick depth of a curve network is the depth that the window shows. Where the pick ray hits the drawn tube, it is the depth of the tube surface. Elsewhere, it is the depth of the curve line. The click area of a curve is wider than the drawn tube or line, so a thin curve is easy to select. Because of the depth, the click area does not cover a surface in front of the curve.
 
 ## Transparency Rendering
 

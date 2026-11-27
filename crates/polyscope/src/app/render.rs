@@ -106,6 +106,8 @@ impl App {
         // The pick pass draws after the scene passes, with the uniforms of the
         // frame preparation and the UI, and with the tube geometry of this frame.
         self.grid_pick_element_types = render_pick::render_pick_pass(engine);
+        // A click until the next pick pass uses the camera of this pick buffer.
+        self.pick_view = self.prepared_pick_view.take();
 
         // Handle screenshot if pending (local request from F12 key)
         if let Some(filename) = self.screenshot_pending.take() {

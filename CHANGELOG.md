@@ -30,10 +30,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The pick pass used the curve network tube geometry of the frame before, so
   for one frame a tube was picked at its old place or with its old radius. The
   pick pass now runs after the scene passes, which make this geometry.
+- The pick depth of a curve network was the depth of the front of its click
+  area, which is wider than the drawn line or tube. A curve just behind a
+  surface then covered the surface in the pick buffer. The pick depth is now
+  the depth of the drawn tube or line.
+- A click and a double-click used the live camera with the pick buffer of the
+  last frame. A scroll or a drag before the next frame could then change
+  their result. They now use the camera of the frame in the pick buffer.
 
 ### Documentation
 - Feature Status lists that the pick shaders ignore slice planes, so a click
   can select an element that a slice plane hides.
+- Architecture Differences states where the picks of camera views and volume
+  grids differ from C++ Polyscope.
 
 ## [0.6.2] - 2026-11-26
 

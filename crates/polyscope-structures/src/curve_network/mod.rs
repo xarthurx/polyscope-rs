@@ -637,11 +637,19 @@ impl CurveNetwork {
 
         // Also update tube pick uniforms if initialized
         if let Some(buffer) = &self.tube_pick_uniform_buffer {
+            // A minimum radius makes thin curves easier to select.
+            let min_pick_radius = 0.01 * scene_length_scale;
+            // The pick depth comes from the drawn tube. A curve in line mode
+            // draws no tube, so its radius only widens the click area, as before.
+            let (radius, min_pick_radius) = if self.render_mode == 1 {
+                (radius, min_pick_radius)
+            } else {
+                (0.0, radius.max(min_pick_radius))
+            };
             let tube_pick_uniforms = TubePickUniforms {
                 global_start: self.global_start,
                 radius,
-                // A minimum radius makes thin curves easier to select.
-                min_pick_radius: 0.01 * scene_length_scale,
+                min_pick_radius,
                 _padding: 0.0,
             };
             queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[tube_pick_uniforms]));

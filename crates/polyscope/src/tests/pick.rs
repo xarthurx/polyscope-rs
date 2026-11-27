@@ -825,3 +825,147 @@ fn test_click_compares_slice_planes_with_the_pick_depth() {
     app.render_pick_frame();
     assert_eq!(click(app), Some(ClickHit::Plane("plane_front".to_owned())));
 }
+
+/// A curve network in line mode draws a line, so its pick depth is the depth
+/// of the line and not the front of its wider click area. A line just behind
+/// a surface mesh does not cover the mesh in the pick buffer.
+#[test]
+fn test_line_behind_a_mesh_does_not_cover_it() {
+    use polyscope_render::PickElementType;
+
+    let _guard = setup();
+    register_point_cloud("line_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping line pick depth test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+    let (right, up, back) = (
+        view.row(0).truncate(),
+        view.row(1).truncate(),
+        view.row(2).truncate(),
+    );
+    let at = |x: f32, y: f32| right * x + up * y;
+    let square = vec![at(-0.8, 0.3), at(-0.3, 0.3), at(-0.3, 0.8), at(-0.8, 0.8)];
+    register_surface_mesh("line_square", square, vec![vec![0, 1, 2, 3]]);
+    // A line 0.02 behind the square. Its click area has a radius of 0.05.
+    let behind = -back * 0.02;
+    register_curve_network(
+        "line_behind",
+        vec![at(-1.0, 0.55) + behind, at(-0.1, 0.55) + behind],
+        vec![[0, 1]],
+    );
+    with_curve_network("line_behind", |cn| {
+        cn.set_radius(0.05, false);
+    });
+    app.render_pick_frame();
+
+    // The square hides the line, so a click there selects the square.
+    assert_eq!(
+        click_at_position(app, at(-0.55, 0.55)),
+        Some(structure_hit(
+            "SurfaceMesh",
+            "line_square",
+            0,
+            PickElementType::Face
+        ))
+    );
+    // Beside the square, a click selects the line.
+    assert_eq!(
+        click_at_position(app, at(-0.95, 0.55) + behind),
+        Some(structure_hit(
+            "CurveNetwork",
+            "line_behind",
+            0,
+            PickElementType::Edge
+        ))
+    );
+}
+
+/// A click uses the camera of the frame in the pick buffer. A scroll moves
+/// the camera before the next frame, but a click until then still compares
+/// the pick depth with a slice plane as the window shows them.
+#[test]
+fn test_click_uses_the_camera_of_the_pick_buffer() {
+    use polyscope_render::PickElementType;
+
+    let _guard = setup();
+    register_point_cloud("zoom_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping click camera test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+    let (right, up, back) = (
+        view.row(0).truncate(),
+        view.row(1).truncate(),
+        view.row(2).truncate(),
+    );
+    let at = |x: f32, y: f32| right * x + up * y;
+    let square = vec![at(-0.8, 0.3), at(-0.3, 0.3), at(-0.3, 0.8), at(-0.8, 0.8)];
+    register_surface_mesh("zoom_square", square, vec![vec![0, 1, 2, 3]]);
+    // A slice plane 0.1 behind the square. The square stays on its visible side.
+    let target = at(-0.55, 0.55);
+    add_slice_plane_with_pose("zoom_plane", target - back * 0.1, back).set_plane_size(1.0);
+    app.render_pick_frame();
+
+    let (x, y) = pixel_of(app.engine.as_ref().expect("engine"), target);
+    let screen = glam::Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
+    let square_hit = Some(structure_hit(
+        "SurfaceMesh",
+        "zoom_square",
+        0,
+        PickElementType::Face,
+    ));
+    assert_eq!(app.click_hit_at(screen), square_hit);
+
+    // A scroll moves the camera toward the scene, by more than the distance
+    // from the square to the plane. The window still shows the frame before.
+    app.engine.as_mut().expect("engine").camera.zoom_scroll(2.0);
+    assert_eq!(app.click_hit_at(screen), square_hit);
+}
+
+/// The selection checks the element of a click when it applies the click. A
+/// point cloud that loses points during the double-click time is not selected
+/// with a point that it no longer has.
+#[test]
+fn test_click_selection_checks_the_element() {
+    use crate::app::{App, ClickHit};
+    use polyscope_render::PickElementType;
+    use std::time::{Duration, Instant};
+
+    let _guard = setup();
+    deselect_structure();
+    let name = unique_name("shrink_pc");
+    register_point_cloud(&name, vec![Vec3::ZERO, Vec3::X, Vec3::Y]);
+    let hit = |element_index| {
+        Some(ClickHit::Structure {
+            type_name: "PointCloud".to_owned(),
+            name: name.clone(),
+            element_index,
+            element_type: PickElementType::Point,
+        })
+    };
+    let screen = glam::Vec2::new(10.0, 20.0);
+    let later = || Instant::now() + Duration::from_secs(1);
+    let mut app = App::new();
+
+    // The point cloud loses two points before the click applies.
+    app.queue_click_pick(hit(2), screen);
+    with_point_cloud(&name, |pc| pc.update_points(vec![Vec3::ZERO]));
+    app.update_pending_pick(later());
+    assert!(app.selection.is_none());
+    assert!(with_context(|ctx| ctx.selected_structure().is_none()));
+
+    // A point that it still has is selected.
+    app.queue_click_pick(hit(0), screen);
+    app.update_pending_pick(later());
+    let selection = app.selection.as_ref().expect("selection of point 0");
+    assert_eq!(selection.element_index, 0);
+}

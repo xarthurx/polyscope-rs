@@ -6,8 +6,8 @@
 //! maps it into the screenshot target.
 
 use super::{
-    App, CurveNetwork, GroundPlaneMode, Options, PointCloud, SurfaceMesh, VolumeMesh, render_init,
-    render_peel, render_pick, render_scene, render_volume_grid,
+    App, CurveNetwork, GroundPlaneMode, Options, PointCloud, SurfaceMesh, VolumeMesh, picking,
+    render_init, render_peel, render_pick, render_scene, render_volume_grid,
 };
 use polyscope_render::RenderEngine;
 
@@ -35,6 +35,11 @@ impl App {
 
         render_init::drain_material_queue(engine);
         render_init::update_uniforms(engine);
+        // The scene passes and the pick pass of a window frame draw with these
+        // camera uniforms. The pick pass keeps this view for the clicks.
+        if interactive {
+            self.prepared_pick_view = Some(picking::PickView::of(engine));
+        }
         render_init::init_structure_gpu_resources(engine);
         let isosurface_meshes =
             render_volume_grid::init_volume_grid_quantities(engine, interactive);

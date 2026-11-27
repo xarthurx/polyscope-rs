@@ -1,6 +1,8 @@
 use std::time::{Duration, Instant};
 
-use super::{App, PickResult, Vec3};
+use super::{
+    App, CurveNetwork, PickResult, PointCloud, Structure, SurfaceMesh, Vec3, VolumeGrid, VolumeMesh,
+};
 use polyscope_render::PickElementType;
 
 /// Longest time between the two clicks of a double-click. C++ Polyscope uses
@@ -112,6 +114,58 @@ pub(super) struct PickBufferHit {
     pub quantity_index: Option<usize>,
     /// The index of the element in its structure or quantity.
     pub element_index: u32,
+}
+
+/// The camera and the image size of the frame that the pick buffer shows.
+///
+/// Input events between frames can move the live camera. A click uses this
+/// copy for its ray and for its pick depth, so they match the pick buffer.
+#[derive(Debug, Clone)]
+pub(crate) struct PickView {
+    pub camera: polyscope_render::Camera,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl PickView {
+    /// Returns the current camera and image size of an engine.
+    pub(crate) fn of(engine: &polyscope_render::RenderEngine) -> Self {
+        Self {
+            camera: engine.camera.clone(),
+            width: engine.width,
+            height: engine.height,
+        }
+    }
+}
+
+/// Returns whether a structure still has the element of a pick hit.
+///
+/// The structure can change between the frame of the pick buffer and the
+/// delayed selection, for example when a point cloud gets fewer points.
+fn element_exists(structure: &dyn Structure, element_type: PickElementType, index: u32) -> bool {
+    let any = structure.as_any();
+    let count = if let Some(pc) = any.downcast_ref::<PointCloud>() {
+        pc.points().len()
+    } else if let Some(mesh) = any.downcast_ref::<SurfaceMesh>() {
+        mesh.num_faces()
+    } else if let Some(cn) = any.downcast_ref::<CurveNetwork>() {
+        cn.num_edges()
+    } else if let Some(vm) = any.downcast_ref::<VolumeMesh>() {
+        vm.num_cells()
+    } else if let Some(vg) = any.downcast_ref::<VolumeGrid>() {
+        let nodes = vg.node_dim();
+        let dim = if element_type == PickElementType::Cell {
+            nodes.saturating_sub(glam::UVec3::ONE)
+        } else {
+            nodes
+        };
+        dim.x as usize * dim.y as usize * dim.z as usize
+    } else {
+        // A camera view is selected as a whole: its wireframe always has the
+        // same edges.
+        return true;
+    };
+    (index as usize) < count
 }
 
 /// A single-click pick that waits until the click cannot become a double-click.
@@ -226,9 +280,16 @@ impl App {
             crate::with_context(|ctx| match hit {
                 ClickHit::Plane(name) => ctx.has_slice_plane(name),
                 // A pick reports the structure, also for a volume grid quantity.
+                // The element must still exist.
                 ClickHit::Structure {
-                    type_name, name, ..
-                } => ctx.registry.get(type_name, name).is_some(),
+                    type_name,
+                    name,
+                    element_index,
+                    element_type,
+                } => ctx
+                    .registry
+                    .get(type_name, name)
+                    .is_some_and(|s| element_exists(s, *element_type, *element_index)),
             })
         });
 
@@ -302,23 +363,31 @@ impl App {
         })
     }
 
+    /// Returns the view of the frame that the pick buffer shows, or the live
+    /// view before the first pick pass.
+    fn click_view(&self) -> Option<PickView> {
+        self.pick_view
+            .clone()
+            .or_else(|| self.engine.as_ref().map(PickView::of))
+    }
+
     /// Returns what a single click at a screen position hits: the element in
     /// the pick buffer under the cursor, or a slice plane in front of it.
     ///
-    /// As in C++ Polyscope, the pick buffer gives the structure and the
-    /// element for every structure type. The pick buffer, the pick depth and
-    /// the slice plane test all use the center of the pixel under the cursor,
-    /// as the rasterizer does. Only a slice plane under the cursor needs the
-    /// distance of the element, so a click without one reads no depth.
+    /// The pick buffer gives the structure and the element for every
+    /// structure type. The pick buffer, the pick depth and the slice plane
+    /// test all use the center of the pixel under the cursor, as the
+    /// rasterizer does, and the camera of the frame of the pick buffer. Only a
+    /// slice plane under the cursor needs the distance of the element, so a
+    /// click without one reads no depth.
     pub(crate) fn click_hit_at(&self, screen: glam::Vec2) -> Option<ClickHit> {
-        let engine = self.engine.as_ref()?;
+        let view = self.click_view()?;
         if screen.x < 0.0 || screen.y < 0.0 {
             return None;
         }
         let pixel = screen.floor() + glam::Vec2::splat(0.5);
-        let (x, y) = (pixel.x as u32, pixel.y as u32);
-        let element = self.pick_buffer_hit_at(x, y);
-        let ray = self.screen_ray(pixel, engine.width, engine.height, &engine.camera);
+        let element = self.pick_buffer_hit_at(pixel.x as u32, pixel.y as u32);
+        let ray = self.screen_ray(pixel, view.width, view.height, &view.camera);
         let plane = ray.and_then(|(origin, dir)| self.pick_slice_plane_at_ray(origin, dir));
         log::debug!("[CLICK DEBUG] element: {element:?}, plane: {plane:?}");
         match (plane, element, ray) {
@@ -326,7 +395,7 @@ impl App {
             // The element wins only if it is nearer than the slice plane.
             (Some((plane_name, plane_t)), Some(element), Some((origin, dir))) => {
                 let nearer = self
-                    .pick_depth_distance(pixel, x, y, origin, dir)
+                    .pick_depth_distance(&view, pixel, origin, dir)
                     .is_some_and(|t| t < plane_t);
                 Some(if nearer {
                     element
@@ -382,22 +451,20 @@ impl App {
     }
 
     /// Returns the distance along the click ray of the surface in the pick
-    /// depth buffer at a pixel. The scene draws with the same depth, so the
-    /// distance decides what the window shows in front.
+    /// depth buffer at a pixel center. The scene draws with the same depth, so
+    /// the distance decides what the window shows in front.
     fn pick_depth_distance(
         &self,
+        view: &PickView,
         pixel: glam::Vec2,
-        x: u32,
-        y: u32,
         ray_origin: Vec3,
         ray_dir: Vec3,
     ) -> Option<f32> {
         let engine = self.engine.as_ref()?;
-        let depth = engine.pick_depth_at(x, y)?;
-        let position =
-            engine
-                .camera
-                .screen_depth_to_world(pixel, depth, engine.width, engine.height)?;
+        let depth = engine.pick_depth_at(pixel.x as u32, pixel.y as u32)?;
+        let position = view
+            .camera
+            .screen_depth_to_world(pixel, depth, view.width, view.height)?;
         Some((position - ray_origin).dot(ray_dir))
     }
 
@@ -405,18 +472,19 @@ impl App {
     ///
     /// Like C++ `pickAtScreenCoords`, this reads the pick buffer for the hit and the
     /// pick depth buffer for the position. Thus it works for every structure type
-    /// in the pick pass. Returns None for the background.
+    /// in the pick pass. Returns None for the background. The position comes
+    /// from the camera of the frame of the pick buffer.
     pub(super) fn pick_world_position_at(&self, screen: glam::Vec2) -> Option<Vec3> {
         let engine = self.engine.as_ref()?;
+        let view = self.click_view()?;
         if screen.x < 0.0 || screen.y < 0.0 {
             return None;
         }
         let (x, y) = (screen.x as u32, screen.y as u32);
         self.gpu_pick_at(x, y)?;
         let depth = engine.pick_depth_at(x, y)?;
-        engine
-            .camera
-            .screen_depth_to_world(screen, depth, engine.width, engine.height)
+        view.camera
+            .screen_depth_to_world(screen, depth, view.width, view.height)
     }
 
     pub(super) fn screen_ray(

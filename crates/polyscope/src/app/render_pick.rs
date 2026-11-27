@@ -424,6 +424,7 @@ impl super::App {
             super::render_frame::encode_scene(engine, &mut encoder, &options, false);
             engine.queue.submit(std::iter::once(encoder.finish()));
             self.grid_pick_element_types = render_pick_pass(engine);
+            self.pick_view = self.prepared_pick_view.take();
         }
     }
 }

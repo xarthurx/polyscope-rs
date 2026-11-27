@@ -150,6 +150,27 @@ fn ray_cylinder_intersect(
     return true;
 }
 
+// Returns the point of the segment from `a` to `b` that is nearest to the
+// ray. `ray_dir` has unit length.
+fn segment_point_nearest_ray(
+    ray_origin: vec3<f32>,
+    ray_dir: vec3<f32>,
+    a: vec3<f32>,
+    b: vec3<f32>,
+) -> vec3<f32> {
+    let v = b - a;
+    let w0 = ray_origin - a;
+    let vv = dot(v, v);
+    let dv = dot(ray_dir, v);
+    let denom = vv - dv * dv;
+    var s = 0.0;
+    // A ray parallel to the segment, or a segment of zero length, takes `a`.
+    if (vv > 1e-12 && denom > 1e-8 * vv) {
+        s = (dot(w0, v) - dv * dot(w0, ray_dir)) / denom;
+    }
+    return a + clamp(s, 0.0, 1.0) * v;
+}
+
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
     @builtin(frag_depth) depth: f32,
@@ -188,8 +209,19 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         discard;
     }
 
-    // Compute depth
-    let clip_pos = camera.view_proj * vec4<f32>(hit_point, 1.0);
+    // The depth is the depth of what the scene draws: the tube surface where
+    // the ray hits the drawn tube, else the curve line (`pick.radius` is 0 for
+    // a curve that draws lines). Thus the wider pick cylinder does not cover
+    // nearer geometry in the pick buffer.
+    var depth_point = segment_point_nearest_ray(ray_origin, ray_dir, tail, tip);
+    var t_drawn: f32;
+    var drawn_point: vec3<f32>;
+    if (pick.radius > 0.0
+        && ray_cylinder_intersect(ray_origin, ray_dir, tail, tip, pick.radius,
+                                  &t_drawn, &drawn_point)) {
+        depth_point = drawn_point;
+    }
+    let clip_pos = camera.view_proj * vec4<f32>(depth_point, 1.0);
     out.depth = clip_pos.z / clip_pos.w;
 
     // Output encoded pick ID
