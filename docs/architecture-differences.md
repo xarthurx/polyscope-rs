@@ -68,9 +68,9 @@ A click takes the structure and the element from the pick buffer, as C++ does. T
 
 C++ can also pick vertices, edges, halfedges and corners of a surface mesh, and the nodes of a curve network.
 
-A slice plane under the cursor wins if it is nearer along the click ray. The pick depth at the center of the pixel gives the distance of the element, because the scene uses the same depth to decide what is in front. The click reads the pick depth only when a slice plane is under the cursor. A scroll or a drag can move the camera before the next frame. Thus a click and a double-click use a copy of the camera of the frame in the pick buffer.
+A slice plane under the cursor wins if it is nearer along the click ray. The pick depth at the center of the pixel gives the distance of the element, because the scene uses the same depth to decide what is in front. The scene draws the slice planes first, so a plane also wins if the element is nearer by less than the precision of the pick depth. The click reads the pick depth only when a slice plane is under the cursor. A scroll or a drag can move the camera before the next frame. Thus a click and a double-click use a copy of the camera of the frame in the pick buffer.
 
-The pick depth of a curve network is the depth that the window shows. Where the pick ray hits the drawn tube, it is the depth of the tube surface. Elsewhere, it is the depth of the curve line. The click area of a curve is wider than the drawn tube or line, so a thin curve is easy to select. Because of the depth, the click area does not cover a surface in front of the curve.
+The pick depth of a curve network is the depth that the window shows. Where the pick ray hits the drawn tube, it is the depth of the tube surface. Elsewhere, it is the depth of the curve line. A line along the view direction covers one point of the image, and its nearer end gives the depth there. The pick pass uses the render mode of its frame, so a switch between lines and tubes in the UI shows in the pick buffer of the same frame. The click area of a curve is wider than the drawn tube or line, so a thin curve is easy to select. Because of the depth, the click area does not cover a surface in front of the curve.
 
 ## Transparency Rendering
 

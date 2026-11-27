@@ -621,6 +621,22 @@ impl CurveNetwork {
         }
     }
 
+    /// Writes the tube radius of the tube pick for the render mode of the
+    /// frame.
+    ///
+    /// The frame preparation writes the radius of the tube. The pick pass
+    /// calls this method with the render mode that the scene passes of its
+    /// frame used. A curve in line mode draws no tube, so the method writes a
+    /// tube radius of 0, and the pick depth comes from the curve line.
+    pub fn write_tube_pick_render_mode(&self, queue: &wgpu::Queue) {
+        if self.render_mode != 1
+            && let Some(buffer) = &self.tube_pick_uniform_buffer
+        {
+            let offset = std::mem::offset_of!(TubePickUniforms, radius) as u64;
+            queue.write_buffer(buffer, offset, bytemuck::bytes_of(&0.0_f32));
+        }
+    }
+
     /// Updates pick uniforms (e.g., when radius changes).
     ///
     /// `scene_length_scale` is the length scale of the full scene.
@@ -637,15 +653,12 @@ impl CurveNetwork {
 
         // Also update tube pick uniforms if initialized
         if let Some(buffer) = &self.tube_pick_uniform_buffer {
-            // A minimum radius makes thin curves easier to select.
-            let min_pick_radius = 0.01 * scene_length_scale;
-            // The pick depth comes from the drawn tube. A curve in line mode
-            // draws no tube, so its radius only widens the click area, as before.
-            let (radius, min_pick_radius) = if self.render_mode == 1 {
-                (radius, min_pick_radius)
-            } else {
-                (0.0, radius.max(min_pick_radius))
-            };
+            // A minimum radius makes thin curves easier to select. The click
+            // area is at least as wide as the tube, in both render modes.
+            let min_pick_radius = radius.max(0.01 * scene_length_scale);
+            // For a curve in line mode, the pick pass writes 0 as the tube
+            // radius, with the render mode of its frame. See
+            // `write_tube_pick_render_mode`.
             let tube_pick_uniforms = TubePickUniforms {
                 global_start: self.global_start,
                 radius,

@@ -100,8 +100,8 @@ pub struct TubePickUniforms {
     /// buffer shows what the window shows.
     pub radius: f32,
     /// Smallest radius of the click area, so that thin curves are easy to
-    /// select. A curve that draws lines puts the radius of its tube here, so
-    /// its click area stays as wide as the tube.
+    /// select. It is at least the radius of the tube, also for a curve that
+    /// draws lines.
     pub min_pick_radius: f32,
     /// Padding to align to 16 bytes.
     pub _padding: f32,

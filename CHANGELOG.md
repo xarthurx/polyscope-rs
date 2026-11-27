@@ -37,12 +37,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A click and a double-click used the live camera with the pick buffer of the
   last frame. A scroll or a drag before the next frame could then change
   their result. They now use the camera of the frame in the pick buffer.
+- A face in the plane of a slice plane could win a click over the plane,
+  because of the rounding of the pick depth. The window shows the plane
+  there. The plane now wins if the face is nearer by less than the precision
+  of the pick depth.
 
 ### Documentation
 - Feature Status lists that the pick shaders ignore slice planes, so a click
   can select an element that a slice plane hides.
 - Architecture Differences states where the picks of camera views and volume
   grids differ from C++ Polyscope.
+- Feature Status lists two more pick limits: the click area past a tube end,
+  and a click before the first frame after a window resize.
 
 ## [0.6.2] - 2026-11-26
 

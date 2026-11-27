@@ -152,23 +152,30 @@ fn ray_cylinder_intersect(
 
 // Returns the point of the segment from `a` to `b` that is nearest to the
 // ray. `ray_dir` has unit length.
+//
+// The parameter comes from the parts of the segment ends across the ray, so
+// it stays accurate for a segment that is almost parallel to the ray. A
+// segment parallel to the ray covers one point of the image, and its nearer
+// end is in front there. The result does not depend on the order of the ends.
 fn segment_point_nearest_ray(
     ray_origin: vec3<f32>,
     ray_dir: vec3<f32>,
     a: vec3<f32>,
     b: vec3<f32>,
 ) -> vec3<f32> {
+    let a_rel = a - ray_origin;
+    let b_rel = b - ray_origin;
+    let a_along = dot(a_rel, ray_dir);
+    let b_along = dot(b_rel, ray_dir);
+    let a_across = a_rel - a_along * ray_dir;
+    let v_across = (b_rel - b_along * ray_dir) - a_across;
+    let vv_across = dot(v_across, v_across);
     let v = b - a;
-    let w0 = ray_origin - a;
-    let vv = dot(v, v);
-    let dv = dot(ray_dir, v);
-    let denom = vv - dv * dv;
-    var s = 0.0;
-    // A ray parallel to the segment, or a segment of zero length, takes `a`.
-    if (vv > 1e-12 && denom > 1e-8 * vv) {
-        s = (dot(w0, v) - dv * dot(w0, ray_dir)) / denom;
+    if (vv_across <= 1e-12 * dot(v, v)) {
+        return select(a, b, b_along < a_along);
     }
-    return a + clamp(s, 0.0, 1.0) * v;
+    let s = clamp(-dot(a_across, v_across) / vv_across, 0.0, 1.0);
+    return a + s * v;
 }
 
 struct FragmentOutput {

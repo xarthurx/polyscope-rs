@@ -394,9 +394,12 @@ impl App {
             (None, element, _) => element,
             // The element wins only if it is nearer than the slice plane.
             (Some((plane_name, plane_t)), Some(element), Some((origin, dir))) => {
+                // The scene draws the slice planes first and the structures
+                // with a "less" depth test, so a plane wins a tie. The element
+                // wins only if it is nearer by more than the depth precision.
                 let nearer = self
                     .pick_depth_distance(&view, pixel, origin, dir)
-                    .is_some_and(|t| t < plane_t);
+                    .is_some_and(|(t, precision)| t + precision < plane_t);
                 Some(if nearer {
                     element
                 } else {
@@ -451,21 +454,34 @@ impl App {
     }
 
     /// Returns the distance along the click ray of the surface in the pick
-    /// depth buffer at a pixel center. The scene draws with the same depth, so
-    /// the distance decides what the window shows in front.
+    /// depth buffer at a pixel center, and the precision of that distance.
+    /// The scene draws with the same depth, so the distance decides what the
+    /// window shows in front.
+    ///
+    /// The precision is the distance that one step of the f32 depth makes
+    /// there. Surfaces that are nearer to each other than this can draw in
+    /// either order.
     fn pick_depth_distance(
         &self,
         view: &PickView,
         pixel: glam::Vec2,
         ray_origin: Vec3,
         ray_dir: Vec3,
-    ) -> Option<f32> {
+    ) -> Option<(f32, f32)> {
         let engine = self.engine.as_ref()?;
         let depth = engine.pick_depth_at(pixel.x as u32, pixel.y as u32)?;
-        let position = view
-            .camera
-            .screen_depth_to_world(pixel, depth, view.width, view.height)?;
-        Some((position - ray_origin).dot(ray_dir))
+        let distance = |sample: f32| {
+            view.camera
+                .screen_depth_to_world(pixel, sample, view.width, view.height)
+                .map(|position| (position - ray_origin).dot(ray_dir))
+        };
+        let t = distance(depth)?;
+        let step = f32::EPSILON * depth.abs().max(f32::MIN_POSITIVE);
+        let precision = match (distance(depth - step), distance(depth + step)) {
+            (Some(nearer), Some(farther)) => 0.5 * (farther - nearer).abs(),
+            _ => 0.0,
+        };
+        Some((t, precision))
     }
 
     /// Returns the world position of the structure at a screen position.

@@ -358,6 +358,8 @@ These features exist in both libraries but behave differently.
 - **Tone mapping values.** Exposure, white level and gamma are not part of `Options` or of a saved view. Only the Tone Mapping panel sets them.
 - **Changes from another thread during a frame.** The scene passes and the pick pass read the registry under separate locks. If another thread hides, shows, removes or updates a structure between them, the pick buffer of that frame and the window can differ. The next frame shows the change in both. A transform change does not cause this, because the pick pass uses the pick uniforms that the frame preparation writes together with the render uniforms.
 - **Picks ignore slice planes.** The pick shaders draw points, curve networks, camera views and surface meshes also where a slice plane hides them. A click or a double-click there can select or center on a hidden element. C++ applies the slice planes in the pick shaders too. Volume meshes are not affected: a slice plane removes whole cells from the render data that the pick pass draws. Gridcubes ignore slice planes in the scene as well.
+- **The click area past a tube end.** The click area of a tube reaches half a tube radius past each end. There, the pick depth comes from a longer tube. Outside the node sphere at the end, a click can select the tube where the window shows a surface just behind it.
+- **A click right after a window resize.** A resize makes new, empty pick buffers. A click before the next frame finds no element, so it clears the selection, as a click on the background does.
 
 ---
 

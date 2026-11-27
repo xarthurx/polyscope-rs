@@ -180,6 +180,7 @@ fn assign_pick_ranges(engine: &mut RenderEngine, ctx: &mut Context) -> GridPickE
             if let Some(count) = cn.render_data().map(|rd| rd.num_edges) {
                 let start = engine.assign_pick_range("CurveNetwork", &name, count);
                 cn.write_pick_global_start(&engine.queue, start);
+                cn.write_tube_pick_render_mode(&engine.queue);
             }
         } else if let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>() {
             if cv.pick_bind_group().is_some()

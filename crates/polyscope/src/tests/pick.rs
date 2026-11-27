@@ -969,3 +969,166 @@ fn test_click_selection_checks_the_element() {
     let selection = app.selection.as_ref().expect("selection of point 0");
     assert_eq!(selection.element_index, 0);
 }
+
+/// A curve that the UI switches from lines to tubes after the frame
+/// preparation draws a tube in that frame. The pick pass of the frame takes
+/// its depth from the drawn tube too.
+#[test]
+fn test_tube_switch_in_a_frame_is_picked_as_a_tube() {
+    use polyscope_render::PickElementType;
+
+    let _guard = setup();
+    register_point_cloud("switch_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping tube switch test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+    let (right, up, back) = (
+        view.row(0).truncate(),
+        view.row(1).truncate(),
+        view.row(2).truncate(),
+    );
+    let at = |x: f32, y: f32| right * x + up * y;
+    let square = vec![at(-0.8, 0.3), at(-0.3, 0.3), at(-0.3, 0.8), at(-0.8, 0.8)];
+    register_surface_mesh("switch_square", square, vec![vec![0, 1, 2, 3]]);
+    // The curve axis is 0.02 behind the square. A tube of radius 0.05 comes
+    // 0.03 in front of the square.
+    let behind = -back * 0.02;
+    register_curve_network(
+        "switch_curve",
+        vec![at(-1.0, 0.55) + behind, at(-0.1, 0.55) + behind],
+        vec![[0, 1]],
+    );
+    with_curve_network("switch_curve", |cn| {
+        cn.set_radius(0.05, false);
+    });
+    app.render_pick_frame();
+    let square_hit = Some(structure_hit(
+        "SurfaceMesh",
+        "switch_square",
+        0,
+        PickElementType::Face,
+    ));
+    assert_eq!(click_at_position(app, at(-0.55, 0.55)), square_hit);
+
+    // The UI shows the tube after the frame preparation.
+    app.render_pick_frame_with(|| {
+        with_curve_network("switch_curve", |cn| {
+            cn.set_render_mode(1);
+        });
+    });
+    assert_eq!(
+        click_at_position(app, at(-0.55, 0.55)),
+        Some(structure_hit(
+            "CurveNetwork",
+            "switch_curve",
+            0,
+            PickElementType::Edge
+        ))
+    );
+}
+
+/// A curve line along the view direction covers one point of the image. Its
+/// pick depth there is the depth of its nearer end, in both edge orders.
+#[test]
+fn test_end_on_line_is_picked_at_its_nearer_end() {
+    use polyscope_render::{PickElementType, ProjectionMode};
+
+    let _guard = setup();
+    register_point_cloud("end_on_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping end-on line test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    // An orthographic view along -z, so the pick rays are parallel to the lines.
+    {
+        let camera = &mut app.engine.as_mut().expect("engine").camera;
+        camera.position = Vec3::new(0.0, 0.0, 5.0);
+        camera.target = Vec3::ZERO;
+        camera.up = Vec3::Y;
+        camera.ortho_scale = 1.5;
+        camera.set_projection_mode(ProjectionMode::Orthographic);
+    }
+    // A square at z = 0, between the ends of two lines along z. The first
+    // line starts at its near end, the second at its far end.
+    let square = vec![
+        Vec3::new(-1.0, -0.4, 0.0),
+        Vec3::new(1.0, -0.4, 0.0),
+        Vec3::new(1.0, 0.4, 0.0),
+        Vec3::new(-1.0, 0.4, 0.0),
+    ];
+    register_surface_mesh("end_on_square", square, vec![vec![0, 1, 2, 3]]);
+    let lines = [
+        ("end_on_near_first", -0.5, [0.5, -0.5]),
+        ("end_on_far_first", 0.5, [-0.5, 0.5]),
+    ];
+    for (name, x, [z0, z1]) in lines {
+        register_curve_network(
+            name,
+            vec![Vec3::new(x, 0.0, z0), Vec3::new(x, 0.0, z1)],
+            vec![[0, 1]],
+        );
+        with_curve_network(name, |cn| {
+            cn.set_radius(0.05, false);
+        });
+    }
+    app.render_pick_frame();
+
+    for (name, x, _) in lines {
+        assert_eq!(
+            click_at_position(app, Vec3::new(x, 0.0, 0.0)),
+            Some(structure_hit(
+                "CurveNetwork",
+                name,
+                0,
+                PickElementType::Edge
+            )),
+            "the near end of {name} is in front of the square"
+        );
+    }
+}
+
+/// A slice plane wins a click on a face in its own plane. The scene draws the
+/// slice planes first, and a face at the same depth does not cover the plane.
+#[test]
+fn test_slice_plane_wins_a_tie_with_a_face() {
+    use crate::app::ClickHit;
+
+    let _guard = setup();
+    register_point_cloud("tie_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping slice plane tie test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+    let (right, up, back) = (
+        view.row(0).truncate(),
+        view.row(1).truncate(),
+        view.row(2).truncate(),
+    );
+    let at = |x: f32, y: f32| right * x + up * y;
+    let square = vec![at(-0.8, 0.3), at(-0.3, 0.3), at(-0.3, 0.8), at(-0.8, 0.8)];
+    register_surface_mesh("tie_square", square, vec![vec![0, 1, 2, 3]]);
+    // The slice plane goes through the square and faces the camera.
+    let target = at(-0.55, 0.55);
+    add_slice_plane_with_pose("tie_plane", target, back).set_plane_size(1.0);
+    app.render_pick_frame();
+
+    let plane = Some(ClickHit::Plane("tie_plane".to_owned()));
+    for dx in [-0.2, -0.1, 0.0, 0.1, 0.2] {
+        for dy in [-0.2, -0.1, 0.0, 0.1, 0.2] {
+            let p = target + right * dx + up * dy;
+            assert_eq!(click_at_position(app, p), plane, "click at ({dx}, {dy})");
+        }
+    }
+}
