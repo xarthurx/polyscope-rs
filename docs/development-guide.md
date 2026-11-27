@@ -121,18 +121,20 @@ Global state is managed via `OnceLock<RwLock<Context>>`:
 
 The windowed frame in `app/render.rs` follows this order:
 
-1. Pick pass (GPU picking; a click reads one pixel of it)
-2. Compute pass for curve network tubes
-3. Shadow map pass (surface meshes)
-4. Slice plane visualization
-5. Ground plane (stencil, ground, reflected structures)
-6. Depth prepass of surface meshes (Pretty transparency only)
-7. Main geometry pass (points, curves, vectors, camera views)
-8. Surface mesh and volume mesh pass (HDR color + normal G-buffer), with volume grid isosurfaces and gridcubes
-9. Depth peel transparency (multi-pass, Pretty transparency only)
-10. SSAO (only with an SSAA factor of 1)
-11. Tone mapping (with the SSAA downsample)
-12. egui overlay
+1. Compute pass for curve network tubes
+2. Shadow map pass (surface meshes)
+3. Slice plane visualization
+4. Ground plane (stencil, ground, reflected structures)
+5. Depth prepass of surface meshes (Pretty transparency only)
+6. Main geometry pass (points, curves, vectors, camera views)
+7. Surface mesh and volume mesh pass (HDR color + normal G-buffer), with volume grid isosurfaces and gridcubes
+8. Depth peel transparency (multi-pass, Pretty transparency only)
+9. SSAO (only with an SSAA factor of 1)
+10. Tone mapping (with the SSAA downsample)
+11. egui overlay
+12. Pick pass (GPU picking; a click reads one pixel of it)
+
+The pick pass comes last, so it uses the uniforms and the tube geometry of the image on the screen. The frame preparation writes the pick uniforms together with the render uniforms; the pick pass writes only the first pick index of each structure.
 
 ## API Patterns
 

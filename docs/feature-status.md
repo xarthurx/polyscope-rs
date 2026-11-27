@@ -357,6 +357,7 @@ These features exist in both libraries but behave differently.
 - **Pretty mode non-linear opacity.** Depth peeling renders both faces of closed meshes. The effective alpha is `2a - a^2`. C++ Polyscope gives the same result.
 - **Tone mapping values.** Exposure, white level and gamma are not part of `Options` or of a saved view. Only the Tone Mapping panel sets them.
 - **Changes from another thread during a frame.** The scene passes and the pick pass read the registry under separate locks. If another thread hides, shows, removes or updates a structure between them, the pick buffer of that frame and the window can differ. The next frame shows the change in both. A transform change does not cause this, because the pick pass uses the pick uniforms that the frame preparation writes together with the render uniforms.
+- **Picks ignore slice planes.** The pick shaders draw points, curve networks, camera views and surface meshes also where a slice plane hides them. A click or a double-click there can select or center on a hidden element. C++ applies the slice planes in the pick shaders too. Volume meshes are not affected: a slice plane removes whole cells from the render data that the pick pass draws. Gridcubes ignore slice planes in the scene as well.
 
 ---
 

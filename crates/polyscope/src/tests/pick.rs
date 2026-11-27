@@ -418,13 +418,13 @@ fn structure_hit(
     name: &str,
     element_index: u32,
     element_type: polyscope_render::PickElementType,
-) -> Option<crate::app::ClickHit> {
-    Some(crate::app::ClickHit::Structure {
+) -> crate::app::ClickHit {
+    crate::app::ClickHit::Structure {
         type_name: type_name.to_owned(),
         name: name.to_owned(),
         element_index,
         element_type,
-    })
+    }
 }
 
 /// Tone maps the scene of the last frame and reads its RGBA pixels.
@@ -478,10 +478,24 @@ fn test_click_reports_mesh_faces_and_cells() {
     register_tet_mesh("click_tets", vertices, vec![[0, 1, 2, 3], [4, 5, 6, 7]]);
     app.render_pick_frame();
 
-    let face = |index| structure_hit("SurfaceMesh", "click_square", index, PickElementType::Face);
+    let face = |index| {
+        Some(structure_hit(
+            "SurfaceMesh",
+            "click_square",
+            index,
+            PickElementType::Face,
+        ))
+    };
     assert_eq!(click_at_position(app, at(-0.7, 0.7)), face(1));
     assert_eq!(click_at_position(app, at(-0.4, 0.4)), face(0));
-    let cell = |index| structure_hit("VolumeMesh", "click_tets", index, PickElementType::Cell);
+    let cell = |index| {
+        Some(structure_hit(
+            "VolumeMesh",
+            "click_tets",
+            index,
+            PickElementType::Cell,
+        ))
+    };
     assert_eq!(click_at_position(app, at(0.75, 0.45)), cell(1));
     assert_eq!(click_at_position(app, at(0.35, 0.45)), cell(0));
 }
@@ -597,15 +611,29 @@ fn test_pick_pass_uses_the_transform_of_the_scene() {
     let reference = capture_scene(app);
 
     let view = app.engine.as_ref().expect("engine").camera.view_matrix();
-    let (right, up) = (view.row(0).truncate(), view.row(1).truncate());
+    let (right, up, back) = (
+        view.row(0).truncate(),
+        view.row(1).truncate(),
+        view.row(2).truncate(),
+    );
     let old = up * 0.5 - right * 0.5;
     let new = up * 0.5 + right * 0.5;
     register_point_cloud("move_point", vec![old]);
     with_point_cloud("move_point", |pc| pc.set_point_radius(0.1));
+    // A tetrahedron below the point. Its center is inside its outline.
+    let old_tet = -right * 0.5;
+    let tet = vec![
+        old_tet - right * 0.12 - up * 0.1,
+        old_tet + right * 0.12 - up * 0.1,
+        old_tet + up * 0.15,
+        old_tet + back * 0.1,
+    ];
+    register_tet_mesh("move_tet", tet, vec![[0, 1, 2, 3]]);
     app.render_pick_frame();
 
     app.render_pick_frame_with(|| {
         set_point_cloud_transform("move_point", Mat4::from_translation(new - old));
+        set_volume_mesh_transform("move_tet", Mat4::from_translation(new - old));
     });
     let image = capture_scene(app);
     let engine = app.engine.as_ref().expect("engine");
@@ -617,13 +645,183 @@ fn test_pick_pass_uses_the_transform_of_the_scene() {
     // The scene of this frame shows the point at the old position.
     assert_ne!(color(&image, old), color(&reference, old));
     assert_eq!(color(&image, new), color(&reference, new));
-    // The pick buffer of this frame shows it there too.
+    // The pick buffer of this frame shows it there too, and the tetrahedron.
     let point = Some(("PointCloud".to_owned(), "move_point".to_owned(), 0));
     assert_eq!(pick_at_position(app, old), point);
     assert_ne!(pick_at_position(app, new), point);
+    let cell = Some(("VolumeMesh".to_owned(), "move_tet".to_owned(), 0));
+    let new_tet = old_tet + (new - old);
+    assert_eq!(pick_at_position(app, old_tet), cell);
+    assert_ne!(pick_at_position(app, new_tet), cell);
 
     // The next frame shows the new position in both.
     app.render_pick_frame();
     assert_eq!(pick_at_position(app, new), point);
     assert_ne!(pick_at_position(app, old), point);
+    assert_eq!(pick_at_position(app, new_tet), cell);
+}
+
+/// The pick uniforms of a gridcube quantity follow its render uniforms in
+/// every mode. Gridcubes that the UI shows again after an isosurface are
+/// picked where the scene draws them.
+#[test]
+fn test_gridcubes_after_an_isosurface_are_picked_in_place() {
+    use crate::app::ClickHit;
+    use polyscope_structures::volume_grid::VolumeGridNodeScalarQuantity;
+
+    let _guard = setup();
+    register_point_cloud("mode_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let name = unique_name("mode_grid");
+    let grid = register_volume_grid(
+        &name,
+        glam::UVec3::splat(3),
+        Vec3::new(-0.9, -0.3, -0.3),
+        Vec3::new(-0.3, 0.3, 0.3),
+    );
+    grid.add_node_scalar_quantity("height", vec![1.0; 27]);
+    with_volume_grid(&name, |vg| enable_quantity(vg, "height"));
+    let set_mode = |mode| {
+        with_volume_grid(&name, |vg| {
+            for quantity in vg.quantities_mut() {
+                if let Some(nsq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                {
+                    nsq.set_viz_mode(mode);
+                }
+            }
+        });
+    };
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping gridcube mode test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    // The grid moves to the right while it shows an isosurface.
+    set_mode(VolumeGridVizMode::Isosurface);
+    let shift = Vec3::new(1.2, 0.0, 0.0);
+    with_volume_grid(&name, |vg| vg.set_transform(Mat4::from_translation(shift)));
+    app.render_pick_frame();
+
+    // The UI shows the gridcubes again after the frame preparation.
+    app.render_pick_frame_with(|| set_mode(VolumeGridVizMode::Gridcube));
+    match click_at_position(app, Vec3::new(-0.6, 0.0, 0.0) + shift) {
+        Some(ClickHit::Structure {
+            type_name,
+            name: hit_name,
+            ..
+        }) if type_name == "VolumeGrid" => assert_eq!(hit_name, name),
+        other => panic!("no gridcube at the moved grid center: {other:?}"),
+    }
+}
+
+/// A gridcube click reports the element type of the frame that the window
+/// shows, also if the quantities of the grid change before the click.
+#[test]
+fn test_gridcube_click_keeps_the_element_type_of_the_frame() {
+    use crate::app::ClickHit;
+    use polyscope_render::PickElementType;
+    use polyscope_structures::volume_grid::VolumeGridNodeScalarQuantity;
+
+    let _guard = setup();
+    let name = unique_name("removal_grid");
+    let grid = register_volume_grid(
+        &name,
+        glam::UVec3::splat(4),
+        Vec3::splat(-0.4),
+        Vec3::splat(0.4),
+    );
+    // Quantity 0 shows an isosurface, so the pick buffer shows the cell
+    // gridcubes of quantity 1.
+    grid.add_node_scalar_quantity("height", vec![1.0; 64]);
+    grid.add_cell_scalar_quantity("density", vec![1.0; 27]);
+    with_volume_grid(&name, |vg| {
+        for quantity in vg.quantities_mut() {
+            quantity.set_enabled(true);
+            if let Some(nsq) = quantity
+                .as_any_mut()
+                .downcast_mut::<VolumeGridNodeScalarQuantity>()
+            {
+                nsq.set_viz_mode(VolumeGridVizMode::Isosurface);
+            }
+        }
+    });
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping gridcube element type test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    // After the frame, the node quantity goes, and the cell quantity becomes quantity 0.
+    with_volume_grid(&name, |vg| {
+        vg.remove_quantity("height");
+    });
+    match click_at_position(app, Vec3::ZERO) {
+        Some(ClickHit::Structure {
+            type_name,
+            element_index,
+            element_type,
+            ..
+        }) if type_name == "VolumeGrid" => {
+            assert_eq!(element_type, PickElementType::Cell);
+            assert_eq!(element_index % 9, 4, "cell {element_index}");
+        }
+        other => panic!("no gridcube at the grid center: {other:?}"),
+    }
+}
+
+/// A slice plane under the cursor wins if it is nearer than the element in
+/// the pick buffer, and loses if it is behind the element. The clicks are at
+/// the corner of a pixel, so they test that the plane test and the pick depth
+/// use the same pixel center.
+#[test]
+fn test_click_compares_slice_planes_with_the_pick_depth() {
+    use crate::app::ClickHit;
+    use polyscope_render::PickElementType;
+
+    let _guard = setup();
+    register_point_cloud("plane_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping slice plane click test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+
+    let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+    let (right, up, back) = (
+        view.row(0).truncate(),
+        view.row(1).truncate(),
+        view.row(2).truncate(),
+    );
+    let at = |x: f32, y: f32| right * x + up * y;
+    let square = vec![at(-0.8, 0.3), at(-0.3, 0.3), at(-0.3, 0.8), at(-0.8, 0.8)];
+    register_surface_mesh("plane_square", square, vec![vec![0, 1, 2, 3]]);
+    let target = at(-0.55, 0.55);
+    let click = |app: &app::App| {
+        let (x, y) = pixel_of(app.engine.as_ref().expect("engine"), target);
+        app.click_hit_at(glam::Vec2::new(x as f32, y as f32))
+    };
+
+    // A slice plane behind the square. The square stays on its visible side.
+    add_slice_plane_with_pose("plane_behind", target - back * 0.3, back).set_plane_size(1.0);
+    app.render_pick_frame();
+    assert_eq!(
+        click(app),
+        Some(structure_hit(
+            "SurfaceMesh",
+            "plane_square",
+            0,
+            PickElementType::Face
+        ))
+    );
+    remove_slice_plane("plane_behind");
+
+    // A slice plane in front of the square.
+    add_slice_plane_with_pose("plane_front", target + back * 0.3, -back).set_plane_size(1.0);
+    app.render_pick_frame();
+    assert_eq!(click(app), Some(ClickHit::Plane("plane_front".to_owned())));
 }

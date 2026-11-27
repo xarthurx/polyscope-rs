@@ -10,12 +10,12 @@
 //! structure where the window shows it, also if another thread moves a
 //! structure during the frame.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::{CameraView, CurveNetwork, PointCloud, Structure, SurfaceMesh, VolumeGrid, VolumeMesh};
 use polyscope_core::Context;
 use polyscope_core::structure::HasQuantities;
-use polyscope_render::RenderEngine;
+use polyscope_render::{PickElementType, RenderEngine};
 use polyscope_structures::volume_grid::{
     VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,
 };
@@ -112,6 +112,11 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
     });
 }
 
+/// The element type of each volume grid quantity range of a pick pass, by
+/// grid name and quantity index: a cell for a cell quantity, and a node
+/// (shown as a vertex) for a node quantity.
+pub(super) type GridPickElementTypes = HashMap<(String, usize), PickElementType>;
+
 /// Renders the pick pass of a window frame.
 ///
 /// The window runs it after the scene passes of the frame, so it uses the
@@ -120,11 +125,15 @@ pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
 /// writes the first pick index of each owner and draws. Thus another thread
 /// cannot change the registry between these steps, and the pick buffer always
 /// matches the pick ranges of the frame.
-pub(super) fn render_pick_pass(engine: &mut RenderEngine) {
+///
+/// Returns the element type of each gridcube range, so that a click reports
+/// the type of the frame that it sees, also if the quantities change later.
+pub(super) fn render_pick_pass(engine: &mut RenderEngine) -> GridPickElementTypes {
     crate::with_context_mut(|ctx| {
-        assign_pick_ranges(engine, ctx);
+        let grid_types = assign_pick_ranges(engine, ctx);
         draw_pick_owners(engine, ctx);
-    });
+        grid_types
+    })
 }
 
 /// Gives the pick ranges of the frame to the visible owners with pick
@@ -136,8 +145,9 @@ pub(super) fn render_pick_pass(engine: &mut RenderEngine) {
 /// structure gets no range, so it cannot use up the indices of visible
 /// structures. Only the first pick index is written: the other pick uniforms
 /// come from the frame preparation.
-fn assign_pick_ranges(engine: &mut RenderEngine, ctx: &mut Context) {
+fn assign_pick_ranges(engine: &mut RenderEngine, ctx: &mut Context) -> GridPickElementTypes {
     engine.clear_pick_ranges();
+    let mut grid_types = GridPickElementTypes::new();
     let visible: HashSet<(&'static str, String)> = ctx
         .registry
         .iter()
@@ -196,6 +206,7 @@ fn assign_pick_ranges(engine: &mut RenderEngine, ctx: &mut Context) {
                         let start =
                             engine.assign_quantity_pick_range("VolumeGrid", &name, index, count);
                         nsq.write_pick_global_start(&engine.queue, start);
+                        grid_types.insert((name.clone(), index), PickElementType::Vertex);
                     }
                 } else if let Some(csq) = quantity
                     .as_any_mut()
@@ -206,6 +217,7 @@ fn assign_pick_ranges(engine: &mut RenderEngine, ctx: &mut Context) {
                     let start =
                         engine.assign_quantity_pick_range("VolumeGrid", &name, index, count);
                     csq.write_pick_global_start(&engine.queue, start);
+                    grid_types.insert((name.clone(), index), PickElementType::Cell);
                 }
             }
         } else if let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>()
@@ -216,6 +228,7 @@ fn assign_pick_ranges(engine: &mut RenderEngine, ctx: &mut Context) {
             vm.write_pick_global_start(&engine.queue, start);
         }
     }
+    grid_types
 }
 
 /// Returns whether an owner draws with the pick range of this frame.
@@ -410,7 +423,7 @@ impl super::App {
                     });
             super::render_frame::encode_scene(engine, &mut encoder, &options, false);
             engine.queue.submit(std::iter::once(encoder.finish()));
-            render_pick_pass(engine);
+            self.grid_pick_element_types = render_pick_pass(engine);
         }
     }
 }

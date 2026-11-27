@@ -16,9 +16,9 @@ use polyscope_structures::volume_grid::{
 /// name, vertices and triangles.
 pub(super) type IsosurfaceMesh = (String, Vec<Vec3>, Vec<[u32; 3]>);
 
-/// Returns whether a structure is a volume grid with an enabled quantity that
-/// shows gridcubes.
-fn has_enabled_gridcubes(structure: &dyn Structure) -> bool {
+/// Returns whether a structure is a volume grid with an enabled scalar
+/// quantity, which can show gridcubes.
+fn has_enabled_grid_scalars(structure: &dyn Structure) -> bool {
     structure
         .as_any()
         .downcast_ref::<VolumeGrid>()
@@ -26,9 +26,7 @@ fn has_enabled_gridcubes(structure: &dyn Structure) -> bool {
             vg.quantities().iter().any(|q| {
                 q.is_enabled()
                     && (q.as_any().is::<VolumeGridCellScalarQuantity>()
-                        || q.as_any()
-                            .downcast_ref::<VolumeGridNodeScalarQuantity>()
-                            .is_some_and(|nsq| nsq.viz_mode() == VolumeGridVizMode::Gridcube))
+                        || q.as_any().is::<VolumeGridNodeScalarQuantity>())
             })
         })
 }
@@ -53,11 +51,12 @@ pub(super) fn init_volume_grid_quantities(
         // The gridcube pick pipeline exists before the first gridcube pick resources.
         if interactive
             && !engine.has_gridcube_pick_pipeline()
-            && ctx.registry.iter().any(has_enabled_gridcubes)
+            && ctx.registry.iter().any(has_enabled_grid_scalars)
         {
             engine.init_gridcube_pick_pipeline();
         }
         let engine = &*engine;
+        let make_pick_resources = interactive && engine.has_gridcube_pick_pipeline();
 
         for structure in ctx.registry.iter_mut() {
             if structure.type_name() == "VolumeGrid"
@@ -164,11 +163,10 @@ pub(super) fn init_volume_grid_quantities(
                             };
                             rd.update_uniforms(&engine.queue, &uniforms);
                         }
-                        // The window picks the gridcubes of gridcube mode.
-                        if interactive
-                            && nsq.viz_mode() == VolumeGridVizMode::Gridcube
-                            && nsq.gridcube_render_data().is_some()
-                        {
+                        // The pick uniforms follow the render uniforms in every
+                        // mode, so they are current when the UI switches the
+                        // quantity back to gridcubes.
+                        if make_pick_resources && nsq.gridcube_render_data().is_some() {
                             if nsq.pick_bind_group().is_none() {
                                 let start = nsq.pick_global_start();
                                 nsq.init_pick_resources(
@@ -277,7 +275,7 @@ pub(super) fn init_volume_grid_quantities(
                             };
                             rd.update_uniforms(&engine.queue, &uniforms);
                         }
-                        if interactive && csq.gridcube_render_data().is_some() {
+                        if make_pick_resources && csq.gridcube_render_data().is_some() {
                             if csq.pick_bind_group().is_none() {
                                 let start = csq.pick_global_start();
                                 csq.init_pick_resources(

@@ -1251,10 +1251,10 @@ impl Structure for VolumeMesh {
 
     fn set_transform(&mut self, transform: Mat4) {
         self.transform = transform;
+        // The culled cells depend on the transform, so the next frame culls
+        // them again. New render data drops the pick resources. Until then,
+        // the pick resources match the render data that the scene draws.
         self.culling_plane_cache = None;
-        // Invalidate pick resources since cell culling may change
-        self.pick_bind_group = None;
-        self.pick_cell_index_buffer = None;
     }
 
     fn is_enabled(&self) -> bool {

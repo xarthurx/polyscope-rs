@@ -61,7 +61,7 @@ The frame preparation creates the pick resources and writes the pick uniforms (m
 
 The pick depth gives the world position of the hit. A double-click uses it to set the view center on any structure type.
 
-A click takes the structure and the element from the pick buffer, as in C++: a point, a face of a surface mesh, an edge of a curve network or of a camera view wireframe, a cell of a volume mesh, and a node or a cell of a volume grid (from the gridcube quantity). A slice plane under the cursor wins if it is nearer along the click ray. The pick depth gives the distance of the element; points and curve network edges use an exact ray test. C++ can also pick vertices, edges, halfedges and corners of a surface mesh, and the nodes of a curve network.
+A click takes the structure and the element from the pick buffer, as in C++: a point, a face of a surface mesh, an edge of a curve network or of a camera view wireframe, a cell of a volume mesh, and a node or a cell of a volume grid (from the gridcube quantity). A slice plane under the cursor wins if it is nearer along the click ray. The pick depth at the center of the pixel gives the distance of the element, because the scene uses the same depth to decide what is in front. The click reads the pick depth only when a slice plane is under the cursor. C++ can also pick vertices, edges, halfedges and corners of a surface mesh, and the nodes of a curve network.
 
 ## Transparency Rendering
 

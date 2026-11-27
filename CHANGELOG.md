@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for one frame a tube was picked at its old place or with its old radius. The
   pick pass now runs after the scene passes, which make this geometry.
 
+### Documentation
+- Feature Status lists that the pick shaders ignore slice planes, so a click
+  can select an element that a slice plane hides.
+
 ## [0.6.2] - 2026-11-26
 
 ### Added
