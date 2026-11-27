@@ -71,6 +71,16 @@ pub struct App {
     pub(super) pending_pick: Option<picking::PendingPick>,
     // GPU picking - selected element index (from GPU pick)
     pub(super) selected_element_index: Option<u32>,
+    // GPU picking - the element type of each volume grid quantity range of the
+    // last pick pass, so a click reports the type of the displayed frame
+    pub(super) grid_pick_element_types: render_pick::GridPickElementTypes,
+    // GPU picking - the camera and the image size of the camera uniforms that
+    // the frame preparation wrote. The pick pass of the frame draws with them.
+    pub(super) prepared_pick_view: Option<picking::PickView>,
+    // GPU picking - the camera and the image size of the frame in the pick
+    // buffer. A click uses them, because input can move the camera before the
+    // next frame.
+    pub(super) pick_view: Option<picking::PickView>,
     // Screenshot state
     pub(super) screenshot_pending: Option<String>,
     pub(super) screenshot_counter: u32,
@@ -131,6 +141,9 @@ impl App {
             last_left_click_screen_pos: None,
             pending_pick: None,
             selected_element_index: None,
+            grid_pick_element_types: render_pick::GridPickElementTypes::new(),
+            prepared_pick_view: None,
+            pick_view: None,
             screenshot_pending: None,
             screenshot_counter: 0,
             camera_settings: polyscope_ui::CameraSettings::default(),

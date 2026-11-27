@@ -96,7 +96,7 @@ A dash (—) means that C++ Polyscope also has no such quantity on the structure
 |---------|--------|-------|
 | Mouse navigation | Partial | Rotate, pan, zoom and view center. No Ctrl+Shift+drag zoom and no Shift+scroll clip-plane shift. |
 | Click selection | Full | The C++ click rules: delayed single-click pick, double-click, modifier keys, drag threshold. |
-| Element picking | Partial | Point clouds report a point, curve networks an edge. A click on a surface mesh or a volume mesh reports element 0, see [Known Issues](#known-issues). No vertex, corner or node picks. |
+| Element picking | Partial | Point clouds report a point, surface meshes a face, curve networks an edge, volume meshes a cell, volume grids a node or a cell, and camera views an edge. No vertex, corner or node picks on surface meshes and curve networks. |
 | Selection panel | Partial | Shows the structure and the element index. No quantity values. |
 | Keyboard | Partial | W, A, S, D, Q, E in First Person navigation. Esc and F12. No Ctrl+C or Ctrl+V for the view. |
 | Gizmo | Partial | One gizmo for the selected structure or slice plane. Translate, rotate or scale. Snap increments. |
@@ -356,9 +356,10 @@ These features exist in both libraries but behave differently.
 - **Pretty mode depth precision.** The min-depth texture of depth peeling is `Rgba16Float`, because WebGPU cannot blend `R32Float` without the optional `float32-blendable` feature. Thus the depth epsilon is `2e-3` (C++: `1e-6`). Pretty transparency can merge layers that are closer than about 0.002 in depth.
 - **Pretty mode non-linear opacity.** Depth peeling renders both faces of closed meshes. The effective alpha is `2a - a^2`. C++ Polyscope gives the same result.
 - **Tone mapping values.** Exposure, white level and gamma are not part of `Options` or of a saved view. Only the Tone Mapping panel sets them.
-- **Click on a mesh element.** A click on a surface mesh or a volume mesh selects the mesh with element 0. The click code (`app/input.rs`) gives the face of the pick buffer the distance of the ray hit, and on equal distance the ray hit, with element 0, wins. The click code also ignores the volume mesh cells of the pick buffer.
-- **Click on a volume grid.** A click does not select a volume grid. The click code ignores the gridcubes of the pick buffer.
-- **Changes from another thread during a frame.** The frame preparation uploads the transforms for the scene, and the pick pass reads them again under its own lock. If another thread moves a structure between the two, the pick buffer of that frame uses the new position, and the window shows the old one. The next frame uses the new position in both.
+- **Changes from another thread during a frame.** The scene passes and the pick pass read the registry under separate locks. If another thread hides, shows, removes or updates a structure between them, the pick buffer of that frame and the window can differ. The next frame shows the change in both. A transform change does not cause this, because the pick pass uses the pick uniforms that the frame preparation writes together with the render uniforms.
+- **Picks ignore slice planes.** The pick shaders draw points, curve networks, camera views and surface meshes also where a slice plane hides them. A click or a double-click there can select or center on a hidden element. C++ applies the slice planes in the pick shaders too. Volume meshes are not affected: a slice plane removes whole cells from the render data that the pick pass draws. Gridcubes ignore slice planes in the scene as well.
+- **The click area past a tube end.** The click area of a tube reaches half a tube radius past each end. There, the pick depth comes from a longer tube. Outside the node sphere at the end, a click can select the tube where the window shows a surface just behind it.
+- **A click right after a window resize.** A resize makes new, empty pick buffers. A click before the next frame finds no element, so it clears the selection, as a click on the background does.
 
 ---
 

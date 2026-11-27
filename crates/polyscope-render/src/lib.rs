@@ -73,8 +73,8 @@ pub use error::{RenderError, RenderResult};
 pub use ground_plane::{GroundPlaneFrame, GroundPlaneRenderData, GroundPlaneUniforms};
 pub use materials::{Material, MaterialRegistry, MaterialUniforms};
 pub use pick::{
-    MeshPickUniforms, PickElementType, PickResult, PickUniforms, TubePickUniforms, color_to_index,
-    index_to_color,
+    MeshPickUniforms, PickElementType, PickOwnerHit, PickResult, PickUniforms, TubePickUniforms,
+    color_to_index, index_to_color,
 };
 pub use point_cloud_render::{PointCloudRenderData, PointUniforms};
 pub use reflection::{ground_reflection_matrix, reflection_matrix};

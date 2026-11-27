@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `RenderEngine::lookup_pick_owner` and `PickOwnerHit`: the owner of a pick
+  index, with the index of the quantity that owns the range.
+- `write_pick_global_start` for point clouds, surface meshes, curve networks,
+  camera views, volume meshes and volume grid scalar quantities. It writes
+  only the first pick index to the pick uniforms.
+
+### Fixed
+- A click on a surface mesh or a volume mesh selected element 0. A click now
+  takes the element from the pick buffer, as C++ Polyscope does: the face of a
+  surface mesh and the cell of a volume mesh. A click no longer tests each
+  mesh triangle on the CPU.
+- A click did not select a volume grid or a camera view. It now selects a
+  volume grid with the cell of a cell quantity or the node of a node quantity,
+  and a camera view with the edge of its wireframe.
+- If another thread moved a structure during a frame, the pick buffer of that
+  frame could use the new position while the window showed the old one. The
+  frame preparation now writes the pick uniforms together with the render
+  uniforms, and the pick pass writes only the first pick index of each
+  structure.
+- The pick pass used the curve network tube geometry of the frame before, so
+  for one frame a tube was picked at its old place or with its old radius. The
+  pick pass now runs after the scene passes, which make this geometry.
+- The pick depth of a curve network was the depth of the front of its click
+  area, which is wider than the drawn line or tube. A curve just behind a
+  surface then covered the surface in the pick buffer. The pick depth is now
+  the depth of the drawn tube or line.
+- A click and a double-click used the live camera with the pick buffer of the
+  last frame. A scroll or a drag before the next frame could then change
+  their result. They now use the camera of the frame in the pick buffer.
+- A face in the plane of a slice plane could win a click over the plane,
+  because of the rounding of the pick depth. The window shows the plane
+  there. The plane now wins if the face is nearer by less than the precision
+  of the pick depth.
+
+### Documentation
+- Feature Status lists that the pick shaders ignore slice planes, so a click
+  can select an element that a slice plane hides.
+- Architecture Differences states where the picks of camera views and volume
+  grids differ from C++ Polyscope.
+- Feature Status lists two more pick limits: the click area past a tube end,
+  and a click before the first frame after a window resize.
+
 ## [0.6.2] - 2026-11-26
 
 ### Added

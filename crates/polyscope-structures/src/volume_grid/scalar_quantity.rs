@@ -283,6 +283,9 @@ impl VolumeGridNodeScalarQuantity {
     pub fn set_gridcube_render_data(&mut self, data: GridcubeRenderData) {
         self.gridcube_render_data = Some(data);
         self.gridcube_dirty = false;
+        // The pick resources refer to the old position buffer.
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
     }
 
     /// Returns the isosurface render data.
@@ -377,6 +380,21 @@ impl VolumeGridNodeScalarQuantity {
     #[must_use]
     pub fn pick_global_start(&self) -> u32 {
         self.global_start
+    }
+
+    /// Sets the first global pick index and writes only this index to the
+    /// pick uniforms.
+    ///
+    /// The other pick uniforms keep the values of the last
+    /// `update_pick_uniforms` call. The window writes them together with the
+    /// render uniforms, so the pick pass draws the gridcubes where the scene
+    /// draws it.
+    pub fn write_pick_global_start(&mut self, queue: &wgpu::Queue, global_start: u32) {
+        self.global_start = global_start;
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let offset = std::mem::offset_of!(GridcubePickUniforms, global_start) as u64;
+            queue.write_buffer(buffer, offset, bytemuck::bytes_of(&global_start));
+        }
     }
 
     /// Updates the pick uniform buffer with current model transform and cube size factor.
@@ -763,6 +781,9 @@ impl VolumeGridCellScalarQuantity {
     pub fn set_gridcube_render_data(&mut self, data: GridcubeRenderData) {
         self.gridcube_render_data = Some(data);
         self.gridcube_dirty = false;
+        // The pick resources refer to the old position buffer.
+        self.pick_uniform_buffer = None;
+        self.pick_bind_group = None;
     }
 
     // --- Pick resources ---
@@ -832,6 +853,21 @@ impl VolumeGridCellScalarQuantity {
     #[must_use]
     pub fn pick_global_start(&self) -> u32 {
         self.global_start
+    }
+
+    /// Sets the first global pick index and writes only this index to the
+    /// pick uniforms.
+    ///
+    /// The other pick uniforms keep the values of the last
+    /// `update_pick_uniforms` call. The window writes them together with the
+    /// render uniforms, so the pick pass draws the gridcubes where the scene
+    /// draws it.
+    pub fn write_pick_global_start(&mut self, queue: &wgpu::Queue, global_start: u32) {
+        self.global_start = global_start;
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let offset = std::mem::offset_of!(GridcubePickUniforms, global_start) as u64;
+            queue.write_buffer(buffer, offset, bytemuck::bytes_of(&global_start));
+        }
     }
 
     /// Updates the pick uniform buffer with current model transform and cube size factor.

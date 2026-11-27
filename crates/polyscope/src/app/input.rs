@@ -1,6 +1,4 @@
-use super::picking::{
-    ClickHit, DOUBLE_CLICK_DIST, DOUBLE_CLICK_TIME, ReleaseAction, release_action,
-};
+use super::picking::{DOUBLE_CLICK_DIST, DOUBLE_CLICK_TIME, ReleaseAction, release_action};
 use super::{
     ActiveEventLoop, App, ApplicationHandler, Arc, ControlFlow, EguiIntegration, ElementState,
     FutureExt, KeyCode, LogicalSize, MouseButton, RenderEngine, Vec3, Window, WindowEvent,
@@ -396,150 +394,14 @@ impl ApplicationHandler for App {
                     // A click without modifier keys in the 3D viewport picks
                     if action == ReleaseAction::QueuePick {
                         log::debug!("[CLICK DEBUG] Processing click in 3D viewport");
-                        if let Some(engine) = &self.engine {
+                        if self.engine.is_some() {
                             let click_screen =
                                 glam::Vec2::new(self.mouse_pos.0 as f32, self.mouse_pos.1 as f32);
-
-                            let ray = self.screen_ray(
-                                click_screen,
-                                engine.width,
-                                engine.height,
-                                &engine.camera,
-                            );
-                            let Some((ray_origin, ray_dir)) = ray else {
-                                log::debug!("[CLICK DEBUG] No ray - deselecting");
-                                self.queue_click_pick(None, click_screen);
-                                self.last_click_pos = None;
-                                return;
-                            };
-
-                            let plane_hit = self.pick_slice_plane_at_ray(ray_origin, ray_dir);
-                            log::debug!("[CLICK DEBUG] plane_hit: {plane_hit:?}");
-
-                            let plane_params = crate::with_context(|ctx| {
-                                let mut enabled_planes: Vec<(String, Vec3, Vec3)> = ctx
-                                    .slice_planes()
-                                    .filter(|p| p.is_enabled())
-                                    .map(|p| (p.name().to_string(), p.origin(), p.normal()))
-                                    .collect();
-                                enabled_planes.sort_by(|a, b| a.0.cmp(&b.0));
-                                enabled_planes
-                                    .into_iter()
-                                    .map(|(_, origin, normal)| (origin, normal))
-                                    .collect::<Vec<_>>()
-                            });
-
-                            let structure_hit =
-                                self.pick_structure_at_ray(ray_origin, ray_dir, &plane_params);
-                            log::debug!("[CLICK DEBUG] structure_hit: {structure_hit:?}");
-
-                            // GPU picking for point clouds, refined with ray distance
-                            let gpu_picked =
-                                self.gpu_pick_at(self.mouse_pos.0 as u32, self.mouse_pos.1 as u32);
-                            log::debug!("[CLICK DEBUG] gpu_picked: {gpu_picked:?}");
-                            let mut point_hit: Option<(String, u32, f32)> = None;
-                            let mut curve_hit: Option<(String, u32, f32)> = None;
-                            let mut mesh_hit: Option<(String, u32, f32)> = None;
-                            // Filter GPU picks by group visibility
-                            let gpu_picked = gpu_picked.filter(|(type_name, name, _)| {
-                                crate::with_context(|ctx| {
-                                    ctx.is_structure_visible_in_groups(type_name, name)
-                                })
-                            });
-                            if let Some((type_name, name, idx)) = gpu_picked {
-                                if type_name == "PointCloud" {
-                                    point_hit = self
-                                        .pick_point_cloud_at_ray(ray_origin, ray_dir, &name, idx)
-                                        .map(|t| (name, idx, t));
-                                } else if type_name == "CurveNetwork" {
-                                    curve_hit = self
-                                        .pick_curve_network_edge_at_ray(
-                                            ray_origin, ray_dir, &name, idx,
-                                        )
-                                        .map(|t| (name, idx, t));
-                                } else if type_name == "SurfaceMesh" {
-                                    // GPU pick gives face index — validate with ray hit
-                                    if let Some((_, _, t)) = &structure_hit {
-                                        mesh_hit = Some((name, idx, *t));
-                                    } else {
-                                        // GPU picked a mesh but ray didn't hit — use a default depth
-                                        mesh_hit = Some((name, idx, 1.0));
-                                    }
-                                }
-                            }
-                            log::debug!("[CLICK DEBUG] point_hit: {point_hit:?}");
-                            log::debug!("[CLICK DEBUG] curve_hit: {curve_hit:?}");
-
-                            let mut best_hit: Option<(ClickHit, f32)> = None;
-
-                            if let Some((name, t)) = plane_hit {
-                                best_hit = Some((ClickHit::Plane(name), t));
-                            }
-
-                            if let Some((type_name, name, t)) = structure_hit {
-                                let is_better =
-                                    best_hit.as_ref().is_none_or(|(_, best_t)| t < *best_t);
-                                if is_better {
-                                    best_hit = Some((
-                                        ClickHit::Structure {
-                                            type_name,
-                                            name,
-                                            element_index: 0,
-                                        },
-                                        t,
-                                    ));
-                                }
-                            }
-
-                            if let Some((name, idx, t)) = point_hit {
-                                let is_better =
-                                    best_hit.as_ref().is_none_or(|(_, best_t)| t < *best_t);
-                                if is_better {
-                                    best_hit = Some((
-                                        ClickHit::Structure {
-                                            type_name: "PointCloud".to_string(),
-                                            name,
-                                            element_index: idx,
-                                        },
-                                        t,
-                                    ));
-                                }
-                            }
-
-                            if let Some((name, idx, t)) = curve_hit {
-                                let is_better =
-                                    best_hit.as_ref().is_none_or(|(_, best_t)| t < *best_t);
-                                if is_better {
-                                    best_hit = Some((
-                                        ClickHit::Structure {
-                                            type_name: "CurveNetwork".to_string(),
-                                            name,
-                                            element_index: idx,
-                                        },
-                                        t,
-                                    ));
-                                }
-                            }
-
-                            if let Some((name, idx, t)) = mesh_hit {
-                                let is_better =
-                                    best_hit.as_ref().is_none_or(|(_, best_t)| t < *best_t);
-                                if is_better {
-                                    best_hit = Some((
-                                        ClickHit::Structure {
-                                            type_name: "SurfaceMesh".to_string(),
-                                            name,
-                                            element_index: idx,
-                                        },
-                                        t,
-                                    ));
-                                }
-                            }
-
-                            log::debug!("[CLICK DEBUG] best_hit: {best_hit:?}");
+                            let hit = self.click_hit_at(click_screen);
+                            log::debug!("[CLICK DEBUG] hit: {hit:?}");
                             // The first click of a double-click must not change the
                             // selection, so the pick waits (C++ commit 022deea).
-                            self.queue_click_pick(best_hit.map(|(hit, _)| hit), click_screen);
+                            self.queue_click_pick(hit, click_screen);
                         }
                     } else {
                         log::debug!(

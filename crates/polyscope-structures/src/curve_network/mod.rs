@@ -602,6 +602,41 @@ impl CurveNetwork {
         self.global_start
     }
 
+    /// Sets the first global pick index and writes only this index to the
+    /// pick uniforms.
+    ///
+    /// The other pick uniforms keep the values of the last
+    /// `update_pick_uniforms` call. The window writes them together with the
+    /// render uniforms, so the pick pass draws the curve network where the scene
+    /// draws it.
+    pub fn write_pick_global_start(&mut self, queue: &wgpu::Queue, global_start: u32) {
+        self.global_start = global_start;
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let offset = std::mem::offset_of!(PickUniforms, global_start) as u64;
+            queue.write_buffer(buffer, offset, bytemuck::bytes_of(&global_start));
+        }
+        if let Some(buffer) = &self.tube_pick_uniform_buffer {
+            let offset = std::mem::offset_of!(TubePickUniforms, global_start) as u64;
+            queue.write_buffer(buffer, offset, bytemuck::bytes_of(&global_start));
+        }
+    }
+
+    /// Writes the tube radius of the tube pick for the render mode of the
+    /// frame.
+    ///
+    /// The frame preparation writes the radius of the tube. The pick pass
+    /// calls this method with the render mode that the scene passes of its
+    /// frame used. A curve in line mode draws no tube, so the method writes a
+    /// tube radius of 0, and the pick depth comes from the curve line.
+    pub fn write_tube_pick_render_mode(&self, queue: &wgpu::Queue) {
+        if self.render_mode != 1
+            && let Some(buffer) = &self.tube_pick_uniform_buffer
+        {
+            let offset = std::mem::offset_of!(TubePickUniforms, radius) as u64;
+            queue.write_buffer(buffer, offset, bytemuck::bytes_of(&0.0_f32));
+        }
+    }
+
     /// Updates pick uniforms (e.g., when radius changes).
     ///
     /// `scene_length_scale` is the length scale of the full scene.
@@ -618,11 +653,16 @@ impl CurveNetwork {
 
         // Also update tube pick uniforms if initialized
         if let Some(buffer) = &self.tube_pick_uniform_buffer {
+            // A minimum radius makes thin curves easier to select. The click
+            // area is at least as wide as the tube, in both render modes.
+            let min_pick_radius = radius.max(0.01 * scene_length_scale);
+            // For a curve in line mode, the pick pass writes 0 as the tube
+            // radius, with the render mode of its frame. See
+            // `write_tube_pick_render_mode`.
             let tube_pick_uniforms = TubePickUniforms {
                 global_start: self.global_start,
                 radius,
-                // A minimum radius makes thin curves easier to select.
-                min_pick_radius: 0.01 * scene_length_scale,
+                min_pick_radius,
                 _padding: 0.0,
             };
             queue.write_buffer(buffer, 0, bytemuck::cast_slice(&[tube_pick_uniforms]));

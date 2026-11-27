@@ -413,7 +413,9 @@ impl App {
                                 &self.selection_info,
                             );
 
-                            // Immediately update GPU buffers so structure renders at new position this frame
+                            // Immediately update GPU buffers so structure renders at new position this frame.
+                            // The pick uniforms get the same transform, because the pick pass
+                            // of this frame comes after the scene passes.
                             crate::with_context(|ctx| {
                                 if let Some((type_name, name)) = ctx.selected_structure()
                                     && let Some(structure) = ctx.registry.get(type_name, name)
@@ -426,6 +428,7 @@ impl App {
                                                 &engine.queue,
                                                 &engine.color_maps,
                                             );
+                                            pc.update_pick_uniforms(&engine.queue);
                                         }
                                     } else if type_name == "SurfaceMesh" {
                                         if let Some(mesh) =
@@ -435,6 +438,7 @@ impl App {
                                                 &engine.queue,
                                                 &engine.color_maps,
                                             );
+                                            mesh.update_pick_uniforms(&engine.queue);
                                         }
                                     } else if type_name == "CurveNetwork" {
                                         if let Some(cn) =
@@ -445,12 +449,17 @@ impl App {
                                                 &engine.color_maps,
                                                 ctx.length_scale,
                                             );
+                                            cn.update_pick_uniforms(
+                                                &engine.queue,
+                                                ctx.length_scale,
+                                            );
                                         }
                                     } else if type_name == "VolumeMesh"
                                         && let Some(vm) =
                                             structure.as_any().downcast_ref::<VolumeMesh>()
                                     {
                                         vm.update_gpu_buffers(&engine.queue);
+                                        vm.update_pick_uniforms(&engine.queue);
                                     }
                                 }
                             });

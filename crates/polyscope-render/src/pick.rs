@@ -94,9 +94,14 @@ impl Default for PickUniforms {
 pub struct TubePickUniforms {
     /// The starting global index for this structure's elements.
     pub global_start: u32,
-    /// Tube radius for ray-cylinder intersection.
+    /// Radius of the drawn tube, or 0 for a curve that draws lines. Where the
+    /// pick ray hits the drawn tube, the pick depth is the depth of the tube
+    /// surface. Elsewhere, it is the depth of the curve line. Thus the pick
+    /// buffer shows what the window shows.
     pub radius: f32,
-    /// Minimum pick radius - ensures curves are always clickable even when very thin.
+    /// Smallest radius of the click area, so that thin curves are easy to
+    /// select. It is at least the radius of the tube, also for a curve that
+    /// draws lines.
     pub min_pick_radius: f32,
     /// Padding to align to 16 bytes.
     pub _padding: f32,
@@ -162,6 +167,20 @@ pub fn index_to_color(index: u32) -> [u8; 3] {
 /// bits of its RGB channels. Index 0 is the background. The pick shaders draw
 /// a larger index as the background, so it cannot select another element.
 pub(crate) const PICK_INDEX_COUNT: u32 = 1 << 24;
+
+/// The owner of a global pick index and the index of the element in its range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PickOwnerHit<'a> {
+    /// Structure type name, for example `PointCloud`.
+    pub type_name: &'a str,
+    /// Structure name. For the range of a quantity, the name of its structure.
+    pub structure_name: &'a str,
+    /// The index of the quantity in the quantities of the structure, if a
+    /// quantity owns the range (the gridcubes of a volume grid quantity).
+    pub quantity_index: Option<usize>,
+    /// The index of the element in the range.
+    pub local_index: u32,
+}
 
 /// The owner of a pick range: a structure, or one quantity of a structure.
 ///
@@ -311,6 +330,14 @@ impl PickRanges {
     /// global pick index. For a quantity, it returns the name of its structure.
     /// Returns None for the background and for an index without an owner.
     pub(crate) fn lookup(&self, global_index: u32) -> Option<(&str, &str, u32)> {
+        self.lookup_owner(global_index)
+            .map(|hit| (hit.type_name, hit.structure_name, hit.local_index))
+    }
+
+    /// Returns the owner of a global pick index, with the index of the
+    /// quantity if a quantity owns the range. Returns None for the background
+    /// and for an index without an owner.
+    pub(crate) fn lookup_owner(&self, global_index: u32) -> Option<PickOwnerHit<'_>> {
         if global_index >= PICK_INDEX_COUNT {
             return None;
         }
@@ -319,7 +346,12 @@ impl PickRanges {
             let local = u32::try_from(local)
                 .ok()
                 .filter(|&local| local < range.count)?;
-            Some((owner.type_name.as_str(), owner.structure.as_str(), local))
+            Some(PickOwnerHit {
+                type_name: &owner.type_name,
+                structure_name: &owner.structure,
+                quantity_index: owner.quantity,
+                local_index: local,
+            })
         })
     }
 
@@ -463,6 +495,15 @@ mod tests {
         assert_eq!(ranges.assign_quantity("VolumeGrid", "g", 1, 1), 9);
         assert_eq!(ranges.lookup(8), Some(("VolumeGrid", "g", 7)));
         assert_eq!(ranges.lookup(9), Some(("VolumeGrid", "g", 0)));
+        // The owner lookup tells the two quantities apart.
+        assert_eq!(
+            ranges.lookup_owner(8).and_then(|hit| hit.quantity_index),
+            Some(0)
+        );
+        assert_eq!(
+            ranges.lookup_owner(9).and_then(|hit| hit.quantity_index),
+            Some(1)
+        );
         assert_eq!(ranges.quantity_start("VolumeGrid", "g", 0), Some(1));
         assert_eq!(ranges.start("VolumeGrid", "g"), None);
         // Structure names that contain `/`.

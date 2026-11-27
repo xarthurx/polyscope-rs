@@ -328,6 +328,21 @@ impl CameraView {
         self.pick_global_start
     }
 
+    /// Sets the first global pick index and writes only this index to the
+    /// pick uniforms.
+    ///
+    /// The other pick uniforms keep the values of the last
+    /// `update_pick_uniforms` call. The window writes them together with the
+    /// render uniforms, so the pick pass draws the camera view where the scene
+    /// draws it.
+    pub fn write_pick_global_start(&mut self, queue: &wgpu::Queue, global_start: u32) {
+        self.pick_global_start = global_start;
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let offset = std::mem::offset_of!(polyscope_render::PickUniforms, global_start) as u64;
+            queue.write_buffer(buffer, offset, bytemuck::bytes_of(&global_start));
+        }
+    }
+
     /// Sets the first global pick index. The next `update_pick_uniforms`
     /// call writes it to the GPU.
     pub fn set_pick_global_start(&mut self, global_start: u32) {

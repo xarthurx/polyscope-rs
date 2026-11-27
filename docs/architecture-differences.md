@@ -55,11 +55,22 @@ The colormap tables are the C++ tables. `scripts/extract_colormaps.py` extracts 
 
 Encoding: one 24-bit global element index in RGB: `R = bits 16-23`, `G = bits 8-15`, `B = bits 0-7`. Index 0 is the background. Each structure owns the range `[global_start, global_start + element count)`. A volume grid quantity owns a range of its own. The pick buffer holds about 16.7 million elements in total over all structures. If the scene has more elements, the pick shaders draw the elements past the limit as the background, and a warning is logged once.
 
-C++ Polyscope gives a structure a new range each time it prepares its pick program. It takes the range from 64-bit indices and does not use an index again. polyscope-rs has only 24 bits. Thus each window frame gives all ranges again, one after the other, from the current element counts. A count change, a removed structure or an empty structure leaves no unused indices. Hidden structures get no range. One lock of the context covers the whole pick pass: it creates the missing pick resources, gives the ranges, writes the pick uniforms and draws.
+C++ Polyscope gives a structure a new range each time it prepares its pick program. It takes the range from 64-bit indices and does not use an index again. polyscope-rs has only 24 bits. Thus each window frame gives all ranges again, one after the other, from the current element counts. A count change, a removed structure or an empty structure leaves no unused indices. Hidden structures get no range.
+
+The frame preparation creates the pick resources and writes the pick uniforms (model, radius and cube size) together with the render uniforms, in the same lock and with the same values. The pick pass runs after the scene passes, under one lock of the context: it gives the ranges, writes only the first pick index of each owner and draws. Thus the pick buffer uses the transforms and the curve network tube geometry of the image on the screen.
 
 The pick depth gives the world position of the hit. A double-click uses it to set the view center on any structure type.
 
-A click reports one element type per structure: a point, a face of a surface mesh, an edge of a curve network, a cell of a volume mesh. C++ can also pick vertices, edges, halfedges and corners of a surface mesh, and the nodes of a curve network.
+A click takes the structure and the element from the pick buffer, as C++ does. The element is a point, a face of a surface mesh, an edge of a curve network or of a camera view wireframe, a cell of a volume mesh, or a node or a cell of a volume grid. Two element types are different from C++:
+
+- C++ gives a camera view one pick index, so a click selects the full camera view. polyscope-rs gives each edge of the wireframe its own index.
+- C++ finds the node or the cell of a volume grid on the CPU, from the world position of the pick. polyscope-rs gives each gridcube quantity its own pick range, so the gridcube index is the cell of a cell quantity or the node of a node quantity.
+
+C++ can also pick vertices, edges, halfedges and corners of a surface mesh, and the nodes of a curve network.
+
+A slice plane under the cursor wins if it is nearer along the click ray. The pick depth at the center of the pixel gives the distance of the element, because the scene uses the same depth to decide what is in front. The scene draws the slice planes first, so a plane also wins if the element is nearer by less than the precision of the pick depth. The click reads the pick depth only when a slice plane is under the cursor. A scroll or a drag can move the camera before the next frame. Thus a click and a double-click use a copy of the camera of the frame in the pick buffer.
+
+The pick depth of a curve network is the depth that the window shows. Where the pick ray hits the drawn tube, it is the depth of the tube surface. Elsewhere, it is the depth of the curve line. A line along the view direction covers one point of the image, and its nearer end gives the depth there. The pick pass uses the render mode of its frame, so a switch between lines and tubes in the UI shows in the pick buffer of the same frame. The click area of a curve is wider than the drawn tube or line, so a thin curve is easy to select. Because of the depth, the click area does not cover a surface in front of the curve.
 
 ## Transparency Rendering
 
