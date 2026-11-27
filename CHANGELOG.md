@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-27
+
 ### Added
 - `RenderEngine::lookup_pick_owner` and `PickOwnerHit`: the owner of a pick
   index, with the index of the quantity that owns the range.

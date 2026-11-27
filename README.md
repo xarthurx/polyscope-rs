@@ -31,7 +31,7 @@ This project is an experiment in **AI-driven software development**. I have limi
 
 ## Project Status
 
-**Current Version:** 0.6.2
+**Current Version:** 0.6.3
 
 **Status:** polyscope-rs ports the main structures and quantities of C++ Polyscope 2.x, but not its complete API. The largest gaps:
 

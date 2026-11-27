@@ -1,6 +1,6 @@
 # Feature Status & Roadmap
 
-Status of polyscope-rs 0.6.2 compared with C++ Polyscope 2.x.
+Status of polyscope-rs 0.6.3 compared with C++ Polyscope 2.x.
 
 ## Summary
 
