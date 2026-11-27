@@ -358,7 +358,9 @@ pub fn init_structure_gpu_resources(engine: &mut RenderEngine) {
 
 /// Update GPU buffers for all structures.
 /// With `update_pick_uniforms` (the window), it also updates the pick uniforms
-/// of the structures; captures skip them.
+/// of the structures; captures skip them. It writes the pick uniforms in the
+/// same lock and with the same model and radius as the render uniforms, so the
+/// pick pass draws each structure where the scene draws it.
 pub fn update_gpu_buffers(engine: &RenderEngine, update_pick_uniforms: bool) {
     crate::with_context(|ctx| {
         for structure in ctx.registry.iter() {

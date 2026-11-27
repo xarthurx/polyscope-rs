@@ -40,12 +40,11 @@ fn test_curve_pick_radius_follows_the_radius() {
     };
     assert!(!hit(app), "the thin tube must not cover the test pixel");
 
-    // The pick pass of a frame uses the tube geometry of the frame before.
-    // So two frames after the change, the pick must use the new radius.
+    // The pick pass runs after the scene passes, which make the tube geometry
+    // of the frame. So the next frame picks with the new radius.
     with_curve_network("pick_radius_cn", |cn| {
         cn.set_radius(0.3, false);
     });
-    app.render_pick_frame();
     app.render_pick_frame();
     assert!(hit(app), "the pick pass must use the new tube radius");
 }
@@ -315,8 +314,7 @@ fn test_gridcube_pick_reports_the_volume_grid() {
     let engine = app.engine.as_mut().expect("engine");
     let (width, height) = (engine.width, engine.height);
     engine.init_pick_buffers(width, height);
-    // The second frame gives a range to the existing pick resources.
-    app.render_pick_frame();
+    // One frame creates the pick resources and gives them a range.
     app.render_pick_frame();
     let (type_name, structure, cell) =
         pick_at_position(app, Vec3::ZERO).expect("a gridcube at the grid center");
@@ -427,6 +425,19 @@ fn structure_hit(
         element_index,
         element_type,
     })
+}
+
+/// Tone maps the scene of the last frame and reads its RGBA pixels.
+fn capture_scene(app: &mut app::App) -> Vec<u8> {
+    let engine = app.engine.as_mut().expect("engine");
+    let mut encoder = engine
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("test capture encoder"),
+        });
+    engine.tone_map_to_screenshot_target(&mut encoder);
+    engine.queue.submit(std::iter::once(encoder.finish()));
+    app.capture_to_buffer().expect("capture")
 }
 
 /// A click reports the face of a surface mesh and the cell of a volume mesh
@@ -567,4 +578,52 @@ fn test_click_selects_a_camera_view() {
             }
         });
     assert_eq!(hit, Some((name, PickElementType::Edge)));
+}
+
+/// The pick pass draws a structure with the transform of the scene passes of
+/// its frame. If another thread moves the structure after the frame
+/// preparation, the scene and the pick buffer of that frame both show the old
+/// position, and the next frame shows the new position in both.
+#[test]
+fn test_pick_pass_uses_the_transform_of_the_scene() {
+    let _guard = setup();
+    register_point_cloud("move_cube", vec![Vec3::splat(-1.0), Vec3::splat(1.0)]);
+    let Some(mut renderer) = pick_renderer() else {
+        eprintln!("Skipping pick transform test: no GPU adapter available");
+        return;
+    };
+    let app = &mut renderer.app;
+    app.render_pick_frame();
+    let reference = capture_scene(app);
+
+    let view = app.engine.as_ref().expect("engine").camera.view_matrix();
+    let (right, up) = (view.row(0).truncate(), view.row(1).truncate());
+    let old = up * 0.5 - right * 0.5;
+    let new = up * 0.5 + right * 0.5;
+    register_point_cloud("move_point", vec![old]);
+    with_point_cloud("move_point", |pc| pc.set_point_radius(0.1));
+    app.render_pick_frame();
+
+    app.render_pick_frame_with(|| {
+        set_point_cloud_transform("move_point", Mat4::from_translation(new - old));
+    });
+    let image = capture_scene(app);
+    let engine = app.engine.as_ref().expect("engine");
+    let color = |image: &[u8], p: Vec3| -> [u8; 4] {
+        let (x, y) = pixel_of(engine, p);
+        let i = 4 * (y * engine.width + x) as usize;
+        image[i..i + 4].try_into().expect("an RGBA pixel")
+    };
+    // The scene of this frame shows the point at the old position.
+    assert_ne!(color(&image, old), color(&reference, old));
+    assert_eq!(color(&image, new), color(&reference, new));
+    // The pick buffer of this frame shows it there too.
+    let point = Some(("PointCloud".to_owned(), "move_point".to_owned(), 0));
+    assert_eq!(pick_at_position(app, old), point);
+    assert_ne!(pick_at_position(app, new), point);
+
+    // The next frame shows the new position in both.
+    app.render_pick_frame();
+    assert_eq!(pick_at_position(app, new), point);
+    assert_ne!(pick_at_position(app, old), point);
 }

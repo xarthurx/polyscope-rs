@@ -1,42 +1,143 @@
 //! GPU picking of the window: pick resources of the structures and the pick pass.
 //!
 //! Captures and headless renders do not pick, so only the window uses this module.
+//!
+//! The frame preparation creates the pick resources. It writes the pick
+//! uniforms (model, radius and cube size) in the same lock and with the same
+//! values as the render uniforms. The pick pass runs after the scene passes.
+//! It gives the pick ranges of the frame and writes only the first pick index
+//! of each owner, so it reads no transform. Thus the pick buffer shows each
+//! structure where the window shows it, also if another thread moves a
+//! structure during the frame.
 
 use std::collections::HashSet;
 
 use super::{CameraView, CurveNetwork, PointCloud, Structure, SurfaceMesh, VolumeGrid, VolumeMesh};
 use polyscope_core::Context;
-use polyscope_core::quantity::Quantity;
 use polyscope_core::structure::HasQuantities;
 use polyscope_render::RenderEngine;
 use polyscope_structures::volume_grid::{
     VolumeGridCellScalarQuantity, VolumeGridNodeScalarQuantity, VolumeGridVizMode,
 };
 
+/// Creates the missing pick resources of the structures with render data.
+///
+/// The frame preparation calls this function before `update_gpu_buffers`,
+/// which writes the pick uniforms together with the render uniforms. Thus new
+/// pick resources get the model and the radius of the render uniforms of the
+/// same frame. Volume grid quantities create their pick resources in
+/// `init_volume_grid_quantities`. New pick resources keep the first pick index
+/// of their structure until the pick pass gives the range of the frame.
+pub(super) fn init_pick_resources(engine: &mut RenderEngine) {
+    crate::with_context_mut(|ctx| {
+        for structure in ctx.registry.iter_mut() {
+            if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>() {
+                if pc.pick_bind_group().is_none() && pc.render_data().is_some() {
+                    let start = pc.pick_global_start();
+                    pc.init_pick_resources(
+                        &engine.device,
+                        engine.pick_bind_group_layout(),
+                        engine.camera_buffer(),
+                        start,
+                    );
+                }
+            } else if let Some(mesh) = structure.as_any_mut().downcast_mut::<SurfaceMesh>() {
+                if mesh.pick_bind_group().is_none() && mesh.render_data().is_some() {
+                    let start = mesh.pick_global_start();
+                    mesh.init_pick_resources(
+                        &engine.device,
+                        engine.mesh_pick_bind_group_layout(),
+                        engine.camera_buffer(),
+                        start,
+                    );
+                }
+            } else if let Some(cn) = structure.as_any_mut().downcast_mut::<CurveNetwork>() {
+                if cn.render_data().is_none() {
+                    continue;
+                }
+                if cn.pick_bind_group().is_none() {
+                    if !engine.has_curve_network_pick_pipeline() {
+                        engine.init_curve_network_pick_pipeline();
+                    }
+                    let start = cn.pick_global_start();
+                    cn.init_pick_resources(
+                        &engine.device,
+                        engine.pick_bind_group_layout(),
+                        engine.camera_buffer(),
+                        start,
+                    );
+                }
+                // The tube pick (ray-cylinder intersection) gives a larger
+                // clickable area than the line pick.
+                if !cn.has_tube_pick_resources() {
+                    if !engine.has_curve_network_tube_pick_pipeline() {
+                        engine.init_curve_network_tube_pick_pipeline();
+                    }
+                    cn.init_tube_pick_resources(
+                        &engine.device,
+                        engine.curve_network_tube_pick_bind_group_layout(),
+                        engine.camera_buffer(),
+                    );
+                }
+            } else if let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>() {
+                // The curve network line pick draws the wireframe edges.
+                if cv.pick_bind_group().is_none() && cv.render_data().is_some() {
+                    if !engine.has_curve_network_pick_pipeline() {
+                        engine.init_curve_network_pick_pipeline();
+                    }
+                    let start = cv.pick_global_start();
+                    cv.init_pick_resources(
+                        &engine.device,
+                        engine.pick_bind_group_layout(),
+                        engine.camera_buffer(),
+                        start,
+                    );
+                }
+            } else if let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>()
+                && vm.pick_bind_group().is_none()
+                && vm.render_data().is_some()
+            {
+                if !engine.has_mesh_pick_pipeline() {
+                    engine.init_mesh_pick_pipeline();
+                }
+                let start = vm.pick_global_start();
+                vm.init_pick_resources(
+                    &engine.device,
+                    engine.mesh_pick_bind_group_layout(),
+                    engine.camera_buffer(),
+                    start,
+                );
+            }
+        }
+    });
+}
+
 /// Renders the pick pass of a window frame.
 ///
-/// One lock of the context covers the whole pass. It creates the missing pick
-/// resources, gives the pick ranges of the frame, writes the pick uniforms and
-/// draws. Thus another thread cannot change the registry between these steps,
-/// and the pick buffer always matches the pick ranges of the frame.
+/// The window runs it after the scene passes of the frame, so it uses the
+/// uniforms and the curve network tube geometry of that frame. One lock of the
+/// context covers the whole pass: it gives the pick ranges of the frame,
+/// writes the first pick index of each owner and draws. Thus another thread
+/// cannot change the registry between these steps, and the pick buffer always
+/// matches the pick ranges of the frame.
 pub(super) fn render_pick_pass(engine: &mut RenderEngine) {
     crate::with_context_mut(|ctx| {
-        prepare_pick_owners(engine, ctx);
+        assign_pick_ranges(engine, ctx);
         draw_pick_owners(engine, ctx);
     });
 }
 
-/// Creates the missing pick resources of the visible structures, gives them
-/// the pick ranges of the frame and writes their pick uniforms.
+/// Gives the pick ranges of the frame to the visible owners with pick
+/// resources and writes the first pick index of each owner.
 ///
 /// Each frame gives all ranges again, one after the other, from the current
 /// element counts. Thus a count change, a removed structure or an empty
 /// structure leaves no unused indices, and two ranges cannot overlap. A hidden
 /// structure gets no range, so it cannot use up the indices of visible
-/// structures.
-fn prepare_pick_owners(engine: &mut RenderEngine, ctx: &mut Context) {
+/// structures. Only the first pick index is written: the other pick uniforms
+/// come from the frame preparation.
+fn assign_pick_ranges(engine: &mut RenderEngine, ctx: &mut Context) {
     engine.clear_pick_ranges();
-    let length_scale = ctx.length_scale;
     let visible: HashSet<(&'static str, String)> = ctx
         .registry
         .iter()
@@ -45,251 +146,81 @@ fn prepare_pick_owners(engine: &mut RenderEngine, ctx: &mut Context) {
         .collect();
 
     for structure in ctx.registry.iter_mut() {
-        if !visible.contains(&(structure.type_name(), structure.name().to_string())) {
+        let key = (structure.type_name(), structure.name().to_string());
+        if !visible.contains(&key) {
             continue;
         }
+        let name = key.1;
 
-        // PointCloud: the pick pass draws it with render data
-        if structure.type_name() == "PointCloud" {
-            let structure_name = structure.name().to_string();
-            if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>()
-                && pc.render_data().is_some()
+        if let Some(pc) = structure.as_any_mut().downcast_mut::<PointCloud>() {
+            if pc.pick_bind_group().is_some()
+                && let Some(count) = pc.render_data().map(|rd| rd.num_points)
             {
-                let num_points = pc.points().len() as u32;
-                let global_start =
-                    engine.assign_pick_range("PointCloud", &structure_name, num_points);
-                if pc.pick_bind_group().is_some() {
-                    pc.set_pick_global_start(global_start);
-                } else {
-                    pc.init_pick_resources(
-                        &engine.device,
-                        engine.pick_bind_group_layout(),
-                        engine.camera_buffer(),
-                        global_start,
-                    );
-                }
-                pc.update_pick_uniforms(&engine.queue);
+                let start = engine.assign_pick_range("PointCloud", &name, count);
+                pc.write_pick_global_start(&engine.queue, start);
             }
-        }
-
-        // SurfaceMesh: the pick pass draws it with pick resources
-        if structure.type_name() == "SurfaceMesh"
-            && let Some(mesh) = structure.as_any_mut().downcast_mut::<SurfaceMesh>()
-        {
-            let has_pick = mesh.pick_bind_group().is_some();
-            if has_pick || mesh.render_data().is_some() {
-                let num_faces = mesh.num_faces() as u32;
-                let global_start = engine.assign_pick_range("SurfaceMesh", mesh.name(), num_faces);
-                if has_pick {
-                    mesh.set_pick_global_start(global_start);
-                } else {
-                    mesh.init_pick_resources(
-                        &engine.device,
-                        engine.mesh_pick_bind_group_layout(),
-                        engine.camera_buffer(),
-                        global_start,
-                    );
-                }
-                mesh.update_pick_uniforms(&engine.queue);
+        } else if let Some(mesh) = structure.as_any_mut().downcast_mut::<SurfaceMesh>() {
+            if mesh.pick_bind_group().is_some() {
+                let count = mesh.num_faces() as u32;
+                let start = engine.assign_pick_range("SurfaceMesh", &name, count);
+                mesh.write_pick_global_start(&engine.queue, start);
             }
-        }
-
-        // CurveNetwork: the pick pass draws it with render data (edge and tube)
-        if structure.type_name() == "CurveNetwork"
-            && let Some(cn) = structure.as_any_mut().downcast_mut::<CurveNetwork>()
-            && cn.render_data().is_some()
-        {
-            let num_edges = cn.num_edges() as u32;
-            let global_start = engine.assign_pick_range("CurveNetwork", cn.name(), num_edges);
-            if cn.pick_bind_group().is_some() {
-                cn.set_pick_global_start(global_start);
-            } else {
-                // Initialize curve network pick pipeline if not done
-                if !engine.has_curve_network_pick_pipeline() {
-                    engine.init_curve_network_pick_pipeline();
-                }
-                cn.init_pick_resources(
-                    &engine.device,
-                    engine.pick_bind_group_layout(),
-                    engine.camera_buffer(),
-                    global_start,
-                );
+        } else if let Some(cn) = structure.as_any_mut().downcast_mut::<CurveNetwork>() {
+            // The line pick and the tube pick share the range.
+            if let Some(count) = cn.render_data().map(|rd| rd.num_edges) {
+                let start = engine.assign_pick_range("CurveNetwork", &name, count);
+                cn.write_pick_global_start(&engine.queue, start);
             }
-
-            // Initialize tube pick resources (for tube render mode)
-            // This provides a larger clickable area using ray-cylinder intersection
-            if !cn.has_tube_pick_resources() {
-                // Initialize tube pick pipeline if not done
-                if !engine.has_curve_network_tube_pick_pipeline() {
-                    engine.init_curve_network_tube_pick_pipeline();
-                }
-                cn.init_tube_pick_resources(
-                    &engine.device,
-                    engine.curve_network_tube_pick_bind_group_layout(),
-                    engine.camera_buffer(),
-                );
+        } else if let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>() {
+            if cv.pick_bind_group().is_some()
+                && let Some(count) = cv.render_data().map(|rd| rd.num_edges)
+            {
+                let start = engine.assign_pick_range("CameraView", &name, count);
+                cv.write_pick_global_start(&engine.queue, start);
             }
-            // The line and tube pick radii follow the current radius.
-            cn.update_pick_uniforms(&engine.queue, length_scale);
-        }
-
-        // CameraView: the curve network line pick draws its wireframe edges
-        if structure.type_name() == "CameraView"
-            && let Some(cv) = structure.as_any_mut().downcast_mut::<CameraView>()
-            && let Some(num_edges) = cv.render_data().map(|rd| rd.num_edges)
-        {
-            let global_start = engine.assign_pick_range("CameraView", cv.name(), num_edges);
-            if cv.pick_bind_group().is_some() {
-                cv.set_pick_global_start(global_start);
-                cv.update_pick_uniforms(&engine.queue);
-            } else {
-                if !engine.has_curve_network_pick_pipeline() {
-                    engine.init_curve_network_pick_pipeline();
+        } else if let Some(vg) = structure.as_any_mut().downcast_mut::<VolumeGrid>() {
+            // Each gridcube quantity owns a range. The range belongs to the
+            // index of the quantity.
+            for (index, quantity) in vg.quantities_mut().iter_mut().enumerate() {
+                if !quantity.is_enabled() {
+                    continue;
                 }
-                cv.init_pick_resources(
-                    &engine.device,
-                    engine.pick_bind_group_layout(),
-                    engine.camera_buffer(),
-                    global_start,
-                );
-            }
-        }
-
-        // VolumeGrid: pick resources of enabled gridcube quantities
-        if structure.type_name() == "VolumeGrid"
-            && let Some(vg) = structure.as_any_mut().downcast_mut::<VolumeGrid>()
-        {
-            let cube_size_factor = vg.cube_size_factor();
-            let transform = vg.transform();
-            // Init gridcube pick pipeline if needed
-            if !engine.has_gridcube_pick_pipeline() {
-                // Only init if there are any enabled gridcube quantities
-                let has_enabled_gridcube = vg.quantities().iter().any(|q| {
-                    if let Some(nsq) = q.as_any().downcast_ref::<VolumeGridNodeScalarQuantity>() {
-                        nsq.is_enabled()
-                            && nsq.viz_mode() == VolumeGridVizMode::Gridcube
-                            && nsq.gridcube_render_data().is_some()
-                    } else if let Some(csq) =
-                        q.as_any().downcast_ref::<VolumeGridCellScalarQuantity>()
+                if let Some(nsq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridNodeScalarQuantity>()
+                {
+                    if nsq.viz_mode() == VolumeGridVizMode::Gridcube
+                        && nsq.pick_bind_group().is_some()
                     {
-                        csq.is_enabled() && csq.gridcube_render_data().is_some()
-                    } else {
-                        false
+                        let count = nsq.num_pick_elements();
+                        let start =
+                            engine.assign_quantity_pick_range("VolumeGrid", &name, index, count);
+                        nsq.write_pick_global_start(&engine.queue, start);
                     }
-                });
-                if has_enabled_gridcube {
-                    engine.init_gridcube_pick_pipeline();
+                } else if let Some(csq) = quantity
+                    .as_any_mut()
+                    .downcast_mut::<VolumeGridCellScalarQuantity>()
+                    && csq.pick_bind_group().is_some()
+                {
+                    let count = csq.num_pick_elements();
+                    let start =
+                        engine.assign_quantity_pick_range("VolumeGrid", &name, index, count);
+                    csq.write_pick_global_start(&engine.queue, start);
                 }
             }
-
-            // Give pick ranges and init pick resources for each enabled
-            // quantity. The range belongs to the index of the quantity.
-            if engine.has_gridcube_pick_pipeline() {
-                let vg_name = vg.name().to_string();
-                for (index, quantity) in vg.quantities_mut().iter_mut().enumerate() {
-                    if !quantity.is_enabled() {
-                        continue;
-                    }
-
-                    if let Some(nsq) = quantity
-                        .as_any_mut()
-                        .downcast_mut::<VolumeGridNodeScalarQuantity>()
-                    {
-                        // The pick pass draws it in gridcube mode with pick resources.
-                        let has_pick = nsq.pick_bind_group().is_some();
-                        if nsq.viz_mode() == VolumeGridVizMode::Gridcube
-                            && (has_pick || nsq.gridcube_render_data().is_some())
-                        {
-                            let global_start = engine.assign_quantity_pick_range(
-                                "VolumeGrid",
-                                &vg_name,
-                                index,
-                                nsq.num_pick_elements(),
-                            );
-                            if has_pick {
-                                nsq.set_pick_global_start(global_start);
-                            } else {
-                                nsq.init_pick_resources(
-                                    &engine.device,
-                                    engine.gridcube_pick_bind_group_layout(),
-                                    engine.camera_buffer(),
-                                    global_start,
-                                );
-                            }
-                            // The model and the cube size can change in each frame.
-                            nsq.update_pick_uniforms(
-                                &engine.queue,
-                                transform.to_cols_array_2d(),
-                                cube_size_factor,
-                            );
-                        }
-                    }
-
-                    if let Some(csq) = quantity
-                        .as_any_mut()
-                        .downcast_mut::<VolumeGridCellScalarQuantity>()
-                    {
-                        // The pick pass draws it with pick resources.
-                        let has_pick = csq.pick_bind_group().is_some();
-                        if has_pick || csq.gridcube_render_data().is_some() {
-                            let global_start = engine.assign_quantity_pick_range(
-                                "VolumeGrid",
-                                &vg_name,
-                                index,
-                                csq.num_pick_elements(),
-                            );
-                            if has_pick {
-                                csq.set_pick_global_start(global_start);
-                            } else {
-                                csq.init_pick_resources(
-                                    &engine.device,
-                                    engine.gridcube_pick_bind_group_layout(),
-                                    engine.camera_buffer(),
-                                    global_start,
-                                );
-                            }
-                            // The model and the cube size can change in each frame.
-                            csq.update_pick_uniforms(
-                                &engine.queue,
-                                transform.to_cols_array_2d(),
-                                cube_size_factor,
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        // VolumeMesh: the pick pass draws it with pick resources
-        if structure.type_name() == "VolumeMesh"
-            && let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>()
+        } else if let Some(vm) = structure.as_any_mut().downcast_mut::<VolumeMesh>()
+            && vm.pick_bind_group().is_some()
         {
-            let has_pick = vm.pick_bind_group().is_some();
-            if has_pick || vm.render_data().is_some() {
-                let num_cells = vm.num_cells() as u32;
-                let global_start = engine.assign_pick_range("VolumeMesh", vm.name(), num_cells);
-                if has_pick {
-                    vm.set_pick_global_start(global_start);
-                } else {
-                    if !engine.has_mesh_pick_pipeline() {
-                        engine.init_mesh_pick_pipeline();
-                    }
-                    vm.init_pick_resources(
-                        &engine.device,
-                        engine.mesh_pick_bind_group_layout(),
-                        engine.camera_buffer(),
-                        global_start,
-                    );
-                }
-                vm.update_pick_uniforms(&engine.queue);
-            }
+            let count = vm.num_cells() as u32;
+            let start = engine.assign_pick_range("VolumeMesh", &name, count);
+            vm.write_pick_global_start(&engine.queue, start);
         }
     }
 }
 
 /// Returns whether an owner draws with the pick range of this frame.
 ///
-/// `prepare_pick_owners` gives a range to each owner that the pick pass
+/// `assign_pick_ranges` gives a range to each owner that the pick pass
 /// draws, under the same lock. The check keeps the pass from drawing an owner
 /// with an old first index if the two functions ever disagree.
 fn has_frame_range(engine: &RenderEngine, type_name: &str, name: &str, start: u32) -> bool {
@@ -455,22 +386,19 @@ fn draw_pick_owners(engine: &RenderEngine, ctx: &Context) {
 
 #[cfg(test)]
 impl super::App {
-    /// Runs the passes of a window frame without the surface and the UI:
-    /// frame preparation, pick pass and scene passes. It works with a
-    /// headless engine.
+    /// Runs the passes of a window frame without the surface and the UI, in
+    /// the order of the window: frame preparation, scene passes and pick
+    /// pass. It works with a headless engine.
     pub(crate) fn render_pick_frame(&mut self) {
         self.render_pick_frame_with(|| {});
     }
 
-    /// Runs `between` after the frame preparation and before the pick pass,
-    /// as another thread can, and then the rest of the frame as
-    /// `render_pick_frame` does.
+    /// Runs `between` after the frame preparation, where the window builds
+    /// the UI and where another thread can change the registry. Then it runs
+    /// the scene passes and the pick pass as `render_pick_frame` does.
     pub(crate) fn render_pick_frame_with(&mut self, between: impl FnOnce()) {
         self.prepare_frame(true);
         between();
-        if let Some(engine) = &mut self.engine {
-            render_pick_pass(engine);
-        }
         let options = crate::with_context(|ctx| ctx.options.clone());
         self.configure_frame(&options);
         if let Some(engine) = &mut self.engine {
@@ -482,6 +410,7 @@ impl super::App {
                     });
             super::render_frame::encode_scene(engine, &mut encoder, &options, false);
             engine.queue.submit(std::iter::once(encoder.finish()));
+            render_pick_pass(engine);
         }
     }
 }

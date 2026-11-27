@@ -602,6 +602,25 @@ impl CurveNetwork {
         self.global_start
     }
 
+    /// Sets the first global pick index and writes only this index to the
+    /// pick uniforms.
+    ///
+    /// The other pick uniforms keep the values of the last
+    /// `update_pick_uniforms` call. The window writes them together with the
+    /// render uniforms, so the pick pass draws the curve network where the scene
+    /// draws it.
+    pub fn write_pick_global_start(&mut self, queue: &wgpu::Queue, global_start: u32) {
+        self.global_start = global_start;
+        if let Some(buffer) = &self.pick_uniform_buffer {
+            let offset = std::mem::offset_of!(PickUniforms, global_start) as u64;
+            queue.write_buffer(buffer, offset, bytemuck::bytes_of(&global_start));
+        }
+        if let Some(buffer) = &self.tube_pick_uniform_buffer {
+            let offset = std::mem::offset_of!(TubePickUniforms, global_start) as u64;
+            queue.write_buffer(buffer, offset, bytemuck::bytes_of(&global_start));
+        }
+    }
+
     /// Updates pick uniforms (e.g., when radius changes).
     ///
     /// `scene_length_scale` is the length scale of the full scene.

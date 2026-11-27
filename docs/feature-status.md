@@ -356,7 +356,7 @@ These features exist in both libraries but behave differently.
 - **Pretty mode depth precision.** The min-depth texture of depth peeling is `Rgba16Float`, because WebGPU cannot blend `R32Float` without the optional `float32-blendable` feature. Thus the depth epsilon is `2e-3` (C++: `1e-6`). Pretty transparency can merge layers that are closer than about 0.002 in depth.
 - **Pretty mode non-linear opacity.** Depth peeling renders both faces of closed meshes. The effective alpha is `2a - a^2`. C++ Polyscope gives the same result.
 - **Tone mapping values.** Exposure, white level and gamma are not part of `Options` or of a saved view. Only the Tone Mapping panel sets them.
-- **Changes from another thread during a frame.** The frame preparation uploads the transforms for the scene, and the pick pass reads them again under its own lock. If another thread moves a structure between the two, the pick buffer of that frame uses the new position, and the window shows the old one. The next frame uses the new position in both.
+- **Changes from another thread during a frame.** The scene passes and the pick pass read the registry under separate locks. If another thread hides, shows, removes or updates a structure between them, the pick buffer of that frame and the window can differ. The next frame shows the change in both. A transform change does not cause this, because the pick pass uses the pick uniforms that the frame preparation writes together with the render uniforms.
 
 ---
 

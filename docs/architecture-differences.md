@@ -55,7 +55,9 @@ The colormap tables are the C++ tables. `scripts/extract_colormaps.py` extracts 
 
 Encoding: one 24-bit global element index in RGB: `R = bits 16-23`, `G = bits 8-15`, `B = bits 0-7`. Index 0 is the background. Each structure owns the range `[global_start, global_start + element count)`. A volume grid quantity owns a range of its own. The pick buffer holds about 16.7 million elements in total over all structures. If the scene has more elements, the pick shaders draw the elements past the limit as the background, and a warning is logged once.
 
-C++ Polyscope gives a structure a new range each time it prepares its pick program. It takes the range from 64-bit indices and does not use an index again. polyscope-rs has only 24 bits. Thus each window frame gives all ranges again, one after the other, from the current element counts. A count change, a removed structure or an empty structure leaves no unused indices. Hidden structures get no range. One lock of the context covers the whole pick pass: it creates the missing pick resources, gives the ranges, writes the pick uniforms and draws.
+C++ Polyscope gives a structure a new range each time it prepares its pick program. It takes the range from 64-bit indices and does not use an index again. polyscope-rs has only 24 bits. Thus each window frame gives all ranges again, one after the other, from the current element counts. A count change, a removed structure or an empty structure leaves no unused indices. Hidden structures get no range.
+
+The frame preparation creates the pick resources and writes the pick uniforms (model, radius and cube size) together with the render uniforms, in the same lock and with the same values. The pick pass runs after the scene passes, under one lock of the context: it gives the ranges, writes only the first pick index of each owner and draws. Thus the pick buffer uses the transforms and the curve network tube geometry of the image on the screen.
 
 The pick depth gives the world position of the hit. A double-click uses it to set the view center on any structure type.
 

@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `RenderEngine::lookup_pick_owner` and `PickOwnerHit`: the owner of a pick
   index, with the index of the quantity that owns the range.
+- `write_pick_global_start` for point clouds, surface meshes, curve networks,
+  camera views, volume meshes and volume grid scalar quantities. It writes
+  only the first pick index to the pick uniforms.
 
 ### Fixed
 - A click on a surface mesh or a volume mesh selected element 0. A click now
@@ -19,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A click did not select a volume grid or a camera view. It now selects a
   volume grid with the cell of a cell quantity or the node of a node quantity,
   and a camera view with the edge of its wireframe.
+- If another thread moved a structure during a frame, the pick buffer of that
+  frame could use the new position while the window showed the old one. The
+  frame preparation now writes the pick uniforms together with the render
+  uniforms, and the pick pass writes only the first pick index of each
+  structure.
+- The pick pass used the curve network tube geometry of the frame before, so
+  for one frame a tube was picked at its old place or with its old radius. The
+  pick pass now runs after the scene passes, which make this geometry.
 
 ## [0.6.2] - 2026-11-26
 

@@ -3,10 +3,11 @@ use super::{App, ScreenDescriptor, render_frame, render_pick};
 impl App {
     /// Renders a single frame of the window.
     ///
-    /// The frame prepares the scene, draws the pick pass, builds the UI,
-    /// encodes the scene passes into the HDR texture, tone maps that texture
-    /// to the surface and draws the UI on top. Screenshots reuse the HDR
-    /// result of this frame.
+    /// The frame prepares the scene, builds the UI, encodes the scene passes
+    /// into the HDR texture, tone maps that texture to the surface and draws
+    /// the UI on top. The pick pass comes last, so it uses the uniforms and
+    /// the curve network tube geometry of the image on the screen.
+    /// Screenshots reuse the HDR result of this frame.
     pub(super) fn render(&mut self) {
         // Drain any queued view-state application before touching the camera.
         let pending = polyscope_core::state::with_context_mut(
@@ -25,11 +26,6 @@ impl App {
         }
 
         self.prepare_frame(true);
-
-        // Render pick pass (GPU picking)
-        if let Some(engine) = &mut self.engine {
-            render_pick::render_pick_pass(engine);
-        }
 
         // Build UI (take engine/egui temporarily to satisfy borrow checker)
         let mut engine_temp = self.engine.take().unwrap();
@@ -106,6 +102,10 @@ impl App {
 
         engine.queue.submit(std::iter::once(encoder.finish()));
         engine.queue.present(output);
+
+        // The pick pass draws after the scene passes, with the uniforms of the
+        // frame preparation and the UI, and with the tube geometry of this frame.
+        render_pick::render_pick_pass(engine);
 
         // Handle screenshot if pending (local request from F12 key)
         if let Some(filename) = self.screenshot_pending.take() {

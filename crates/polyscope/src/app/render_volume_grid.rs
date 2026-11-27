@@ -4,6 +4,7 @@
 
 use super::{Structure, Vec3, VolumeGrid};
 use polyscope_core::quantity::Quantity;
+use polyscope_core::structure::HasQuantities;
 use polyscope_render::{
     GridcubeRenderData, GridcubeUniforms, IsosurfaceRenderData, RenderEngine, SimpleMeshUniforms,
 };
@@ -15,15 +16,49 @@ use polyscope_structures::volume_grid::{
 /// name, vertices and triangles.
 pub(super) type IsosurfaceMesh = (String, Vec<Vec3>, Vec<[u32; 3]>);
 
+/// Returns whether a structure is a volume grid with an enabled quantity that
+/// shows gridcubes.
+fn has_enabled_gridcubes(structure: &dyn Structure) -> bool {
+    structure
+        .as_any()
+        .downcast_ref::<VolumeGrid>()
+        .is_some_and(|vg| {
+            vg.quantities().iter().any(|q| {
+                q.is_enabled()
+                    && (q.as_any().is::<VolumeGridCellScalarQuantity>()
+                        || q.as_any()
+                            .downcast_ref::<VolumeGridNodeScalarQuantity>()
+                            .is_some_and(|nsq| nsq.viz_mode() == VolumeGridVizMode::Gridcube))
+            })
+        })
+}
+
 /// Builds the GPU data of the enabled volume grid scalar quantities and
 /// updates their uniforms.
+///
+/// An interactive frame (the window) also creates the pick resources of the
+/// gridcubes. It writes their pick uniforms in the same lock and with the same
+/// model and cube size as their render uniforms, so the pick pass draws the
+/// gridcubes where the scene draws them.
 ///
 /// Returns the isosurfaces that the UI asked to register as surface meshes.
 /// Register them with [`register_isosurface_meshes`] after the context lock
 /// is released.
-pub(super) fn init_volume_grid_quantities(engine: &RenderEngine) -> Vec<IsosurfaceMesh> {
+pub(super) fn init_volume_grid_quantities(
+    engine: &mut RenderEngine,
+    interactive: bool,
+) -> Vec<IsosurfaceMesh> {
     let mut meshes_to_register: Vec<IsosurfaceMesh> = Vec::new();
     crate::with_context_mut(|ctx| {
+        // The gridcube pick pipeline exists before the first gridcube pick resources.
+        if interactive
+            && !engine.has_gridcube_pick_pipeline()
+            && ctx.registry.iter().any(has_enabled_gridcubes)
+        {
+            engine.init_gridcube_pick_pipeline();
+        }
+        let engine = &*engine;
+
         for structure in ctx.registry.iter_mut() {
             if structure.type_name() == "VolumeGrid"
                 && let Some(vg) = structure.as_any_mut().downcast_mut::<VolumeGrid>()
@@ -129,6 +164,26 @@ pub(super) fn init_volume_grid_quantities(engine: &RenderEngine) -> Vec<Isosurfa
                             };
                             rd.update_uniforms(&engine.queue, &uniforms);
                         }
+                        // The window picks the gridcubes of gridcube mode.
+                        if interactive
+                            && nsq.viz_mode() == VolumeGridVizMode::Gridcube
+                            && nsq.gridcube_render_data().is_some()
+                        {
+                            if nsq.pick_bind_group().is_none() {
+                                let start = nsq.pick_global_start();
+                                nsq.init_pick_resources(
+                                    &engine.device,
+                                    engine.gridcube_pick_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    start,
+                                );
+                            }
+                            nsq.update_pick_uniforms(
+                                &engine.queue,
+                                transform.to_cols_array_2d(),
+                                cube_size_factor,
+                            );
+                        }
                         if let Some(rd) = nsq.isosurface_render_data() {
                             let color = nsq.isosurface_color();
                             let uniforms = SimpleMeshUniforms {
@@ -221,6 +276,22 @@ pub(super) fn init_volume_grid_quantities(engine: &RenderEngine) -> Vec<Isosurfa
                                 ..Default::default()
                             };
                             rd.update_uniforms(&engine.queue, &uniforms);
+                        }
+                        if interactive && csq.gridcube_render_data().is_some() {
+                            if csq.pick_bind_group().is_none() {
+                                let start = csq.pick_global_start();
+                                csq.init_pick_resources(
+                                    &engine.device,
+                                    engine.gridcube_pick_bind_group_layout(),
+                                    engine.camera_buffer(),
+                                    start,
+                                );
+                            }
+                            csq.update_pick_uniforms(
+                                &engine.queue,
+                                transform.to_cols_array_2d(),
+                                cube_size_factor,
+                            );
                         }
                     }
                 }
